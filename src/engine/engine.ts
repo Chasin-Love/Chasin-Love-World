@@ -273,10 +273,18 @@ export class UniverseEngine {
   private lastDragDx = 0;
   private lastDragDy = 0;
 
+  /* Reusable scratchpad instances for zero-GC render frame updates */
+  private _vScratch1 = new THREE.Vector3();
+  private _vScratch2 = new THREE.Vector3();
+  private _vScratch3 = new THREE.Vector3();
+  private _vDirScratch = new THREE.Vector3();
+  private _qScratch = new THREE.Quaternion();
+  private _corePosBuffer = new Float32Array(1000 * 3);
+
   constructor(canvas: HTMLCanvasElement, bodies: CosmicBody[], cb: EngineCallbacks) {
     this.cb = cb;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.35));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
@@ -298,7 +306,7 @@ export class UniverseEngine {
 
     this.connectionMat = new THREE.LineBasicMaterial({ color: 0xf2c178, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
     const initGeom = new THREE.BufferGeometry();
-    initGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(300 * 3), 3));
+    initGeom.setAttribute('position', new THREE.BufferAttribute(this._corePosBuffer, 3));
     this.connectionLines = new THREE.LineSegments(initGeom, this.connectionMat);
     this.connectionLines.frustumCulled = false;
     this.scene.add(this.connectionLines);
@@ -2193,10 +2201,9 @@ export class UniverseEngine {
     if (targetUv) {
       (this.portalPass.uniforms.uCenter.value as THREE.Vector2).copy(targetUv);
     } else if (this.demonCoreGroup) {
-      const v = new THREE.Vector3();
-      this.demonCoreGroup.getWorldPosition(v).project(this.camera);
-      if (v.z < 1) {
-        (this.portalPass.uniforms.uCenter.value as THREE.Vector2).set(v.x * 0.5 + 0.5, v.y * 0.5 + 0.5);
+      this.demonCoreGroup.getWorldPosition(this._vScratch1).project(this.camera);
+      if (this._vScratch1.z < 1) {
+        (this.portalPass.uniforms.uCenter.value as THREE.Vector2).set(this._vScratch1.x * 0.5 + 0.5, this._vScratch1.y * 0.5 + 0.5);
       } else {
         (this.portalPass.uniforms.uCenter.value as THREE.Vector2).set(0.5, 0.5);
       }
@@ -2271,9 +2278,8 @@ export class UniverseEngine {
     if (this.portal.phase !== 'idle') {
       const b = this.bodies.find((x) => x.data.id === this.portal.bodyId);
       if (b) {
-        const v = new THREE.Vector3();
-        b.group.getWorldPosition(v).project(this.camera);
-        if (v.z < 1) this.portal.uv.set(v.x * 0.5 + 0.5, v.y * 0.5 + 0.5);
+        b.group.getWorldPosition(this._vScratch1).project(this.camera);
+        if (this._vScratch1.z < 1) this.portal.uv.set(this._vScratch1.x * 0.5 + 0.5, this._vScratch1.y * 0.5 + 0.5);
       }
       (pu.uCenter.value as THREE.Vector2).copy(this.portal.uv);
     } else {
@@ -2343,17 +2349,19 @@ export class UniverseEngine {
     /* auto focus / release */
     if (!this.focusId && !this.coreActive && this.currentDist() < 150 && this.portal.phase === 'idle') {
       let best: RuntimeBody | null = null, bestScore = Infinity;
-      const fwd = new THREE.Vector3();
-      this.camera.getWorldDirection(fwd);
-      this.bodies.forEach((b) => {
-        if (b.data.kind === 'nebula' || b.data.kind === 'hole') return;
-        const wp = new THREE.Vector3();
-        b.group.getWorldPosition(wp);
-        const to = wp.clone().sub(this.camera.position);
-        const d = to.length();
-        const ang = to.normalize().angleTo(fwd);
-        if (ang < 0.5 && d < 300 && d * (1 + ang) < bestScore) { best = b; bestScore = d * (1 + ang); }
-      });
+      this.camera.getWorldDirection(this._vScratch1);
+      for (let i = 0; i < this.bodies.length; i++) {
+        const b = this.bodies[i];
+        if (b.data.kind === 'nebula' || b.data.kind === 'hole') continue;
+        b.group.getWorldPosition(this._vScratch2);
+        this._vScratch3.copy(this._vScratch2).sub(this.camera.position);
+        const dCam = this._vScratch3.length();
+        const ang = this._vScratch3.normalize().angleTo(this._vScratch1);
+        if (ang < 0.5 && dCam < 300 && dCam * (1 + ang) < bestScore) {
+          best = b;
+          bestScore = dCam * (1 + ang);
+        }
+      }
       if (best) this.focusId = (best as RuntimeBody).data.id;
     } else if (this.focusId && this.currentDist() > 560) {
       this.focusId = null;
@@ -2372,17 +2380,15 @@ export class UniverseEngine {
 
   private updateBodies(dt: number) {
     const sysW = 1 - smoothstep(430, 860, this.currentDist());
-    const sunDir = new THREE.Vector3();
-    const wp = new THREE.Vector3();
-    const inv = new THREE.Quaternion();
 
-    this.bodies.forEach((b) => {
+    for (let i = 0; i < this.bodies.length; i++) {
+      const b = this.bodies[i];
       const o = b.data.orbit;
       const phys = calculatePhysics(b.data, this.simDays);
       const pos = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01);
       b.group.position.set(pos.x, pos.y, pos.z);
-      b.group.getWorldPosition(wp);
-      sunDir.copy(wp).multiplyScalar(-1).normalize();
+      b.group.getWorldPosition(this._vScratch2);
+      this._vScratch1.copy(this._vScratch2).multiplyScalar(-1).normalize();
 
       /* ghost + fade lerps */
       b.ghost += (b.ghostTarget - b.ghost) * Math.min(1, dt * 3);
@@ -2392,7 +2398,7 @@ export class UniverseEngine {
       b.hoverT += ((this.hoveredId === b.data.id ? 1 : 0) - b.hoverT) * Math.min(1, dt * 8);
 
       if (b.mat) {
-        if (b.mat.uniforms.uSunDir) (b.mat.uniforms.uSunDir.value as THREE.Vector3).copy(sunDir);
+        if (b.mat.uniforms.uSunDir) (b.mat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vScratch1);
         if (b.mat.uniforms.uTime) b.mat.uniforms.uTime.value = this.clockT;
         if (b.mat.uniforms.uGhost) b.mat.uniforms.uGhost.value = b.ghost;
         if (b.mat.uniforms.uFade) b.mat.uniforms.uFade.value = b.fade * sysW;
@@ -2405,17 +2411,17 @@ export class UniverseEngine {
 
       if (b.cloudMat) {
         b.cloudMat.uniforms.uTime.value = this.clockT;
-        (b.cloudMat.uniforms.uSunDir.value as THREE.Vector3).copy(sunDir);
+        (b.cloudMat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vScratch1);
         b.cloudMat.uniforms.uFade.value = b.fade * sysW * (1 - b.ghost);
         b.cloudMat.visible = b.cloudMat.uniforms.uFade.value > 0.02;
       }
       if (b.atmo) {
-        (b.atmo.material as THREE.ShaderMaterial).uniforms.uSunDir.value = sunDir.clone();
+        ((b.atmo.material as THREE.ShaderMaterial).uniforms.uSunDir.value as THREE.Vector3).copy(this._vScratch1);
         b.atmo.visible = b.fade * sysW * (1 - b.ghost) > 0.05;
       }
       if (b.ringMat) {
-        b.ringMesh!.getWorldQuaternion(inv).invert();
-        (b.ringMat.uniforms.uSunLocal.value as THREE.Vector3).copy(sunDir).applyQuaternion(inv);
+        b.ringMesh!.getWorldQuaternion(this._qScratch).invert();
+        (b.ringMat.uniforms.uSunLocal.value as THREE.Vector3).copy(this._vScratch1).applyQuaternion(this._qScratch);
         b.ringMesh!.visible = b.fade * sysW * (1 - b.ghost * 0.85) > 0.05;
       }
 
@@ -2460,7 +2466,7 @@ export class UniverseEngine {
         s.core.rotation.y += dt * 0.25; s.shell.rotation.z -= dt * 0.05;
         s.r1.rotation.z += dt * 0.3; s.r2.rotation.x += dt * 0.22;
       }
-    });
+    }
 
     /* anchor — axial spin & core interface ember lerp */
     this.anchorGroup.rotation.y += dt * 0.08; /* Axial rotation around polar axis */
@@ -2666,16 +2672,14 @@ export class UniverseEngine {
     if (this.backdropMat) {
       this.backdropMat.uniforms.uKamuiErase.value = this.kamuiErase;
       this.backdropMat.uniforms.uTime.value = this.clockT;
-      const vDir = new THREE.Vector3();
-      this.camera.getWorldDirection(vDir);
-      (this.backdropMat.uniforms.uVortexDir.value as THREE.Vector3).copy(vDir);
+      this.camera.getWorldDirection(this._vDirScratch);
+      (this.backdropMat.uniforms.uVortexDir.value as THREE.Vector3).copy(this._vDirScratch);
     }
     if (this.giantMultiverseBoundaryMat) {
       this.giantMultiverseBoundaryMat.uniforms.uTime.value = this.clockT;
       this.giantMultiverseBoundaryMat.uniforms.uKamuiErase.value = wins.multiverse > 0.01 ? (1.0 - wins.multiverse) * 0.5 : 0;
-      const vDir = new THREE.Vector3();
-      this.camera.getWorldDirection(vDir);
-      (this.giantMultiverseBoundaryMat.uniforms.uVortexDir.value as THREE.Vector3).copy(vDir);
+      this.camera.getWorldDirection(this._vDirScratch);
+      (this.giantMultiverseBoundaryMat.uniforms.uVortexDir.value as THREE.Vector3).copy(this._vDirScratch);
     }
     if (this.skyDomeMesh) {
       this.skyDomeMesh.visible = this.kamuiErase < 0.998;
@@ -2743,6 +2747,9 @@ export class UniverseEngine {
   }
 
   private setLevelOpacity(group: THREE.Group, w: number) {
+    const isVis = w > 0.001;
+    group.visible = isVis;
+    if (!isVis) return;
     group.traverse((obj) => {
       if (obj instanceof THREE.Points) {
         const m = obj.material as THREE.ShaderMaterial;
@@ -2765,8 +2772,8 @@ export class UniverseEngine {
     if (!active) { this.surfaceLocked = false; return; }
     if (fb) {
       if (!this.surfaceLocked && this.surfaceBlend > 0.06) {
-        const dir = this.camera.position.clone().sub(fb.group.position).normalize();
-        this.surfaceQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+        this._vScratch1.copy(this.camera.position).sub(fb.group.position).normalize();
+        this.surfaceQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), this._vScratch1);
         this.surfaceLocked = true;
       }
       this.surface.position.copy(fb.group.position);
@@ -2780,9 +2787,9 @@ export class UniverseEngine {
       (this.skyMat.uniforms.uHorizon.value as THREE.Color).set(p.atmo);
       (this.skyMat.uniforms.uZenith.value as THREE.Color).set(p.deep);
       /* world-space sun direction (terrain normals are world-space) */
-      const sunDir = fb.group.position.clone().multiplyScalar(-1).normalize();
-      (this.surfaceMat.uniforms.uSunDir.value as THREE.Vector3).copy(sunDir);
-      (this.skyMat.uniforms.uSunDir.value as THREE.Vector3).copy(sunDir);
+      this._vScratch2.copy(fb.group.position).multiplyScalar(-1).normalize();
+      (this.surfaceMat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vScratch2);
+      (this.skyMat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vScratch2);
       this.surfaceMat.uniforms.uFogDensity.value = 0.03 / fb.data.radius;
       (this.surfaceMat.uniforms.uFog.value as THREE.Color).set(p.atmo).multiplyScalar(0.75);
       this.surfaceParticlesMat.uniforms.uOpacity.value = this.surfaceBlend;
@@ -2798,23 +2805,28 @@ export class UniverseEngine {
     this.coreT += (target - this.coreT) * Math.min(1, dt * 2.6);
     this.connectionMat.opacity = this.coreT * 0.3;
     if (this.coreT > 0.02) {
-      const pos: number[] = [];
-      const a = new THREE.Vector3(), b = new THREE.Vector3();
-      this.connections.forEach(([ia, ib]) => {
-        if (ia.ghostTarget > 0.5 || ib.ghostTarget > 0.5) return; /* link to an un-formed world stays dark */
-        ia.group.getWorldPosition(a);
-        ib.group.getWorldPosition(b);
-        pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
-      });
+      let idx = 0;
+      for (let i = 0; i < this.connections.length; i++) {
+        const [ia, ib] = this.connections[i];
+        if (ia.ghostTarget > 0.5 || ib.ghostTarget > 0.5) continue; /* link to an un-formed world stays dark */
+        ia.group.getWorldPosition(this._vScratch1);
+        ib.group.getWorldPosition(this._vScratch2);
+        this._corePosBuffer[idx++] = this._vScratch1.x;
+        this._corePosBuffer[idx++] = this._vScratch1.y;
+        this._corePosBuffer[idx++] = this._vScratch1.z;
+        this._corePosBuffer[idx++] = this._vScratch2.x;
+        this._corePosBuffer[idx++] = this._vScratch2.y;
+        this._corePosBuffer[idx++] = this._vScratch2.z;
+      }
       const attr = this.connectionLines.geometry.getAttribute('position') as THREE.BufferAttribute;
-      if (attr && attr.array.length >= pos.length) {
-        (attr.array as Float32Array).set(pos);
-        this.connectionLines.geometry.setDrawRange(0, pos.length / 3);
+      if (attr && attr.array.length >= idx) {
+        (attr.array as Float32Array).set(this._corePosBuffer.subarray(0, idx));
+        this.connectionLines.geometry.setDrawRange(0, idx / 3);
         attr.needsUpdate = true;
       } else {
         this.connectionLines.geometry.dispose();
         const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        g.setAttribute('position', new THREE.Float32BufferAttribute(this._corePosBuffer.subarray(0, idx), 3));
         this.connectionLines.geometry = g;
       }
     }
