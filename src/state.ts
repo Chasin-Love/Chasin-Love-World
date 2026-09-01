@@ -4,6 +4,7 @@
  * and dispatch actions across realities, bodies, diary entries, and the universal vault.
  */
 
+import { useSyncExternalStore } from 'react';
 import type {
   Attachment,
   BodyKind,
@@ -18,7 +19,14 @@ import type {
   VaultFile,
   VaultSecrets,
 } from './types';
-import { getReality, REALITIES, RAW_REALITIES } from './realities';
+import {
+  getReality,
+  REALITIES,
+  RAW_REALITIES,
+  computeAllRealities,
+  setRuntimeRealities,
+  RealityConfig,
+} from './realities';
 import {
   BTRFS_DEFAULT_SUBVOLS,
   btrfsChecksum,
@@ -63,6 +71,8 @@ function createSnapshot(s: UniverseState): UniverseState {
     customRealityDescriptions: s.customRealityDescriptions
       ? { ...s.customRealityDescriptions }
       : {},
+    customRealities: s.customRealities ? [...s.customRealities] : [],
+    deletedRealityIds: s.deletedRealityIds ? [...s.deletedRealityIds] : [],
     bodies: [...s.bodies],
     entries: [...s.entries],
     connections: [...s.connections],
@@ -95,6 +105,10 @@ function primeState(p: UniverseState): UniverseState {
     )[0];
     latest.updatedAt = nowMs - 3600000;
   }
+  // Synchronize runtime realities with custom realities & deletions
+  setRuntimeRealities(
+    computeAllRealities(p.customRealities, p.deletedRealityIds, p.customRealityDescriptions)
+  );
   return p;
 }
 
@@ -105,6 +119,8 @@ function loadState(): UniverseState {
       const parsed = JSON.parse(raw) as UniverseState;
       if (parsed && Array.isArray(parsed.bodies) && parsed.bodies.length) {
         if (!parsed.activeRealityId) parsed.activeRealityId = 'sol-prime';
+        if (!Array.isArray(parsed.customRealities)) parsed.customRealities = [];
+        if (!Array.isArray(parsed.deletedRealityIds)) parsed.deletedRealityIds = [];
         if (!Array.isArray(parsed.vaultFolders)) parsed.vaultFolders = [];
         if (!Array.isArray(parsed.vaultTrash)) parsed.vaultTrash = [];
         if (!Array.isArray(parsed.vaultUsers)) parsed.vaultUsers = [];
@@ -171,6 +187,10 @@ export function subscribe(fn: () => void): () => void {
   };
 }
 
+export function useUniverse(): UniverseState {
+  return useSyncExternalStore(subscribe, getState, getState);
+}
+
 function audit(msg: string) {
   state.audit = [...state.audit.slice(-199), { t: Date.now(), msg }];
 }
@@ -210,6 +230,46 @@ export const actions = {
     const raw = RAW_REALITIES.find((x) => x.id === realityId);
     if (r && raw) r.description = raw.description;
     audit(`Reset description for Reality: ${r ? r.name : realityId}`);
+    notify();
+  },
+
+  createReality(newReality: RealityConfig) {
+    if (!state.customRealities) state.customRealities = [];
+    state.customRealities = [...state.customRealities.filter((x) => x.id !== newReality.id), newReality];
+    // Recompute runtime realities
+    setRuntimeRealities(
+      computeAllRealities(state.customRealities, state.deletedRealityIds, state.customRealityDescriptions)
+    );
+    audit(`[Multiverse Nexus] Manifested new parallel reality: ${newReality.name}`);
+    notify();
+  },
+
+  deleteReality(realityId: string) {
+    // Protect core default reality from deletion
+    if (realityId === 'sol-prime') return;
+
+    if (!state.deletedRealityIds) state.deletedRealityIds = [];
+    if (!state.deletedRealityIds.includes(realityId)) {
+      state.deletedRealityIds = [...state.deletedRealityIds, realityId];
+    }
+    if (state.customRealities) {
+      state.customRealities = state.customRealities.filter((r) => r.id !== realityId);
+    }
+    if (state.customRealityDescriptions) {
+      delete state.customRealityDescriptions[realityId];
+    }
+    // Recompute runtime realities
+    setRuntimeRealities(
+      computeAllRealities(state.customRealities, state.deletedRealityIds, state.customRealityDescriptions)
+    );
+    // If the active reality was deleted, switch back to Sol-Prime
+    if (state.activeRealityId === realityId) {
+      const fallback = REALITIES[0] || RAW_REALITIES[0];
+      state.activeRealityId = fallback.id;
+      state.bodies = [...fallback.bodies];
+      state.entries = [...(fallback.entries || [])];
+    }
+    audit(`[Multiverse Nexus] Collapsed parallel reality: ${realityId}`);
     notify();
   },
 

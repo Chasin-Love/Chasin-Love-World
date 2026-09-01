@@ -35,26 +35,30 @@ export const RAW_REALITIES: any[] = [
   ...parallelRealities,
 ];
 
-// Cosmological 3D Golden Spiral structural layout algorithm for parallel bubble universes orbiting the central Core
-export const REALITIES: RealityConfig[] = RAW_REALITIES.map((r, i) => {
-  const total = RAW_REALITIES.length;
-  // All 20 parallel universes orbit around the central Sovereign Core at (0,0,0)
+/**
+ * Cosmological 3D Golden Spiral structural layout algorithm for parallel bubble universes orbiting the central Core.
+ * Features user-friendly, spacious orbital separation to eliminate visual crowding.
+ */
+export function buildRealityConfig(
+  r: any,
+  i: number,
+  total: number,
+  customDescriptions?: Record<string, string>
+): RealityConfig {
   const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~2.399963
   const phi = i * goldenAngle;
-  const yNorm = ((i + 0.5) / total) * 2 - 1; // vertical spread from -1 to +1
-  const radFactor = Math.sqrt(Math.max(0.25, 1 - yNorm * yNorm * 0.7));
-  
-  // Outer orbital distance from the Core (0,0,0)
-  const R = 280000 + (i % 5) * 35000;
+  const yNorm = total > 1 ? ((i + 0.5) / total) * 2 - 1 : 0; // vertical spread from -1 to +1
+  const radFactor = Math.sqrt(Math.max(0.35, 1 - yNorm * yNorm * 0.65));
+
+  // Harmonious orbital distance from Core (0,0,0) comfortably inside the giant 960,000-unit Multiverse Hypersphere
+  const R = 540000 + (i % 6) * 42000;
   const x = Math.round(Math.cos(phi) * radFactor * R);
-  const y = Math.round(yNorm * 220000);
+  const y = Math.round(yNorm * 360000);
   const z = Math.round(Math.sin(phi) * radFactor * R);
   const bubblePos: [number, number, number] = [x, y, z];
 
-  // Ensure anchor star & black hole vault conform strictly to multiverse philosophy
-  // Every reality must have exactly one Anchor Star (at index 0) and exactly one Black Hole Vault
   let hasVault = false;
-  let updatedBodies = r.bodies.map((b: any, bIdx: number) => {
+  let updatedBodies = (r.bodies || []).map((b: any, bIdx: number) => {
     if (bIdx === 0) {
       return {
         ...b,
@@ -76,7 +80,6 @@ export const REALITIES: RealityConfig[] = RAW_REALITIES.map((r, i) => {
     return b;
   });
 
-  // If a reality lacks a black hole vault, insert exactly one black hole vault orbiting the system
   if (!hasVault) {
     const day = 86400000;
     const now = Date.now();
@@ -94,7 +97,6 @@ export const REALITIES: RealityConfig[] = RAW_REALITIES.map((r, i) => {
     };
     updatedBodies.push(vaultBody);
   } else {
-    // If multiple vaults were present, ensure only one vault body exists per reality
     let vaultFound = false;
     updatedBodies = updatedBodies.filter((b: any) => {
       if (b.kind === 'vault') {
@@ -115,16 +117,39 @@ export const REALITIES: RealityConfig[] = RAW_REALITIES.map((r, i) => {
     bubbleSize
   );
 
+  const desc = customDescriptions && customDescriptions[r.id] ? customDescriptions[r.id] : r.description;
+
   return {
     ...r,
+    description: desc,
     bubblePos,
     bubbleSize,
     bodies: updatedBodies,
-    clusters,
-    homeLineage,
+    clusters: r.clusters || clusters,
+    homeLineage: r.homeLineage || homeLineage,
   };
-});
+}
 
+export function computeAllRealities(
+  customRealities?: RealityConfig[],
+  deletedIds?: string[],
+  customDescriptions?: Record<string, string>
+): RealityConfig[] {
+  const deletedSet = new Set(deletedIds || []);
+  const baseList = RAW_REALITIES.filter((r) => !deletedSet.has(r.id));
+  const customList = (customRealities || []).filter((r) => !deletedSet.has(r.id));
+  const combined = [...baseList, ...customList];
+  const total = combined.length;
+
+  return combined.map((r, i) => buildRealityConfig(r, i, total, customDescriptions));
+}
+
+// Initial statically built realities
+export let REALITIES: RealityConfig[] = computeAllRealities();
+
+export function setRuntimeRealities(realities: RealityConfig[]) {
+  REALITIES = realities;
+}
 
 export function getReality(id: string, customDescriptions?: Record<string, string>): RealityConfig {
   const found = REALITIES.find((r) => r.id === id) || REALITIES[0];
@@ -135,4 +160,99 @@ export function getReality(id: string, customDescriptions?: Record<string, strin
     };
   }
   return found;
+}
+
+/**
+ * Factory to construct a complete, validated new parallel reality
+ */
+export function createNewRealityConfig(params: {
+  name: string;
+  codeName?: string;
+  spectral: string;
+  description: string;
+  colorA: string;
+  colorB: string;
+  planetsCount: number;
+  clusterName?: string;
+}): RealityConfig {
+  const day = 86400000;
+  const now = Date.now();
+  const TAU = Math.PI * 2;
+  const id = `reality-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const codeName = params.codeName || `UNIV-${Math.floor(100 + Math.random() * 900)}-${params.name.slice(0, 3).toUpperCase()}`;
+
+  // Generate Anchor Star
+  const anchorStar: any = {
+    id: 'anchor',
+    name: `${params.name.toUpperCase()} ANCHOR STAR`,
+    kind: 'star',
+    meaning: 'chapter',
+    note: `Primary cosmic anchor star for the ${params.name} continuum.`,
+    createdAt: now - 1200 * day,
+    radius: 4.8,
+    palette: { deep: '#0f172a', base: params.colorA, high: params.colorB, atmo: params.colorA, ice: '#ffffff' },
+    orbit: { a: 0, speed: 0, phase: 0, incl: 0 },
+  };
+
+  // Generate Black Hole Vault
+  const vaultBody: any = {
+    id: `${id}-vault`,
+    name: `${params.name.split(' ')[0]} Eventide Singularity Vault`,
+    kind: 'vault',
+    meaning: null,
+    note: `Eventide Vault for encrypted memories and datasets native to ${params.name}.`,
+    createdAt: now - 900 * day,
+    radius: 2.9,
+    palette: { deep: '#000000', base: '#0b0f19', high: params.colorA, atmo: params.colorB, ice: '#ffffff' },
+    orbit: { a: 210, speed: TAU / 12000, phase: 1.2, incl: -0.1 },
+  };
+
+  const planetNames = [
+    'Aethelgard', 'Celestia', 'Vesperion', 'Chronos', 'Astraea', 'Hyperion', 'Zephyria', 'Elysium', 'Nocturne', 'Pyros'
+  ];
+
+  const generatedBodies = [anchorStar];
+  const count = Math.min(8, Math.max(1, params.planetsCount));
+  for (let p = 0; p < count; p++) {
+    const pName = planetNames[p % planetNames.length] + (p >= planetNames.length ? ` ${p + 1}` : '');
+    const semiMajor = 35 + p * 22 + Math.random() * 6;
+    const speed = TAU / (1400 + p * 600);
+    const phase = Math.random() * TAU;
+    const incl = (Math.random() - 0.5) * 0.18;
+    generatedBodies.push({
+      id: `${id}-planet-${p + 1}`,
+      name: pName,
+      kind: 'planet',
+      meaning: (['memory', 'dream', 'project', 'idea', 'moment'] as const)[p % 5],
+      note: `Celestial world in the ${params.name} system.`,
+      createdAt: now - (600 - p * 50) * day,
+      radius: 1.2 + (p % 3) * 0.45,
+      rings: p % 3 === 1,
+      clouds: true,
+      palette: {
+        deep: '#030712',
+        base: p % 2 === 0 ? params.colorA : params.colorB,
+        high: '#e2e8f0',
+        atmo: params.colorA,
+        ice: '#ffffff',
+      },
+      orbit: { a: semiMajor, speed, phase, incl },
+    });
+  }
+  generatedBodies.push(vaultBody);
+
+  const rawConfig = {
+    id,
+    name: params.name,
+    codeName,
+    spectral: params.spectral,
+    description: params.description,
+    colorA: params.colorA,
+    colorB: params.colorB,
+    starColor: params.colorA,
+    bodies: generatedBodies,
+    entries: [],
+  };
+
+  return buildRealityConfig(rawConfig, REALITIES.length, REALITIES.length + 1);
 }

@@ -221,6 +221,8 @@ export interface AuditEntry { t: number; msg: string; }
 export interface UniverseState {
   activeRealityId?: string;
   customRealityDescriptions?: Record<string, string>;
+  customRealities?: any[];
+  deletedRealityIds?: string[];
   bodies: CosmicBody[];
   entries: DiaryEntry[];
   connections: Connection[];

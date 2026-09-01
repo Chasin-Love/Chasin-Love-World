@@ -383,31 +383,57 @@ void main(){
 export const portalFrag = /* glsl */ `
 uniform sampler2D tDiffuse; uniform vec2 uCenter; uniform float uStrength;
 uniform float uTime; uniform vec3 uColor; uniform float uAspect;
+uniform vec2 uTrail[3];
 varying vec2 vUv;
 ${NOISE}
+
+float distToSegment(vec2 p, vec2 a, vec2 b, float aspect) {
+  vec2 pa = vec2((p.x - a.x) * aspect, p.y - a.y);
+  vec2 ba = vec2((b.x - a.x) * aspect, b.y - a.y);
+  float h = clamp(dot(pa, ba) / (dot(ba, ba) + 1e-8), 0.0, 1.0);
+  return length(pa - ba * h);
+}
+
 void main(){
   vec2 uv = vUv;
+  if (uStrength < 0.001) {
+    gl_FragColor = texture2D(tDiffuse, uv);
+    return;
+  }
+  
   vec2 o = uv - uCenter;
   vec2 d = vec2(o.x * uAspect, o.y);
   float r = length(d);
   float s = uStrength;
   
-  // Kamui Space-Time Vortex Distortion
+  // Calculate short-lived trailing path behind distortion
+  float dSeg0 = distToSegment(uv, uCenter, uTrail[0], uAspect);
+  float dSeg1 = distToSegment(uv, uTrail[0], uTrail[1], uAspect);
+  float dSeg2 = distToSegment(uv, uTrail[1], uTrail[2], uAspect);
+  
+  float trailWake = exp(-dSeg0 * 16.0) * 0.75 +
+                    exp(-dSeg1 * 20.0) * 0.45 +
+                    exp(-dSeg2 * 25.0) * 0.22;
+  trailWake *= s;
+
+  // Localized Kamui Portal Space-Time Distortion
   float fall = exp(-r * 3.8);
-  // High-frequency spiral twisting effect
-  float spiralTwist = s * 6.5 * fall;
+  float spiralTwist = s * 6.5 * fall + trailWake * 1.8;
   float ripple = sin(r * 32.0 - uTime * 6.0) * s * 0.18 * fall;
   float ang = spiralTwist + ripple;
   
   float ca = cos(ang); float sa = sin(ang);
   d = mat2(ca, -sa, sa, ca) * d;
   
-  // Gravitational implosion pull towards portal center
-  vec2 pullDir = normalize(o + vec2(1e-6));
-  vec2 suv = uCenter + vec2(d.x / uAspect, d.y) - pullDir * s * 0.28 * fall;
+  // Subtle radial space-time distortion lens as the portal expands
+  float radialDistort = (sin(r * 22.0 - uTime * 5.0) * 0.05 + (pow(r, 1.2) - r) * 0.25) * exp(-r * 2.2) * s;
   
-  // Chromatic dispersion (RGB separation caused by extreme spatial warping)
-  float ab = s * 0.025 * fall + 0.0002;
+  // Gravitational implosion pull towards portal center with trailing wake distortion
+  vec2 pullDir = normalize(o + vec2(1e-6));
+  vec2 suv = uCenter + vec2(d.x / uAspect, d.y) - pullDir * (s * 0.28 * fall + radialDistort + trailWake * 0.06);
+  
+  // Chromatic dispersion along local gravitational gradient & lingering wake
+  float ab = s * 0.025 * fall + trailWake * 0.012 + 0.0002;
   vec3 col;
   col.r = texture2D(tDiffuse, suv + vec2(ab, 0.0)).r;
   col.g = texture2D(tDiffuse, suv).g;
@@ -426,6 +452,9 @@ void main(){
   vec3 portalHue = mix(uColor, vec3(0.3, 0.9, 1.0), sin(uTime * 4.0) * 0.3 + 0.3);
   col += portalHue * (ring * 1.2 + ring2 * 0.6 + KamuiGlow * 1.5) * s;
   col += vec3(1.0, 0.95, 0.85) * core * 0.2 * s;
+  
+  // Lingering space-time trailing path glow
+  col += vec3(0.4, 0.85, 1.0) * trailWake * 0.65;
   
   gl_FragColor = vec4(col, 1.0);
 }
@@ -538,6 +567,7 @@ void main(){
 /* ------------------------- deep-sky backdrop ----------------------- */
 export const backdropVert = /* glsl */ `
 varying vec3 vDir;
+
 void main(){
   vDir = position;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -545,6 +575,8 @@ void main(){
 
 export const backdropFrag = /* glsl */ `
 uniform float uTime;
+uniform float uKamuiErase;
+uniform vec3 uVortexDir;
 varying vec3 vDir;
 ${NOISE}
 
@@ -555,7 +587,77 @@ float starHash(vec3 p){
 }
 
 void main(){
-  vec3 d = normalize(vDir);
+  float k = clamp(uKamuiErase, 0.0, 1.0);
+  if (k >= 0.998) {
+    discard;
+  }
+  
+  vec3 rawD = normalize(vDir);
+  vec3 d = rawD;
+  float edgeAlpha = 1.0;
+  
+  // =========================================================================
+  // AUTHENTIC KAMUI SPACE-TIME NINJUTSU: PURE GEOMETRIC SPACE BENDING & VACUUM
+  // =========================================================================
+  // No external lightning, no artificial lines, no fake energy fx.
+  // Space itself bends, twists, spirals into a singularity vacuum that sucks
+  // reality in (and uncurls/releases when entering).
+  if (k > 0.0005) {
+    vec3 vAxis = normalize(uVortexDir);
+    if (length(vAxis) < 0.01) {
+      vAxis = vec3(0.0, 0.0, -1.0);
+    }
+    
+    // Dynamic orthonormal coordinate frame aligned directly with camera sightline
+    vec3 upRef = abs(vAxis.y) < 0.92 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangentX = normalize(cross(vAxis, upRef));
+    vec3 tangentY = cross(tangentX, vAxis);
+    
+    // Angular displacement from the Kamui vortex center [0, PI]
+    float dotV = clamp(dot(rawD, vAxis), -1.0, 1.0);
+    float alpha = acos(dotV);
+    float r = alpha / 3.14159265; // Normalized spherical radius [0, 1]
+    
+    // Azimuthal angle around vortex center [-PI, PI]
+    float theta = atan(dot(rawD, tangentY), dot(rawD, tangentX));
+    
+    // 1. Relativistic Logarithmic Spiral Streamlines & Frame-Dragging Vortex
+    // In polar vortex flow, space flows along logarithmic spirals: theta'(r) = theta + Omega(r, t)
+    float vortexTwist = (18.0 * pow(k, 1.25)) / (pow(r, 0.58) + 0.035) + uTime * (5.5 + 4.5 * k);
+    float twistedTheta = theta + vortexTwist;
+    
+    // 2. 3-Blade Spiral Streamline Phase Coordinate
+    // Points of constant psi define continuous logarithmic spiral arms twisting into the core
+    float psi = 3.0 * theta + (14.0 * pow(k, 1.2)) / (pow(r, 0.52) + 0.05) - uTime * 7.2;
+    float spiralArmMetric = sin(psi) * 0.35 * k + cos(psi * 2.0 + uTime * 3.0) * 0.12 * k;
+    
+    // 3. Authentic Spiral Suction Horizon (True Spiraling Vortex Edge, NOT Concentric Circles)
+    // The reality boundary contracts inward as an authentic multi-armed spiral whirlpool
+    float spiralHorizon = (1.0 - pow(k, 1.12)) * 1.35 + spiralArmMetric * (1.0 - 0.3 * k);
+    spiralHorizon = max(0.0001, spiralHorizon);
+    
+    // If coordinate has already been engulfed past the spiraling vortex horizon -> Discard!
+    if (r > spiralHorizon) {
+      discard;
+    }
+    
+    // 4. Inward Logarithmic Suction & Space-Time Metric Compression
+    // Coordinates are drawn inward along the logarithmic spiral streamlines into the throat
+    float rNorm = r / max(0.001, spiralHorizon);
+    float rSuction = pow(rNorm, 1.0 + k * 1.5) * (1.0 + sin(psi) * 0.15 * k);
+    rSuction = clamp(rSuction, 0.0002, 1.0);
+    float warpedAlpha = rSuction * 3.14159265;
+    
+    // Reconstruct the curved, twisted 3D ray through warped space-time
+    vec3 warpedRay = cos(twistedTheta) * sin(warpedAlpha) * tangentX +
+                     sin(twistedTheta) * sin(warpedAlpha) * tangentY +
+                     cos(warpedAlpha) * vAxis;
+    d = normalize(warpedRay);
+    
+    // Smooth natural edge falloff at the spiraling horizon boundary of the vacuum portal
+    float distToHorizon = spiralHorizon - r;
+    edgeAlpha = smoothstep(0.0, 0.07, distToHorizon);
+  }
   
   // Abyssal deep space vacuum background (360-degree dark universe base)
   vec3 col = vec3(0.001, 0.0015, 0.003);
@@ -568,23 +670,18 @@ void main(){
   vec3 webCoord = d * 4.5 + vec3(uTime * 0.001, 0.0, uTime * 0.0005);
   float n1 = snoise(webCoord);
   float n2 = snoise(webCoord * 2.1 + vec3(3.2, 7.1, 1.4));
-  float filaments = pow(max(0.0, 1.0 - abs(n1) - abs(n2)), 3.5); // Web filament lines
-  float cosmicVoid = smoothstep(0.2, 0.7, abs(fbm3(d * 1.8)));  // Large cosmic voids
+  float filaments = pow(max(0.0, 1.0 - abs(n1) - abs(n2)), 3.5);
+  float cosmicVoid = smoothstep(0.2, 0.7, abs(fbm3(d * 1.8)));
   
-  // Cosmic web color (deep indigo & violet intergalactic filaments)
   vec3 webCol = mix(vec3(0.015, 0.035, 0.095), vec3(0.045, 0.025, 0.11), filaments);
   col += webCol * filaments * cosmicVoid * 1.6;
   
   // 2. SUPERCLUSTERS & GALAXY CLUSTERS AT WEB NODES
-  // Nodes where filaments intersect house dense galaxy superclusters
   float nodes = pow(filaments, 2.5) * smoothstep(0.3, 0.8, fbm3(d * 6.0));
   vec3 superclusterGlow = vec3(0.08, 0.09, 0.16) * nodes * 2.5;
   col += superclusterGlow;
   
   // 3. DISTANT GALAXIES & GALAXY GROUPS
-  // Micro galaxy points and spiral blurs mapped in deep background.
-  // Radial falloff inside each cell keeps every galaxy a soft round glow —
-  // never a filled square patch.
   vec3 galCell = floor(d * 32.0);
   float galHash = starHash(galCell);
   if (galHash > 0.985) {
@@ -595,34 +692,30 @@ void main(){
     col += galCol * galCore * 0.45;
   }
   
-  // 4. MILKY WAY GALAXY PLANE & SPIRAL ARMS (Our Home Galaxy)
-  // Equatorial galactic disk projection
+  // 4. MILKY WAY GALAXY PLANE & SPIRAL ARMS
   vec3 bn = normalize(vec3(d.x, d.y * 2.2, d.z));
   float galacticPlane = exp(-pow(bn.y * 3.2, 2.0));
   
-  // Galactic Bulge & Integrated Starlight
   vec3 bulgeCol = vec3(0.065, 0.05, 0.075);
   col += bulgeCol * galacticPlane;
   
-  // 5. DARK MATTER & INTERSTELLAR DUST LANES (Orion Arm Dust Silhouette)
-  // Dark molecular dust lanes obscuring the galactic plane
+  // 5. DARK MATTER & INTERSTELLAR DUST LANES
   float dustLanes = fbm3(d * 3.5 + vec3(1.4, -2.1, 4.8));
   float dustMask = 1.0 - smoothstep(0.35, 0.75, dustLanes) * galacticPlane * 0.85;
   col *= dustMask;
   
-  // 6. LOCAL STAR-FORMING REGIONS (H II Ionized Molecular Nebulae - e.g. Orion Nebula)
+  // 6. LOCAL STAR-FORMING REGIONS
   float HII_region = fbm3(d * 2.2 + vec3(-5.2, 3.1, -1.8));
   float nebulaIon = pow(smoothstep(0.45, 0.82, HII_region), 2.2) * galacticPlane;
   vec3 HII_col = mix(vec3(0.05, 0.015, 0.06), vec3(0.02, 0.05, 0.08), sin(d.x * 3.0) * 0.5 + 0.5);
   col += HII_col * nebulaIon * 1.5;
   
-  // 7. STELLAR SYSTEM & LOCAL FOREGROUND STARS (Spectral Classes O, B, A, F, G, K, M)
+  // 7. STELLAR SYSTEM & LOCAL FOREGROUND STARS
   vec3 starCell1 = floor(d * 900.0);
   float s1 = starHash(starCell1);
   if(s1 > 0.9986) {
     float starDist1 = length(fract(d * 900.0) - 0.5);
     float b = pow((s1 - 0.9986) / 0.0014, 2.5) * smoothstep(0.45, 0.0, starDist1);
-    // Spectral color temperature (Blue O/B stars to Warm G/K/M stars)
     vec3 specCol = mix(vec3(0.65, 0.82, 1.0), vec3(1.0, 0.85, 0.65), fract(s1 * 17.0));
     col += specCol * b * 0.5 * dustMask;
   }
@@ -636,7 +729,8 @@ void main(){
     col += specCol * b * 0.85;
   }
   
-  gl_FragColor = vec4(col, 1.0);
+  float alpha = edgeAlpha * (1.0 - smoothstep(0.88, 0.998, k));
+  gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
 }
 `;
 
@@ -653,6 +747,7 @@ void main(){
 
 export const multiverseFrag = /* glsl */ `
 uniform float uTime; uniform vec3 uColorA; uniform vec3 uColorB; uniform float uOpacity;
+uniform float uTearStrength;
 varying vec3 vN; varying vec3 vW; varying vec3 vP; varying vec2 vUv;
 ${NOISE}
 void main(){
@@ -671,7 +766,42 @@ void main(){
   col += rimCol * irid * 2.2;
   col += vec3(1.0, 0.96, 0.88) * galCore * 0.8;
   
+  // Semi-transparent animated surface tears & cracks overlay before entering Kamui vortex
+  float tear = clamp(uTearStrength, 0.0, 1.0);
+  float crackMask = 0.0;
+  if (tear > 0.001) {
+    vec3 spherePos = normalize(vP);
+    vec3 crackCoord = spherePos * 8.5 + vec3(uTime * 0.12, -uTime * 0.08, uTime * 0.09);
+    vec3 warp = vec3(
+      fbm3(crackCoord + vec3(0.0, 1.5, 3.1)),
+      fbm3(crackCoord + vec3(4.1, 0.9, 2.2)),
+      fbm3(crackCoord + vec3(2.3, 3.8, 0.5))
+    );
+    vec3 tearP = crackCoord * 1.5 + warp * 2.2;
+    
+    // Sharp zero-crossing ridge noise for jagged dimensional surface fissures
+    float ridge1 = abs(snoise(tearP));
+    float ridge2 = abs(snoise(tearP * 2.5 + vec3(3.8)));
+    
+    float crackCore = smoothstep(0.075 * tear + 0.008, 0.0, ridge1);
+    float crackEdge = smoothstep(0.24 * tear + 0.015, 0.0, ridge1);
+    float subCrack = smoothstep(0.055 * tear + 0.008, 0.0, ridge2) * 0.65;
+    
+    float crackPattern = max(crackCore, subCrack);
+    crackMask = smoothstep(1.0 - tear * 1.35, 1.0 - tear * 0.75, fbm3(spherePos * 3.2));
+    
+    // High-energy electric cyan / magenta / white hot rift glow bleeding through fractures
+    vec3 tearGlowCol = mix(vec3(0.0, 0.95, 1.0), vec3(1.0, 0.2, 0.75), sin(uTime * 4.5 + tearP.y * 3.0) * 0.5 + 0.5);
+    vec3 tearHotCore = vec3(1.0, 0.98, 0.92);
+    vec3 tearColor = mix(tearGlowCol * 3.0, tearHotCore * 5.0, crackCore);
+    
+    col = mix(col, col + tearColor * (crackPattern * 2.0 + crackEdge * 0.7), crackMask * tear);
+  }
+  
   float alpha = (irid * 0.88 + galCore * 0.5 + swirl * 0.2) * uOpacity;
+  if (tear > 0.001) {
+    alpha = max(alpha, crackMask * tear * 0.92);
+  }
   gl_FragColor = vec4(col * 1.25, alpha);
 }`;
 
@@ -793,9 +923,10 @@ void main(){
   vN = normalize(mat3(modelMatrix) * normal);
   vP = position;
   
-  // Harmonic breathing vertex displacement
-  float disp = fbm(position * 0.04 + vec3(uTime * 0.25)) * 0.08;
-  vec3 displaced = position + normal * disp * (sin(uTime * 2.0) * 0.35 + 0.65);
+  // Relativistic Kerr gravitational pulsating surface distortion
+  float disp = fbm(position * 0.00035 + vec3(uTime * 0.3, -uTime * 0.2, uTime * 0.25)) * 420.0;
+  float pulse = sin(uTime * 2.8 + length(position) * 0.0008) * 180.0;
+  vec3 displaced = position + normal * (disp + pulse);
   
   vW = (modelMatrix * vec4(displaced, 1.0)).xyz;
   gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0);
@@ -807,6 +938,7 @@ uniform float uTime;
 uniform vec3 uColorCore;
 uniform vec3 uColorAura;
 uniform float uHover;
+uniform float uTearStrength;
 varying vec3 vN;
 varying vec3 vW;
 varying vec3 vP;
@@ -818,48 +950,183 @@ void main(){
   float mu = max(dot(n, viewDir), 0.0);
   
   vec3 q = normalize(vP);
-  float t = uTime * 0.65;
+  float t = uTime * 0.55;
   
-  // 1. Multi-octave Cosmic Harmonic Vortex Streams
+  // 1. Relativistic Kerr Frame-Dragging Vortex (differential angular rotation)
   float ang = atan(q.z, q.x);
   float radius = length(q.xz);
-  float swirl = sin(ang * 6.0 + radius * 8.0 - t * 1.8);
+  float vortexSpeed = 1.8 / (radius + 0.35);
+  float rotAng = ang + t * vortexSpeed;
   
-  // 2. Quantum Singularity Plasma Structure
-  float n1 = fbm(q * 5.0 + vec3(t * 0.2, t * 0.15, -t * 0.25));
-  float n2 = fbm(q * 12.0 - vec3(t * 0.35, -t * 0.2, t * 0.45));
-  float plasma = (n1 * 0.6 + n2 * 0.4 + swirl * 0.15);
+  // 2. Relativistic Doppler Beaming Asymmetry (approaching side is blueshifted & brighter)
+  float doppler = sin(ang + t * 0.9) * 0.35 + 0.65;
   
-  // 3. Supreme Sovereign Color Palette: Deep Abyssal Obsidian -> Royal Indigo -> Cosmic Violet -> Radiant Amber/Gold Core
-  vec3 colAbyss = vec3(0.02, 0.015, 0.04);
-  vec3 colIndigo = vec3(0.08, 0.15, 0.55);
-  vec3 colViolet = vec3(0.55, 0.12, 0.85);
-  vec3 colCrimsonGold = vec3(0.95, 0.35, 0.12);
-  vec3 colPureGold = vec3(1.0, 0.88, 0.42);
+  // 3. Multi-scale Quantum Vacuum Fluctuations & Turbulent Magnetohydrodynamics
+  vec3 warpedQ = vec3(cos(rotAng) * radius, q.y, sin(rotAng) * radius);
+  float warp = fbm3(warpedQ * 3.8 + vec3(t * 0.25, -t * 0.15, t * 0.18));
+  float n1 = fbm(warpedQ * 5.5 + warp * 0.75);
+  float n2 = fbm(warpedQ * 12.0 - vec3(t * 0.35, t * 0.2, -t * 0.25));
+  float plasma = (n1 * 0.55 + n2 * 0.35 + warp * 0.2) * (0.75 + 0.35 * doppler);
   
-  vec3 col = mix(colAbyss, colIndigo, smoothstep(0.1, 0.4, plasma));
-  col = mix(col, colViolet, smoothstep(0.4, 0.68, plasma));
-  col = mix(col, colCrimsonGold, smoothstep(0.68, 0.88, plasma));
-  col = mix(col, colPureGold, smoothstep(0.88, 0.98, plasma));
+  // 4. Supreme Multiverse Spectrum: Deep Void Black -> Electric Sapphire -> Dimensional Violet -> Supernova Amber-Gold
+  // Dimmed to preserve rich geometric contrast without blinding white saturation
+  vec3 colVoid = vec3(0.008, 0.005, 0.018);
+  vec3 colSapphire = vec3(0.015, 0.32, 0.75);
+  vec3 colViolet = vec3(0.52, 0.08, 0.72);
+  vec3 colAmberGold = vec3(0.85, 0.48, 0.06);
+  vec3 colWarmGlow = vec3(0.95, 0.82, 0.65);
   
-  // 4. Central Sacred Singularity Aperture (Focal anchor of the multiverse)
-  float eyeGaze = pow(mu, 4.0);
-  vec3 eyeCol = mix(vec3(0.85, 0.18, 0.35), vec3(1.0, 0.92, 0.65), eyeGaze);
-  col += eyeCol * eyeGaze * 1.4;
+  vec3 col = mix(colVoid, colSapphire, smoothstep(0.08, 0.42, plasma));
+  col = mix(col, colViolet, smoothstep(0.42, 0.72, plasma));
+  col = mix(col, colAmberGold, smoothstep(0.72, 0.90, plasma));
+  col = mix(col, colWarmGlow, smoothstep(0.90, 0.99, plasma));
   
-  // 5. Celestial Stabilization Runes & Lattice Filaments
-  float runeGrid = abs(sin(q.x * 24.0 + t) * sin(q.y * 24.0 - t * 0.7) * sin(q.z * 24.0 + t * 0.5));
-  float runeSparks = smoothstep(0.72, 0.85, runeGrid) * smoothstep(0.4, 0.8, plasma);
-  col += vec3(0.4, 0.9, 1.0) * runeSparks * 1.6;
+  // 5. Chromatic Gravitational Lensing Separation
+  float chromaR = fbm(warpedQ * 6.2 + vec3(0.05, 0.0, 0.0));
+  float chromaB = fbm(warpedQ * 6.2 - vec3(0.05, 0.0, 0.0));
+  col.r += chromaR * 0.15 * (1.0 - mu);
+  col.b += chromaB * 0.22 * (1.0 - mu);
   
-  // 6. Radiant Spacetime Stabilizer Rim Shield
-  float rim = pow(1.0 - mu, 2.2);
-  vec3 rimCol = mix(vec3(0.2, 0.85, 1.0), vec3(0.95, 0.25, 0.65), sin(t * 1.2 + q.y * 4.0) * 0.5 + 0.5);
-  col += rimCol * rim * 2.4;
+  // 6. Sacred Multidimensional Tesseract Resonance Grid (Crisp neon filament lines)
+  float gridX = abs(fract(q.x * 12.0 + t * 0.15) - 0.5);
+  float gridY = abs(fract(q.y * 12.0 - t * 0.12) - 0.5);
+  float gridZ = abs(fract(q.z * 12.0 + t * 0.18) - 0.5);
+  float tesseractLattice = smoothstep(0.46, 0.495, min(gridX, min(gridY, gridZ)));
+  col += vec3(0.0, 0.85, 0.75) * tesseractLattice * 0.85 * smoothstep(0.15, 0.85, plasma);
   
-  // Hover & Active Resonance Boost
-  col *= 1.1 + uHover * 0.5 + sin(t * 2.5) * 0.08;
+  // 7. Photon Ring & Relativistic Event Horizon Rim Glow (Tightly calibrated, non-overexposing)
+  float photonRing = pow(1.0 - mu, 3.2);
+  float thinCorona = pow(1.0 - mu, 8.5);
+  vec3 rimCol = mix(vec3(0.0, 0.85, 0.75), vec3(0.85, 0.12, 0.55), sin(t * 1.2 + q.y * 5.0) * 0.5 + 0.5);
+  col += rimCol * photonRing * 0.95 + vec3(0.85, 0.92, 0.98) * thinCorona * 1.1;
   
-  gl_FragColor = vec4(col, 1.0);
+  // 8. Central Singularity Focus
+  float eyeGaze = pow(mu, 6.0);
+  col += mix(vec3(0.85, 0.08, 0.32), vec3(0.2, 0.75, 0.85), sin(t * 1.6) * 0.5 + 0.5) * eyeGaze * 0.75;
+  
+  // Hover & Active Resonance Boost (Clean & subtle)
+  col *= 0.92 + uHover * 0.35 + sin(t * 2.5) * 0.06;
+  
+  // Semi-transparent animated surface tears & cracks overlay before entering Kamui vortex
+  float tear = clamp(uTearStrength, 0.0, 1.0);
+  if (tear > 0.001) {
+    vec3 crackCoord = q * 9.5 + vec3(uTime * 0.14, -uTime * 0.09, uTime * 0.11);
+    vec3 warpTear = vec3(
+      fbm3(crackCoord + vec3(0.0, 1.5, 3.1)),
+      fbm3(crackCoord + vec3(4.1, 0.9, 2.2)),
+      fbm3(crackCoord + vec3(2.3, 3.8, 0.5))
+    );
+    vec3 tearP = crackCoord * 1.5 + warpTear * 2.4;
+    
+    float ridge1 = abs(snoise(tearP));
+    float ridge2 = abs(snoise(tearP * 2.7 + vec3(4.5)));
+    
+    float crackCore = smoothstep(0.08 * tear + 0.008, 0.0, ridge1);
+    float crackEdge = smoothstep(0.25 * tear + 0.015, 0.0, ridge1);
+    float subCrack = smoothstep(0.06 * tear + 0.008, 0.0, ridge2) * 0.65;
+    
+    float crackPattern = max(crackCore, subCrack);
+    float crackMask = smoothstep(1.0 - tear * 1.35, 1.0 - tear * 0.75, fbm3(q * 3.5));
+    
+    vec3 tearGlowCol = mix(vec3(0.0, 0.95, 1.0), vec3(1.0, 0.25, 0.75), sin(uTime * 4.0 + tearP.y * 3.0) * 0.5 + 0.5);
+    vec3 tearHotCore = vec3(1.0, 0.98, 0.92);
+    vec3 tearColor = mix(tearGlowCol * 3.2, tearHotCore * 5.0, crackCore);
+    
+    col = mix(col, col + tearColor * (crackPattern * 2.2 + crackEdge * 0.7), crackMask * tear);
+  }
+  
+  gl_FragColor = vec4(col, 0.95);
+}
+`;
+
+/* ----------------- Giant Multiverse Boundary Hypersphere ---------------- */
+export const multiverseBoundaryVert = /* glsl */ `
+varying vec3 vN;
+varying vec3 vW;
+varying vec3 vP;
+varying vec2 vUv;
+void main(){
+  vN = normalize(normalMatrix * normal);
+  vW = (modelMatrix * vec4(position, 1.0)).xyz;
+  vP = position;
+  vUv = uv;
+  gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0);
+}
+`;
+
+export const multiverseBoundaryFrag = /* glsl */ `
+uniform float uTime;
+uniform vec3 uColorA;
+uniform vec3 uColorB;
+uniform float uKamuiErase;
+uniform vec3 uVortexDir;
+varying vec3 vN;
+varying vec3 vW;
+varying vec3 vP;
+varying vec2 vUv;
+${NOISE}
+
+void main(){
+  float k = clamp(uKamuiErase, 0.0, 1.0);
+  vec3 q = normalize(vP);
+  
+  // Kamui Space-Time Bending & Spiral Suction directly on the Multiverse Hypersphere surface
+  if (k > 0.001) {
+    vec3 vAxis = normalize(uVortexDir);
+    if (length(vAxis) < 0.01) vAxis = vec3(0.0, 0.0, -1.0);
+    
+    vec3 upRef = abs(vAxis.y) < 0.92 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangentX = normalize(cross(vAxis, upRef));
+    vec3 tangentY = cross(tangentX, vAxis);
+    
+    float dotV = clamp(dot(q, vAxis), -1.0, 1.0);
+    float alpha = acos(dotV);
+    float r = alpha / 3.14159265;
+    float theta = atan(dot(q, tangentY), dot(q, tangentX));
+    
+    // Logarithmic spiral swirling on the giant sphere surface
+    float vortexTwist = (14.0 * pow(k, 1.25)) / (pow(r, 0.58) + 0.038) + uTime * (4.2 + 3.8 * k);
+    float twistedTheta = theta + vortexTwist;
+    
+    // Logarithmic metric suction pulling geodesic lines toward vortex axis
+    float rSuction = pow(clamp(r, 0.0001, 1.0), 1.0 + k * 1.5);
+    float warpedAlpha = rSuction * 3.14159265;
+    
+    vec3 warpedQ = cos(twistedTheta) * sin(warpedAlpha) * tangentX +
+                   sin(twistedTheta) * sin(warpedAlpha) * tangentY +
+                   cos(warpedAlpha) * vAxis;
+    q = normalize(warpedQ);
+  }
+
+  vec3 n = normalize(vN);
+  vec3 v = normalize(cameraPosition - vW);
+  float ndotv = abs(dot(n, v));
+  float rim = pow(1.0 - ndotv, 2.8);
+  
+  // Spherical celestial coordinates (Quantum flux geodesics & spiral streamlines)
+  float lat = q.y;
+  float lon = atan(q.z, q.x);
+  
+  // Continuous Helical & Spiral Flux Streamlines (No static concentric circles)
+  float spiral1 = abs(fract((lon / 3.14159265) * 4.0 + lat * 3.5 - uTime * 0.04) - 0.5);
+  float spiral2 = abs(fract((lon / 3.14159265) * 4.0 - lat * 3.5 + uTime * 0.035) - 0.5);
+  float flowLines = min(spiral1, spiral2);
+  float grid = smoothstep(0.46, 0.492, flowLines);
+  
+  // Subtle iridescent aurora membrane across outer multiverse sphere
+  float aurora = fbm3(q * 3.8 + vec3(uTime * 0.012, uTime * 0.008, 0.0));
+  vec3 baseCol = mix(uColorA, uColorB, aurora * 0.5 + 0.5);
+  vec3 gridCol = vec3(0.0, 0.96, 0.85);
+  
+  vec3 col = mix(baseCol * 0.4, gridCol, grid * 0.55);
+  col += vec3(0.65, 0.35, 0.95) * rim * 1.4;
+  
+  if (k > 0.01) {
+    float kGlow = sin(uTime * 5.0 + lat * 4.0) * 0.2 + 0.8;
+    col += vec3(0.0, 0.95, 0.85) * k * kGlow * 0.45;
+  }
+  
+  float alpha = rim * 0.28 + grid * 0.16 + aurora * 0.07;
+  gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.55));
 }
 `;

@@ -12,6 +12,7 @@ import {
   multiverseVert, multiverseFrag, asteroidVert, asteroidFrag,
   exoplanetPlateVert, exoplanetPlateFrag,
   demonCoreVert, demonCoreFrag,
+  multiverseBoundaryVert, multiverseBoundaryFrag,
 } from './shaders';
 import type { CosmicBody } from '../types';
 import { REALITIES, RealityConfig, GalaxyClusterData } from '../realities';
@@ -243,15 +244,23 @@ export class UniverseEngine {
   private activeReality: RealityConfig | null = null;
   private realityGroups: Record<string, THREE.Group> = {};
   private activeRealityShieldMesh: THREE.Group | null = null;
+  private giantMultiverseBoundaryMat!: THREE.ShaderMaterial;
+  private giantMultiverseSphereGroup!: THREE.Group;
   private demonCoreGroup!: THREE.Group;
   private demonCoreMat!: THREE.ShaderMaterial;
   private demonCoreRings: THREE.Mesh[] = [];
   private demonCoreSpires: THREE.Mesh[] = [];
   private demonCoreInnerGeom!: THREE.Mesh;
   private demonCorePulseRings: THREE.Mesh[] = [];
+  private demonCoreJets: THREE.Mesh[] = [];
+  private demonCoreTesseract: THREE.Group | null = null;
+  private demonCoreTachyonNodes: THREE.Mesh[] = [];
   private coreStabilizerBeams!: THREE.LineSegments;
   private coreStabilizerBeamMat!: THREE.LineBasicMaterial;
   private corePulseOrbs: THREE.Mesh[] = [];
+  private kamuiErase = 0;
+  private skyDomeMesh!: THREE.Mesh;
+  private farStarsPoints!: THREE.Points;
   private demonCoreLight!: THREE.PointLight;
   private demonCoreCollider!: THREE.Mesh;
   private kamuiTimer = 0;
@@ -259,6 +268,10 @@ export class UniverseEngine {
   private lastDateSent = 0;
   private clockT = 0;
   private disposed = false;
+  private orbitMomentumX = 0;
+  private orbitMomentumY = 0;
+  private lastDragDx = 0;
+  private lastDragDy = 0;
 
   constructor(canvas: HTMLCanvasElement, bodies: CosmicBody[], cb: EngineCallbacks) {
     this.cb = cb;
@@ -266,11 +279,11 @@ export class UniverseEngine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.setClearColor('#04060c', 1);
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 900000);
-    this.scene.add(new THREE.AmbientLight(0x2a3a55, 0.4));
-    const sun = new THREE.PointLight(0xfff0d6, 1.1, 0, 0);
+    this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 8000000);
+    this.scene.add(new THREE.AmbientLight(0x1e293b, 0.3));
+    const sun = new THREE.PointLight(0xfff0d6, 0.95, 0, 0);
     this.scene.add(sun);
 
     this.buildSky();
@@ -293,13 +306,20 @@ export class UniverseEngine {
     this.composer = new EffectComposer(this.renderer);
     this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.18, 0.2, 0.88);
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.12, 0.15, 0.90);
     this.composer.addPass(this.bloomPass);
     this.portalPass = new ShaderPass({
       uniforms: {
         tDiffuse: { value: null }, uCenter: { value: new THREE.Vector2(0.5, 0.5) },
         uStrength: { value: 0 }, uTime: { value: 0 }, uAspect: { value: 1 },
         uColor: { value: new THREE.Color('#f2c178') },
+        uTrail: {
+          value: [
+            new THREE.Vector2(0.5, 0.5),
+            new THREE.Vector2(0.5, 0.5),
+            new THREE.Vector2(0.5, 0.5),
+          ],
+        },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: portalFrag,
@@ -398,6 +418,7 @@ export class UniverseEngine {
       },
       () => 0.5 + R() * 1.0, () => [0.6, 0.68, 0.85], () => 0.25 + R() * 0.3, 1.2, false,
     );
+    this.farStarsPoints = far;
     this.scene.add(far);
     this.scene.add(this.gNeighborhood);
   }
@@ -405,13 +426,22 @@ export class UniverseEngine {
   /* the real-universe canvas: an inverted celestial sphere + faint deep-sky nebulosity */
   private buildSky() {
     this.backdropMat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 } },
-      vertexShader: backdropVert, fragmentShader: backdropFrag,
-      side: THREE.BackSide, depthWrite: false, fog: false,
+      uniforms: {
+        uTime: { value: 0 },
+        uKamuiErase: { value: 0 },
+        uVortexDir: { value: new THREE.Vector3(0, 0, -1) },
+      },
+      vertexShader: backdropVert,
+      fragmentShader: backdropFrag,
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      transparent: true,
     });
     const dome = new THREE.Mesh(new THREE.SphereGeometry(460000, 48, 32), this.backdropMat);
     dome.frustumCulled = false;
     this.scene.add(dome);
+    this.skyDomeMesh = dome;
 
     /* Deep sky volumetric nebulae using circular point clouds — zero quad plane boundaries */
     const mkNebulaPoints = (col: [number, number, number], center: [number, number, number], radius: number, count: number) => {
@@ -431,6 +461,7 @@ export class UniverseEngine {
         4.0,
         true,
       );
+      this.skyNebulae.push(pts.material as THREE.ShaderMaterial);
       this.scene.add(pts);
     };
     mkNebulaPoints([0.15, 0.35, 0.55], [-140000, 60000, -190000], 120000, 1600);
@@ -763,14 +794,87 @@ export class UniverseEngine {
     });
   }
 
-  private buildMultiverse() {
+  private buildMultiverse(customRealitiesList?: RealityConfig[]) {
     const R = Math.random;
+    const realitiesToBuild = customRealitiesList || REALITIES;
     this.multiverseColliders = [];
     this.clusterNodes = [];
+    this.multiverseMats = [];
+    this.realityGroups = {};
+    this.demonCorePulseRings = [];
+    this.demonCoreRings = [];
+    this.demonCoreSpires = [];
+    this.demonCoreJets = [];
+    this.demonCoreTachyonNodes = [];
+    this.corePulseOrbs = [];
+
+    /* 0. Giant Sovereign Multiverse Hypersphere Boundary (Enclosing ALL parallel realities & clusters inside) */
+    const giantSphereGroup = new THREE.Group();
+    const giantRadius = 960000;
+    this.giantMultiverseBoundaryMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uColorA: { value: new THREE.Color('#06b6d4') },
+        uColorB: { value: new THREE.Color('#8b5cf6') },
+        uKamuiErase: { value: 0 },
+        uVortexDir: { value: new THREE.Vector3(0, 0, -1) },
+      },
+      vertexShader: multiverseBoundaryVert,
+      fragmentShader: multiverseBoundaryFrag,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+    });
+    const giantSphereMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(giantRadius, 64, 48),
+      this.giantMultiverseBoundaryMat
+    );
+    giantSphereGroup.add(giantSphereMesh);
+
+    // Geodesic Coordinate Latitude / Longitude Latticework Rings
+    const giantRingMat = new THREE.MeshBasicMaterial({
+      color: 0x06b6d4,
+      transparent: true,
+      opacity: 0.28,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    // Equator Ring
+    const equatorRing = new THREE.Mesh(new THREE.TorusGeometry(giantRadius, 1800, 8, 160), giantRingMat);
+    giantSphereGroup.add(equatorRing);
+    // Polar Meridians
+    const meridian1 = new THREE.Mesh(new THREE.TorusGeometry(giantRadius, 1400, 8, 160), giantRingMat.clone());
+    meridian1.rotation.x = Math.PI / 2;
+    giantSphereGroup.add(meridian1);
+    const meridian2 = new THREE.Mesh(new THREE.TorusGeometry(giantRadius, 1400, 8, 160), giantRingMat.clone());
+    meridian2.rotation.y = Math.PI / 2;
+    giantSphereGroup.add(meridian2);
+
+    // Outer Multiverse Boundary Horizon Marker Points
+    const boundaryHalo = this.makePoints(
+      480,
+      (idx, arr) => {
+        const bp = Math.acos(2 * R() - 1);
+        const bt = R() * Math.PI * 2;
+        arr[idx * 3] = giantRadius * Math.sin(bp) * Math.cos(bt);
+        arr[idx * 3 + 1] = giantRadius * Math.cos(bp);
+        arr[idx * 3 + 2] = giantRadius * Math.sin(bp) * Math.sin(bt);
+      },
+      () => 2.5 + R() * 3.5,
+      (idx) => (idx % 2 === 0 ? [0.0, 0.96, 0.85] : [0.55, 0.35, 0.95]),
+      () => 0.45 + R() * 0.45,
+      2.8,
+      true
+    );
+    giantSphereGroup.add(boundaryHalo);
+    this.giantMultiverseSphereGroup = giantSphereGroup;
+    this.gMultiverse.add(giantSphereGroup);
 
     /* 1. Parallel Illuminated Bubble Universes corresponding to REALITIES & their Galaxy Clusters */
-    for (let i = 0; i < REALITIES.length; i++) {
-      const real = REALITIES[i];
+    for (let i = 0; i < realitiesToBuild.length; i++) {
+      const real = realitiesToBuild[i];
       const pos = new THREE.Vector3(...real.bubblePos);
       const size = real.bubbleSize;
       
@@ -780,7 +884,7 @@ export class UniverseEngine {
       const colA = new THREE.Color(real.colorA);
       const colB = new THREE.Color(real.colorB);
       const mat = new THREE.ShaderMaterial({
-        uniforms: { uTime: { value: 0 }, uColorA: { value: colA }, uColorB: { value: colB }, uOpacity: { value: 0.88 } },
+        uniforms: { uTime: { value: 0 }, uColorA: { value: colA }, uColorB: { value: colB }, uOpacity: { value: 0.85 }, uTearStrength: { value: 0 } },
         vertexShader: multiverseVert, fragmentShader: multiverseFrag,
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide,
       });
@@ -861,11 +965,11 @@ export class UniverseEngine {
           pos.z + Math.sin(initialA) * orbitRadius * Math.cos(orbitIncl),
         );
 
-        // Radiant Glowing Cluster Core Sprite
+        // Radiant Glowing Cluster Core Sprite (Dimmed chromatic glow, no blown-out white)
         const glowTex = makeGlowTexture(128, [
-          [0, 'rgba(255,255,255,1)'],
-          [0.22, cluster.color],
-          [0.55, `${cluster.color}55`],
+          [0, cluster.color],
+          [0.35, `${cluster.color}88`],
+          [0.7, `${cluster.color}22`],
           [1, 'rgba(0,0,0,0)'],
         ]);
         const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -874,7 +978,7 @@ export class UniverseEngine {
           depthWrite: false,
           transparent: true,
         }));
-        glowSprite.scale.setScalar(size * 0.24);
+        glowSprite.scale.setScalar(size * 0.12);
         nodeGroup.add(glowSprite);
 
         // Core Sphere representation
@@ -982,7 +1086,7 @@ export class UniverseEngine {
     
     // Luminous core for colliding pair
     const c1 = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: makeGlowTexture(128, [[0, 'rgba(255,255,240,0.7)'], [0.35, 'rgba(255,190,120,0.3)'], [1, 'rgba(0,0,0,0)']]),
+      map: makeGlowTexture(128, [[0, 'rgba(255,220,160,0.6)'], [0.35, 'rgba(255,160,80,0.25)'], [1, 'rgba(0,0,0,0)']]),
       blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
     }));
     c1.scale.setScalar(4500);
@@ -1004,12 +1108,15 @@ export class UniverseEngine {
     anchorRing2.rotation.y = Math.PI / 6;
     anchorShield.add(anchorRing1);
     anchorShield.add(anchorRing2);
-    anchorShield.position.set(...REALITIES[0].bubblePos);
-    anchorShield.scale.setScalar(REALITIES[0].bubbleSize);
+    const activeRealityObj = realitiesToBuild.find((r) => r.id === this.activeRealityId) || realitiesToBuild[0];
+    if (activeRealityObj) {
+      anchorShield.position.set(...activeRealityObj.bubblePos);
+      anchorShield.scale.setScalar(activeRealityObj.bubbleSize);
+    }
     this.activeRealityShieldMesh = anchorShield;
     this.gMultiverse.add(anchorShield);
 
-    /* 3. The Supreme Sovereign Multiverse Core & Universal Stabilizer Matrix */
+    /* 3. The Supreme Sovereign Multiverse Core & Universal Stabilizer Matrix (Calibrated, High-Contrast Detailing) */
     const demonCore = new THREE.Group();
     demonCore.position.set(0, 0, 0);
 
@@ -1020,6 +1127,7 @@ export class UniverseEngine {
         uColorCore: { value: new THREE.Color('#ff0055') },
         uColorAura: { value: new THREE.Color('#8b5cf6') },
         uHover: { value: 0 },
+        uTearStrength: { value: 0 },
       },
       vertexShader: demonCoreVert,
       fragmentShader: demonCoreFrag,
@@ -1028,46 +1136,90 @@ export class UniverseEngine {
     });
 
     // Layer 1: Central Sovereign Icosahedron Core (Plasma Shell) - Monumental Presence
-    const coreMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(8500, 4), this.demonCoreMat);
+    const coreMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(9200, 4), this.demonCoreMat);
     demonCore.add(coreMesh);
 
     // Layer 2: Inner Golden Quantum Octahedron Singularity
     this.demonCoreInnerGeom = new THREE.Mesh(
-      new THREE.OctahedronGeometry(5800, 2),
+      new THREE.OctahedronGeometry(6200, 2),
       new THREE.MeshBasicMaterial({
         color: 0xffb703,
         wireframe: true,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.65,
         blending: THREE.AdditiveBlending,
       })
     );
     demonCore.add(this.demonCoreInnerGeom);
 
-    // Layer 3: Central Nexus Crystal
+    // Layer 2.5: 4D Tesseract Hypercube Matrix (Nested rotating wireframe cubes)
+    const tesseractGroup = new THREE.Group();
+    const cubeMatOuter = new THREE.MeshBasicMaterial({
+      color: 0x00f5d4,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending,
+    });
+    const cubeMatInner = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.60,
+      blending: THREE.AdditiveBlending,
+    });
+    const cubeOuter = new THREE.Mesh(new THREE.BoxGeometry(4800, 4800, 4800), cubeMatOuter);
+    const cubeInner = new THREE.Mesh(new THREE.BoxGeometry(2400, 2400, 2400), cubeMatInner);
+    tesseractGroup.add(cubeOuter);
+    tesseractGroup.add(cubeInner);
+    demonCore.add(tesseractGroup);
+    this.demonCoreTesseract = tesseractGroup;
+
+    // Layer 3: Central Nexus Crystal (Dodecahedron)
     const coreNexus = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(2800, 1),
+      new THREE.DodecahedronGeometry(3200, 1),
       new THREE.MeshBasicMaterial({
         color: 0x00f5d4,
         wireframe: false,
         transparent: true,
-        opacity: 0.92,
+        opacity: 0.65,
         blending: THREE.AdditiveBlending,
       })
     );
     demonCore.add(coreNexus);
 
+    // Layer 4: Relativistic Polar Plasma Jets (+Y and -Y Energetic Cones - Calibrated Opacity)
+    this.demonCoreJets = [];
+    const jetMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.20,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const topJet = new THREE.Mesh(new THREE.ConeGeometry(2400, 95000, 32, 1, true), jetMat);
+    topJet.position.set(0, 48000, 0);
+    demonCore.add(topJet);
+    this.demonCoreJets.push(topJet);
+
+    const bottomJet = new THREE.Mesh(new THREE.ConeGeometry(2400, 95000, 32, 1, true), jetMat);
+    bottomJet.position.set(0, -48000, 0);
+    bottomJet.rotation.x = Math.PI;
+    demonCore.add(bottomJet);
+    this.demonCoreJets.push(bottomJet);
+
     // 4 Gyroscopic Armillary Stabilizer Rings (Managing & Stabilizing Space-Time)
     this.demonCoreRings = [];
     const ringColors = ['#f59e0b', '#06b6d4', '#8b5cf6', '#ff0055'];
-    const ringRadii = [12000, 16500, 21000, 26000];
-    const ringThickness = [90, 80, 70, 60];
+    const ringRadii = [14000, 19500, 25000, 31000];
+    const ringThickness = [110, 95, 80, 70];
     for (let r = 0; r < 4; r++) {
       const ringGeom = new THREE.TorusGeometry(ringRadii[r], ringThickness[r], 16, 120);
       const ringMat = new THREE.MeshBasicMaterial({
         color: new THREE.Color(ringColors[r]),
         transparent: true,
-        opacity: 0.88,
+        opacity: 0.65,
         blending: THREE.AdditiveBlending,
         side: THREE.DoubleSide,
         depthWrite: false,
@@ -1081,7 +1233,7 @@ export class UniverseEngine {
       // Add 6 Stabilizer Node Crystals per ring
       for (let n = 0; n < 6; n++) {
         const nAngle = (n / 6) * Math.PI * 2;
-        const nodeGeom = new THREE.OctahedronGeometry(450, 0);
+        const nodeGeom = new THREE.OctahedronGeometry(550, 0);
         const nodeMat = new THREE.MeshBasicMaterial({
           color: new THREE.Color(ringColors[r]),
           wireframe: true,
@@ -1093,12 +1245,32 @@ export class UniverseEngine {
       }
     }
 
+    // 6 Eccentric Tachyon Satellite Probes Orbiting the Core
+    this.demonCoreTachyonNodes = [];
+    for (let t = 0; t < 6; t++) {
+      const tGeom = new THREE.DodecahedronGeometry(600, 0);
+      const tMat = new THREE.MeshBasicMaterial({
+        color: t % 2 === 0 ? 0x00f5d4 : 0xf59e0b,
+        wireframe: true,
+        blending: THREE.AdditiveBlending,
+      });
+      const tNode = new THREE.Mesh(tGeom, tMat);
+      tNode.userData = {
+        radius: 36000 + t * 4500,
+        speed: 0.015 + t * 0.005,
+        incl: (t * Math.PI) / 6,
+        phase: t * 1.05,
+      };
+      demonCore.add(tNode);
+      this.demonCoreTachyonNodes.push(tNode);
+    }
+
     // 12 Radiating Sovereign Stabilizer Spires / Energy Monoliths
     this.demonCoreSpires = [];
     const spireMat = new THREE.MeshStandardMaterial({
       color: 0x090314,
       emissive: new THREE.Color('#8b5cf6'),
-      emissiveIntensity: 2.2,
+      emissiveIntensity: 1.1,
       metalness: 0.95,
       roughness: 0.15,
     });
@@ -1106,9 +1278,9 @@ export class UniverseEngine {
     for (let h = 0; h < numSpires; h++) {
       const hAngle = (h / numSpires) * Math.PI * 2;
       const pitch = (h % 3 === 0 ? 0 : h % 3 === 1 ? 0.52 : -0.52);
-      const spireGeom = new THREE.CylinderGeometry(200, 900, 9500, 6);
+      const spireGeom = new THREE.CylinderGeometry(240, 1100, 11000, 6);
       const spire = new THREE.Mesh(spireGeom, spireMat);
-      const dist = 12500;
+      const dist = 14500;
       spire.position.set(
         Math.cos(hAngle) * Math.cos(pitch) * dist,
         Math.sin(pitch) * dist,
@@ -1119,65 +1291,67 @@ export class UniverseEngine {
       this.demonCoreSpires.push(spire);
     }
 
-    // Harmonic Spacetime Pulse Wave Rings (Expanding Stabilizer Shockwaves)
+    // Dynamic Multidimensional Spacetime Gyroscopic Pulse Waves (Non-concentric spiral orientations)
     this.demonCorePulseRings = [];
-    for (let p = 0; p < 3; p++) {
-      const pulseGeom = new THREE.TorusGeometry(9000, 60, 12, 90);
+    const pulseColors = [0x00f5d4, 0xec4899, 0x8b5cf6, 0xf59e0b];
+    for (let p = 0; p < 4; p++) {
+      const pulseGeom = new THREE.TorusGeometry(11000, 75, 12, 90);
       const pulseMat = new THREE.MeshBasicMaterial({
-        color: 0x00f5d4,
+        color: pulseColors[p % pulseColors.length],
         transparent: true,
-        opacity: 0.6,
+        opacity: 0.35,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
       const pMesh = new THREE.Mesh(pulseGeom, pulseMat);
-      pMesh.rotation.x = Math.PI / 2;
-      pMesh.userData = { phase: p / 3, baseScale: 1.0 };
+      pMesh.rotation.x = (p * Math.PI) / 4 + 0.35;
+      pMesh.rotation.y = p * 0.78;
+      pMesh.rotation.z = (p * Math.PI) / 3;
+      pMesh.userData = { phase: p / 4, baseScale: 1.0, rotSpeed: 0.005 + p * 0.003 };
       demonCore.add(pMesh);
       this.demonCorePulseRings.push(pMesh);
     }
 
     // Swirling Celestial Mana Embers & Accretion Vortex
     const demonEmbers = this.makePoints(
-      1500,
+      2200,
       (idx, arr) => {
-        const rad = 9500 + Math.pow(R(), 0.6) * 22000;
+        const rad = 11000 + Math.pow(R(), 0.6) * 28000;
         const ang = R() * Math.PI * 2;
         const pAng = Math.acos(2 * R() - 1);
         arr[idx * 3] = rad * Math.sin(pAng) * Math.cos(ang);
-        arr[idx * 3 + 1] = rad * Math.cos(pAng) * 0.35 + (R() - 0.5) * 800;
+        arr[idx * 3 + 1] = rad * Math.cos(pAng) * 0.35 + (R() - 0.5) * 1200;
         arr[idx * 3 + 2] = rad * Math.sin(pAng) * Math.sin(ang);
       },
-      () => 3.5 + R() * 5.5,
+      () => 2.5 + R() * 4.5,
       (idx) => {
         const palette: [number, number, number][] = [
-          [0.0, 0.96, 0.83], // Cyan
-          [1.0, 0.72, 0.0],  // Amber Gold
-          [0.55, 0.36, 0.96], // Violet
-          [1.0, 0.0, 0.33],   // Sovereign Crimson
+          [0.0, 0.85, 0.75], // Cyan
+          [0.85, 0.60, 0.0],  // Amber Gold
+          [0.45, 0.28, 0.85], // Violet
+          [0.85, 0.0, 0.28],   // Sovereign Crimson
         ];
         return palette[idx % palette.length];
       },
-      () => 0.55 + R() * 0.45,
-      3.2,
+      () => 0.45 + R() * 0.35,
+      2.6,
       true
     );
     demonCore.add(demonEmbers);
 
-    // Balanced Sovereign Ambient Point Lights
-    this.demonCoreLight = new THREE.PointLight(0x8b5cf6, 2.8, 180000);
+    // Balanced Sovereign Ambient Point Lights (Dimmed to preserve crisp visual detail)
+    this.demonCoreLight = new THREE.PointLight(0x8b5cf6, 0.45, 180000);
     demonCore.add(this.demonCoreLight);
 
-    const cyanSubLight = new THREE.PointLight(0x00f5d4, 1.8, 140000);
+    const cyanSubLight = new THREE.PointLight(0x00f5d4, 0.30, 150000);
     demonCore.add(cyanSubLight);
 
-    // Multiverse Quantum Stabilization Beams (Direct Energy Tethers to all 20 Realities)
+    // Multiverse Quantum Stabilization Beams (Direct Energy Tethers to all Realities)
     const beamPositions: number[] = [];
     const realityPositions: THREE.Vector3[] = [];
-    REALITIES.forEach((r) => {
+    realitiesToBuild.forEach((r) => {
       const targetPos = new THREE.Vector3(...r.bubblePos);
       realityPositions.push(targetPos);
-      // Line from Core (0,0,0) to target reality
       beamPositions.push(0, 0, 0);
       beamPositions.push(targetPos.x, targetPos.y, targetPos.z);
     });
@@ -1187,21 +1361,21 @@ export class UniverseEngine {
     this.coreStabilizerBeamMat = new THREE.LineBasicMaterial({
       color: 0x06b6d4,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.25,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
     this.coreStabilizerBeams = new THREE.LineSegments(beamGeom, this.coreStabilizerBeamMat);
     this.gMultiverse.add(this.coreStabilizerBeams);
 
-    // 20 Quantum Pulse Orbs travelling along the stabilization lines
+    // Quantum Pulse Orbs travelling along the stabilization lines
     this.corePulseOrbs = [];
     realityPositions.forEach((pos, idx) => {
-      const orbGeom = new THREE.SphereGeometry(180, 8, 8);
+      const orbGeom = new THREE.SphereGeometry(220, 8, 8);
       const orbMat = new THREE.MeshBasicMaterial({
         color: idx % 2 === 0 ? 0x00f5d4 : 0xf59e0b,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.75,
         blending: THREE.AdditiveBlending,
       });
       const orb = new THREE.Mesh(orbGeom, orbMat);
@@ -1212,7 +1386,7 @@ export class UniverseEngine {
 
     // Interactive Raycasting Collider for the Core
     this.demonCoreCollider = new THREE.Mesh(
-      new THREE.SphereGeometry(26000, 16, 14),
+      new THREE.SphereGeometry(32000, 16, 14),
       new THREE.MeshBasicMaterial({ visible: false })
     );
     this.demonCoreCollider.userData = { isDemonCore: true, id: 'demon-core' };
@@ -1224,6 +1398,14 @@ export class UniverseEngine {
 
     this.gMultiverse.add(gPair);
     this.scene.add(this.gMultiverse);
+  }
+
+  public rebuildMultiverse(customRealitiesList?: RealityConfig[]) {
+    while (this.gMultiverse.children.length > 0) {
+      const obj = this.gMultiverse.children[0];
+      this.gMultiverse.remove(obj);
+    }
+    this.buildMultiverse(customRealitiesList);
   }
 
   private buildLevels() {
@@ -1506,6 +1688,8 @@ export class UniverseEngine {
       this.mouseScreenY = e.clientY;
       if (this.dragging) {
         const dx = e.clientX - this.lastPX, dy = e.clientY - this.lastPY;
+        this.lastDragDx = dx;
+        this.lastDragDy = dy;
         if (this.panMode) {
           /* straight drag — slide the whole view up/down/sideways */
           const k = this.currentDist() * 0.0016;
@@ -1515,9 +1699,9 @@ export class UniverseEngine {
           const maxPan = Math.max(120, this.currentDist() * 1.4);
           if (this.panOffset.length() > maxPan) this.panOffset.setLength(maxPan);
         } else {
-          /* circular drag — orbit */
-          this.tTheta -= dx * 0.0052;
-          this.tPhi = Math.min(Math.PI - 0.08, Math.max(0.08, this.tPhi - dy * 0.0052));
+          /* circular drag — orbit: drag right rotates right, drag left rotates left */
+          this.tTheta += dx * 0.0048;
+          this.tPhi = Math.min(Math.PI - 0.05, Math.max(0.05, this.tPhi - dy * 0.0048));
         }
         this.lastPX = e.clientX; this.lastPY = e.clientY;
       }
@@ -1529,6 +1713,10 @@ export class UniverseEngine {
       this.dragging = false; this.panMode = false;
       try { canvas.releasePointerCapture(e.pointerId); } catch { /* noop */ }
       const moved = Math.hypot(e.clientX - this.downX, e.clientY - this.downY);
+      if (moved > 4 && !this.panMode) {
+        this.orbitMomentumX = this.lastDragDx * 0.0028;
+        this.orbitMomentumY = this.lastDragDy * 0.0028;
+      }
       if (allowClick && moved < 7 && performance.now() - this.downT < 600 && e.button === 0) this.handleClick();
     };
     canvas.addEventListener('pointerup', (e) => endDrag(e, true));
@@ -2076,7 +2264,10 @@ export class UniverseEngine {
       const kEase = Math.sin(this.kamuiTimer * Math.PI);
       ease = Math.max(ease, kEase * 1.15);
     }
-    pu.uStrength.value = (this.portal.phase === 'idle' && this.kamuiTimer <= 0) ? 0 : ease;
+    const portalVal = (this.portal.phase === 'idle' && this.kamuiTimer <= 0) ? 0 : ease;
+    const scaleKamuiPulse = Math.sin(this.kamuiErase * Math.PI) * 1.15;
+    pu.uStrength.value = Math.max(portalVal, scaleKamuiPulse);
+
     if (this.portal.phase !== 'idle') {
       const b = this.bodies.find((x) => x.data.id === this.portal.bodyId);
       if (b) {
@@ -2085,7 +2276,16 @@ export class UniverseEngine {
         if (v.z < 1) this.portal.uv.set(v.x * 0.5 + 0.5, v.y * 0.5 + 0.5);
       }
       (pu.uCenter.value as THREE.Vector2).copy(this.portal.uv);
+    } else {
+      (pu.uCenter.value as THREE.Vector2).set(0.5, 0.5);
     }
+
+    // Shift trailing history points for lingering space-time wake
+    const trailArr = pu.uTrail.value as THREE.Vector2[];
+    const curCenter = pu.uCenter.value as THREE.Vector2;
+    trailArr[2].lerp(trailArr[1], 0.45);
+    trailArr[1].lerp(trailArr[0], 0.55);
+    trailArr[0].lerp(curCenter, 0.70);
 
     /* cinematic fov kick */
     const targetFov = 50 + ease * 14 - this.coreT * 4;
@@ -2093,6 +2293,16 @@ export class UniverseEngine {
     this.camera.updateProjectionMatrix();
 
     /* camera */
+    if (!this.dragging) {
+      if (Math.abs(this.orbitMomentumX) > 0.00001) {
+        this.tTheta += this.orbitMomentumX;
+        this.orbitMomentumX *= 0.92;
+      }
+      if (Math.abs(this.orbitMomentumY) > 0.00001) {
+        this.tPhi = Math.min(Math.PI - 0.05, Math.max(0.05, this.tPhi - this.orbitMomentumY));
+        this.orbitMomentumY *= 0.92;
+      }
+    }
     const damp = Math.min(1, dt * 5.2);
     this.theta += (this.tTheta - this.theta) * damp;
     this.phi += (this.tPhi - this.phi) * damp;
@@ -2312,10 +2522,22 @@ export class UniverseEngine {
         }
       });
     }
-    this.multiverseMats.forEach((m) => { m.uniforms.uTime.value = this.clockT; });
+    const kamuiTear = Math.sin(this.kamuiErase * Math.PI) * 1.35;
+    const portalTear = this.portal.phase !== 'idle' ? Math.sin(this.portal.t * Math.PI) * 1.5 : 0;
+    const baseTear = Math.max(kamuiTear, portalTear);
+
+    this.multiverseMats.forEach((m) => {
+      m.uniforms.uTime.value = this.clockT;
+      const isHover = this.hoveredId && this.hoveredId.startsWith('reality:');
+      const tVal = Math.max(baseTear, isHover ? 0.35 + 0.15 * Math.sin(this.clockT * 3.5) : 0);
+      if (m.uniforms.uTearStrength) m.uniforms.uTearStrength.value = tVal;
+    });
     if (this.demonCoreMat) {
       this.demonCoreMat.uniforms.uTime.value = this.clockT;
       this.demonCoreMat.uniforms.uHover.value = (this.hoveredId === 'demon-core' ? 1.0 : 0.0);
+      const isCoreHover = this.hoveredId === 'demon-core';
+      const cTVal = Math.max(baseTear, isCoreHover ? 0.65 + 0.25 * Math.sin(this.clockT * 4.0) : 0);
+      if (this.demonCoreMat.uniforms.uTearStrength) this.demonCoreMat.uniforms.uTearStrength.value = cTVal;
     }
     if (this.demonCoreGroup) {
       this.demonCoreGroup.rotation.y += 0.005;
@@ -2327,6 +2549,20 @@ export class UniverseEngine {
         this.demonCoreInnerGeom.rotation.z += 0.008;
       }
 
+      // 4D Tesseract hypercube matrix rotation
+      if (this.demonCoreTesseract) {
+        this.demonCoreTesseract.rotation.x += 0.016;
+        this.demonCoreTesseract.rotation.y += 0.024;
+        this.demonCoreTesseract.rotation.z -= 0.012;
+      }
+
+      // Relativistic polar plasma jets flickering / pulsation
+      this.demonCoreJets.forEach((jet, idx) => {
+        const jetFlicker = 1.0 + 0.18 * Math.sin(this.clockT * 12.0 + idx * Math.PI);
+        const jetLength = 1.0 + 0.12 * Math.sin(this.clockT * 6.0 + idx * 2.0);
+        jet.scale.set(jetFlicker, jetLength, jetFlicker);
+      });
+
       // 4 Gyroscopic armillary stabilizer rings
       this.demonCoreRings.forEach((ring, idx) => {
         const dir = idx % 2 === 0 ? 1 : -1;
@@ -2335,13 +2571,25 @@ export class UniverseEngine {
         ring.rotation.x += 0.003;
       });
 
+      // Eccentric Tachyon Satellite Probes Orbiting the Core
+      this.demonCoreTachyonNodes.forEach((node) => {
+        const u = node.userData;
+        const a = u.phase + this.clockT * u.speed;
+        const tx = Math.cos(a) * u.radius;
+        const ty = Math.sin(a) * u.radius * Math.sin(u.incl);
+        const tz = Math.sin(a) * u.radius * Math.cos(u.incl);
+        node.position.set(tx, ty, tz);
+        node.rotation.x += 0.02;
+        node.rotation.y += 0.03;
+      });
+
       // 12 Sovereign Monolith Spires (Stabilizer field breathing)
       this.demonCoreSpires.forEach((spire, idx) => {
         const pulse = 1.0 + 0.12 * Math.sin(this.clockT * 2.4 + idx * 0.52);
         spire.scale.set(pulse, 1.0 + 0.08 * Math.sin(this.clockT * 2.0 + idx * 0.3), pulse);
       });
 
-      // Harmonic Spacetime Shockwave Pulse Rings (Stabilizing waves expanding outward)
+      // Multidimensional Spacetime Gyroscopic Pulse Waves
       this.demonCorePulseRings.forEach((pMesh) => {
         pMesh.userData.phase = (pMesh.userData.phase + 0.006) % 1.0;
         const ph = pMesh.userData.phase as number;
@@ -2349,7 +2597,10 @@ export class UniverseEngine {
         pMesh.scale.set(currentScaleCrit, currentScaleCrit, currentScaleCrit);
         const pMat = pMesh.material as THREE.MeshBasicMaterial;
         pMat.opacity = Math.sin(ph * Math.PI) * 0.55;
-        pMesh.rotation.z += 0.004;
+        const rotSpd = (pMesh.userData.rotSpeed as number) || 0.005;
+        pMesh.rotation.z += rotSpd;
+        pMesh.rotation.x += rotSpd * 0.7;
+        pMesh.rotation.y += rotSpd * 0.5;
       });
     }
 
@@ -2406,13 +2657,49 @@ export class UniverseEngine {
     });
 
     (this.horizon.material as THREE.ShaderMaterial).uniforms.uOpacity.value = wins.web * 0.5;
-    this.backdropMat.uniforms.uTime.value = this.clockT;
-    this.skyNebulae.forEach((m) => { m.uniforms.uTime.value = this.clockT * 0.4; });
+
+    // Kamui Spacetime Singularity Vortex Erase Animation for the Inner Reality Sky Sphere:
+    // When zooming out toward the Core / Multiverse level (d > 165000), the inner sphere twists into a Kamui vortex and erases
+    const targetKamui = THREE.MathUtils.clamp((d - 165000) / (205000 - 165000), 0, 1);
+    this.kamuiErase = THREE.MathUtils.damp(this.kamuiErase, targetKamui, 4.5, 0.016);
+
+    if (this.backdropMat) {
+      this.backdropMat.uniforms.uKamuiErase.value = this.kamuiErase;
+      this.backdropMat.uniforms.uTime.value = this.clockT;
+      const vDir = new THREE.Vector3();
+      this.camera.getWorldDirection(vDir);
+      (this.backdropMat.uniforms.uVortexDir.value as THREE.Vector3).copy(vDir);
+    }
+    if (this.giantMultiverseBoundaryMat) {
+      this.giantMultiverseBoundaryMat.uniforms.uTime.value = this.clockT;
+      this.giantMultiverseBoundaryMat.uniforms.uKamuiErase.value = wins.multiverse > 0.01 ? (1.0 - wins.multiverse) * 0.5 : 0;
+      const vDir = new THREE.Vector3();
+      this.camera.getWorldDirection(vDir);
+      (this.giantMultiverseBoundaryMat.uniforms.uVortexDir.value as THREE.Vector3).copy(vDir);
+    }
+    if (this.skyDomeMesh) {
+      this.skyDomeMesh.visible = this.kamuiErase < 0.998;
+    }
+    if (this.farStarsPoints) {
+      const farMat = this.farStarsPoints.material as THREE.ShaderMaterial;
+      if (farMat && farMat.uniforms && farMat.uniforms.uOpacity) {
+        farMat.uniforms.uOpacity.value = Math.max(0, 1 - this.kamuiErase);
+      }
+    }
+    this.skyNebulae.forEach((m) => {
+      if (m.uniforms && m.uniforms.uOpacity) {
+        m.uniforms.uOpacity.value = Math.max(0, 1 - this.kamuiErase);
+      }
+      m.uniforms.uTime.value = this.clockT * 0.4;
+    });
 
     this.clouds.forEach((c) => {
       c.mat.uniforms.uScale.value = (c.px * camLen) / 240;
       c.mat.uniforms.uTime.value = this.clockT;
     });
+    if (this.giantMultiverseBoundaryMat) {
+      this.giantMultiverseBoundaryMat.uniforms.uTime.value = this.clockT;
+    }
     this.setLevelOpacity(this.gNeighborhood, wins.neighborhood);
     this.setLevelOpacity(this.gGalaxy, wins.galaxy);
     this.setLevelOpacity(this.gCluster, wins.cluster);
