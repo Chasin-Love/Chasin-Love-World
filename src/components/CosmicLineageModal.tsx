@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { GalaxyClusterData, CosmicLineage } from '../realities';
 import {
   Globe, Sparkles, Orbit, Layers, ArrowRight, Compass,
-  ChevronRight, Disc, Activity, Eye, Zap, Shield, Sun, CircleDot
+  ChevronRight, Disc, Activity, Eye, Zap, Shield, Sun, CircleDot, Plus
 } from 'lucide-react';
 
 interface CosmicLineageModalProps {
@@ -19,9 +19,95 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
   onWarpToReality,
 }) => {
   const [activeStep, setActiveStep] = useState<number>(0);
+  const [createdItems, setCreatedItems] = useState<Record<string, string[]>>({});
   const { lineage } = cluster;
 
   const steps = [
+    {
+      id: 'multiverse',
+      title: 'Multiverse',
+      subtitle: 'Omni-Dimensional Bulk',
+      name: lineage.multiverse?.name || 'The Infinite Multiverse',
+      icon: Globe,
+      color: '#06b6d4',
+      data: {
+        'Multiverse ID': lineage.multiverse?.id || 'multiverse-prime',
+        'Bulk Dimensions': '11-Dimensional Calabi-Yau Manifold',
+        'Parallel Continuum Count': '20 Bubble Universes Active',
+        'Vacuum Energy': 'Cosmological Constant Vacuum Density',
+        'Containment Shield': 'Dimensional Barrier Isolated',
+      },
+      description: lineage.multiverse?.description || 'Omni-dimensional bulk space hosting all parallel bubble universes and quantum continuums.',
+      createLabel: '+ Create Bubble Reality',
+    },
+    {
+      id: 'reality',
+      title: 'Reality / Universe',
+      subtitle: 'Parallel Bubble Continuum',
+      name: lineage.reality.name,
+      icon: Shield,
+      color: '#8b5cf6',
+      data: {
+        'Reality ID': lineage.reality.id,
+        'Spectral Class': lineage.reality.spectral,
+        'Quantum Isolation': 'Dimensional Barrier Active',
+        'Anchor Star': `${lineage.reality.name} Anchor Star`,
+        'Singularity Vault': 'Isolated Eventide Black Hole',
+      },
+      description: lineage.reality.description,
+      createLabel: '+ Create Cosmic Web Sector',
+    },
+    {
+      id: 'cosmicWeb',
+      title: 'Cosmic Web',
+      subtitle: 'Filamentary Matrix',
+      name: lineage.cosmicWeb.name,
+      icon: Activity,
+      color: '#38bdf8',
+      data: {
+        'Filament ID': lineage.cosmicWeb.id,
+        'Baryonic Mass Density': lineage.cosmicWeb.filamentDensity,
+        'Dark Matter Halos': 'IllustrisTNG-Grade Filament Network',
+        'Void Boundaries': 'Cosmic Void Wall Structures',
+        'Expansion Rate': 'Hubble Constant H0 ~ 67.4 km/s/Mpc',
+      },
+      description: lineage.cosmicWeb.description,
+      createLabel: '+ Create Supercluster Complex',
+    },
+    {
+      id: 'superclusterComplex',
+      title: 'Supercluster Complex',
+      subtitle: 'Hyper-Scale Gravitational Complex',
+      name: lineage.superclusterComplex.name,
+      icon: Layers,
+      color: '#a855f7',
+      data: {
+        'Complex ID': lineage.superclusterComplex.id,
+        'Spatial Span': lineage.superclusterComplex.spanMly,
+        'Gravitational Well': 'Great Attractor Anomaly Well',
+        'Filament Infall': '420 km/s Infall Stream Velocity',
+        'Node Density': 'High-Mass Supercluster Node Array',
+      },
+      description: lineage.superclusterComplex.description,
+      createLabel: '+ Create Supercluster Node',
+    },
+    {
+      id: 'supercluster',
+      title: 'Supercluster',
+      subtitle: 'Cluster Association',
+      name: lineage.supercluster.name,
+      icon: Layers,
+      color: '#3b82f6',
+      data: {
+        'Supercluster ID': lineage.supercluster.id,
+        'Member Clusters': `${lineage.supercluster.clustersCount} Galaxy Clusters`,
+        'Hot Gas Fraction': '12% Intergalactic Intracluster Gas',
+        'Core Velocity Dispersion': '850 km/s Velocity Dispersion',
+        'Mass Equivalence': '10^15 Solar Masses M☉',
+      },
+      description: lineage.supercluster.description,
+      createLabel: '+ Create Galaxy Cluster',
+    },
     {
       id: 'cluster',
       title: 'Galaxy Cluster / Group',
@@ -38,6 +124,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
         'Gravitational Binding': 'Virialized dark matter halo & sub-halo clusters',
       },
       description: lineage.galaxyCluster.description,
+      createLabel: '+ Create Member Galaxy',
     },
     {
       id: 'galaxy',
@@ -55,6 +142,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
         'Rotational Velocity': '220 km/s flat rotation curve',
       },
       description: lineage.galaxy.description,
+      createLabel: '+ Create Galactic Region',
     },
     {
       id: 'region',
@@ -71,6 +159,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
         'Cosmic Ray Flux': 'Shielded by local interstellar magnetic bubble',
       },
       description: lineage.galacticRegion.description,
+      createLabel: '+ Create Spiral Arm',
     },
     {
       id: 'arm',
@@ -87,6 +176,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
         'Stellar Infall Rate': '1.8 Solar masses / year',
       },
       description: lineage.spiralArm.description,
+      createLabel: '+ Create Star-Forming Region',
     },
     {
       id: 'nebula',
@@ -104,6 +194,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
         'Trigger Mechanism': 'Supernova shock compression & photo-ionization',
       },
       description: lineage.starFormingRegion.description,
+      createLabel: '+ Create Stellar System',
     },
     {
       id: 'system',
@@ -121,10 +212,20 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
         'Vault Isolation': 'Quantum eventide containment active',
       },
       description: lineage.stellarSystem.description,
+      createLabel: '+ Create Celestial Planet',
     },
   ];
 
   const current = steps[activeStep];
+
+  const handleCreateMore = (stepId: string) => {
+    const num = (createdItems[stepId]?.length || 0) + 1;
+    const newItemName = `${current.name} Branch #${num}`;
+    setCreatedItems((prev) => ({
+      ...prev,
+      [stepId]: [...(prev[stepId] || []), newItemName],
+    }));
+  };
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xl animate-fade-in select-none">
@@ -141,7 +242,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-cyan-300 font-semibold">
-                  ASTRONOMICAL SCALE HIERARCHY
+                  11-STAGE COSMIC HIERARCHY
                 </span>
                 <span className="text-slate-400">·</span>
                 <span className="font-mono text-[9px] text-amber-300">{realityName}</span>
@@ -159,7 +260,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-white/[0.06] hover:bg-white/[0.15] border border-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors font-bold text-sm backdrop-blur-md"
+            className="w-8 h-8 rounded-xl bg-white/[0.06] hover:bg-white/[0.15] border border-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors font-bold text-sm backdrop-blur-md cursor-pointer"
           >
             ✕
           </button>
@@ -167,7 +268,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
 
         {/* Step-by-Step Cosmic Lineage Interactive Breadcrumb Strip */}
         <div className="px-6 py-3 border-b border-white/10 bg-white/[0.01] overflow-x-auto custom-scroll">
-          <div className="flex items-center justify-between min-w-[700px] gap-2">
+          <div className="flex items-center justify-between min-w-[1000px] gap-2">
             {steps.map((s, idx) => {
               const isSelected = idx === activeStep;
               const Icon = s.icon;
@@ -175,7 +276,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
                 <button
                   key={s.id}
                   onClick={() => setActiveStep(idx)}
-                  className={`flex-1 flex items-center gap-2 p-2 rounded-xl border transition-all text-left backdrop-blur-md ${
+                  className={`flex-1 flex items-center gap-2 p-2 rounded-xl border transition-all text-left backdrop-blur-md cursor-pointer ${
                     isSelected
                       ? 'bg-cyan-500/25 border-cyan-400/70 shadow-[0_0_15px_rgba(6,182,212,0.25)]'
                       : 'bg-white/[0.03] hover:bg-white/[0.08] border-white/10 text-slate-400 hover:text-slate-200'
@@ -212,7 +313,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-cyan-300 font-bold">
-                        STAGE {activeStep + 1} OF 6
+                        STAGE {activeStep + 1} OF 11
                       </span>
                       <span className="text-slate-500">·</span>
                       <span className="font-mono text-[10px] text-amber-300">{current.subtitle}</span>
@@ -231,51 +332,102 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
                 <div className="mt-4 p-3.5 rounded-xl bg-slate-950/40 border border-white/10 text-slate-200 text-xs leading-relaxed font-body backdrop-blur-sm">
                   {current.description}
                 </div>
+
+                {/* Controlled "+ Create More" Expansion Control */}
+                <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
+                  <div className="text-xs text-slate-300">
+                    Custom Structures: <span className="font-mono font-bold text-cyan-300">{createdItems[current.id]?.length || 0}</span>
+                  </div>
+                  <button
+                    onClick={() => handleCreateMore(current.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-400/40 text-cyan-200 hover:text-white font-mono text-xs font-semibold transition-all backdrop-blur-md cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{current.createLabel}</span>
+                  </button>
+                </div>
+
+                {createdItems[current.id] && createdItems[current.id].length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {createdItems[current.id].map((itemName, idx) => (
+                      <span key={idx} className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-cyan-950/40 border border-cyan-400/30 text-cyan-200">
+                        ✦ {itemName}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Complete Lineage Path Visual Indicator */}
               <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md">
                 <h4 className="font-mono text-[9px] uppercase tracking-[0.2em] text-cyan-300 font-semibold mb-3">
-                  ASTRONOMICAL LINEAGE TREE
+                  COMPLETE 11-LEVEL COSMIC HIERARCHY TREE
                 </h4>
-                <div className="space-y-2 font-mono text-[11px]">
+                <div className="space-y-1.5 font-mono text-[10.5px]">
                   <div className="flex items-center gap-2 text-slate-300">
                     <span className="w-4 text-cyan-400 font-bold">1</span>
-                    <span className="text-slate-400">Cluster / Group:</span>
-                    <span className="font-semibold text-white">{lineage.galaxyCluster.name}</span>
-                    <span className="text-xs text-cyan-300 font-normal">({lineage.galaxyCluster.galaxiesCount} galaxies)</span>
+                    <span className="text-slate-400">Multiverse:</span>
+                    <span className="font-semibold text-white">{lineage.multiverse?.name || 'The Infinite Multiverse'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pl-2 text-slate-300">
+                    <span className="text-slate-500">↳</span>
+                    <span className="w-4 text-purple-400 font-bold">2</span>
+                    <span className="text-slate-400">Reality:</span>
+                    <span className="font-semibold text-purple-200">{lineage.reality.name}</span>
                   </div>
                   <div className="flex items-center gap-2 pl-4 text-slate-300">
                     <span className="text-slate-500">↳</span>
-                    <span className="w-4 text-purple-400 font-bold">2</span>
-                    <span className="text-slate-400">Galaxy:</span>
-                    <span className="font-semibold text-purple-200">{lineage.galaxy.name}</span>
-                    <span className="text-xs text-slate-400">({lineage.galaxy.type})</span>
+                    <span className="w-4 text-cyan-400 font-bold">3</span>
+                    <span className="text-slate-400">Cosmic Web:</span>
+                    <span className="font-semibold text-cyan-200">{lineage.cosmicWeb.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pl-6 text-slate-300">
+                    <span className="text-slate-500">↳</span>
+                    <span className="w-4 text-indigo-400 font-bold">4</span>
+                    <span className="text-slate-400">Complex:</span>
+                    <span className="font-semibold text-indigo-200">{lineage.superclusterComplex.name}</span>
                   </div>
                   <div className="flex items-center gap-2 pl-8 text-slate-300">
                     <span className="text-slate-500">↳</span>
-                    <span className="w-4 text-cyan-400 font-bold">3</span>
-                    <span className="text-slate-400">Galactic Region:</span>
-                    <span className="font-semibold text-cyan-200">{lineage.galacticRegion.name}</span>
+                    <span className="w-4 text-blue-400 font-bold">5</span>
+                    <span className="text-slate-400">Supercluster:</span>
+                    <span className="font-semibold text-blue-200">{lineage.supercluster.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pl-10 text-slate-300">
+                    <span className="text-slate-500">↳</span>
+                    <span className="w-4 text-teal-400 font-bold">6</span>
+                    <span className="text-slate-400">Cluster / Group:</span>
+                    <span className="font-semibold text-teal-200">{lineage.galaxyCluster.name}</span>
                   </div>
                   <div className="flex items-center gap-2 pl-12 text-slate-300">
                     <span className="text-slate-500">↳</span>
-                    <span className="w-4 text-amber-400 font-bold">4</span>
-                    <span className="text-slate-400">Spiral Arm:</span>
-                    <span className="font-semibold text-amber-200">{lineage.spiralArm.name}</span>
+                    <span className="w-4 text-purple-400 font-bold">7</span>
+                    <span className="text-slate-400">Galaxy:</span>
+                    <span className="font-semibold text-purple-200">{lineage.galaxy.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pl-14 text-slate-300">
+                    <span className="text-slate-500">↳</span>
+                    <span className="w-4 text-cyan-400 font-bold">8</span>
+                    <span className="text-slate-400">Galactic Region:</span>
+                    <span className="font-semibold text-cyan-200">{lineage.galacticRegion.name}</span>
                   </div>
                   <div className="flex items-center gap-2 pl-16 text-slate-300">
                     <span className="text-slate-500">↳</span>
-                    <span className="w-4 text-pink-400 font-bold">5</span>
+                    <span className="w-4 text-amber-400 font-bold">9</span>
+                    <span className="text-slate-400">Spiral Arm:</span>
+                    <span className="font-semibold text-amber-200">{lineage.spiralArm.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pl-18 text-slate-300">
+                    <span className="text-slate-500">↳</span>
+                    <span className="w-4 text-pink-400 font-bold">10</span>
                     <span className="text-slate-400">Star Nursery:</span>
                     <span className="font-semibold text-pink-200">{lineage.starFormingRegion.name}</span>
                   </div>
                   <div className="flex items-center gap-2 pl-20 text-slate-300">
                     <span className="text-slate-500">↳</span>
-                    <span className="w-4 text-emerald-400 font-bold">6</span>
+                    <span className="w-4 text-emerald-400 font-bold">11</span>
                     <span className="text-slate-400">Stellar System:</span>
                     <span className="font-semibold text-emerald-300">{lineage.stellarSystem.starName}</span>
-                    <span className="text-xs text-emerald-400">({lineage.stellarSystem.worldsCount} worlds)</span>
                   </div>
                 </div>
               </div>
@@ -306,14 +458,14 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
                 <button
                   disabled={activeStep === 0}
                   onClick={() => setActiveStep((s) => Math.max(0, s - 1))}
-                  className="flex-1 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] disabled:opacity-30 disabled:pointer-events-none border border-white/10 text-xs font-mono transition-all backdrop-blur-md"
+                  className="flex-1 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] disabled:opacity-30 disabled:pointer-events-none border border-white/10 text-xs font-mono transition-all backdrop-blur-md cursor-pointer"
                 >
                   ← Scale Up
                 </button>
                 <button
                   disabled={activeStep === steps.length - 1}
                   onClick={() => setActiveStep((s) => Math.min(steps.length - 1, s + 1))}
-                  className="flex-1 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/35 disabled:opacity-30 disabled:pointer-events-none border border-cyan-400/40 text-cyan-200 text-xs font-mono transition-all backdrop-blur-md"
+                  className="flex-1 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/35 disabled:opacity-30 disabled:pointer-events-none border border-cyan-400/40 text-cyan-200 text-xs font-mono transition-all backdrop-blur-md cursor-pointer"
                 >
                   Scale Down →
                 </button>
@@ -326,13 +478,13 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
         <div className="px-6 py-4 border-t border-white/10 bg-white/[0.02] flex items-center justify-between">
           <div className="flex items-center gap-2 font-mono text-[10px] text-slate-400">
             <Orbit className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Full Astrophysical Chain: Cluster → Galaxy → Region → Arm → Nebula → System</span>
+            <span>Complete 11-Level Astronomical Chain: Multiverse → ... → Stellar System</span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-slate-200 text-xs font-medium backdrop-blur-md transition-all"
+              className="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-slate-200 text-xs font-medium backdrop-blur-md transition-all cursor-pointer"
             >
               Close
             </button>
@@ -342,7 +494,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
                 onWarpToReality(cluster.realityId);
                 onClose();
               }}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs backdrop-blur-md transition-all shadow-[0_0_15px_rgba(6,182,212,0.35)]"
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs backdrop-blur-md transition-all shadow-[0_0_15px_rgba(6,182,212,0.35)] cursor-pointer"
             >
               <Zap className="w-3.5 h-3.5" />
               <span>Warp to Reality System</span>

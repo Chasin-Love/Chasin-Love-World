@@ -47,18 +47,21 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
   const activeReality = getReality(activeRealityId, universeState.customRealityDescriptions);
 
   const hierarchyStages = [
+    { label: 'Multiverse', short: 'Bulk', key: 'MULTIVERSE', desc: 'Omni-dimensional bulk space hosting all parallel bubble realities' },
+    { label: 'Reality / Universe', short: 'Reality', key: 'REALITY', desc: 'Isolated universe continuum with unique physical parameters' },
+    { label: 'Cosmic Web', short: 'Web', key: 'COSMIC WEB', desc: 'Observable universe dark matter filaments & voids' },
+    { label: 'Supercluster Complex', short: 'Complex', key: 'COMPLEX', desc: 'Hyper-scale gravitational complex containing multiple superclusters' },
+    { label: 'Supercluster', short: 'Supercluster', key: 'SUPERCLUSTER', desc: 'Virgo & Laniakea supercluster galaxy streams' },
+    { label: 'Galaxy Cluster / Group', short: 'Cluster', key: 'GALAXY CLUSTER', desc: 'Local group, interacting galaxies & satellite cluster' },
+    { label: 'Galaxy', short: 'Galaxy', key: 'SPIRAL GALAXY', desc: 'The Milliandra galactic disk & luminous core' },
+    { label: 'Galactic Region', short: 'Region', key: 'REGION', desc: 'Local galactic quadrant & stellar neighborhood' },
+    { label: 'Spiral Arm', short: 'Arm', key: 'SPIRAL ARM', desc: 'Local density wave spur & starburst arm' },
+    { label: 'Star-Forming Region', short: 'Nursery', key: 'STAR-FORMING', desc: 'Stellar nursery & molecular cloud forge' },
     { label: 'Stellar System', short: 'System', key: 'STELLAR SYSTEM', desc: 'Planets, moons, rings & central star' },
-    { label: 'Star-Forming Region', short: 'Nursery', key: 'STAR-FORMING', desc: 'Stellar nursery & local stellar neighborhood' },
-    { label: 'Spiral Arm', short: 'Spiral Arm', key: 'SPIRAL ARM', desc: 'Local spiral arm & galactic region' },
-    { label: 'Spiral Galaxy', short: 'Galaxy', key: 'SPIRAL GALAXY', desc: 'The Milliandra galactic disk & luminous core' },
-    { label: 'Galaxy Cluster & Local Group', short: 'Cluster', key: 'GALAXY CLUSTER', desc: 'Local group, interacting galaxies & satellite cluster' },
-    { label: 'Supercluster Complex', short: 'Supercluster', key: 'SUPERCLUSTER', desc: 'Virgo & Laniakea supercluster galaxy streams' },
-    { label: 'Cosmic Web', short: 'Cosmic Web', key: 'COSMIC WEB', desc: 'Observable universe dark matter filaments & nodes' },
-    { label: 'The Multiverse', short: 'Multiverse', key: 'MULTIVERSE', desc: 'Parallel bubble universes floating in hyperspace' },
   ];
 
   const activeStageIndex = hierarchyStages.findIndex(s => currentScaleLabel.toUpperCase().includes(s.key));
-  const currentIdx = activeStageIndex !== -1 ? activeStageIndex : (currentScaleLabel.includes('SURFACE') || currentScaleLabel.includes('APPROACH') ? 0 : 0);
+  const currentIdx = activeStageIndex !== -1 ? activeStageIndex : (currentScaleLabel.includes('SURFACE') || currentScaleLabel.includes('APPROACH') ? 10 : 10);
 
   const handleCreateReality = (params: {
     name: string;
@@ -137,7 +140,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
           >
             <ShieldCheck className="w-2.5 h-2.5 text-cyan-400" />
             <span className="hidden sm:inline">BARRIER:</span>
-            <span className="font-semibold text-cyan-200">{currentIdx === 7 ? 'MACRO BULK' : 'ISOLATED'}</span>
+            <span className="font-semibold text-cyan-200">{currentIdx === 0 ? 'MACRO BULK' : 'ISOLATED'}</span>
           </div>
 
           <div className="h-3 w-[1px] bg-white/15 mx-0.5" />
@@ -157,10 +160,10 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                 ? 'text-cyan-300 bg-cyan-500/15 border-cyan-400/45' 
                 : 'text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.1] border-white/10'
             }`}
-            title="Toggle 8-Stage Cosmic Hierarchy Navigator"
+            title="Toggle 11-Stage Cosmic Hierarchy Navigator"
           >
             <Compass className="w-3 h-3" />
-            <span>Hierarchy (8)</span>
+            <span>Hierarchy (11)</span>
           </button>
 
           <div className="h-3 w-[1px] bg-white/15 mx-0.5" />
@@ -196,9 +199,9 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
           )}
         </div>
 
-        {/* 8-Stage Interactive Cosmic Hierarchy Breadcrumb Ribbon */}
+        {/* 11-Stage Interactive Cosmic Hierarchy Breadcrumb Ribbon */}
         {showHierarchyBar && (
-          <div className="pointer-events-auto flex items-center gap-1 bg-slate-950/20 hover:bg-slate-950/30 backdrop-blur-md border border-cyan-400/20 rounded-2xl px-3 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.3)] text-[11px] max-w-[95vw] overflow-x-auto custom-scroll transition-all">
+          <div className="pointer-events-auto flex items-center gap-1 bg-slate-950/20 hover:bg-slate-950/30 backdrop-blur-md border border-cyan-400/20 rounded-2xl px-3 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.3)] text-[11px] max-w-[98vw] overflow-x-auto custom-scroll transition-all">
             <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400/80 mr-1 hidden sm:inline">SCALE:</span>
             {hierarchyStages.map((stage, idx) => {
               const isActive = currentIdx === idx;
@@ -247,7 +250,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                 <div>
                   <h2 className="text-lg font-bold text-white tracking-wide drop-shadow-sm">Parallel Realities Directory</h2>
                   <p className="text-xs text-slate-300/80">
-                    {allRealities.length} parallel realities across the Multiverse. Each reality hosts its own complete cosmic hierarchy.
+                    {allRealities.length} parallel realities across the Multiverse. Each reality hosts its own complete 11-stage cosmic hierarchy.
                   </p>
                 </div>
               </div>
@@ -255,7 +258,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/80 to-blue-600/80 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(6,182,212,0.3)] border border-cyan-300/40 backdrop-blur-md transition-all font-mono"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/80 to-blue-600/80 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(6,182,212,0.3)] border border-cyan-300/40 backdrop-blur-md transition-all font-mono cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>New Reality</span>
@@ -263,7 +266,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
 
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="w-8 h-8 rounded-xl bg-white/[0.06] hover:bg-white/[0.15] border border-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors font-bold text-sm backdrop-blur-md"
+                  className="w-8 h-8 rounded-xl bg-white/[0.06] hover:bg-white/[0.15] border border-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors font-bold text-sm backdrop-blur-md cursor-pointer"
                 >
                   ✕
                 </button>
@@ -337,7 +340,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                               onEditRealityLore(r);
                               setIsOpen(false);
                             }}
-                            className="px-2.5 py-1.5 rounded-lg text-xs font-mono flex items-center gap-1 bg-amber-400/10 hover:bg-amber-400/20 text-amber-200 hover:text-amber-100 border border-amber-300/30 transition-all backdrop-blur-md"
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-mono flex items-center gap-1 bg-amber-400/10 hover:bg-amber-400/20 text-amber-200 hover:text-amber-100 border border-amber-300/30 transition-all backdrop-blur-md cursor-pointer"
                             title="Edit Lore Description"
                           >
                             <Edit3 className="w-3 h-3" />
@@ -348,7 +351,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                         {!isProtected && (
                           <button
                             onClick={(e) => handleDeleteReality(e, r.id)}
-                            className="p-1.5 rounded-lg text-xs flex items-center justify-center bg-red-500/10 hover:bg-red-500/25 text-red-300 hover:text-red-100 border border-red-500/30 transition-all backdrop-blur-md"
+                            className="p-1.5 rounded-lg text-xs flex items-center justify-center bg-red-500/10 hover:bg-red-500/25 text-red-300 hover:text-red-100 border border-red-500/30 transition-all backdrop-blur-md cursor-pointer"
                             title="Delete this reality branch"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -361,7 +364,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                             onWarpReality(r.id);
                             setIsOpen(false);
                           }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all backdrop-blur-md ${
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all backdrop-blur-md cursor-pointer ${
                             isActive
                               ? 'bg-cyan-500 text-slate-950 hover:bg-cyan-400 font-bold shadow-[0_0_12px_rgba(6,182,212,0.4)]'
                               : 'bg-white/[0.08] hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-200 border border-white/10 hover:border-cyan-400/40'
@@ -414,7 +417,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                                 setIsOpen(false);
                               }
                             }}
-                            className="text-[10px] font-mono text-cyan-300 hover:text-white flex items-center gap-0.5 hover:underline"
+                            className="text-[10px] font-mono text-cyan-300 hover:text-white flex items-center gap-0.5 hover:underline cursor-pointer"
                           >
                             <Compass className="w-2.5 h-2.5" />
                             <span>Inspect Hierarchy</span>
@@ -483,7 +486,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                             onEditRealityLore(selectedPreview);
                             setIsOpen(false);
                           }}
-                          className="flex-1 py-2.5 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-300/30 hover:border-amber-300/60 text-amber-200 hover:text-amber-100 font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all backdrop-blur-md"
+                          className="flex-1 py-2.5 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-300/30 hover:border-amber-300/60 text-amber-200 hover:text-amber-100 font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all backdrop-blur-md cursor-pointer"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                           <span>Edit Lore</span>
@@ -495,7 +498,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                           onWarpReality(selectedPreview.id);
                           setIsOpen(false);
                         }}
-                        className="flex-1 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-md"
+                        className="flex-1 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-md cursor-pointer"
                       >
                         <Zap className="w-4 h-4" />
                         <span>Travel to {selectedPreview.name}</span>
@@ -516,7 +519,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
               <span className="font-mono text-[11px] text-cyan-300">{allRealities.length} Parallel Bubble Universes Available</span>
               <button
                 onClick={() => setIsOpen(false)}
-                className="px-4 py-1.5 bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-slate-200 rounded-xl text-xs backdrop-blur-md transition-all"
+                className="px-4 py-1.5 bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-slate-200 rounded-xl text-xs backdrop-blur-md transition-all cursor-pointer"
               >
                 Close
               </button>
@@ -527,4 +530,3 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
     </>
   );
 };
-
