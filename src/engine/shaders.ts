@@ -298,6 +298,104 @@ void main(){
   gl_FragColor = vec4(col * (0.8 + heat*1.4), a * 0.9);
 }`;
 
+/* ------------------------- SCIENTIFIC BLACK HOLE ----------------------- */
+/* Astrophysics-grounded Black Hole renderer:
+   Event horizon shadow + Ray-curving Gravitational Lensing + Accretion Disk with Relativistic Doppler asymmetry/redshift + Photon Ring */
+
+export const blackHoleVert = /* glsl */ `
+varying vec3 vN;
+varying vec3 vW;
+varying vec3 vP;
+void main(){
+  vN = normalize(mat3(modelMatrix) * normal);
+  vW = (modelMatrix * vec4(position, 1.0)).xyz;
+  vP = position;
+  gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0);
+}`;
+
+export const blackHoleFrag = /* glsl */ `
+uniform float uTime;
+uniform vec3 uColorDiskInner;
+uniform vec3 uColorDiskOuter;
+uniform float uRadius;
+varying vec3 vN;
+varying vec3 vW;
+varying vec3 vP;
+${NOISE}
+
+void main(){
+  vec3 viewDir = normalize(cameraPosition - vW);
+  vec3 n = normalize(vN);
+  float mu = max(dot(n, viewDir), 0.0);
+
+  // Radial distance from center in normalized local coordinates
+  float r = length(vP) / max(0.001, uRadius);
+
+  // 1. Schwarzschild Shadow & Event Horizon Boundary (r < 0.45 = Total Absorptive Shadow)
+  float shadowRadius = 0.45;
+  float eventHorizon = smoothstep(shadowRadius, shadowRadius * 1.15, r);
+
+  // 2. Gravitational Lensing Deflection / Einstein Ring Approximation
+  // Light paths near the compact mass bend radially around the shadow boundary
+  float lensDist = abs(r - shadowRadius * 1.35);
+  float gravitationalLens = exp(-lensDist * 8.0);
+
+  // 3. Photon Ring Structure (Bright critical photon orbit boundary r ~ 0.52)
+  float photonRingRadius = 0.52;
+  float photonRingWidth = 0.045;
+  float photonRing = exp(-pow((r - photonRingRadius) / photonRingWidth, 2.0));
+
+  // 4. Relativistic Accretion Disk with Orbital Motion & Doppler Boosting Asymmetry
+  float ang = atan(vP.z, vP.x);
+  float orbitalVelocity = 3.5 / (r + 0.2);
+  float angOrbit = ang + uTime * orbitalVelocity;
+
+  // Doppler beaming factor: approaching side (positive X/Z projected) is boosted and blueshifted
+  float dopplerFactor = sin(angOrbit) * 0.45 + 0.55;
+  float dopplerShift = pow(dopplerFactor, 2.5);
+
+  // High-frequency Magnetohydrodynamic (MHD) plasma turbulence
+  vec3 plasmaCoord = vec3(cos(angOrbit) * r * 4.0, vP.y * 3.0, sin(angOrbit) * r * 4.0 + uTime * 0.8);
+  float turbulence = fbm(plasmaCoord) * 0.6 + fbm3(plasmaCoord * 2.5) * 0.4;
+
+  // Thermal Radial Temperature Gradient: Extremely hot inner disk (ultraviolet/cyan-white) to cooler outer disk (amber/red)
+  vec3 innerCol = length(uColorDiskInner) > 0.05 ? uColorDiskInner : vec3(0.3, 0.85, 1.0);
+  vec3 outerCol = length(uColorDiskOuter) > 0.05 ? uColorDiskOuter : vec3(0.95, 0.42, 0.08);
+  vec3 hotCoreCol = vec3(1.0, 0.98, 0.92);
+
+  // Thermal blend based on radial distance
+  float heatFraction = pow(clamp(1.0 - (r - shadowRadius) / 1.8, 0.0, 1.0), 2.0);
+  vec3 diskColor = mix(outerCol, innerCol, heatFraction);
+  diskColor = mix(diskColor, hotCoreCol, pow(heatFraction, 2.5));
+
+  // Apply Doppler redshift/blueshift color modification
+  vec3 blueshift = vec3(0.2, 0.5, 1.2);
+  vec3 redshift = vec3(1.3, 0.3, 0.1);
+  diskColor *= mix(redshift, blueshift, dopplerFactor);
+  diskColor *= dopplerShift * (0.65 + 0.35 * turbulence);
+
+  // 5. Composite Black Hole Physical Emission Structure
+  vec3 col = vec3(0.0);
+
+  // Accretion disk radial extent mask
+  float diskMask = smoothstep(shadowRadius * 1.05, shadowRadius * 1.25, r) * (1.0 - smoothstep(1.8, 2.4, r));
+  col += diskColor * diskMask * 1.8;
+
+  // Photon Ring Luminous Boost
+  vec3 photonCol = mix(vec3(1.0, 0.95, 0.85), innerCol, 0.5);
+  col += photonCol * photonRing * 2.8;
+
+  // Gravitational Lensing Distorted Background Halo
+  vec3 lensHaloCol = mix(outerCol, vec3(0.2, 0.7, 1.0), 0.5);
+  col += lensHaloCol * gravitationalLens * 0.85;
+
+  // Enforce Event Horizon Shadow Capture (Pure darkness at center)
+  col *= eventHorizon;
+
+  float alpha = (diskMask * 0.88 + photonRing * 0.95 + gravitationalLens * 0.45) * eventHorizon;
+  gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
+}`;
+
 /* ------------------------------ nebula ---------------------------- */
 
 export const nebulaFrag = /* glsl */ `
