@@ -432,6 +432,10 @@ export class UniverseEngine {
     this.farStarsPoints = far;
     this.scene.add(far);
     this.scene.add(this.gNeighborhood);
+
+    this.scene.traverse((obj) => {
+      obj.frustumCulled = false;
+    });
   }
 
   /* the real-universe canvas: an inverted celestial sphere + faint deep-sky nebulosity */
@@ -1413,6 +1417,10 @@ export class UniverseEngine {
 
     this.gMultiverse.add(gPair);
     this.scene.add(this.gMultiverse);
+
+    this.gMultiverse.traverse((obj) => {
+      obj.frustumCulled = false;
+    });
   }
 
   public rebuildMultiverse(customRealitiesList?: RealityConfig[]) {
@@ -1633,6 +1641,10 @@ export class UniverseEngine {
     }));
     this.beacon.scale.setScalar(1500);
     this.scene.add(this.beacon);
+
+    [this.gNeighborhood, this.gGalaxy, this.gCluster, this.gSupercluster, this.gWeb].forEach((g) => {
+      g.traverse((obj) => { obj.frustumCulled = false; });
+    });
   }
 
   private buildSurface() {
@@ -1716,7 +1728,7 @@ export class UniverseEngine {
         } else {
           /* circular drag — orbit: drag right rotates right, drag left rotates left */
           this.tTheta += dx * 0.0048;
-          this.tPhi = Math.min(Math.PI - 0.05, Math.max(0.05, this.tPhi - dy * 0.0048));
+          this.tPhi = Math.min(Math.PI - 0.02, Math.max(0.02, this.tPhi - dy * 0.0048));
         }
         this.lastPX = e.clientX; this.lastPY = e.clientY;
       }
@@ -2302,7 +2314,7 @@ export class UniverseEngine {
         this.orbitMomentumX *= 0.92;
       }
       if (Math.abs(this.orbitMomentumY) > 0.00001) {
-        this.tPhi = Math.min(Math.PI - 0.05, Math.max(0.05, this.tPhi - this.orbitMomentumY));
+        this.tPhi = Math.min(Math.PI - 0.02, Math.max(0.02, this.tPhi - this.orbitMomentumY));
         this.orbitMomentumY *= 0.92;
       }
     }
@@ -2338,6 +2350,7 @@ export class UniverseEngine {
       this.renderCenter.y + dist * cp,
       this.renderCenter.z + dist * sp * Math.sin(this.theta),
     );
+    this.camera.up.set(0, 1, 0);
     this.camera.lookAt(this.renderCenter);
     this.camera.near = Math.max(0.05, dist * 0.004);
     this.camera.far = 5000000;
@@ -2504,11 +2517,11 @@ export class UniverseEngine {
     const d = this.currentDist();
     const camLen = this.camera.position.length() + 1;
     const wins = {
-      neighborhood: windowFn(d, 260, 750, 4800, 8500),
-      galaxy: windowFn(d, 3500, 7500, 22000, 38000),
-      cluster: windowFn(d, 16000, 26000, 55000, 75000),
-      supercluster: windowFn(d, 45000, 68000, 110000, 135000),
-      web: windowFn(d, 90000, 120000, 165000, 188000),
+      neighborhood: windowFn(d, 260, 750, 4800, 12000),
+      galaxy: windowFn(d, 3500, 7500, 22000, 180000),
+      cluster: windowFn(d, 16000, 26000, 55000, 220000),
+      supercluster: windowFn(d, 45000, 68000, 110000, 350000),
+      web: windowFn(d, 90000, 120000, 165000, 500000),
       multiverse: windowFn(d, 175000, 205000, 1e12, 1e12),
     };
     this.gNeighborhood.visible = wins.neighborhood > 0.01;
