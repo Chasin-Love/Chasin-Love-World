@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
   starVert, starFrag, planetVert, planetFrag, cloudFrag, atmoFrag,
-  ringVert, ringFrag, discFrag, nebulaFrag, pointsVert, pointsFrag,
+  ringVert, ringFrag, discFrag, nebulaVert, nebulaFrag, pointsVert, pointsFrag,
   portalFrag, terrainVert, terrainFrag, skyFrag,
   coronaVert, coronaFrag, backdropVert, backdropFrag,
   multiverseVert, multiverseFrag, asteroidVert, asteroidFrag,
@@ -616,31 +616,73 @@ export class UniverseEngine {
     } else if (data.kind === 'nebula') {
       const s = data.radius * 3.2;
       const cA = col(p.base), cB = col(p.high);
+
+      // 1. Primary Pillars of Creation Volumetric Quad Mesh with GLSL Pillars Shader
+      const nebMat = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uColorA: { value: cA },
+          uColorB: { value: cB },
+          uOpacity: { value: 0.92 },
+        },
+        vertexShader: nebulaVert,
+        fragmentShader: nebulaFrag,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+      });
+
+      const nebPlane = new THREE.Mesh(new THREE.PlaneGeometry(s * 2.8, s * 2.8), nebMat);
+      nebPlane.renderOrder = 3;
+      g.add(nebPlane);
+      rb.mat = nebMat;
+
+      // Secondary Parallax Plane rotated slightly to provide 3D volumetric depth
+      const nebPlane2 = new THREE.Mesh(new THREE.PlaneGeometry(s * 2.5, s * 2.5), nebMat);
+      nebPlane2.rotation.y = Math.PI * 0.25;
+      nebPlane2.renderOrder = 2;
+      g.add(nebPlane2);
+
+      // 2. Surrounding 3D Dust Particle Cloud
       const nebPts = this.makePoints(
-        350,
+        550,
         (i, a) => {
-          const r = Math.pow(Math.random(), 0.6) * s * 0.45;
+          const r = Math.pow(Math.random(), 0.6) * s * 0.65;
           const t = Math.random() * Math.PI * 2, pVal = Math.acos(2 * Math.random() - 1);
           a[i * 3] = r * Math.sin(pVal) * Math.cos(t);
-          a[i * 3 + 1] = r * Math.cos(pVal) * 0.4;
+          a[i * 3 + 1] = r * Math.cos(pVal) * 0.7;
           a[i * 3 + 2] = r * Math.sin(pVal) * Math.sin(t);
         },
-        () => 2.2 + Math.random() * 3.5,
+        () => 2.5 + Math.random() * 4.0,
         () => {
           const w = Math.random();
-          return [cA.r * (1 - w) + cB.r * w, cA.g * (1 - w) + cB.g * w, cA.b * (1 - w) + cB.b * w];
+          return w > 0.7 ? [0.35, 0.92, 1.0] : [cA.r * (1 - w) + cB.r * w, cA.g * (1 - w) + cB.g * w, cA.b * (1 - w) + cB.b * w];
         },
-        () => 0.25 + Math.random() * 0.45,
-        2.5,
+        () => 0.35 + Math.random() * 0.5,
+        2.8,
         true,
       );
       g.add(nebPts);
-      const core = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: makeGlowTexture(128, [[0, 'rgba(220,255,244,0.8)'], [0.3, 'rgba(140,220,200,0.3)'], [1, 'rgba(111,194,180,0)']]),
-        blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
-      }));
-      core.scale.setScalar(s * 0.5);
-      g.add(core);
+
+      // 3. Embedded Protostar Lens Flares at Pillar Tips
+      const flareTex = makeGlowTexture(128, [
+        [0, 'rgba(255,255,255,1)'],
+        [0.2, 'rgba(255,200,100,0.85)'],
+        [0.5, 'rgba(255,120,40,0.35)'],
+        [1, 'rgba(0,0,0,0)'],
+      ]);
+      const flareMat = new THREE.SpriteMaterial({ map: flareTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+
+      const flare1 = new THREE.Sprite(flareMat);
+      flare1.position.set(-s * 0.3, s * 0.75, 2);
+      flare1.scale.setScalar(s * 0.35);
+      g.add(flare1);
+
+      const flare2 = new THREE.Sprite(flareMat);
+      flare2.position.set(s * 0.12, s * 0.42, 1);
+      flare2.scale.setScalar(s * 0.28);
+      g.add(flare2);
     } else if (data.kind === 'hole') {
       const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.15, 48, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
       g.add(sphere);
