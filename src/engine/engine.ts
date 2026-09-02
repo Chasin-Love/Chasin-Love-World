@@ -624,13 +624,14 @@ export class UniverseEngine {
           uColorA: { value: cA },
           uColorB: { value: cB },
           uOpacity: { value: 0.95 },
+          uCamLocalP: { value: new THREE.Vector3() },
         },
         vertexShader: nebulaVert,
         fragmentShader: nebulaFrag,
         transparent: true,
         depthWrite: false,
         side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
       });
 
       const nebBox = new THREE.Mesh(new THREE.BoxGeometry(s * 2.5, s * 2.5, s * 2.5), nebMat);
@@ -1872,8 +1873,8 @@ export class UniverseEngine {
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const d = this.currentDist();
 
-    // Multiverse scale ONLY — parallel reality bubbles and their orbiting clusters are ONLY interactive when zoomed out to the Multiverse macro scale (d >= 170000)
-    if (d >= 170000 && this.gMultiverse && this.gMultiverse.visible) {
+    // Multiverse scale ONLY — parallel reality bubbles and their orbiting clusters are ONLY interactive when zoomed out to the Multiverse macro scale (d >= 650000)
+    if (d >= 650000 && this.gMultiverse && this.gMultiverse.visible) {
       this.raycaster.far = 5000000;
       const visibleColliders = this.multiverseColliders;
       const hits = this.raycaster.intersectObjects(visibleColliders, false);
@@ -2026,38 +2027,50 @@ export class UniverseEngine {
     this.focusId = null;
     this.panOffset.set(0, 0, 0);
     switch (stageIndex) {
-      case 0: // Stellar System
-        this.tZoomT = 0.15;
-        this.tPhi = 1.12;
-        break;
-      case 1: // Star-Forming Region
-        this.tZoomT = 0.42;
-        this.tPhi = 1.12;
-        break;
-      case 2: // Spiral Arm
-        this.tZoomT = 0.54;
-        this.tPhi = 1.10;
-        break;
-      case 3: // Spiral Galaxy
-        this.tZoomT = 0.65;
-        this.tPhi = 1.08;
-        break;
-      case 4: // Galaxy Cluster & Local Group
-        this.tZoomT = 0.73;
-        this.tPhi = 1.05;
-        break;
-      case 5: // Supercluster Complex
-        this.tZoomT = 0.79;
-        this.tPhi = 1.05;
-        break;
-      case 6: // Cosmic Web
-        this.tZoomT = 0.85;
-        this.tPhi = 1.05;
-        break;
-      case 7: // The Multiverse
-      default:
+      case 0: // Multiverse
         this.tZoomT = 0.96;
         this.tPhi = 1.05;
+        break;
+      case 1: // Reality / Universe
+        this.tZoomT = 0.88;
+        this.tPhi = 1.05;
+        break;
+      case 2: // Cosmic Web
+        this.tZoomT = 0.82;
+        this.tPhi = 1.05;
+        break;
+      case 3: // Supercluster Complex
+        this.tZoomT = 0.76;
+        this.tPhi = 1.05;
+        break;
+      case 4: // Supercluster
+        this.tZoomT = 0.71;
+        this.tPhi = 1.05;
+        break;
+      case 5: // Galaxy Cluster / Group
+        this.tZoomT = 0.66;
+        this.tPhi = 1.05;
+        break;
+      case 6: // Galaxy
+        this.tZoomT = 0.60;
+        this.tPhi = 1.08;
+        break;
+      case 7: // Galactic Region
+        this.tZoomT = 0.52;
+        this.tPhi = 1.10;
+        break;
+      case 8: // Spiral Arm
+        this.tZoomT = 0.44;
+        this.tPhi = 1.10;
+        break;
+      case 9: // Star-Forming Region
+        this.tZoomT = 0.33;
+        this.tPhi = 1.12;
+        break;
+      case 10: // Stellar System
+      default:
+        this.tZoomT = 0.15;
+        this.tPhi = 1.12;
         break;
     }
   }
@@ -2263,7 +2276,7 @@ export class UniverseEngine {
 
     // 5. Dimensional Barrier: Hide all elements belonging to other realities (unless in multiverse view)
     if (this.realityGroups) {
-      const isMultiverseMode = this.currentDist ? this.currentDist() >= 170000 : false;
+      const isMultiverseMode = this.currentDist ? this.currentDist() >= 650000 : false;
       Object.keys(this.realityGroups).forEach((id) => {
         if (this.realityGroups[id]) {
           this.realityGroups[id].visible = isMultiverseMode || (id === reality.id);
@@ -2479,6 +2492,11 @@ export class UniverseEngine {
         if (b.mat.uniforms.uTime) b.mat.uniforms.uTime.value = this.clockT;
         if (b.mat.uniforms.uGhost) b.mat.uniforms.uGhost.value = b.ghost;
         if (b.mat.uniforms.uFade) b.mat.uniforms.uFade.value = b.fade * sysW;
+        if (b.mat.uniforms.uCamLocalP && b.data.kind === 'nebula') {
+          this._vScratch3.copy(this.camera.position);
+          b.group.worldToLocal(this._vScratch3);
+          (b.mat.uniforms.uCamLocalP.value as THREE.Vector3).copy(this._vScratch3);
+        }
       }
       b.extras?.forEach((m) => { m.uniforms.uTime.value = this.clockT; });
 
@@ -2585,11 +2603,11 @@ export class UniverseEngine {
     const camLen = this.camera.position.length() + 1;
     const wins = {
       neighborhood: windowFn(d, 260, 750, 4800, 12000),
-      galaxy: windowFn(d, 3500, 7500, 22000, 180000),
-      cluster: windowFn(d, 16000, 26000, 55000, 220000),
-      supercluster: windowFn(d, 45000, 68000, 110000, 350000),
-      web: windowFn(d, 90000, 120000, 165000, 500000),
-      multiverse: windowFn(d, 175000, 205000, 1e12, 1e12),
+      galaxy: windowFn(d, 3500, 7500, 38000, 250000),
+      cluster: windowFn(d, 25000, 42000, 95000, 350000),
+      supercluster: windowFn(d, 70000, 100000, 250000, 600000),
+      web: windowFn(d, 180000, 280000, 650000, 1200000),
+      multiverse: windowFn(d, 650000, 1000000, 1e12, 1e12),
     };
     this.gNeighborhood.visible = wins.neighborhood > 0.01;
     this.gGalaxy.visible = wins.galaxy > 0.01;
@@ -2742,8 +2760,9 @@ export class UniverseEngine {
     (this.horizon.material as THREE.ShaderMaterial).uniforms.uOpacity.value = wins.web * 0.5;
 
     // Kamui Spacetime Singularity Vortex Erase Animation for the Inner Reality Sky Sphere:
-    // When zooming out toward the Core / Multiverse level (d > 165000), the inner sphere twists into a Kamui vortex and erases
-    const targetKamui = THREE.MathUtils.clamp((d - 165000) / (205000 - 165000), 0, 1);
+    // Triggers automatically when zooming out from the end of Cosmic Web into Multiverse scale (d: 650000 -> 1200000)
+    // and settles to 1.0 upon entering the Multiverse stage.
+    const targetKamui = THREE.MathUtils.clamp((d - 650000) / (1200000 - 650000), 0, 1);
     this.kamuiErase = THREE.MathUtils.damp(this.kamuiErase, targetKamui, 4.5, 0.016);
 
     if (this.backdropMat) {
@@ -2804,19 +2823,22 @@ export class UniverseEngine {
     this.beacon.scale.setScalar(camLen * 0.011);
     this.gGalaxy.rotation.y = this.clockT * 0.0022;
 
-    /* Scale label covering exact 8-stage cosmological hierarchy:
-       Stellar System → Star-Forming Region → Spiral Arm → Spiral Galaxy → Galaxy Cluster & Local Group → Supercluster Complex → Cosmic Web → The Multiverse */
+    /* Scale label covering exact 11-stage cosmological hierarchy:
+       STELLAR SYSTEM → STAR-FORMING REGION → SPIRAL ARM → GALACTIC REGION → GALAXY → GALAXY CLUSTER / GALAXY GROUP → SUPERCLUSTER → SUPERCLUSTER COMPLEX → COSMIC WEB → REALITY / UNIVERSE → MULTIVERSE */
     let label = 'STELLAR SYSTEM';
     const fb = this.focusBody();
     if (fb && this.surfaceBlend > 0.5) label = `SURFACE · ${fb.data.name.toUpperCase()}`;
     else if (d < 260) label = fb ? `APPROACH · ${fb.data.name.toUpperCase()}` : 'STELLAR SYSTEM';
-    else if (d < 1500) label = 'STAR-FORMING REGION';
-    else if (d < 5500) label = 'SPIRAL ARM';
-    else if (d < 24000) label = 'SPIRAL GALAXY';
-    else if (d < 58000) label = 'GALAXY CLUSTER & LOCAL GROUP';
-    else if (d < 110000) label = 'SUPERCLUSTER COMPLEX';
-    else if (d < 185000) label = 'COSMIC WEB';
-    else label = 'THE MULTIVERSE';
+    else if (d < 1200) label = 'STAR-FORMING REGION';
+    else if (d < 4500) label = 'SPIRAL ARM';
+    else if (d < 14000) label = 'GALACTIC REGION';
+    else if (d < 38000) label = 'GALAXY';
+    else if (d < 85000) label = 'GALAXY CLUSTER / GALAXY GROUP';
+    else if (d < 160000) label = 'SUPERCLUSTER';
+    else if (d < 320000) label = 'SUPERCLUSTER COMPLEX';
+    else if (d < 650000) label = 'COSMIC WEB';
+    else if (d < 1200000) label = 'REALITY / UNIVERSE';
+    else label = 'MULTIVERSE';
     if (label !== this.lastLabel) {
       this.lastLabel = label;
       this.cb.onScaleLabel(label);
