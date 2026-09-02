@@ -733,28 +733,23 @@ void main(){
     // The reality boundary contracts inward as an authentic multi-armed spiral whirlpool
     float spiralHorizon = (1.0 - pow(k, 1.12)) * 1.35 + spiralArmMetric * (1.0 - 0.3 * k);
     spiralHorizon = max(0.0001, spiralHorizon);
-    
-    // If coordinate has already been engulfed past the spiraling vortex horizon -> Discard!
-    if (r > spiralHorizon) {
-      discard;
-    }
-    
+
     // 4. Inward Logarithmic Suction & Space-Time Metric Compression
     // Coordinates are drawn inward along the logarithmic spiral streamlines into the throat
     float rNorm = r / max(0.001, spiralHorizon);
-    float rSuction = pow(rNorm, 1.0 + k * 1.5) * (1.0 + sin(psi) * 0.15 * k);
+    float rSuction = pow(clamp(rNorm, 0.0002, 1.0), 1.0 + k * 1.5) * (1.0 + sin(psi) * 0.15 * k);
     rSuction = clamp(rSuction, 0.0002, 1.0);
     float warpedAlpha = rSuction * 3.14159265;
-    
+
     // Reconstruct the curved, twisted 3D ray through warped space-time
     vec3 warpedRay = cos(twistedTheta) * sin(warpedAlpha) * tangentX +
                      sin(twistedTheta) * sin(warpedAlpha) * tangentY +
                      cos(warpedAlpha) * vAxis;
     d = normalize(warpedRay);
-    
+
     // Smooth natural edge falloff at the spiraling horizon boundary of the vacuum portal
     float distToHorizon = spiralHorizon - r;
-    edgeAlpha = smoothstep(0.0, 0.07, distToHorizon);
+    edgeAlpha = r > spiralHorizon ? smoothstep(0.12, 0.0, r - spiralHorizon) : smoothstep(-0.07, 0.0, distToHorizon);
   }
   
   // Abyssal deep space vacuum background (360-degree dark universe base)
