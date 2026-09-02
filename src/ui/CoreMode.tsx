@@ -112,7 +112,7 @@ export default function CoreMode({ onClose, onInspect, onTemporal, onEnterWorld 
   useEffect(() => { onTemporal(isPast ? t : null); }, [t, isPast, onTemporal]);
   useEffect(() => () => onTemporal(null), [onTemporal]);
 
-  /* temporal playback loop — throttled to ~30fps state updates to keep WebGL smooth */
+  /* temporal playback loop — throttled to ~25fps state updates to keep WebGL smooth and prevent UI jank */
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
@@ -120,12 +120,12 @@ export default function CoreMode({ onClose, onInspect, onTemporal, onEnterWorld 
     let lastUpdate = last;
     const span = max - min;
     const loop = (n: number) => {
-      const dt = n - last;
       last = n;
-      if (n - lastUpdate >= 35) {
+      const elapsed = n - lastUpdate;
+      if (elapsed >= 40) {
         lastUpdate = n;
         setT((cur) => {
-          const next = cur + (n - lastUpdate + dt) * (span / 12000);
+          const next = cur + elapsed * (span / 12000);
           if (next >= max) { setPlaying(false); return max; }
           return next;
         });

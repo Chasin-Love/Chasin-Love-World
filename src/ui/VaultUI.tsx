@@ -10,6 +10,7 @@ import {
   AudioChip, IcClose, IcCopy, IcDownload, IcEdit, IcEye, IcFolder, IcGrid, IcLock, IcMove, IcPlus,
   IcRows, IcScan, IcSearch, IcTerminal, IcTrash, IcUnlock, IcUser, toast, useUniverse,
 } from './bits';
+import { VaultBtrfsManager } from './VaultBtrfsManager';
 import { delPayload, getPayload, hasIdb, putPayload } from '../db';
 
 /* ================================ helpers ================================ */
@@ -4044,6 +4045,7 @@ function DeepScan({ onClose }: { onClose: () => void }) {
 const SECTIONS: { id: string; label: string; kinds: VaultKind[] | null }[] = [
   { id: 'home', label: 'Home', kinds: null },
   { id: 'fs', label: 'File system', kinds: null },
+  { id: 'btrfs', label: 'Btrfs Engine', kinds: null },
   { id: 'all', label: 'Everything', kinds: null },
   { id: 'void', label: 'The Void', kinds: null },
 ];
@@ -4355,6 +4357,8 @@ export default function VaultUI({ onClose }: { onClose: () => void }) {
                 />
               ) : section === 'fs' ? (
                 <FileManager onOpen={open} onImport={(f, d) => void importFiles(f, d)} onLock={quickLock} onRemove={removeFile} />
+              ) : section === 'btrfs' ? (
+                <VaultBtrfsManager />
               ) : section === 'void' ? (
                 <TheVoid />
               ) : (
