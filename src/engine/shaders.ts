@@ -520,12 +520,17 @@ vec4 evalNebula3D(vec3 p, float t) {
 }
 
 void main(){
+  // Determine local coordinate scale factor to normalize mesh bounds to [-1.25, 1.25]^3
+  float boxHalf = max(max(abs(vLocalP.x), abs(vLocalP.y)), abs(vLocalP.z));
+  float scaleFactor = max(boxHalf / 1.25, 1e-4);
+
+  vec3 ro = vCamLocalP / scaleFactor;
+  vec3 pLocal = vLocalP / scaleFactor;
+  vec3 rd = normalize(pLocal - ro);
+
   // Bounding local space [-1.2, 1.2]^3
   vec3 boxMin = vec3(-1.25);
   vec3 boxMax = vec3(1.25);
-
-  vec3 ro = vCamLocalP;
-  vec3 rd = normalize(vLocalP - vCamLocalP);
 
   vec2 hit = intersectAABB(ro, rd, boxMin, boxMax);
   if (hit.x > hit.y || hit.y < 0.0) discard;
@@ -596,7 +601,7 @@ void main(){
   vec3 finalCol = accumColor + colDeepBackground * transmittance;
 
   // Edge boundary opacity falloff
-  vec3 edgeDist = abs(vLocalP) / 1.25;
+  vec3 edgeDist = abs(pLocal) / 1.25;
   float maxEdge = max(max(edgeDist.x, edgeDist.y), edgeDist.z);
   float edgeFade = smoothstep(1.0, 0.6, maxEdge);
 

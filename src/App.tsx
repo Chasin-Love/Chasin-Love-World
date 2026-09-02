@@ -181,7 +181,6 @@ export default function App() {
       },
     });
     engineRef.current = engine;
-    (window as any).__ENGINE__ = engine;
 
     const boot = () => { initAudio(); window.removeEventListener('pointerdown', boot); };
     window.addEventListener('pointerdown', boot);
