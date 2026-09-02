@@ -1,4 +1,46 @@
+export interface CosmicAddress {
+  realityId: string;
+  cosmicWebId: string;
+  complexId?: string;
+  superclusterId?: string;
+  clusterId?: string;
+  galaxyId?: string;
+  regionId?: string;
+  spiralArmId?: string;
+  starFormingRegionId?: string;
+  stellarSystemId?: string;
+}
+
 export interface CosmicLineage {
+  multiverse?: {
+    id: string;
+    name: string;
+    description: string;
+  };
+  reality: {
+    id: string;
+    name: string;
+    spectral: string;
+    description: string;
+  };
+  cosmicWeb: {
+    id: string;
+    name: string;
+    filamentDensity: string;
+    description: string;
+  };
+  superclusterComplex: {
+    id: string;
+    name: string;
+    spanMly: string;
+    description: string;
+  };
+  supercluster: {
+    id: string;
+    name: string;
+    clustersCount: number;
+    description: string;
+  };
   galaxyCluster: {
     id: string;
     name: string;
@@ -9,6 +51,7 @@ export interface CosmicLineage {
     isHomeCluster?: boolean;
   };
   galaxy: {
+    id: string;
     name: string;
     type: string;
     diameterKly: string;
@@ -16,17 +59,20 @@ export interface CosmicLineage {
     description: string;
   };
   galacticRegion: {
+    id: string;
     name: string;
     distanceFromCore: string;
     temperature: string;
     description: string;
   };
   spiralArm: {
+    id: string;
     name: string;
     pitchAngle: string;
     description: string;
   };
   starFormingRegion: {
+    id: string;
     name: string;
     type: string;
     spanLy: string;
@@ -34,6 +80,7 @@ export interface CosmicLineage {
     description: string;
   };
   stellarSystem: {
+    id: string;
     starName: string;
     spectralClass: string;
     habitableZoneAU: string;
@@ -45,6 +92,7 @@ export interface CosmicLineage {
 export interface GalaxyClusterData {
   id: string;
   realityId: string;
+  address: CosmicAddress;
   name: string;
   type: 'Galaxy Cluster' | 'Galaxy Group' | 'Supercluster Node';
   code: string;

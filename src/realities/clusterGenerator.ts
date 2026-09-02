@@ -1,5 +1,5 @@
 import { CosmicBody } from '../types';
-import { CosmicLineage, GalaxyClusterData } from './hierarchyTypes';
+import { CosmicAddress, CosmicLineage, GalaxyClusterData } from './hierarchyTypes';
 
 interface ClusterTemplate {
   name: string;
@@ -119,6 +119,21 @@ const CLUSTER_TEMPLATES_BY_REALITY: Record<string, ClusterTemplate[]> = {
   ],
 };
 
+export function buildCosmicAddress(realityId: string, clusterIdx: number): CosmicAddress {
+  return {
+    realityId,
+    cosmicWebId: `web-${realityId}`,
+    complexId: `complex-${realityId}-${Math.floor(clusterIdx / 2)}`,
+    superclusterId: `supercluster-${realityId}-${clusterIdx}`,
+    clusterId: `cluster-${realityId}-${clusterIdx}`,
+    galaxyId: `galaxy-${realityId}-${clusterIdx}`,
+    regionId: `region-${realityId}-${clusterIdx}`,
+    spiralArmId: `arm-${realityId}-${clusterIdx}`,
+    starFormingRegionId: `sfr-${realityId}-${clusterIdx}`,
+    stellarSystemId: `system-${realityId}-${clusterIdx}`,
+  };
+}
+
 export function generateClustersForReality(
   realityId: string,
   realityName: string,
@@ -222,8 +237,38 @@ export function generateClustersForReality(
     const orbitPhase = (idx * 1.37) % (Math.PI * 2);
     const orbitIncl = ((idx % 2 === 0 ? 1 : -1) * (0.15 + idx * 0.12));
     const clusterColor = idx === 0 ? colorA : idx % 2 === 0 ? colorB : '#38bdf8';
+    const address = buildCosmicAddress(realityId, idx);
 
     const lineage: CosmicLineage = {
+      multiverse: {
+        id: 'multiverse-prime',
+        name: 'The Infinite Multiverse',
+        description: 'Omni-dimensional bulk space hosting all parallel bubble universes and quantum continuums.',
+      },
+      reality: {
+        id: realityId,
+        name: realityName,
+        spectral: 'Quantum Bubble Reality',
+        description: `Parallel Universe continuum ${realityName} operating with isolated physical parameters.`,
+      },
+      cosmicWeb: {
+        id: address.cosmicWebId,
+        name: `${realityName} Cosmic Filament Web`,
+        filamentDensity: '0.84 Baryonic Mass / Vol',
+        description: 'Large-scale dark matter filaments and vast cosmic voids interconnecting all supercluster complexes.',
+      },
+      superclusterComplex: {
+        id: address.complexId!,
+        name: `${realityName} Complex ${String.fromCharCode(65 + Math.floor(idx / 2))}`,
+        spanMly: `${400 + idx * 80} Mly`,
+        description: 'Hyper-scale gravitational complex containing multiple supercluster nodes.',
+      },
+      supercluster: {
+        id: address.superclusterId!,
+        name: `${tmpl.name.replace(/(Group|Cluster|Node)/, '').trim()} Supercluster`,
+        clustersCount: 12 + idx * 4,
+        description: 'Dense concentration of galaxy clusters and group filaments.',
+      },
       galaxyCluster: {
         id: tmpl.code,
         name: tmpl.name,
@@ -234,6 +279,7 @@ export function generateClustersForReality(
         isHomeCluster: isHome,
       },
       galaxy: {
+        id: address.galaxyId!,
         name: tmpl.galaxyName,
         type: tmpl.galaxyType,
         diameterKly: `${100 + (idx * 15)} kly`,
@@ -241,17 +287,20 @@ export function generateClustersForReality(
         description: `Major luminous galaxy within ${tmpl.name}, hosting vast spiral arms and hundreds of star-forming nebulae.`,
       },
       galacticRegion: {
+        id: address.regionId!,
         name: tmpl.regionName,
         distanceFromCore: `${24 + (idx * 2)} kly from Galactic Core`,
         temperature: 'Warm Interstellar Medium (~7,000 K)',
         description: `The surrounding galactic sub-sector with balanced cosmic radiation and rich heavy-element abundance.`,
       },
       spiralArm: {
+        id: address.spiralArmId!,
         name: tmpl.armName,
         pitchAngle: '12.4° Galactic Pitch',
         description: `A major density wave compressing interstellar molecular clouds and triggering new generations of stars.`,
       },
       starFormingRegion: {
+        id: address.starFormingRegionId!,
         name: tmpl.nebulaName,
         type: tmpl.nebulaType,
         spanLy: tmpl.spanLy,
@@ -259,6 +308,7 @@ export function generateClustersForReality(
         description: `Vast stellar nursery where gas and dust collapse gravitationally to birth proto-planetary solar systems.`,
       },
       stellarSystem: {
+        id: address.stellarSystemId!,
         starName: isHome ? anchor.name : `${tmpl.name.split(' ')[0]} Primary Star`,
         spectralClass: isHome ? 'G2V Main Sequence / Spectral Core' : 'F5V Luminous Dwarf',
         habitableZoneAU: '0.95 – 1.42 AU',
@@ -272,6 +322,7 @@ export function generateClustersForReality(
     return {
       id: `${realityId}-cluster-${idx}`,
       realityId,
+      address,
       name: tmpl.name,
       type: tmpl.type,
       code: tmpl.code,

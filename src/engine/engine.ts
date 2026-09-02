@@ -13,6 +13,7 @@ import {
   exoplanetPlateVert, exoplanetPlateFrag,
   demonCoreVert, demonCoreFrag,
   multiverseBoundaryVert, multiverseBoundaryFrag,
+  blackHoleVert, blackHoleFrag,
 } from './shaders';
 import type { CosmicBody } from '../types';
 import { REALITIES, RealityConfig, GalaxyClusterData } from '../realities';
@@ -657,34 +658,38 @@ export class UniverseEngine {
       photon.scale.setScalar(6.5);
       g.add(photon);
     } else if (data.kind === 'vault') {
-      /* the Universal Vault — a black-hole-class containment object */
+      /* the Universal Vault — a high-fidelity astrophysically grounded black hole */
       const R = data.radius;
+      const bhMat = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uColorDiskInner: { value: new THREE.Color('#38bdf8') },
+          uColorDiskOuter: { value: new THREE.Color('#f59e0b') },
+          uRadius: { value: R * 3.5 },
+        },
+        vertexShader: blackHoleVert,
+        fragmentShader: blackHoleFrag,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+      });
+      const bhMesh = new THREE.Mesh(new THREE.SphereGeometry(R * 3.5, 64, 48), bhMat);
+      bhMesh.renderOrder = 4;
+      g.add(bhMesh);
+
       const core = new THREE.Mesh(new THREE.SphereGeometry(R * 0.62, 48, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
       g.add(core);
-      const shell = new THREE.Mesh(
-        new THREE.RingGeometry(R * 0.78, R * 4.6, 96, 1),
-        new THREE.ShaderMaterial({
-          uniforms: { uTime: { value: 0 }, uInner: { value: R * 0.78 }, uOuter: { value: R * 4.6 }, uColor: { value: new THREE.Color('#59d8c2') }, uColor2: { value: new THREE.Color('#f2c178') } },
-          vertexShader: ringVert, fragmentShader: discFrag,
-          transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-        }),
-      );
-      shell.rotation.x = -Math.PI / 2 + 0.42;
-      shell.renderOrder = 4;
-      g.add(shell);
-      const photon = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: makeRingGlowTexture(),
-        blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
-      }));
-      photon.scale.setScalar(R * 3.4);
-      g.add(photon);
+
       const latticeMat = new THREE.MeshStandardMaterial({ color: 0x0c1418, emissive: new THREE.Color('#6fc2b4'), emissiveIntensity: 1.8, metalness: 0.7, roughness: 0.35 });
       const r1 = new THREE.Mesh(new THREE.TorusGeometry(R * 1.9, 0.04, 8, 110), latticeMat);
       const r2 = new THREE.Mesh(new THREE.TorusGeometry(R * 2.4, 0.026, 8, 110), latticeMat.clone());
       r1.rotation.x = 1.1; r2.rotation.x = -0.7; r2.rotation.y = 0.6;
       g.add(r1, r2);
-      g.userData.spin = { core, shell, r1, r2 };
-      rb.extras = [shell.material as THREE.ShaderMaterial];
+
+      g.userData.spin = { core, shell: bhMesh, r1, r2 };
+      rb.mat = bhMat;
+      rb.extras = [bhMat];
     }
 
     const cr = Math.max(data.radius * 1.5, 2.6);
