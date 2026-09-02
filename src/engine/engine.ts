@@ -307,7 +307,9 @@ export class UniverseEngine {
 
     this.connectionMat = new THREE.LineBasicMaterial({ color: 0xf2c178, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
     const initGeom = new THREE.BufferGeometry();
-    initGeom.setAttribute('position', new THREE.BufferAttribute(this._corePosBuffer, 3));
+    const posAttr = new THREE.BufferAttribute(this._corePosBuffer, 3);
+    posAttr.setUsage(THREE.DynamicDrawUsage);
+    initGeom.setAttribute('position', posAttr);
     this.connectionLines = new THREE.LineSegments(initGeom, this.connectionMat);
     this.connectionLines.frustumCulled = false;
     this.scene.add(this.connectionLines);
@@ -1735,18 +1737,8 @@ export class UniverseEngine {
     canvas.addEventListener('pointerup', (e) => endDrag(e, true));
     canvas.addEventListener('pointercancel', (e) => endDrag(e, false));
     canvas.addEventListener('dblclick', (e) => {
-      this.pointer.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
-      const id = this.pick();
-      if (id && id.startsWith('reality:')) {
-        const realityId = id.replace('reality:', '');
-        if (this.clickTimer) { clearTimeout(this.clickTimer); this.clickTimer = null; }
-        if (this.cb.onDoubleClickReality) {
-          this.cb.onDoubleClickReality(realityId);
-        }
-      } else if (id) {
-        if (this.clickTimer) { clearTimeout(this.clickTimer); this.clickTimer = null; }
-        this.activate(id);
-      }
+      e.preventDefault();
+      // Double clicks are handled with precise single/double click discrimination in handleClick()
     });
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -2810,6 +2802,13 @@ export class UniverseEngine {
     this.coreT += (target - this.coreT) * Math.min(1, dt * 2.6);
     this.connectionMat.opacity = this.coreT * 0.3;
     if (this.coreT > 0.02) {
+      const requiredFloats = this.connections.length * 6;
+      if (requiredFloats > this._corePosBuffer.length) {
+        this._corePosBuffer = new Float32Array(Math.max(requiredFloats * 2, 3000));
+        const attr = new THREE.BufferAttribute(this._corePosBuffer, 3);
+        attr.setUsage(THREE.DynamicDrawUsage);
+        this.connectionLines.geometry.setAttribute('position', attr);
+      }
       let idx = 0;
       for (let i = 0; i < this.connections.length; i++) {
         const [ia, ib] = this.connections[i];
@@ -2824,16 +2823,10 @@ export class UniverseEngine {
         this._corePosBuffer[idx++] = this._vScratch2.z;
       }
       const attr = this.connectionLines.geometry.getAttribute('position') as THREE.BufferAttribute;
-      if (attr && attr.array.length >= idx) {
-        (attr.array as Float32Array).set(this._corePosBuffer.subarray(0, idx));
-        this.connectionLines.geometry.setDrawRange(0, idx / 3);
+      if (attr) {
         attr.needsUpdate = true;
-      } else {
-        this.connectionLines.geometry.dispose();
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.Float32BufferAttribute(this._corePosBuffer.subarray(0, idx), 3));
-        this.connectionLines.geometry = g;
       }
+      this.connectionLines.geometry.setDrawRange(0, idx / 3);
     }
     this.connectionLines.visible = this.coreT > 0.02;
   }
