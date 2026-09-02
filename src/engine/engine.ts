@@ -617,13 +617,13 @@ export class UniverseEngine {
       const s = data.radius * 3.2;
       const cA = col(p.base), cB = col(p.high);
 
-      // 1. Primary Pillars of Creation Volumetric Quad Mesh with GLSL Pillars Shader
+      // 1. Primary Volumetric Raymarched 3D Density Bounding Geometry
       const nebMat = new THREE.ShaderMaterial({
         uniforms: {
           uTime: { value: 0 },
           uColorA: { value: cA },
           uColorB: { value: cB },
-          uOpacity: { value: 0.92 },
+          uOpacity: { value: 0.95 },
         },
         vertexShader: nebulaVert,
         fragmentShader: nebulaFrag,
@@ -633,56 +633,81 @@ export class UniverseEngine {
         blending: THREE.AdditiveBlending,
       });
 
-      const nebPlane = new THREE.Mesh(new THREE.PlaneGeometry(s * 2.8, s * 2.8), nebMat);
-      nebPlane.renderOrder = 3;
-      g.add(nebPlane);
+      const nebBox = new THREE.Mesh(new THREE.BoxGeometry(s * 2.5, s * 2.5, s * 2.5), nebMat);
+      nebBox.renderOrder = 3;
+      g.add(nebBox);
       rb.mat = nebMat;
 
-      // Secondary Parallax Plane rotated slightly to provide 3D volumetric depth
-      const nebPlane2 = new THREE.Mesh(new THREE.PlaneGeometry(s * 2.5, s * 2.5), nebMat);
-      nebPlane2.rotation.y = Math.PI * 0.25;
-      nebPlane2.renderOrder = 2;
-      g.add(nebPlane2);
-
-      // 2. Surrounding 3D Dust Particle Cloud
-      const nebPts = this.makePoints(
-        550,
+      // 2. Surrounding 3D Dense Starfield (Independent 3D points in volumetric space)
+      const starfield3D = this.makePoints(
+        1600,
         (i, a) => {
-          const r = Math.pow(Math.random(), 0.6) * s * 0.65;
+          const r = Math.pow(Math.random(), 0.55) * s * 1.8;
           const t = Math.random() * Math.PI * 2, pVal = Math.acos(2 * Math.random() - 1);
           a[i * 3] = r * Math.sin(pVal) * Math.cos(t);
-          a[i * 3 + 1] = r * Math.cos(pVal) * 0.7;
+          a[i * 3 + 1] = r * Math.cos(pVal);
           a[i * 3 + 2] = r * Math.sin(pVal) * Math.sin(t);
         },
-        () => 2.5 + Math.random() * 4.0,
-        () => {
+        (i) => (i % 30 === 0 ? 3.5 + Math.random() * 2.8 : 0.6 + Math.random() * 1.2),
+        (i) => {
           const w = Math.random();
-          return w > 0.7 ? [0.35, 0.92, 1.0] : [cA.r * (1 - w) + cB.r * w, cA.g * (1 - w) + cB.g * w, cA.b * (1 - w) + cB.b * w];
+          if (w > 0.85) return [0.72, 0.88, 1.0]; // Cool White-Blue
+          if (w > 0.6) return [1.0, 0.95, 0.88]; // Neutral White
+          return [1.0, 0.82, 0.62]; // Warm Yellow
         },
-        () => 0.35 + Math.random() * 0.5,
-        2.8,
-        true,
+        () => 0.4 + Math.random() * 0.55,
+        2.2,
+        true
       );
-      g.add(nebPts);
+      g.add(starfield3D);
 
-      // 3. Embedded Protostar Lens Flares at Pillar Tips
+      // 3. Embedded Protostar Seeds & Diffraction Starbursts
       const flareTex = makeGlowTexture(128, [
         [0, 'rgba(255,255,255,1)'],
-        [0.2, 'rgba(255,200,100,0.85)'],
-        [0.5, 'rgba(255,120,40,0.35)'],
+        [0.15, 'rgba(255,220,130,0.9)'],
+        [0.42, 'rgba(255,140,50,0.4)'],
         [1, 'rgba(0,0,0,0)'],
       ]);
       const flareMat = new THREE.SpriteMaterial({ map: flareTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
 
-      const flare1 = new THREE.Sprite(flareMat);
-      flare1.position.set(-s * 0.3, s * 0.75, 2);
-      flare1.scale.setScalar(s * 0.35);
-      g.add(flare1);
+      // Embedded protostar at Left Pillar Tip
+      const ps1 = new THREE.Sprite(flareMat);
+      ps1.position.set(-s * 0.42, s * 0.48, s * 0.02);
+      ps1.scale.setScalar(s * 0.38);
+      g.add(ps1);
 
-      const flare2 = new THREE.Sprite(flareMat);
-      flare2.position.set(s * 0.12, s * 0.42, 1);
-      flare2.scale.setScalar(s * 0.28);
-      g.add(flare2);
+      // Embedded protostar at Center Pillar Tip
+      const ps2 = new THREE.Sprite(flareMat);
+      ps2.position.set(-s * 0.05, s * 0.78, -s * 0.08);
+      ps2.scale.setScalar(s * 0.42);
+      g.add(ps2);
+
+      // Embedded protostar in Lower Mound
+      const ps3 = new THREE.Sprite(flareMat);
+      ps3.position.set(s * 0.05, -s * 0.62, s * 0.32);
+      ps3.scale.setScalar(s * 0.32);
+      g.add(ps3);
+
+      // 4. Fine 3D Dust Filaments Particle Cloud
+      const dustCloud3D = this.makePoints(
+        850,
+        (i, a) => {
+          const r = Math.pow(Math.random(), 0.7) * s * 1.1;
+          const t = Math.random() * Math.PI * 2, pVal = Math.acos(2 * Math.random() - 1);
+          a[i * 3] = r * Math.sin(pVal) * Math.cos(t);
+          a[i * 3 + 1] = r * Math.cos(pVal) * 0.8;
+          a[i * 3 + 2] = r * Math.sin(pVal) * Math.sin(t);
+        },
+        () => 2.2 + Math.random() * 4.2,
+        () => {
+          const w = Math.random();
+          return w > 0.75 ? [0.25, 0.85, 1.0] : [0.85, 0.45, 0.15];
+        },
+        () => 0.3 + Math.random() * 0.45,
+        2.6,
+        true
+      );
+      g.add(dustCloud3D);
     } else if (data.kind === 'hole') {
       const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.15, 48, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
       g.add(sphere);

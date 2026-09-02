@@ -399,135 +399,211 @@ void main(){
 /* ------------------------------ nebula ---------------------------- */
 
 export const nebulaVert = /* glsl */ `
+uniform vec3 uCamLocalP;
 varying vec2 vUv;
-varying vec3 vP;
-varying vec3 vN;
+varying vec3 vLocalP;
+varying vec3 vWorldP;
+varying vec3 vCamLocalP;
+
 void main(){
   vUv = uv;
-  vP = position;
-  vN = normalize(normalMatrix * normal);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  vLocalP = position;
+  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+  vWorldP = worldPosition.xyz;
+  vCamLocalP = uCamLocalP;
+
+  gl_Position = projectionMatrix * viewMatrix * worldPosition;
 }`;
 
 export const nebulaFrag = /* glsl */ `
 uniform float uTime;
-uniform vec3 uColorA; // Base nebula gas / dust accent color
-uniform vec3 uColorB; // Deep gas / ionization color
+uniform vec3 uColorA; // Ionized gas / cyan-indigo ambient
+uniform vec3 uColorB; // Deep dust / amber warm scattering
 uniform float uOpacity;
 varying vec2 vUv;
-varying vec3 vP;
-varying vec3 vN;
+varying vec3 vLocalP;
+varying vec3 vWorldP;
+varying vec3 vCamLocalP;
+
 ${NOISE}
 
-// Distance function for 3 vertical Pillars of Creation dust columns
-float pillarDensity(vec2 p, float t) {
-  // Center-normalize coordinates [-1, 1]
-  vec2 st = p;
+// Intersect ray O + t*D with axis-aligned bounding box [-bounds, bounds]
+vec2 intersectAABB(vec3 ro, vec3 rd, vec3 boxMin, vec3 boxMax) {
+  vec3 invD = 1.0 / (rd + vec3(1e-7));
+  vec3 t0 = (boxMin - ro) * invD;
+  vec3 t1 = (boxMax - ro) * invD;
+  vec3 tmin = min(t0, t1);
+  vec3 tmax = max(t0, t1);
+  float tn = max(max(tmin.x, tmin.y), tmin.z);
+  float tf = min(min(tmax.x, tmax.y), tmax.z);
+  return vec2(tn, tf);
+}
 
-  // 1. Left / Main Towering Pillar
-  vec2 p1 = st - vec2(-0.22, -0.1);
-  p1.x += sin(p1.y * 3.5 + t * 0.05) * 0.06; // Organic curving body
-  float width1 = 0.18 * (1.0 - smoothstep(-0.8, 0.75, p1.y) * 0.55); // Tapering towards top
-  // Finger-like tip structures (EGGs) at the top of Pillar 1
-  float tip1 = exp(-pow((p1.y - 0.58) / 0.12, 2.0)) * sin(p1.x * 25.0 + 1.2) * 0.04;
-  float d1 = abs(p1.x) - (width1 + tip1);
-  float pillar1 = smoothstep(0.08, -0.05, d1) * smoothstep(-0.85, -0.65, p1.y) * (1.0 - smoothstep(0.55, 0.72, p1.y));
+// 3D Density evaluation for procedural astronomical Pillars of Creation & Stellar Nursery
+// Returns vec4(dustDensity, gasDensity, photoIonization, temperature)
+vec4 evalNebula3D(vec3 p, float t) {
+  // Domain warping for multi-scale turbulent 3D fluid motion & filaments
+  vec3 warp = vec3(
+    fbm3(p * 2.2 + vec3(0.0, t * 0.01, 0.0)),
+    fbm3(p * 2.4 + vec3(1.7, -t * 0.008, 0.5)),
+    fbm3(p * 2.1 + vec3(3.2, 0.8, t * 0.012))
+  );
+  vec3 pw = p + warp * 0.38;
 
-  // 2. Middle Pillar
-  vec2 p2 = st - vec2(0.08, -0.22);
-  p2.x += cos(p2.y * 4.0 - t * 0.04) * 0.05;
-  float width2 = 0.14 * (1.0 - smoothstep(-0.8, 0.45, p2.y) * 0.6);
-  float tip2 = exp(-pow((p2.y - 0.32) / 0.1, 2.0)) * cos(p2.x * 30.0) * 0.03;
-  float d2 = abs(p2.x) - (width2 + tip2);
-  float pillar2 = smoothstep(0.07, -0.04, d2) * smoothstep(-0.85, -0.7, p2.y) * (1.0 - smoothstep(0.28, 0.42, p2.y));
+  // 1. LEFT TOWERING PILLAR (Rising from lower-middle, broad base narrowing upward, top bending right)
+  vec3 p1 = pw - vec3(-0.42, -0.15, 0.02);
+  p1.x += sin(p1.y * 2.8 + t * 0.02) * 0.08; // Organic curving body
+  p1.z += cos(p1.y * 3.2) * 0.05;
+  float h1 = (p1.y + 0.8) / 1.35; // Normalized height [0, 1]
+  float width1 = 0.22 * (1.0 - smoothstep(-0.8, 0.55, p1.y) * 0.58);
+  // Finger-like columns and eroded tip extensions at upper tip
+  float tip1 = exp(-pow((p1.y - 0.48) / 0.14, 2.0)) * (sin(p1.x * 22.0 + 1.2) * 0.035 + cos(p1.z * 18.0) * 0.025);
+  float d1 = length(p1.xz) - (width1 + tip1);
+  float p1Mask = smoothstep(0.08, -0.06, d1) * smoothstep(-0.9, -0.65, p1.y) * (1.0 - smoothstep(0.48, 0.62, p1.y));
 
-  // 3. Right / Smaller Pillar
-  vec2 p3 = st - vec2(0.32, -0.38);
-  p3.x += sin(p3.y * 5.0) * 0.04;
-  float width3 = 0.11 * (1.0 - smoothstep(-0.8, 0.15, p3.y) * 0.5);
-  float d3 = abs(p3.x) - width3;
-  float pillar3 = smoothstep(0.06, -0.04, d3) * smoothstep(-0.85, -0.75, p3.y) * (1.0 - smoothstep(0.05, 0.22, p3.y));
+  // 2. CENTER TALLEST & MOST VISUALLY DOMINANT PILLAR (Elongated, narrow/bulky sections, protruding ridges)
+  vec3 p2 = pw - vec3(-0.05, -0.05, -0.08);
+  p2.x += cos(p2.y * 3.4 - t * 0.015) * 0.06;
+  p2.z += sin(p2.y * 4.1) * 0.06;
+  float width2 = 0.18 * (1.0 - smoothstep(-0.85, 0.75, p2.y) * 0.52);
+  // Protruding 3D ridges and branching structures
+  float ridges2 = sin(p2.y * 14.0) * cos(p2.x * 12.0) * 0.03;
+  float tip2 = exp(-pow((p2.y - 0.78) / 0.16, 2.0)) * (cos(p2.x * 26.0) * 0.04 + sin(p2.z * 20.0) * 0.03);
+  float d2 = length(p2.xz) - (width2 + ridges2 + tip2);
+  float p2Mask = smoothstep(0.08, -0.05, d2) * smoothstep(-0.92, -0.72, p2.y) * (1.0 - smoothstep(0.78, 0.88, p2.y));
 
-  // Combine pillars into unified molecular dust density
-  float pillars = max(max(pillar1, pillar2), pillar3);
+  // 3. UPPER-RIGHT BRANCHING PILLAR COMPLEX (Claw-like sculpted silhouette, connected via diffuse gas)
+  vec3 p3 = pw - vec3(0.42, 0.25, -0.12);
+  p3.x += sin(p3.y * 4.5) * 0.05;
+  p3.z += cos(p3.y * 3.8) * 0.05;
+  // Multiple upward extensions / claw arms
+  float claw1 = length(p3.xz - vec2(-0.06, 0.02)) - 0.09;
+  float claw2 = length(p3.xz - vec2(0.08, -0.04)) - 0.07;
+  float d3 = min(claw1, claw2);
+  float p3Mask = smoothstep(0.07, -0.05, d3) * smoothstep(-0.4, -0.15, p3.y) * (1.0 - smoothstep(0.68, 0.82, p3.y));
 
-  // Add organic fractal turbulence noise to dust borders
-  vec3 qNoise = vec3(st * 3.8, t * 0.015);
-  float nDust = fbm(qNoise);
-  pillars = clamp(pillars + (nDust - 0.45) * 0.35, 0.0, 1.0);
+  // 4. LOWER-CENTER FOREGROUND BULBOUS CLOUD MOUND (Dense mound of gas & dust with dark cavities & folds)
+  vec3 p4 = pw - vec3(0.05, -0.62, 0.32);
+  float d4 = length(p4) - 0.38 + fbm3(p4 * 6.0) * 0.12;
+  float p4Mask = smoothstep(0.12, -0.08, d4);
 
-  return pillars;
+  // 5. FAR-RIGHT / LOWER-RIGHT EDGE CLOUD (Enormous cloud structure entering frame partially)
+  vec3 p5 = pw - vec3(0.85, -0.48, 0.08);
+  float d5 = length(p5) - 0.48 + fbm3(p5 * 4.5) * 0.15;
+  float p5Mask = smoothstep(0.15, -0.1, d5);
+
+  // Combine primary dust structures
+  float mainPillars = max(max(max(p1Mask, p2Mask), p3Mask), max(p4Mask, p5Mask));
+
+  // Multi-scale 3D FBM noise to carve filaments, cavities, knots, and erosion channels
+  float microNoise = fbm(pw * 5.8) * 0.5 + fbm3(pw * 14.0) * 0.25;
+  float dustDensity = clamp(mainPillars * (0.65 + microNoise * 0.75) - (microNoise - 0.35) * 0.3, 0.0, 1.0);
+
+  // Diffuse background nebular gas fill between structures
+  float bgGas = fbm3(pw * 1.8 + vec3(0.0, 0.0, t * 0.01)) * 0.45;
+  bgGas += exp(-length(pw.xy) * 1.8) * 0.35;
+  float gasDensity = clamp(bgGas + dustDensity * 0.85, 0.0, 1.0);
+
+  // Photo-ionization UV radiation surface erosion calculation
+  vec3 lightDirUV = normalize(vec3(-0.75, 0.65, 0.8));
+  // Compute finite difference numerical gradient of dust density for surface normals
+  vec3 eps = vec3(0.02, 0.02, 0.02);
+  float dX = fbm(pw + vec3(eps.x, 0.0, 0.0)) - fbm(pw - vec3(eps.x, 0.0, 0.0));
+  float dY = fbm(pw + vec3(0.0, eps.y, 0.0)) - fbm(pw - vec3(0.0, eps.y, 0.0));
+  float dZ = fbm(pw + vec3(0.0, 0.0, eps.z)) - fbm(pw - vec3(0.0, 0.0, eps.z));
+  vec3 grad = normalize(vec3(dX, dY, dZ) + vec3(1e-5));
+  float photoIonization = pow(clamp(dot(-grad, lightDirUV), 0.0, 1.0), 1.8) * smoothstep(0.05, 0.6, dustDensity);
+
+  float temperature = smoothstep(0.1, 0.85, dustDensity) + photoIonization * 0.5;
+
+  return vec4(dustDensity, gasDensity, photoIonization, temperature);
 }
 
 void main(){
-  vec2 p = (vUv - 0.5) * 2.0;
-  float r = length(p);
-  if (r >= 0.98) discard;
+  // Bounding local space [-1.2, 1.2]^3
+  vec3 boxMin = vec3(-1.25);
+  vec3 boxMax = vec3(1.25);
 
-  float t = uTime * 0.08;
+  vec3 ro = vCamLocalP;
+  vec3 rd = normalize(vLocalP - vCamLocalP);
 
-  // 1. Background Ionized Gas Nebula (H II / O III Cyan & Turquoise Emission)
-  vec3 bgCoord = vec3(p * 2.2, t * 0.15);
-  float bgNoise1 = fbm(bgCoord);
-  float bgNoise2 = fbm3(bgCoord * 2.8 + vec3(2.1, 5.4, 1.2));
+  vec2 hit = intersectAABB(ro, rd, boxMin, boxMax);
+  if (hit.x > hit.y || hit.y < 0.0) discard;
 
-  vec3 cyanGas = length(uColorA) > 0.05 ? uColorA : vec3(0.02, 0.65, 0.82);   // Vibrant Ionized Cyan
-  vec3 tealGas = length(uColorB) > 0.05 ? uColorB : vec3(0.01, 0.35, 0.55);   // Deep Teal
-  vec3 indigoGas = vec3(0.08, 0.05, 0.25); // Deep Backdrop Abyssal Blue
+  float tNear = max(0.0, hit.x);
+  float tFar = hit.y;
 
-  vec3 bgCol = mix(indigoGas, tealGas, bgNoise1);
-  bgCol = mix(bgCol, cyanGas, pow(bgNoise2, 1.8) * 0.8);
+  // Volumetric Raymarching Settings
+  const int STEPS = 54;
+  float stepSize = (tFar - tNear) / float(STEPS);
+  float tCurrent = tNear;
 
-  // Luminous background ionization core glow
-  float bgCore = exp(-r * 2.2);
-  bgCol += cyanGas * bgCore * 0.6;
+  vec3 accumColor = vec3(0.0);
+  float transmittance = 1.0;
 
-  // 2. Pillar Dust Columns
-  float dust = pillarDensity(p, uTime);
+  // Color Palette Definitions
+  vec3 colDeepBackground = vec3(0.008, 0.015, 0.038); // Deep Cosmic Blue Backdrop
+  vec3 colIonizedCyan = length(uColorA) > 0.05 ? uColorA : vec3(0.12, 0.78, 0.95); // Ionized Cyan/Blue
+  vec3 colGoldenYellow = vec3(1.0, 0.72, 0.22); // Warm Golden Yellow
+  vec3 colAmberOrange = length(uColorB) > 0.05 ? uColorB : vec3(0.95, 0.48, 0.12); // Amber Orange
+  vec3 colCopperRed = vec3(0.82, 0.26, 0.06); // Copper Reddish
+  vec3 colDarkDustCharcoal = vec3(0.08, 0.05, 0.04); // Dark Charcoal Dust
+  vec3 colDarkRedUmber = vec3(0.22, 0.10, 0.05); // Dark Reddish Brown
+  vec3 colPaleCreamHighlight = vec3(1.0, 0.96, 0.88); // Subtle Pale Cream Highlights
 
-  // Photo-evaporative Rim / Edge Highlight (harsh cyan/blue UV photo-ionization edges)
-  // Compute spatial gradient of dust density to isolate pillar borders
-  vec2 eps = vec2(0.015, 0.015);
-  float dX = pillarDensity(p + vec2(eps.x, 0.0), uTime) - pillarDensity(p - vec2(eps.x, 0.0), uTime);
-  float dY = pillarDensity(p + vec2(0.0, eps.y), uTime) - pillarDensity(p - vec2(0.0, eps.y), uTime);
-  float edge = length(vec2(dX, dY));
-  float rimHighlight = pow(smoothstep(0.05, 0.5, edge), 1.2) * (1.0 - dust * 0.85);
+  float simTime = uTime * 0.05;
 
-  vec3 rimColor = vec3(0.35, 0.92, 1.0); // Electric Cyan Rim Highlight
-  vec3 dustBaseColor = vec3(0.28, 0.12, 0.04); // Dark Orange-Brown Umber Molecular Dust
-  vec3 dustCoreColor = vec3(0.72, 0.38, 0.12); // Warm Internal Dust Glow
+  for (int i = 0; i < STEPS; i++) {
+    vec3 p = ro + rd * tCurrent;
 
-  // Dust interior color with warm infrared scattering
-  vec3 dustCol = mix(dustBaseColor, dustCoreColor, fbm3(vec3(p * 5.0, t)) * 0.6);
+    // Sample 3D Nebular Density
+    vec4 nData = evalNebula3D(p, uTime);
+    float dDust = nData.x;
+    float dGas = nData.y;
+    float photoIon = nData.z;
+    float temp = nData.w;
 
-  // 3. Embedded Protostars (Hot glowing red/amber/yellow stellar seeds)
-  vec2 ps1 = vec2(-0.22, 0.56); // Tip of main pillar
-  vec2 ps2 = vec2(0.08, 0.32);  // Tip of middle pillar
-  vec2 ps3 = vec2(-0.05, 0.05); // Embedded inside left pillar
-  
-  float starGlow1 = exp(-length(p - ps1) * 18.0);
-  float starGlow2 = exp(-length(p - ps2) * 22.0);
-  float starGlow3 = exp(-length(p - ps3) * 14.0);
-  
-  vec3 protostarCol = vec3(1.0, 0.65, 0.2); // Warm Amber Gold Protostar Glow
-  
-  // 4. Final Composite
-  // Mix background nebula gas with dark dust pillars
-  vec3 finalCol = mix(bgCol, dustCol, dust * 0.92);
-  
-  // Apply photo-evaporative rim highlights
-  finalCol += rimColor * rimHighlight * 1.8;
-  
-  // Add embedded protostar emissions
-  finalCol += protostarCol * (starGlow1 * 1.6 + starGlow2 * 1.4 + starGlow3 * 1.2);
-  
-  // Alpha falloff at boundaries
-  float edgeFade = smoothstep(0.98, 0.2, r) * (1.0 - r * 0.5);
-  float alpha = (bgNoise1 * 0.45 + dust * 0.75 + rimHighlight * 0.6 + (starGlow1 + starGlow2) * 0.5) * edgeFade * uOpacity;
-  
+    if (dGas > 0.001 || dDust > 0.001) {
+      // Physical Dust Color Transition (Charcoal -> Reddish Brown -> Illuminated Amber)
+      vec3 dustColor = mix(colDarkDustCharcoal, colDarkRedUmber, smoothstep(0.1, 0.6, dDust));
+
+      // Physical Gas Emission Color Transition (Golden Yellow -> Amber -> Copper -> Cream Highlights)
+      vec3 gasColor = mix(colCopperRed, colAmberOrange, smoothstep(0.1, 0.45, temp));
+      gasColor = mix(gasColor, colGoldenYellow, smoothstep(0.45, 0.8, temp));
+      gasColor = mix(gasColor, colPaleCreamHighlight, smoothstep(0.8, 1.0, temp));
+
+      // Photo-ionization UV Rim Glow (Cool blue-white & electric cyan edges)
+      vec3 rimGlow = mix(colIonizedCyan, vec3(0.85, 0.95, 1.0), photoIon * 0.6) * photoIon * 2.4;
+
+      // Combine emission and scattering
+      vec3 stepEmission = mix(gasColor, dustColor, dDust * 0.88) * dGas * 1.6 + rimGlow;
+
+      // Optical Absorption / Extinction
+      float stepAbsorption = (dDust * 4.8 + dGas * 0.85) * stepSize;
+      float stepTransmittance = exp(-stepAbsorption);
+
+      // Accumulate color scaled by current transmittance
+      accumColor += transmittance * stepEmission * (1.0 - stepTransmittance);
+      transmittance *= stepTransmittance;
+
+      if (transmittance < 0.015) break; // Early ray termination when optically opaque
+    }
+
+    tCurrent += stepSize;
+  }
+
+  // Blend background cosmic blue into unabsorbed ray transmittance
+  vec3 finalCol = accumColor + colDeepBackground * transmittance;
+
+  // Edge boundary opacity falloff
+  vec3 edgeDist = abs(vLocalP) / 1.25;
+  float maxEdge = max(max(edgeDist.x, edgeDist.y), edgeDist.z);
+  float edgeFade = smoothstep(1.0, 0.6, maxEdge);
+
+  float alpha = (1.0 - transmittance) * edgeFade * uOpacity;
   if (alpha < 0.002) discard;
-  
-  gl_FragColor = vec4(finalCol * 1.25, clamp(alpha, 0.0, 1.0));
+
+  gl_FragColor = vec4(finalCol * 1.35, clamp(alpha, 0.0, 1.0));
 }`;
 
 /* ------------------------- generic points ------------------------- */
