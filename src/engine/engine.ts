@@ -968,19 +968,14 @@ export class UniverseEngine {
       const realityGroup = new THREE.Group();
       realityGroup.userData = { realityId: real.id };
       
-      const colA = new THREE.Color(real.colorA);
-      const colB = new THREE.Color(real.colorB);
-      const mat = new THREE.ShaderMaterial({
-        uniforms: { uTime: { value: 0 }, uColorA: { value: colA }, uColorB: { value: colB }, uOpacity: { value: 0.85 }, uTearStrength: { value: 0 } },
-        vertexShader: multiverseVert, fragmentShader: multiverseFrag,
-        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide,
-      });
-      const bubble = new THREE.Mesh(new THREE.SphereGeometry(size, 48, 32), mat);
-      bubble.position.copy(pos);
-      bubble.userData = { realityId: real.id, isRealityBubble: true };
-      realityGroup.add(bubble);
-      this.multiverseMats.push(mat);
-      this.multiverseColliders.push(bubble);
+      const bubbleCollider = new THREE.Mesh(
+        new THREE.SphereGeometry(size, 16, 12),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      bubbleCollider.position.copy(pos);
+      bubbleCollider.userData = { realityId: real.id, isRealityBubble: true };
+      realityGroup.add(bubbleCollider);
+      this.multiverseColliders.push(bubbleCollider);
       
       /* Soft chromatic star nucleus inside universe bubble */
       const bubbleCoreMat = new THREE.MeshBasicMaterial({
