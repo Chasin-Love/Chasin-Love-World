@@ -1,6 +1,4 @@
-(sarthaksarma7@gmail.com  
-        & 
-  chasin-love on Jami (messaging app)---- for contact)
+(sarthaksarma7@gmail.com   &  chasin-love on Jami (messaging app)---- for contact)
 
 # MY UNIVERSE — a personal cosmos
 
