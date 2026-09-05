@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { UniverseEngine } from './engine/engine';
 import { actions, getState, newId } from './state';
 import { MEANING_LABEL, type CosmicBody, type Meaning } from './types';
-import { chime, initAudio, isMuted, setAudioMode, toggleMute, sfxPortal } from './audio';
+import { chime, initAudio, isMuted, setAudioMode, toggleMute } from './audio';
 import DiaryWindow, { type WinRect } from './ui/DiaryWindow';
 import CoreMode from './ui/CoreMode';
 import VaultUI from './ui/VaultUI';
@@ -51,7 +51,6 @@ export default function App() {
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [entered, setEntered] = useState<string | null>(null);
   const [intro, setIntro] = useState(true);
-  const [introStage, setIntroStage] = useState<'text' | 'light' | 'done'>('text');
   const [cosmicSettings, setCosmicSettings] = useState<CosmicWebSettings>({
     mode: 'simulation',
     showMatterDensity: true,
@@ -67,24 +66,8 @@ export default function App() {
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    /* Stage 1: Text over pure black (0s to 4.8s) */
-    const t1 = setTimeout(() => {
-      setIntroStage('light');
-      engineRef.current?.playIntroSequence(4.2);
-      chime(520);
-      sfxPortal();
-    }, 4800);
-
-    /* Stage 2 to Done: Light ejection + Kamui warp fly-in completes (4.8s + 4.2s = 9.0s) */
-    const t2 = setTimeout(() => {
-      setIntroStage('done');
-      setIntro(false);
-    }, 9000);
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
+    const t = setTimeout(() => setIntro(false), 5000);
+    return () => clearTimeout(t);
   }, []);
 
   /* announce the running build so you can confirm the bundle is current */
@@ -372,46 +355,15 @@ export default function App() {
       {/* ambient vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(130% 100% at 50% 45%, transparent 55%, rgba(2,4,9,0.5) 100%)' }} />
 
-      {/* initial 3D intro animation sequence */}
+      {/* opening veil */}
       {intro && (
-        <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 9999 }}>
-          {/* Stage 1: Black screen with centered glowing text */}
-          {introStage !== 'done' && (
-            <div
-              className={`absolute inset-0 bg-black flex flex-col items-center justify-center transition-opacity duration-1000 ${
-                introStage === 'light' ? 'opacity-0' : 'opacity-100 intro-text-anim'
-              }`}
-              style={{ backgroundColor: '#000000' }}
-            >
-              <div className="font-display font-medium text-paper text-[clamp(24px,4vw,42px)] tracking-[0.5em] text-indent-[0.5em] intro-title-glow">
-                MY UNIVERSE
-              </div>
-              <div className="mt-5 font-mono text-[10px] tracking-[0.38em] uppercase text-solar/80">
-                a personal cosmos · scroll to travel · double-click to enter
-              </div>
-            </div>
-          )}
-
-          {/* Stage 2: Central Light Ejection Bloom & Kamui Portal Warp Overlay */}
-          {introStage === 'light' && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              {/* Ejecting Center Light Ray / Atmosphere Burst */}
-              <div
-                className="absolute inset-0 intro-light-ejection"
-                style={{
-                  background: 'radial-gradient(circle at 50% 50%, rgba(255, 235, 190, 0.95) 0%, rgba(242, 193, 120, 0.7) 18%, rgba(111, 194, 180, 0.35) 45%, rgba(4, 6, 12, 0) 75%)',
-                  mixBlendMode: 'screen',
-                }}
-              />
-              {/* Spinning Quantum Core Ring */}
-              <div
-                className="absolute top-1/2 left-1/2 w-[300px] h-[300px] rounded-full border-2 border-solar/60 intro-core-ring"
-                style={{
-                  boxShadow: '0 0 80px #f2c178, inset 0 0 50px #6fc2b4',
-                }}
-              />
-            </div>
-          )}
+        <div className="intro-veil fixed inset-0 z-[35] pointer-events-none flex flex-col items-center justify-center" style={{ background: 'radial-gradient(80% 70% at 50% 50%, rgba(4,6,12,0.28), rgba(4,6,12,0.6))' }}>
+          <div className="intro-track font-display font-medium text-paper/90 text-[clamp(20px,3.4vw,34px)]" style={{ letterSpacing: '0.5em', textIndent: '0.5em' }}>
+            MY UNIVERSE
+          </div>
+          <div className="mt-4 font-mono text-[9.5px] tracking-[0.34em] uppercase text-solar/70">
+            a personal cosmos · scroll to travel · double-click to enter
+          </div>
         </div>
       )}
 
