@@ -289,6 +289,8 @@ export class UniverseEngine {
   private demonCoreLight!: THREE.PointLight;
   private demonCoreCollider!: THREE.Mesh;
   private kamuiTimer = 0;
+  private introAnimTimer = 0;
+  private introAnimDuration = 4.2;
   private lastLabel = '';
   private lastDateSent = 0;
   private clockT = 0;
@@ -2447,6 +2449,17 @@ void main(){
     this.kamuiTimer = 1.0;
   }
 
+  /** Play 3D Intro Sequence: cinematic fly-in from outer space with Kamui light ejection warp */
+  playIntroSequence(duration = 4.2) {
+    this.focusId = null;
+    this.realityFocused = false;
+    this.introAnimTimer = 1.0;
+    this.introAnimDuration = duration;
+    this.rig.setZoomTarget(0.15);
+    this.rig.setOrbit(0.9, 1.12);
+    this.rig.clearPan();
+  }
+
   /** Pan and zoom camera to the supreme Multiverse Core {Demon} */
   zoomToDemonCore() {
     this.focusId = null;
@@ -2511,6 +2524,10 @@ void main(){
        hyperspace distortion that dies away as you are ejected */
     const tunnelSwirl = this.kamuiWarpFx * 1.35;
     pu.uStrength.value = Math.max(portalVal, scaleKamuiPulse, tunnelSwirl);
+
+    if (this.introAnimTimer > 0) {
+      this.introAnimTimer = Math.max(0, this.introAnimTimer - dt / this.introAnimDuration);
+    }
 
     if (this.portal.phase !== 'idle') {
       const b = this.bodies.find((x) => x.data.id === this.portal.bodyId);

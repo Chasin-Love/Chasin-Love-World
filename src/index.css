@@ -70,18 +70,58 @@ html, body {
 }
 .pulse-soft { animation: pulseSoft 2.6s ease-in-out infinite; }
 
-@keyframes introVeil {
-  0% { opacity: 0; }
-  14% { opacity: 1; }
-  66% { opacity: 1; }
-  100% { opacity: 0; }
+@keyframes introTextFade {
+  0% { opacity: 0; transform: scale(0.95); }
+  20% { opacity: 1; transform: scale(1); }
+  80% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 0; transform: scale(1.06); filter: blur(8px); }
 }
-.intro-veil { animation: introVeil 4.8s ease both; }
-@keyframes introTrack {
-  from { letter-spacing: 0.62em; }
-  to { letter-spacing: 0.42em; }
+.intro-text-anim {
+  animation: introTextFade 4.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.intro-track { animation: introTrack 4.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes introGlowPulse {
+  0%, 100% { text-shadow: 0 0 15px rgba(242, 193, 120, 0.4), 0 0 35px rgba(242, 193, 120, 0.2); }
+  50% { text-shadow: 0 0 30px rgba(255, 220, 160, 0.9), 0 0 60px rgba(242, 193, 120, 0.6), 0 0 90px rgba(111, 194, 180, 0.4); }
+}
+.intro-title-glow {
+  animation: introGlowPulse 2.8s ease-in-out infinite;
+}
+
+@keyframes introLightBloom {
+  0% {
+    opacity: 0;
+    transform: scale(0.1);
+    filter: brightness(2.5) blur(10px);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.5);
+    filter: brightness(3.0) blur(4px);
+  }
+  70% {
+    opacity: 0.8;
+    transform: scale(2.2);
+    filter: brightness(1.8) blur(12px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.0);
+    filter: brightness(1.0) blur(20px);
+  }
+}
+.intro-light-ejection {
+  animation: introLightBloom 4.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes introCenterCoreSpin {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.2); opacity: 0; }
+  35% { transform: translate(-50%, -50%) rotate(180deg) scale(1.4); opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(360deg) scale(3.5); opacity: 0; }
+}
+.intro-core-ring {
+  animation: introCenterCoreSpin 4.0s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
 
 @keyframes execScan {
   0% { top: -4px; opacity: 0; }
