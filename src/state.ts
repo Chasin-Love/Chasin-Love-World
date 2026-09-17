@@ -1109,6 +1109,24 @@ export const actions = {
     notify();
   },
 
+  /** Version snapshot from explicit text — works for payload-backed files
+      whose VaultFile has no inline `content` (saveVersion skips those). */
+  saveVersionContent(id: string, label: string, content: string) {
+    const f = state.vault.find((x) => x.id === id);
+    if (!f || !content) return;
+    const last = f.versions?.[f.versions.length - 1];
+    if (last && last.content === content) return;
+    const v: FileVersion = {
+      id: newId(),
+      savedAt: Date.now(),
+      label,
+      size: content.length,
+      content,
+    };
+    f.versions = [...(f.versions ?? []), v].slice(-10);
+    notify();
+  },
+
   restoreVersion(id: string, versionId: string) {
     const f = state.vault.find((x) => x.id === id);
     const v = f?.versions?.find((x) => x.id === versionId);

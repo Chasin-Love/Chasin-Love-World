@@ -1,6 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { actions, newId } from '../state';
+import { prettyPrint } from './format';
+import type { MonacoHandle } from './vault/MonacoCodeEditor';
+
+/* the real editor (VS Code engine) — loaded in its own chunk on first open */
+const MonacoCodeEditor = lazy(() =>
+  import('./vault/MonacoCodeEditor').then((m) => ({ default: m.MonacoCodeEditor })),
+);
 import {
   authorizeVaultFile, checkVerifier, clearPayloadSession, decryptRecords, encryptRecords,
   isVaultFileAuthorized, isVaultFileLocked, revokeVaultFileAuthorization,
@@ -2317,18 +2324,6 @@ function CodeDocStudio({
   onSave,
   onDownload,
 }: CodeDocStudioProps) {
-  const [code, setCode] = useState(initial);
-  const [mode, setMode] = useState<'code' | 'preview' | 'split' | 'metrics'>('split');
-  const [wordWrap, setWordWrap] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-
-  useEffect(() => {
-    setCode(initial);
-    setIsDirty(false);
-  }, [initial]);
-
   const ext = useMemo(() => fileName.split('.').pop()?.toLowerCase() ?? '', [fileName]);
   const isHtml = mime === 'text/html' || ext === 'html' || ext === 'htm';
   const isCss = mime === 'text/css' || ext === 'css';
@@ -2336,13 +2331,36 @@ function CodeDocStudio({
   const isMd = ext === 'md' || mime === 'text/markdown';
   const isJson = ext === 'json' || mime === 'application/json';
   const isXml = ext === 'xml';
+  const isJsDoc = ['js', 'jsx', 'mjs', 'cjs', 'ts', 'tsx'].includes(ext);
+  const formattable = isJson || isHtml || isCss || isJsDoc;
+
+  /* minified files open PRE-FORMATTED in the editor (baseline = formatted, so
+     SEAL stores the pretty version) — a one-line blob never reaches the pane */
+  const prettyInitial = useMemo(() => {
+    const minified = initial.split('\n').some((l) => l.length > 200);
+    if (!minified || !formattable) return initial;
+    const lang = isJson ? 'json' : isHtml ? 'html' : isCss ? 'css' : 'js';
+    return prettyPrint(initial, lang);
+  }, [initial]);
+
+  const [code, setCode] = useState(prettyInitial);
+  const [mode, setMode] = useState<'code' | 'preview' | 'split' | 'metrics'>('split');
+  const [wordWrap, setWordWrap] = useState(true);
+  const [isDirty, setIsDirty] = useState(false);
+  const monacoRef = useRef<MonacoHandle | null>(null);
+  const editorActive = mode === 'code' || mode === 'split';
+
+  useEffect(() => {
+    setCode(prettyInitial);
+    setIsDirty(false);
+  }, [prettyInitial]);
 
   const canPreview = isHtml || isCss || isSvg || isMd || isJson || isXml;
 
-  // Track edits
+  // Track edits (baseline is the formatted-open text)
   const handleCodeChange = (val: string) => {
     setCode(val);
-    setIsDirty(val !== initial);
+    setIsDirty(val !== prettyInitial);
   };
 
   // Safe Static Document Preview (Non-executing sandbox for documentation)
@@ -2389,17 +2407,6 @@ function CodeDocStudio({
     }
     return { chars, bytes, linesCount: lines.length, tagMatches, scriptCount, styleCount, linkCount, jsonStatus, jsonKeys };
   }, [code, isHtml, isJson, lines.length]);
-
-  // Match counter for search
-  const searchMatches = useMemo(() => {
-    if (!searchTerm.trim()) return 0;
-    try {
-      const reg = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      return (code.match(reg) || []).length;
-    } catch {
-      return 0;
-    }
-  }, [code, searchTerm]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code).then(() => {
@@ -2501,28 +2508,38 @@ function CodeDocStudio({
 
         {/* Quick Tools */}
         <div className="flex items-center gap-2">
-          {isJson && (
+          {formattable && (
             <button
-              onClick={formatJson}
+              onClick={() => {
+                const lang = isJson ? 'json' : isHtml ? 'html' : isCss ? 'css' : 'js';
+                const next = isJson
+                  ? (() => { try { return JSON.stringify(JSON.parse(code), null, 2); } catch { return code; } })()
+                  : prettyPrint(code, lang);
+                if (next !== code) handleCodeChange(next);
+              }}
               className="px-2 py-1 text-[9px] font-mono border border-line/50 text-slate-soft hover:text-teal-ice hover:border-teal-ice/40 rounded transition-colors"
-              title="Format JSON"
+              title={isJson ? 'Format JSON' : 'Pretty-print document'}
             >
               FORMAT
             </button>
           )}
 
-          <button
-            onClick={() => setShowSearch(!showSearch)}
-            className={`px-2 py-1 text-[9px] font-mono border rounded transition-colors ${
-              showSearch ? 'border-teal-ice/50 text-teal-ice bg-teal-ice/10' : 'border-line/50 text-slate-soft hover:text-paper'
-            }`}
-            title="Search in code"
-          >
-            FIND{searchMatches > 0 ? ` (${searchMatches})` : ''}
-          </button>
+          {editorActive && (
+            <button
+              onClick={() => monacoRef.current?.find()}
+              className="px-2 py-1 text-[9px] font-mono border border-line/50 text-slate-soft hover:text-paper rounded transition-colors"
+              title="Find & replace (Ctrl+F inside the editor)"
+            >
+              FIND
+            </button>
+          )}
 
           <button
-            onClick={() => setWordWrap(!wordWrap)}
+            onClick={() => {
+              const next = !wordWrap;
+              setWordWrap(next);
+              monacoRef.current?.setWordWrap(next);
+            }}
             className={`px-2 py-1 text-[9px] font-mono border rounded transition-colors ${
               wordWrap ? 'border-teal-ice/40 text-teal-ice' : 'border-line/50 text-slate-soft hover:text-paper'
             }`}
@@ -2563,30 +2580,6 @@ function CodeDocStudio({
         </div>
       </div>
 
-      {/* Quick Search Bar */}
-      {showSearch && (
-        <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#060b17] border-b border-teal-ice/15 text-[10px] font-mono">
-          <span className="text-teal-ice shrink-0">FIND:</span>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="search within code document…"
-            className="flex-1 bg-void/80 border border-line/50 rounded px-2 py-0.5 text-paper placeholder:text-slate-dim outline-none focus:border-teal-ice"
-            autoFocus
-          />
-          <span className="text-slate-dim shrink-0">
-            {searchTerm ? `${searchMatches} matches found` : 'type to search'}
-          </span>
-          <button
-            onClick={() => { setShowSearch(false); setSearchTerm(''); }}
-            className="text-slate-dim hover:text-paper px-1.5"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
       {/* Main Workspace Area */}
       <div className="flex-1 min-h-0 flex relative">
         {/* Editor Pane */}
@@ -2596,24 +2589,22 @@ function CodeDocStudio({
               <span>{lines.length} lines · {metrics.chars} characters · {fmtBytes(metrics.bytes)}</span>
               <span className="text-teal-ice/80 uppercase tracking-wider">{ext || 'doc'} document</span>
             </div>
-            <div className="flex-1 min-h-0 flex">
-              {/* Line Numbers Gutter */}
-              <div className="w-10 bg-[#03060f] border-r border-line/30 py-3 text-right pr-2 select-none font-mono text-[10px] leading-[1.6] text-slate-dim/40 overflow-hidden">
-                {lines.slice(0, 500).map((_, i) => (
-                  <div key={i}>{i + 1}</div>
-                ))}
-                {lines.length > 500 && <div>…</div>}
-              </div>
-              {/* Text Area */}
-              <textarea
-                value={code}
-                onChange={(e) => handleCodeChange(e.target.value)}
-                spellCheck={false}
-                className={`flex-1 bg-transparent p-3 font-mono text-[11px] leading-[1.6] text-paper resize-none outline-none overflow-auto thin-scroll ${
-                  wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre overflow-x-auto'
-                }`}
-                placeholder="Document content..."
-              />
+            <div className="flex-1 min-h-0 flex flex-col">
+              <Suspense
+                fallback={
+                  <div className="flex-1 flex items-center justify-center font-mono text-[10px] text-slate-dim tracking-[0.2em] uppercase animate-pulse">
+                    summoning the code engine…
+                  </div>
+                }
+              >
+                <MonacoCodeEditor
+                  value={code}
+                  fileName={fileName}
+                  wordWrap={wordWrap}
+                  onChange={handleCodeChange}
+                  onMountHandle={(h) => { monacoRef.current = h; }}
+                />
+              </Suspense>
             </div>
           </div>
         )}
@@ -2738,13 +2729,31 @@ function OtherView({ file }: { file: VaultFile }) {
 function Viewer({ file, onClose }: { file: VaultFile; onClose: () => void }) {
   const [text, setText] = useState(file.content ?? '');
   const [showHistory, setShowHistory] = useState(false);
+  /* payload-backed text files: content resolved once from vault storage */
+  const [payloadText, setPayloadText] = useState<string | null>(null);
+  const [payloadResolving, setPayloadResolving] = useState(false);
   const isCsv = /\.csv$/i.test(file.name);
   const isFits = /\.fits$/i.test(file.name);
-  const editable = file.kind === 'document' && file.content !== undefined && !file.sealed;
+  const isPayloadTextDoc = file.kind === 'document' && file.content === undefined && !!file.payloadRef && !file.sealed;
+  const editable = file.kind === 'document' && (file.content !== undefined || (isPayloadTextDoc && payloadText !== null)) && !file.sealed;
 
   useEffect(() => {
     setText(file.content ?? '');
   }, [file.content]);
+
+  useEffect(() => {
+    if (!isPayloadTextDoc || payloadText !== null || payloadResolving) return;
+    let alive = true;
+    setPayloadResolving(true);
+    void getPayload(file.payloadRef!)
+      .then(async (blob) => {
+        if (!alive) return;
+        setPayloadText(blob ? await blob.text() : '');
+      })
+      .catch(() => { if (alive) setPayloadText(''); })
+      .finally(() => { if (alive) setPayloadResolving(false); });
+    return () => { alive = false; };
+  }, [isPayloadTextDoc, file.payloadRef, payloadText, payloadResolving]);
 
   /* large payloads stream in from IndexedDB as an object URL.
      Sealed media with no stored bytes gets materialized into a real,
@@ -2771,10 +2780,27 @@ function Viewer({ file, onClose }: { file: VaultFile; onClose: () => void }) {
   const versions = file.versions ?? [];
 
   const handleSave = (newContent: string) => {
+    if (file.payloadRef && file.content === undefined) {
+      /* payload-backed document: snapshot, then re-encrypt + write through */
+      if (newContent !== payloadText) {
+        actions.saveVersionContent(file.id, 'before save', payloadText ?? '');
+      }
+      void putPayload(file.payloadRef, new Blob([newContent], { type: file.mime || 'text/plain' }))
+        .then(async () => {
+          const size = new Blob([newContent]).size;
+          const checksum = await sha256Hex(newContent);
+          actions.updateVaultFile(file.id, { checksum, size });
+          setPayloadText(newContent);
+          setText(newContent);
+          toast('payload re-sealed & snapshot created');
+        })
+        .catch(() => toast('payload write failed — storage unavailable', 'warn'));
+      return;
+    }
     if (newContent !== file.content) {
       actions.saveVersion(file.id, 'before save');
     }
-    actions.updateVaultFile(file.id, { content: newContent });
+    actions.updateVaultFile(file.id, { content: newContent, size: newContent.length });
     setText(newContent);
     toast('document re-sealed and snapshot created');
   };
@@ -2831,10 +2857,11 @@ function Viewer({ file, onClose }: { file: VaultFile; onClose: () => void }) {
         )}
 
         <div className="flex-1 min-h-0 overflow-y-auto thin-scroll p-4 sm:p-5">
-          {/* Universal Code & Document Studio */}
-          {file.kind === 'document' && file.content !== undefined && (
+          {/* Universal Code & Document Studio — inline OR payload-backed text */}
+          {file.kind === 'document' && (file.content !== undefined || (isPayloadTextDoc && payloadText !== null)) && (
             <CodeDocStudio
-              initial={text}
+              key={file.id + (file.content === undefined ? ':payload' : ':inline')}
+              initial={file.content !== undefined ? text : payloadText ?? ''}
               fileName={file.name}
               mime={file.mime}
               onSave={handleSave}
@@ -2842,8 +2869,10 @@ function Viewer({ file, onClose }: { file: VaultFile; onClose: () => void }) {
             />
           )}
 
-          {file.kind === 'document' && file.content === undefined && !/\.pdf$/i.test(file.name) && (
-            <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-slate-dim text-center py-10">payload sealed — content stored outside heap</p>
+          {isPayloadTextDoc && payloadText === null && (
+            <p className={`font-mono text-[10px] tracking-[0.2em] uppercase text-slate-dim text-center py-10 ${payloadResolving ? 'animate-pulse' : ''}`}>
+              {payloadResolving ? 'decrypting payload…' : 'payload sealed — content stored outside heap'}
+            </p>
           )}
 
           {file.kind === 'image' && (mediaSrc || file.thumb) && (
