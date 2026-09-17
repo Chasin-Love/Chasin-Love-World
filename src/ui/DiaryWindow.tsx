@@ -9,6 +9,8 @@ import { toast } from './toast';
 import { readAsDataURL, synthBars } from './lib';
 import { AudioPlate, VideoPlate, ImageOrGifPlate, FileOrCodePlate, useAttachmentSource } from './MediaPlates';
 import AttachmentEditor from './AttachmentEditor';
+import { highlightLine, langOf } from './syntax';
+import { prettyPrint } from './format';
 
 export interface WinRect { x: number; y: number; w: number; h: number; }
 
@@ -1030,6 +1032,7 @@ const GluedPage = memo(function GluedPage({
             </div>
             <CodeEditorModal
               initial={codeAtt.codeSnippet ?? ''}
+              lang={langOf(codeAtt.fileExt || codeAtt.name.split('.').pop())}
               onCancel={() => setCodeEditId(null)}
               onSave={(text) => {
                 actions.updateAttachment(entry.id, codeAtt.id, {
@@ -1047,19 +1050,99 @@ const GluedPage = memo(function GluedPage({
   );
 });
 
-function CodeEditorModal({ initial, onCancel, onSave }: { initial: string; onCancel: () => void; onSave: (text: string) => void }) {
+function CodeEditorModal({ initial, lang, onCancel, onSave }: { initial: string; lang: string; onCancel: () => void; onSave: (text: string) => void }) {
   const [text, setText] = useState(initial);
+  const [formatted, setFormatted] = useState(false);
+  const gutterRef = useRef<HTMLDivElement>(null);
+  const hlRef = useRef<HTMLPreElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const lineCount = text.split('\n').length;
+
+  /* highlight overlay lines (capped for very large snippets) */
+  const hlLines = useMemo(() => {
+    const ls = text.split('\n').slice(0, 1500);
+    return ls.map((l) => highlightLine(l.length > 600 ? l.slice(0, 600) : l, lang));
+  }, [text, lang]);
+
+  /* the textarea is the scroller — keep the highlight layer + gutter aligned */
+  const syncScroll = () => {
+    const ta = taRef.current;
+    if (!ta) return;
+    if (hlRef.current) {
+      hlRef.current.scrollTop = ta.scrollTop;
+      hlRef.current.scrollLeft = ta.scrollLeft;
+    }
+    if (gutterRef.current) gutterRef.current.scrollTop = ta.scrollTop;
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    const ta = e.currentTarget;
+    const { selectionStart: s, selectionEnd: en } = ta;
+    setText(text.slice(0, s) + '  ' + text.slice(en));
+    requestAnimationFrame(() => {
+      ta.selectionStart = ta.selectionEnd = s + 2;
+    });
+  };
+
   return (
     <>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        spellCheck={false}
-        className="flex-1 min-h-60 w-full resize-none bg-black/50 border-0 outline-none p-4 font-mono text-[11px] leading-relaxed text-slate-200 focus:ring-0"
-      />
+      <div className="flex-1 min-h-60 w-full flex overflow-hidden bg-black/60 relative font-mono text-[11px] leading-relaxed">
+        {/* line-number gutter */}
+        <div
+          ref={gutterRef}
+          className="select-none shrink-0 w-11 overflow-hidden text-right py-4 pr-2 text-slate-600 border-r border-white/5 bg-black/30"
+          aria-hidden
+        >
+          {Array.from({ length: lineCount }, (_, i) => (
+            <div key={i}>{i + 1}</div>
+          ))}
+        </div>
+        {/* highlighted layer + transparent-caret textarea, perfectly stacked */}
+        <div className="relative flex-1 min-w-0">
+          <pre
+            ref={hlRef}
+            aria-hidden
+            className="absolute inset-0 px-3 py-4 whitespace-pre overflow-hidden pointer-events-none m-0"
+          >
+            {hlLines.map((toks, i) => (
+              <div key={i}>
+                {toks.length === 0
+                  ? '\u00A0'
+                  : toks.map((t, ti) => <span key={ti} style={{ color: t.color }}>{t.text}</span>)}
+              </div>
+            ))}
+          </pre>
+          <textarea
+            ref={taRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onScroll={syncScroll}
+            onKeyDown={handleKeyDown}
+            spellCheck={false}
+            wrap="off"
+            aria-label="code editor"
+            className="absolute inset-0 w-full h-full resize-none bg-transparent border-0 outline-none px-3 py-4 text-transparent caret-solar whitespace-pre overflow-auto focus:ring-0 selection:bg-teal-ice/25"
+          />
+        </div>
+      </div>
       <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-line/40">
-        <span className="font-mono text-[9px] text-slate-dim">{text.split('\n').length} lines · {text.length} chars</span>
+        <span className="font-mono text-[9px] text-slate-dim">
+          {lineCount} lines · {text.length} chars · Tab indents
+          {formatted && <span className="text-violet-300/90"> · ✨ formatted</span>}
+        </span>
         <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const next = prettyPrint(text, lang);
+              if (next !== text) { setText(next); setFormatted(true); sfxTick(); }
+            }}
+            className="px-3 py-1.5 rounded bg-violet-500/15 border border-violet-400/30 text-violet-200 hover:bg-violet-500/25 font-mono text-[10px]"
+            title="pretty-print this snippet (html · css · json · js)"
+          >
+            ✨ format
+          </button>
           <button onClick={onCancel} className="px-3 py-1.5 rounded bg-white/5 border border-white/10 text-slate-dim hover:text-paper font-mono text-[10px]">cancel</button>
           <button onClick={() => onSave(text)} className="px-3 py-1.5 rounded bg-teal-ice/25 border border-teal-ice/50 text-teal-ice font-mono text-[10px] hover:bg-teal-ice/35">save snippet</button>
         </div>

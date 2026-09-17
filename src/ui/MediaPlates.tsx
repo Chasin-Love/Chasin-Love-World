@@ -3,6 +3,8 @@ import type { Attachment } from '../types';
 import { sfxTick } from '../audio';
 import { toast } from './toast';
 import { synthBars } from './lib';
+import { highlightLine, langOf } from './syntax';
+import { looksMinified, prettyPrint } from './format';
 import { getLocalPayload } from '../backend';
 import {
   Play,
@@ -1094,7 +1096,13 @@ export const FileOrCodePlate = memo(function FileOrCodePlate({
   const Icon = info.icon;
 
   const hasCode = Boolean(att.codeSnippet && att.codeSnippet.trim().length > 0);
-  const lines = att.codeSnippet ? att.codeSnippet.split('\n') : [];
+  const rawSnippet = att.codeSnippet ?? '';
+  const lang = langOf(att.fileExt || att.name.split('.').pop());
+  /* minified single-line files are auto-formatted for DISPLAY so they read
+     like a real editor — the stored source is untouched */
+  const wasFormatted = hasCode && looksMinified(rawSnippet) && ['html', 'css', 'json', 'js'].includes(lang);
+  const displayCode = wasFormatted ? prettyPrint(rawSnippet, lang) : rawSnippet;
+  const lines = displayCode ? displayCode.split('\n') : [];
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1154,15 +1162,18 @@ export const FileOrCodePlate = memo(function FileOrCodePlate({
             </div>
             <div className="flex items-center gap-2 mt-0.5 font-mono text-[9px] text-slate-400">
               {att.size && <span>{fmtFileSize(att.size)}</span>}
-              {att.size && (lines.length > 0 || att.lineCount) && <span>•</span>}
               {(att.lineCount || lines.length > 0) && (
-                <span>{att.lineCount || lines.length} lines</span>
+                <>
+                  <span>•</span>
+                  <span>{att.lineCount || lines.length} {(att.lineCount || lines.length) === 1 ? 'line' : 'lines'}</span>
+                </>
               )}
-              <span>•</span>
-              <span className="text-cyan-300/80 flex items-center gap-1">
-                <ShieldCheck size={11} className="text-cyan-400" />
-                Protected Vault Asset
-              </span>
+              {lang !== 'plain' && (
+                <>
+                  <span>•</span>
+                  <span className="text-cyan-300/80">{lang}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1208,17 +1219,27 @@ export const FileOrCodePlate = memo(function FileOrCodePlate({
             expanded ? 'max-h-90 overflow-y-auto' : 'max-h-25 overflow-hidden'
           }`}
         >
-          <pre className="p-3 font-mono text-[10px] leading-[1.6] text-slate-300 select-text overflow-x-auto">
-            {lines.slice(0, expanded ? 400 : 4).map((line, idx) => (
-              <div key={idx} className="flex items-start gap-3 hover:bg-white/2 px-1 rounded">
-                <span className="select-none text-slate-500 text-right w-6 shrink-0 font-mono text-[9px]">
-                  {idx + 1}
-                </span>
-                <span className="flex-1 whitespace-pre break-all font-mono text-slate-200">
-                  {line || ' '}
-                </span>
-              </div>
-            ))}
+          {wasFormatted && (
+            <div className="px-3 pt-2 font-mono text-[8.5px] tracking-[0.18em] uppercase text-violet-300/80">
+              ✨ formatted view — stored source is untouched
+            </div>
+          )}
+          <pre className="p-3 font-mono text-[10px] leading-[1.6] text-slate-300 select-text">
+            {lines.slice(0, expanded ? 400 : 4).map((line, idx) => {
+              const toks = highlightLine(line.length > 600 ? line.slice(0, 600) : line, lang);
+              return (
+                <div key={idx} className="flex items-start gap-3 hover:bg-white/2 px-1 rounded">
+                  <span className="select-none text-slate-500 text-right w-6 shrink-0 font-mono text-[9px]">
+                    {idx + 1}
+                  </span>
+                  <span className="flex-1 whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-slate-200">
+                    {toks.map((t, ti) => (
+                      <span key={ti} style={{ color: t.color }}>{t.text}</span>
+                    ))}
+                  </span>
+                </div>
+              );
+            })}
             {!expanded && lines.length > 4 && (
               <div
                 onClick={toggleExpand}
