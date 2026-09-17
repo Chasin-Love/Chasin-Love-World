@@ -71,16 +71,28 @@ async function writeStoredPayload(id: string, stored: Blob): Promise<void> {
   });
 }
 
-async function readStoredPayload(id: string): Promise<Blob | null> {
+/** Retype a blob when the storage tier lost its MIME (OPFS returns typeless
+ *  Files; <video>/<audio> refuse to play typeless sources). */
+async function withMime(stored: Blob | null, mimeHint: string): Promise<Blob | null> {
+  if (!stored) return null;
+  if (!mimeHint || stored.type) return stored;
+  try {
+    return new Blob([await stored.arrayBuffer()], { type: mimeHint });
+  } catch {
+    return stored;
+  }
+}
+
+async function readStoredPayload(id: string, mimeHint = ''): Promise<Blob | null> {
   /* Desktop tier first. */
   const desktopBytes = await desktopPayloads.get(id);
-  if (desktopBytes) return new Blob([desktopBytes.slice().buffer as ArrayBuffer]);
+  if (desktopBytes) return withMime(new Blob([desktopBytes.slice().buffer as ArrayBuffer]), mimeHint);
 
   const root = await getOpfsRoot();
   if (root) {
     try {
       const fileHandle = await root.getFileHandle(`payload-${id}.bin`);
-      return await fileHandle.getFile();
+      return await withMime(await fileHandle.getFile(), mimeHint);
     } catch {
       // Fallback to IndexedDB if OPFS read fails or file is not in OPFS.
     }
@@ -90,14 +102,14 @@ async function readStoredPayload(id: string): Promise<Blob | null> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly');
     const req = tx.objectStore(STORE).get(id);
-    req.onsuccess = () => resolve((req.result as Blob) ?? null);
+    req.onsuccess = () => { resolve(withMime((req.result as Blob) ?? null, mimeHint)); };
     req.onerror = () => reject(tx.error ?? new Error('IndexedDB get payload failed'));
   });
 }
 
 /** Read the exact bytes stored under a payload ref, without decrypting them. */
-export async function getStoredPayload(id: string): Promise<Blob | null> {
-  return readStoredPayload(id);
+export async function getStoredPayload(id: string, mimeHint = ''): Promise<Blob | null> {
+  return readStoredPayload(id, mimeHint);
 }
 
 /** Write an already-stored payload envelope without encrypting it again. */
@@ -137,8 +149,8 @@ export async function putLocalPayload(id: string, blob: Blob): Promise<void> {
   await writeStoredPayload(id, blob);
 }
 
-export async function getLocalPayload(id: string): Promise<Blob | null> {
-  return readStoredPayload(id);
+export async function getLocalPayload(id: string, mimeHint = ''): Promise<Blob | null> {
+  return readStoredPayload(id, mimeHint);
 }
 
 export async function delLocalPayload(id: string): Promise<void> {

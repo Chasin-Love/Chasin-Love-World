@@ -263,7 +263,7 @@ function persistState() {
     } catch {
       /* quota exceeded — state continues seamlessly in memory */
     }
-  }, 350);
+  }, 1000);
 }
 
 function notify() {

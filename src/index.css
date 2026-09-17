@@ -1891,3 +1891,28 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   0%, 100% { transform: scale(1); filter: brightness(1); }
   50% { transform: scale(1.25); filter: brightness(1.5); }
 }
+
+/* ---- freeform attachment plates: drag the corner to any width × height,
+        content always fits fully inside (contain) or scrolls — never crops */
+.plate-card.has-h {
+  display: flex;
+  flex-direction: column;
+}
+.plate-card.has-h > .plate-media {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+.plate-card.has-h > .plate-media img,
+.plate-card.has-h > .plate-media canvas,
+.plate-card.has-h > .plate-media video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.plate-card.has-h > .plate-media pre,
+.plate-card.has-h > .plate-media .code-scroll {
+  max-height: none;
+  height: 100%;
+  overflow-y: auto;
+}

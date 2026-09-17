@@ -235,6 +235,8 @@ const GluedPage = memo(function GluedPage({
   const [dragState, setDragState] = useState<{ id: string; kind: Attachment['kind']; mode: 'move' | 'resize'; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number } | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
+  const [codeEditId, setCodeEditId] = useState<string | null>(null);
 
   const atts = entry.attachments;
   const mood = moodOf(entry.mood);
@@ -407,54 +409,78 @@ const GluedPage = memo(function GluedPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spacerKey]);
 
+  /* drag gesture with click discrimination: pointer-down NEVER swallows the
+     click — inner controls (PREVIEW, zoom, play, download) stay clickable;
+     a drag only engages after 4px of real movement. */
+  const gesture = useRef<{
+    id: string; kind: Attachment['kind']; mode: 'move' | 'resize';
+    startX: number; startY: number;
+    origX: number; origY: number; origW: number; origH: number;
+    moved: boolean;
+    pointerId: number; target: HTMLElement;
+  } | null>(null);
+  /* suppress the synthetic click right after a real drag */
+  const ghostClickUntil = useRef(0);
+
   const handlePointerDown = (a: Attachment, mode: 'move' | 'resize') => (e: React.PointerEvent) => {
     if (a.glued) return;
-    e.preventDefault();
+    /* interactive controls own their clicks — never start a drag from them */
+    if (mode === 'move' && (e.target as HTMLElement).closest('button, input, a, textarea, select, label')) return;
     e.stopPropagation();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
+    gesture.current = {
+      id: a.id, kind: a.kind, mode,
+      startX: e.clientX, startY: e.clientY,
+      origX: a.x ?? 6, origY: a.y ?? 48,
+      origW: a.w ?? PLATE_DEFAULT_W[a.kind], origH: a.h ?? 240,
+      moved: false, pointerId: e.pointerId, target: e.target as HTMLElement,
+    };
     setSelId(a.id);
-    setDragState({
-      id: a.id,
-      kind: a.kind,
-      mode,
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: a.x ?? 6,
-      origY: a.y ?? 48,
-      origW: a.w ?? PLATE_DEFAULT_W[a.kind],
-      origH: a.h ?? 64,
-    });
-  };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!dragState) return;
-    const rect = (platesRef.current ?? containerRef.current)!.getBoundingClientRect();
-    const dx = ((e.clientX - dragState.startX) / rect.width) * 100;
-    const dy = e.clientY - dragState.startY;
-
-    if (dragState.mode === 'move') {
-      const newX = Math.max(0, Math.min(90, dragState.origX + dx));
-      const newY = Math.max(0, dragState.origY + dy);
-      actions.updateAttachment(entry.id, dragState.id, { x: newX, y: newY });
-    } else {
-      const newW = Math.max(15, Math.min(100, dragState.origW + dx));
-      /* h only constrains media that respects it (audio console, image/video
-         cap) — for text-flow kinds it was a silent no-op */
-      const patch: Partial<Attachment> = { w: newW };
-      if (dragState.kind === 'audio' || dragState.kind === 'image' || dragState.kind === 'video') {
-        patch.h = Math.max(56, dragState.origH + dy);
+    const onMove = (ev: PointerEvent) => {
+      const g = gesture.current;
+      if (!g) return;
+      const dxPx = ev.clientX - g.startX;
+      const dyPx = ev.clientY - g.startY;
+      if (!g.moved && Math.hypot(dxPx, dyPx) < 4) return;
+      if (!g.moved) {
+        g.moved = true;
+        try { g.target.setPointerCapture(g.pointerId); } catch { /* detached */ }
       }
-      actions.updateAttachment(entry.id, dragState.id, patch);
-    }
-  };
+      const rect = (platesRef.current ?? containerRef.current)?.getBoundingClientRect();
+      if (!rect || rect.width === 0) return;
 
-  const handlePointerUp = () => {
-    if (dragState) {
+      if (g.mode === 'move') {
+        const newX = Math.max(0, Math.min(90, g.origX + (dxPx / rect.width) * 100));
+        const newY = Math.max(0, g.origY + dyPx);
+        actions.updateAttachment(entry.id, g.id, { x: newX, y: newY });
+      } else if (g.mode === 'resize') {
+        /* FREEFORM: horizontal → width, vertical → height. Media plates
+           object-fit their content inside (never cropped or distorted);
+           text plates gain a scrollable box. Audio keeps its natural height. */
+        const newW = Math.max(15, Math.min(100, g.origW + (dxPx / rect.width) * 100));
+        if (g.kind === 'audio') {
+          actions.updateAttachment(entry.id, g.id, { w: newW });
+        } else {
+          const newH = Math.max(64, g.origH + dyPx);
+          actions.updateAttachment(entry.id, g.id, { w: newW, h: newH });
+        }
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      const g = gesture.current;
+      gesture.current = null;
       setDragState(null);
-      sfxTick();
-      setTimeout(syncTextSpacers, 20);
-    }
+      if (g?.moved) {
+        ghostClickUntil.current = performance.now() + 300;
+        sfxTick();
+        setTimeout(syncTextSpacers, 20);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   };
 
   const toggleGlue = (a: Attachment) => {
@@ -474,11 +500,39 @@ const GluedPage = memo(function GluedPage({
   };
 
   const editingAtt = editingId ? atts.find((a) => a.id === editingId) ?? null : null;
+  const codeAtt = codeEditId ? atts.find((a) => a.id === codeEditId) ?? null : null;
+
+  /** Video: capture the currently displayed frame as a new photo plate. */
+  const grabVideoFrame = (a: Attachment) => {
+    const el = cardRefs.current[a.id]?.querySelector('video');
+    if (!el || !el.videoWidth) {
+      toast('start the video first, then grab the frame', 'warn');
+      return;
+    }
+    try {
+      const cv = document.createElement('canvas');
+      cv.width = el.videoWidth;
+      cv.height = el.videoHeight;
+      cv.getContext('2d')!.drawImage(el, 0, 0);
+      actions.addAttachment(entry.id, {
+        kind: 'image',
+        name: `frame · ${a.name}`,
+        dataUrl: cv.toDataURL('image/jpeg', 0.9),
+        x: Math.min(80, (a.x ?? 6) + 6),
+        y: (a.y ?? 48) + 32,
+        w: Math.min(48, (a.w ?? 65) - 10),
+      });
+      sfxTick();
+      toast('frame captured as a photo plate — edit it like any photo');
+    } catch {
+      toast('could not capture this frame (protected video?)', 'warn');
+    }
+  };
   /* resolve the editor's image through the same loader the plates use —
      big photos are offloaded to OPFS/IndexedDB and have an empty dataUrl */
   const editingSrc = useAttachmentSource(editingAtt ?? {
     id: '__editor_none__', kind: 'image', name: '', dataUrl: '',
-  });
+  }).src;
 
   return (
     <div
@@ -567,8 +621,6 @@ const GluedPage = memo(function GluedPage({
 
       <div
         className="page-scroll relative flex-1 min-h-0 overflow-y-auto pr-1.5"
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
       >
         <div className="relative min-h-125" ref={platesRef}>
           <div
@@ -585,15 +637,16 @@ const GluedPage = memo(function GluedPage({
           <div className="absolute inset-0 pointer-events-none z-20">
             {atts.map((a) => {
               const isSel = selId === a.id;
+              /* size = width always; height is natural UNLESS the user has
+                 freely resized (freeform): then the card is exactly w×h and
+                 the content object-fits inside — visible in full, no crop */
+              const freeform = a.kind !== 'audio' && !!a.h;
               const style: React.CSSProperties = {
                 position: 'absolute',
                 left: `${a.x ?? 6}%`,
                 top: `${a.y ?? 48}px`,
                 width: `${a.w ?? PLATE_DEFAULT_W[a.kind]}%`,
-                height: a.kind === 'audio' ? `${a.h ?? 64}px` : 'auto',
-                /* h caps media height — vertical resize now visually works */
-                maxHeight: (a.kind === 'image' || a.kind === 'video') && a.h ? `${a.h}px` : undefined,
-                overflow: 'hidden',
+                height: freeform ? `${a.h}px` : undefined,
                 filter: a.kind === 'image' && a.tone ? toneCss(a.tone) : 'none',
                 transform: a.tilt ? 'rotate(-1.8deg)' : undefined,
               };
@@ -603,16 +656,23 @@ const GluedPage = memo(function GluedPage({
                   key={a.id}
                   ref={(el) => { cardRefs.current[a.id] = el; }}
                   style={style}
-                  className={`pointer-events-auto rounded-lg transition-shadow border ${
+                  className={`plate-card pointer-events-auto rounded-lg transition-shadow border ${freeform ? 'has-h' : ''} ${
                     a.glued ? 'border-teal-ice/40 shadow-lg' : 'border-solar/60 shadow-xl cursor-move'
                   } ${isSel ? 'ring-2 ring-solar' : ''}`}
+                  onClickCapture={(e) => {
+                    /* a drag just ended on this plate — eat the ghost click */
+                    if (performance.now() < ghostClickUntil.current) {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }
+                  }}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelId(a.id);
                   }}
                   onPointerDown={handlePointerDown(a, 'move')}
                 >
-                  <div className="relative overflow-hidden rounded-md bg-panel/90">
+                  <div className="plate-media relative overflow-hidden rounded-md bg-panel/90">
                     {a.kind === 'image' && (
                       <ImageOrGifPlate
                         att={a}
@@ -656,6 +716,43 @@ const GluedPage = memo(function GluedPage({
                           ✎ edit
                         </button>
                       )}
+                      {a.kind === 'video' && (
+                        <button
+                          title="capture the current frame as a photo plate"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            grabVideoFrame(a);
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-teal-ice/15 text-teal-ice hover:bg-teal-ice/30"
+                        >
+                          ⎌ frame
+                        </button>
+                      )}
+                      {a.kind === 'code' && (
+                        <button
+                          title="edit this snippet's text in place"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sfxTick();
+                            setCodeEditId(a.id);
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-teal-ice/15 text-teal-ice hover:bg-teal-ice/30"
+                        >
+                          ✎ text
+                        </button>
+                      )}
+                      {(a.kind === 'audio' || a.kind === 'file' || a.kind === 'video') && (
+                        <button
+                          title="rename this attachment"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRenaming({ id: a.id, value: a.name });
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-white/5 text-slate-dim hover:text-paper"
+                        >
+                          ✎ name
+                        </button>
+                      )}
                       <button
                         title={`tone: ${a.tone || 'original'} — click to cycle`}
                         onClick={(e) => {
@@ -681,12 +778,12 @@ const GluedPage = memo(function GluedPage({
                         ⤡
                       </button>
                       <button
-                        title="cycle size — S · M · L"
+                        title="cycle size — S · M · L (width scales, content follows)"
                         onClick={(e) => {
                           e.stopPropagation();
                           const cur = a.w ?? PLATE_DEFAULT_W[a.kind];
                           const next = cur < 40 ? 55 : cur < 68 ? 78 : 32;
-                          actions.updateAttachment(entry.id, a.id, { w: next, h: a.kind === 'audio' ? a.h : undefined });
+                          actions.updateAttachment(entry.id, a.id, { w: next });
                           sfxTick();
                         }}
                         className="px-1.5 py-0.5 rounded bg-white/5 text-slate-dim hover:text-paper"
@@ -881,9 +978,95 @@ const GluedPage = memo(function GluedPage({
           }}
         />
       )}
+
+      {renaming && (() => {
+        const att = atts.find((a) => a.id === renaming.id);
+        if (!att) { setRenaming(null); return null; }
+        return (
+          <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onPointerDown={() => setRenaming(null)}>
+            <div className="w-full max-w-sm rounded-2xl border border-teal-ice/30 bg-[#070b16]/95 p-4 shadow-2xl" onPointerDown={(e) => e.stopPropagation()}>
+              <div className="font-display text-[12px] tracking-[0.14em] uppercase text-paper mb-2">Rename attachment</div>
+              <input
+                autoFocus
+                value={renaming.value}
+                onChange={(e) => setRenaming({ id: renaming.id, value: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const v = renaming.value.trim();
+                    if (v) actions.updateAttachment(entry.id, renaming.id, { name: v });
+                    setRenaming(null);
+                  } else if (e.key === 'Escape') setRenaming(null);
+                }}
+                className="w-full bg-black/40 border border-line/50 rounded-lg px-3 py-2 font-mono text-xs text-paper outline-none focus:border-teal-ice/60"
+                placeholder="attachment name"
+              />
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={() => setRenaming(null)} className="px-3 py-1.5 rounded bg-white/5 border border-white/10 text-slate-dim hover:text-paper font-mono text-[10px]">cancel</button>
+                <button
+                  onClick={() => {
+                    const v = renaming.value.trim();
+                    if (v) { actions.updateAttachment(entry.id, renaming.id, { name: v }); sfxTick(); }
+                    setRenaming(null);
+                  }}
+                  className="px-3 py-1.5 rounded bg-teal-ice/25 border border-teal-ice/50 text-teal-ice font-mono text-[10px] hover:bg-teal-ice/35"
+                >
+                  save name
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {codeAtt && (
+        <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onPointerDown={() => setCodeEditId(null)}>
+          <div className="w-full max-w-2xl rounded-2xl border border-teal-ice/30 bg-[#070b16]/95 shadow-2xl flex flex-col max-h-[86vh]" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-line/40">
+              <div className="min-w-0">
+                <div className="font-display text-[12px] tracking-[0.14em] uppercase text-paper">Edit snippet</div>
+                <div className="font-mono text-[8.5px] text-slate-dim tracking-[0.16em] uppercase truncate">{codeAtt.name}</div>
+              </div>
+              <button onClick={() => setCodeEditId(null)} className="text-slate-dim hover:text-paper px-2 text-lg leading-none">×</button>
+            </div>
+            <CodeEditorModal
+              initial={codeAtt.codeSnippet ?? ''}
+              onCancel={() => setCodeEditId(null)}
+              onSave={(text) => {
+                actions.updateAttachment(entry.id, codeAtt.id, {
+                  codeSnippet: text,
+                  lineCount: text.split('\n').length,
+                });
+                setCodeEditId(null);
+                toast('snippet updated');
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 });
+
+function CodeEditorModal({ initial, onCancel, onSave }: { initial: string; onCancel: () => void; onSave: (text: string) => void }) {
+  const [text, setText] = useState(initial);
+  return (
+    <>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        spellCheck={false}
+        className="flex-1 min-h-60 w-full resize-none bg-black/50 border-0 outline-none p-4 font-mono text-[11px] leading-relaxed text-slate-200 focus:ring-0"
+      />
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-line/40">
+        <span className="font-mono text-[9px] text-slate-dim">{text.split('\n').length} lines · {text.length} chars</span>
+        <div className="flex gap-2">
+          <button onClick={onCancel} className="px-3 py-1.5 rounded bg-white/5 border border-white/10 text-slate-dim hover:text-paper font-mono text-[10px]">cancel</button>
+          <button onClick={() => onSave(text)} className="px-3 py-1.5 rounded bg-teal-ice/25 border border-teal-ice/50 text-teal-ice font-mono text-[10px] hover:bg-teal-ice/35">save snippet</button>
+        </div>
+      </div>
+    </>
+  );
+}
 
 function TagInput({ entryId, tags }: { entryId: string; tags: string[] }) {
   return (

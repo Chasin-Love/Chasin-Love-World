@@ -58,38 +58,74 @@ function fmtSMPTE(sec: number): string {
   return `${h < 10 ? '0' : ''}${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}:${frames < 10 ? '0' : ''}${frames}`;
 }
 
+/** Best-effort mime from a filename — OPFS strips blob types on read-back,
+ *  and <video>/<audio> refuse to play a typeless source (images get sniffed,
+ *  which is why photos kept working while videos/GIFs didn't). */
+export function mimeFromName(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  const map: Record<string, string> = {
+    mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+    mkv: 'video/x-matroska', avi: 'video/x-msvideo', ogg: 'application/ogg', ogv: 'video/ogg',
+    mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', aac: 'audio/aac', flac: 'audio/flac', oga: 'audio/ogg',
+    gif: 'image/gif', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp', avif: 'image/avif',
+    pdf: 'application/pdf', zip: 'application/zip', json: 'application/json', txt: 'text/plain',
+    html: 'text/html', htm: 'text/html', csv: 'text/csv', md: 'text/markdown',
+  };
+  return map[ext] ?? '';
+}
+
 /** Resolves an attachment to displayable bytes: inline dataUrl, or the
  *  offloaded OPFS/IndexedDB payload as a blob URL. Shared by the plates AND
- *  the attachment editor. */
-export function useAttachmentSource(att: Attachment): string {
-  const [source, setSource] = useState(att.dataUrl || '');
+ *  the attachment editor. `missing: true` means the payload is gone — the
+ *  plate should say so instead of rendering a dead silent player. */
+export function useAttachmentSource(att: Attachment): { src: string; missing: boolean } {
+  const [state, setState] = useState<{ src: string; missing: boolean }>({ src: att.dataUrl || '', missing: false });
 
   useEffect(() => {
     let active = true;
     let objectUrl: string | null = null;
     if (att.dataUrl) {
-      setSource(att.dataUrl);
+      setState({ src: att.dataUrl, missing: false });
       return () => { active = false; };
     }
     if (!att.payloadRef) {
-      setSource('');
+      setState({ src: '', missing: !!att.payloadMissing });
       return () => { active = false; };
     }
 
-    setSource('');
-    void getLocalPayload(att.payloadRef).then((blob) => {
-      if (!active || !blob) return;
+    setState({ src: '', missing: false });
+    /* mime hint: OPFS/desktop tiers return typeless blobs — retype on read */
+    const mimeHint = att.mimeType || mimeFromName(att.name);
+    void getLocalPayload(att.payloadRef, mimeHint).then((blob) => {
+      if (!active) return;
+      if (!blob) { setState({ src: '', missing: true }); return; }
       objectUrl = URL.createObjectURL(blob);
-      setSource(objectUrl);
-    }).catch(() => undefined);
+      setState({ src: objectUrl, missing: false });
+    }).catch(() => {
+      if (active) setState({ src: '', missing: true });
+    });
 
     return () => {
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [att.dataUrl, att.payloadRef]);
+  }, [att.dataUrl, att.payloadRef, att.payloadMissing]);
 
-  return source;
+  return state;
+}
+
+/** Small honest overlay shown when an attachment's bytes cannot be found. */
+export function MissingPayloadNotice({ name }: { name: string }) {
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-black/70 text-center p-3">
+      <span className="font-mono text-[10px] text-red-300 tracking-wider">PAYLOAD UNAVAILABLE</span>
+      <span className="font-mono text-[8.5px] text-slate-dim truncate max-w-full" title={name}>{name}</span>
+      <span className="font-mono text-[8px] text-slate-dim/70 leading-snug">
+        its data is missing from this browser's storage (attachments live per-device) — delete & re-attach the file
+      </span>
+    </div>
+  );
 }
 
 /* =========================================================================
@@ -111,7 +147,7 @@ export const AudioPlate = memo(function AudioPlate({
   const [isLooping, setIsLooping] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [volume, setVolume] = useState(0.85);
-  const source = useAttachmentSource(att);
+  const { src: source, missing: sourceMissing } = useAttachmentSource(att);
   const [eqPreset, setEqPreset] = useState<'Cosmic' | 'Vocal' | 'Bass' | 'Flat'>('Cosmic');
   const [hoverFrac, setHoverFrac] = useState<number | null>(null);
   const eqNodesRef = useRef<{ ctx: AudioContext; filter: BiquadFilterNode } | null>(null);
@@ -208,7 +244,7 @@ export const AudioPlate = memo(function AudioPlate({
     if (isPlaying) {
       audio.pause();
     } else {
-      audio.play().catch(() => {});
+      audio.play().catch(() => toast('audio payload missing or blocked by the browser', 'warn'));
     }
   };
 
@@ -275,6 +311,7 @@ export const AudioPlate = memo(function AudioPlate({
   return (
     <div className="relative rounded-2xl bg-linear-to-b from-slate-950/90 via-slate-900/90 to-slate-950/95 border border-cyan-400/30 p-3.5 select-none text-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.6),0_0_20px_rgba(6,182,212,0.12),inset_0_1px_1px_rgba(255,255,255,0.15)] overflow-hidden group font-mono">
       <audio ref={audioRef} src={source || undefined} preload="metadata" />
+      {sourceMissing && <MissingPayloadNotice name={att.name} />}
 
       {/* Holographic Specular Rim & Accent */}
       <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/60 to-transparent pointer-events-none" />
@@ -529,7 +566,7 @@ export const VideoPlate = memo(function VideoPlate({
   const [showControls, setShowControls] = useState(true);
   const [volume, setVolume] = useState(1);
   const [aspectMode, setAspectMode] = useState<'contain' | 'cover' | 'cinema'>('contain');
-  const source = useAttachmentSource(att);
+  const { src: source, missing: sourceMissing } = useAttachmentSource(att);
   const hideTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -545,12 +582,18 @@ export const VideoPlate = memo(function VideoPlate({
     const onEnded = () => setIsPlaying(false);
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
+    const onError = () => {
+      /* the payload is missing/corrupt — surface it instead of a dead player */
+      toast('video payload missing or unreadable', 'warn');
+      setIsPlaying(false);
+    };
 
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('loadedmetadata', onLoadedMeta);
     video.addEventListener('ended', onEnded);
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
+    video.addEventListener('error', onError);
 
     return () => {
       video.removeEventListener('timeupdate', onTimeUpdate);
@@ -558,6 +601,7 @@ export const VideoPlate = memo(function VideoPlate({
       video.removeEventListener('ended', onEnded);
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
+      video.removeEventListener('error', onError);
     };
   }, []);
 
@@ -579,7 +623,12 @@ export const VideoPlate = memo(function VideoPlate({
     if (isPlaying) {
       video.pause();
     } else {
-      video.play().catch(() => {});
+      video.play().catch(() => {
+        /* autoplay policy: some browsers refuse unmuted programmatic play
+           until a stronger gesture — retry once muted so playback still starts */
+        video.muted = true;
+        video.play().catch(() => toast('video blocked by the browser — tap play again', 'warn'));
+      });
     }
     resetHideTimer();
   };
@@ -686,6 +735,7 @@ export const VideoPlate = memo(function VideoPlate({
         } ${aspectMode !== 'contain' ? 'max-h-95' : ''}`}
         onClick={togglePlay}
       />
+      {sourceMissing && <MissingPayloadNotice name={att.name} />}
 
       {/* Big Central Holographic Play Button (when paused) */}
       {!isPlaying && (
@@ -843,7 +893,7 @@ export const ImageOrGifPlate = memo(function ImageOrGifPlate({
   const [isGifPaused, setIsGifPaused] = useState(false);
   const [dimensions, setDimensions] = useState<{ w: number; h: number } | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
-  const source = useAttachmentSource(att);
+  const { src: source, missing: sourceMissing } = useAttachmentSource(att);
 
   const isGif =
     att.isGif ||
@@ -891,6 +941,7 @@ export const ImageOrGifPlate = memo(function ImageOrGifPlate({
     <div className="relative w-full rounded-2xl bg-slate-950/80 border border-cyan-400/30 overflow-hidden group select-none shadow-[0_12px_36px_rgba(0,0,0,0.6),0_0_20px_rgba(6,182,212,0.12)]">
       {/* Specular Rim Lighting */}
       <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/60 to-transparent pointer-events-none z-20" />
+      {sourceMissing && <MissingPayloadNotice name={att.name} />}
 
       {/* Live Image or Frame */}
       <div className="relative overflow-hidden flex items-center justify-center bg-[#030712]">
@@ -1038,7 +1089,7 @@ export const FileOrCodePlate = memo(function FileOrCodePlate({
 }) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const source = useAttachmentSource(att);
+  const { src: source, missing: sourceMissing } = useAttachmentSource(att);
   const info = getFileTypeInfo(att.name, att.fileExt);
   const Icon = info.icon;
 
@@ -1084,6 +1135,7 @@ export const FileOrCodePlate = memo(function FileOrCodePlate({
     <div className="relative w-full rounded-2xl bg-linear-to-b from-slate-950/90 via-slate-900/90 to-slate-950/95 border border-cyan-400/30 overflow-hidden shadow-[0_12px_36px_rgba(0,0,0,0.6),0_0_20px_rgba(6,182,212,0.12)] select-none text-slate-100 font-sans">
       {/* Specular Top Line */}
       <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-400/60 to-transparent pointer-events-none" />
+      {sourceMissing && <MissingPayloadNotice name={att.name} />}
 
       {/* Header Bar */}
       <div className="flex items-center justify-between gap-2 p-3 bg-white/2 border-b border-cyan-500/20">

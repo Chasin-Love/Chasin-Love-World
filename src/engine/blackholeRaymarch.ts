@@ -234,9 +234,12 @@ export function updateRaymarchUniforms(
   time: number,
   portal?: number,
 ): void {
-  const mat = ((visual.group.children[0] as THREE.Mesh | undefined)?.material) as THREE.ShaderMaterial | undefined;
+  const quad = visual.group.children[0] as THREE.Mesh | undefined;
+  const mat = quad?.material as THREE.ShaderMaterial | undefined;
   if (!mat || !mat.uniforms) return;
-  visual.group.updateWorldMatrix(true, false);
+  /* read the matrix world as-is — the render loop keeps it current, and the
+     old updateWorldMatrix(true) call walked the whole ancestor chain twice
+     per hole per frame */
   mat.uniforms.uCenter.value.setFromMatrixPosition(visual.group.matrixWorld);
   mat.uniforms.uCamPos.value.setFromMatrixPosition(camera.matrixWorld);
   mat.uniforms.uTime.value = time;

@@ -22,6 +22,7 @@ export interface GpuCapability {
 }
 
 const STORAGE_KEY = 'my-universe:quality';
+const MIGRATION_KEY = 'my-universe:quality-migrated';
 export const QUALITY_CHANGE_EVENT = 'eventide-quality-change';
 
 let cached: GpuCapability | null = null;
@@ -50,19 +51,15 @@ export function probeCapability(): GpuCapability {
       }
       const low = renderer.toLowerCase();
       const isSoftware = SW_RASTERIZERS.some((s) => low.includes(s));
-      const isApple = low.includes('apple');
-      const isMesa = low.includes('mesa') && !isSoftware;
 
       if (isSoftware) {
         tier = 'low';
-      } else if (isApple || isMesa) {
-        /* Apple GPUs and modern Mesa drivers are strong, but Mesa's ANGLE-on-GL
-           path has historically flaked on heavy fragment loops — keep cinematic
-           behind an explicit opt-in there. */
-        tier = 'medium';
       } else {
-        /* Desktop-class Direct3D/Vulkan-backed GPUs (NVIDIA/AMD/Intel Arc) */
-        tier = 'cinematic';
+        /* Medium is the DEFAULT — it matches the long-standing render cost
+           (pixelRatio 1.35, composite black hole only). Cinematic is strictly
+           OPT-IN via the engine card: auto-enabling it proved too heavy on
+           integrated GPUs and made the whole app lag after the intro. */
+        tier = 'medium';
       }
     } else {
       tier = 'low';
@@ -70,6 +67,19 @@ export function probeCapability(): GpuCapability {
   } catch {
     tier = 'low';
   }
+
+  /* one-time migration: early builds auto-set 'cinematic' behind the user's
+     back and it was persisted — that saved override re-applied on every boot
+     and lagged the whole app. Reset it so medium is the real default; the
+     user can still opt into cinematic from the engine card. */
+  try {
+    if (!localStorage.getItem(MIGRATION_KEY)) {
+      if (localStorage.getItem(STORAGE_KEY) === 'cinematic') {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      localStorage.setItem(MIGRATION_KEY, '1');
+    }
+  } catch { /* private mode */ }
 
   /* user override always wins */
   const stored = localStorage.getItem(STORAGE_KEY) as QualityTier | null;

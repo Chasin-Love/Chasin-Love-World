@@ -139,6 +139,7 @@ export function stopRecording(): Promise<{ dataUrl: string; peaks: number[]; dur
         .then((buf) => {
           const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
           const ac = new AC();
+          const close = () => { void ac.close().catch(() => undefined); };
           return ac.decodeAudioData(buf).then((audio) => {
             const data = audio.getChannelData(0);
             const buckets = 48;
@@ -152,9 +153,9 @@ export function stopRecording(): Promise<{ dataUrl: string; peaks: number[]; dur
               }
               peaks.push(Math.max(0.06, Math.min(1, peak)));
             }
-            void ac.close();
+            close();
             return peaks;
-          }).catch(() => null);
+          }).catch(() => { close(); return null; });
         })
         .then((peaks) => {
           const dur = Math.max(0.4, (performance.now() - recStart) / 1000);
