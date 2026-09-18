@@ -24,7 +24,7 @@ export const CppNativeEngineCard: React.FC = () => {
     let alive = true;
     cosmosBridge.init().then((s) => {
       if (alive) setStatus({ ...s });
-    });
+    }).catch(() => { /* ignore init failure */ });
     setGpu(probeCapability().renderer);
     return () => { alive = false; };
   }, []);

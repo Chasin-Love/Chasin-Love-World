@@ -8,6 +8,7 @@ import {
 import { REALITIES, getReality, createNewRealityConfig, RealityConfig, GalaxyData } from '../../realities';
 import { actions, useUniverse } from '../../state';
 import { toast } from '../../ui/toast';
+import { prettyPrint } from '../../ui/format';
 import { CreateRealityModal } from '../realities/CreateRealityModal';
 import { RealityAdvancedPanel } from '../realities/RealityAdvancedPanel';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';

@@ -2769,7 +2769,7 @@ function Viewer({ file, onClose }: { file: VaultFile; onClose: () => void }) {
     if (file.payloadRef) {
       getPayload(file.payloadRef).then(useBlob).catch(() => undefined);
     } else if (!file.content && (file.kind === 'audio' || file.kind === 'video')) {
-      void synthPayload(file).then(useBlob);
+      void synthPayload(file).then(useBlob).catch(() => undefined);
     } else {
       setMediaUrl(null);
     }
@@ -3807,6 +3807,9 @@ function VaultTerminal({ onClose }: { onClose: () => void }) {
       print('out', '');
       print('sys', `scrub ${report.status.toUpperCase()} · ${report.filesScanned} files · ${fmtBytes(report.bytesScanned)} · ${report.errorsFound} errors · ${report.errorsCorrected} repaired`);
       (report.log ?? []).slice(0, 8).forEach((l) => print(l.startsWith('REPAIRED') ? 'out' : 'err', `  ${l}`));
+      setBusy(false);
+    }).catch((err) => {
+      print('err', `scrub failed: ${String(err)}`);
       setBusy(false);
     });
   };

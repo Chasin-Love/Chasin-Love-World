@@ -297,6 +297,19 @@ export default function App() {
     return () => { engineRef.current?.setRendering(true); };
   }, [mode]);
 
+  /* hidden tabs must stop rendering entirely — every open background tab
+     used to keep a full WebGL universe + bloom pipeline competing for the
+     single GPU, which froze the foreground tab ("app died" moments) */
+  useEffect(() => {
+    const apply = () => {
+      const visible = document.visibilityState === 'visible';
+      engineRef.current?.setRendering(visible && modeRef.current !== 'vault');
+    };
+    apply();
+    document.addEventListener('visibilitychange', apply);
+    return () => document.removeEventListener('visibilitychange', apply);
+  }, []);
+
   /* ------------------------------ keyboard ------------------------------ */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

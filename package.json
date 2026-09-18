@@ -10,7 +10,8 @@
     "lint": "tsc --noEmit",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
-    "desktop:check": "cargo check --manifest-path src-tauri/Cargo.toml"
+    "desktop:check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "serve": "esbuild server/index.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/server.cjs && NODE_ENV=production node dist/server.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
@@ -20,6 +21,7 @@
     "@tauri-apps/api": "^2.11.1",
     "@types/three": "^0.185.4",
     "canvas-confetti": "^1.9.3",
+    "cross-env": "^10.1.0",
     "date-fns": "^2.30.0",
     "express": "^5.2.1",
     "framer-motion": "^11.16.1",
