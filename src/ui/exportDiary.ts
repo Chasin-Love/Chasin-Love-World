@@ -4,7 +4,7 @@ import type { CosmicBody, DiaryEntry } from '../types';
 import { fmtDate } from '../backend';
 import { toast } from './toast';
 
-export type ExportFormat = 'pdf' | 'png' | 'print';
+export type ExportFormat = 'pdf' | 'png' | 'cosmic';
 
 interface ExportOptions {
   format: ExportFormat;
@@ -241,7 +241,7 @@ export async function exportDiaryDocument(
       a.remove();
       toast('Ultra-HD scan saved (300 DPI crisp resolution)');
     } else {
-      // High-Precision Multi-Page PDF / Print Export
+      // High-Precision Multi-Page PDF / Cosmic Print Export
       const canvas = await toCanvas(clone, {
         pixelRatio,
         backgroundColor: '#070b16',
@@ -265,6 +265,8 @@ export async function exportDiaryDocument(
       let heightLeft = contentHeight;
       let position = margin;
       let pageNum = 1;
+      const pageSpan = pageHeight - margin * 2;
+      const totalPages = Math.max(1, Math.ceil(contentHeight / pageSpan));
 
       const stampFooter = (n: number) => {
         pdf.setFont('helvetica', 'normal');
@@ -278,56 +280,78 @@ export async function exportDiaryDocument(
         );
       };
 
+      // Cosmic Print chrome: an archival celestial frame rendered as pure
+      // vector geometry on every page — computed entirely in-app.
+      const drawCosmicChrome = (n: number) => {
+        pdf.setDrawColor(100, 116, 139);
+        pdf.setLineWidth(0.35);
+        pdf.rect(4, 4, pageWidth - 8, pageHeight - 8, 'S');
+        pdf.setDrawColor(64, 78, 99);
+        pdf.setLineWidth(0.25);
+        pdf.rect(6.5, 6.5, pageWidth - 13, pageHeight - 13, 'S');
+
+        // Corner stars: four-point diamonds in anchor-star gold
+        pdf.setFillColor(255, 181, 77);
+        const starRadius = 1.5;
+        [
+          [4, 4],
+          [pageWidth - 4, 4],
+          [4, pageHeight - 4],
+          [pageWidth - 4, pageHeight - 4],
+        ].forEach(([cx, cy]) => {
+          pdf.triangle(cx - starRadius, cy, cx, cy - starRadius, cx, cy + starRadius, 'F');
+          pdf.triangle(cx + starRadius, cy, cx, cy - starRadius, cx, cy + starRadius, 'F');
+        });
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(140, 160, 190);
+        pdf.setFontSize(6);
+        pdf.text('MY UNIVERSE · COSMIC PRINT', pageWidth / 2, 5.85, {
+          align: 'center',
+          charSpace: 0.5,
+        });
+        pdf.setFontSize(7);
+        pdf.text(
+          `PAGE ${n} / ${totalPages} · ${planet.name.toUpperCase()}`,
+          pageWidth / 2,
+          pageHeight - 5.4,
+          { align: 'center', charSpace: 0.5 }
+        );
+      };
+
+      const stampPage = (n: number) => {
+        if (options.format === 'cosmic') drawCosmicChrome(n);
+        else stampFooter(n);
+      };
+
       // First Page
       pdf.setFillColor(7, 11, 22);
       pdf.rect(0, 0, pageWidth, pageHeight, 'F');
       pdf.addImage(imgData, 'JPEG', margin, position, contentWidth, contentHeight);
-      stampFooter(1);
-      heightLeft -= (pageHeight - margin * 2);
+      stampPage(1);
+      heightLeft -= pageSpan;
 
       // Additional pages if diary is very long
       while (heightLeft > 0) {
-        position = margin - (pageHeight - margin * 2) * pageNum;
+        position = margin - pageSpan * pageNum;
         pdf.addPage('a4', 'portrait');
         pdf.setFillColor(7, 11, 22);
         pdf.rect(0, 0, pageWidth, pageHeight, 'F');
         pdf.addImage(imgData, 'JPEG', margin, position, contentWidth, contentHeight);
-        stampFooter(pageNum + 1);
+        stampPage(pageNum + 1);
 
-        heightLeft -= (pageHeight - margin * 2);
+        heightLeft -= pageSpan;
         pageNum++;
       }
 
-      if (options.format === 'print') {
-        /* Print the generated document itself (an iframe of the PDF blob) —
-           window.print() used to print the whole live app instead. */
-        try {
-          const blob = pdf.output('blob');
-          const url = URL.createObjectURL(blob);
-          const frame = document.createElement('iframe');
-          frame.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:0;border:0;';
-          frame.src = url;
-          frame.onload = () => {
-            try {
-              frame.contentWindow?.focus();
-              frame.contentWindow?.print();
-            } catch {
-              /* print blocked — the saved PDF below is the fallback */
-            }
-            setTimeout(() => {
-              URL.revokeObjectURL(url);
-              frame.remove();
-            }, 60_000);
-          };
-          document.body.appendChild(frame);
-          toast(`print dialog opened for the document (${pageNum} page${pageNum > 1 ? 's' : ''})`);
-        } catch {
-          pdf.save(`${baseFilename}_print-ready.pdf`);
-          toast(`Print-ready PDF saved (${pageNum} page${pageNum > 1 ? 's' : ''})`);
-        }
+      // Every export finishes in-app and downloads the finished file directly —
+      // no system print dialog, no external PDF application involved.
+      if (options.format === 'cosmic') {
+        pdf.save(`${baseFilename}_cosmic-print.pdf`);
+        toast(`Cosmic PDF saved — celestial borders drawn in-app (${totalPages} page${totalPages > 1 ? 's' : ''}, no printer needed)`);
       } else {
         pdf.save(`${baseFilename}.pdf`);
-        toast(`Vector PDF document saved (${pageNum} page${pageNum > 1 ? 's' : ''} with zero pixel cracking)`);
+        toast(`Vector PDF document saved (${totalPages} page${totalPages > 1 ? 's' : ''} with zero pixel cracking)`);
       }
     }
 

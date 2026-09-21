@@ -183,7 +183,7 @@ const htmlToText = (html: string): string => {
 };
 
 
-type DiaryExportOptions = { format: 'pdf' | 'png' | 'print'; quality?: 'standard' | 'ultra' | 'master' };
+type DiaryExportOptions = { format: 'pdf' | 'png' | 'cosmic'; quality?: 'standard' | 'ultra' | 'master' };
 
 async function exportDiaryDocumentLazy(
   entry: DiaryEntry,
@@ -844,7 +844,7 @@ const GluedPage = memo(function GluedPage({
           <div className="relative">
             <button
               className={`win-icon ${showExportMenu ? 'bg-solar/20 text-solar' : ''}`}
-              title="Export document (Vector PDF / Ultra-HD Image / Print)"
+              title="Export document (Vector PDF / Ultra-HD Image / Cosmic Print)"
               onClick={() => {
                 sfxTick();
                 setShowExportMenu(!showExportMenu);
@@ -902,15 +902,15 @@ const GluedPage = memo(function GluedPage({
                     setShowExportMenu(false);
                     setIsExporting(true);
                     sfxTick();
-                    await exportDiaryDocumentLazy(entry, planet, containerRef.current, { format: 'print' });
+                    await exportDiaryDocumentLazy(entry, planet, containerRef.current, { format: 'cosmic' });
                     setIsExporting(false);
                   }}
                   className="flex items-start gap-2 p-1.5 rounded hover:bg-void/80 text-left transition-colors border border-transparent hover:border-line/40 group"
                 >
-                  <span className="text-sm mt-0.5">🖨️</span>
+                  <span className="text-sm mt-0.5">🌌</span>
                   <div className="min-w-0 flex-1">
                     <div className="font-sans text-xs text-paper font-medium group-hover:text-slate-soft transition-colors">Cosmic Print / Native PDF</div>
-                    <div className="font-mono text-[8px] text-slate-dim leading-snug mt-0.5">Direct system print engine with dark celestial borders</div>
+                    <div className="font-mono text-[8px] text-slate-dim leading-snug mt-0.5">Rendered 100% in-app · direct download with dark celestial borders — no printer, no dialogs</div>
                   </div>
                 </button>
               </div>
