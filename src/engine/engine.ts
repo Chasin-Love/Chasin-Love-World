@@ -71,6 +71,10 @@ export interface EngineCallbacks {
      selection was released with null) — carries the synthetic CosmicBody
      so the App can show the same selection card + physics telemetry */
   onSelectInnerWorld?: (info: InnerWorldInfo | null) => void;
+  /* fired once after the first fully rendered frame — the App holds its
+     intro veil until then, so shader compilation and scene building never
+     surface as a frozen universe */
+  onFirstFrame?: () => void;
 }
 
 /** Everything the App needs to present a clicked inner world. */
@@ -298,6 +302,22 @@ export class UniverseEngine {
   /* Point clouds captured when the portal arms; the field pulls their points
      toward the core (visual-only suction, transforms untouched). */
   private portalPointSets: { points: THREE.Points; mat: THREE.ShaderMaterial }[] = [];
+  /* The traveler's exact camera + framing at the moment a portal opened.
+     leavePortal() cuts straight back to this — closing a diary or the vault
+     must never slam the camera to the anchor or sweep it sideways. */
+  private portalSavedCam: {
+    rig: ReturnType<CameraRig['snapshot']>;
+    focusId: string | null;
+    galaxyFocusId: string | null;
+    galaxyInnerFocus: boolean;
+    innerFocusBodyId: string | null;
+    realityFocused: boolean;
+  } | null = null;
+  /* fired once after the first rendered frame (drives the App's intro veil) */
+  private firstFrameFired = false;
+  /* the constructor precompiles the whole scene; the first setReality call
+     runs against that same fresh scene and must not compile everything again */
+  private skipNextCompile = true;
   private _vScratch4 = new THREE.Vector3();
   private dragging = false; private lastPX = 0; private lastPY = 0; private downX = 0; private downY = 0; private downT = 0;
   private vaultPulse = 0; /* spikes when the Vault stores/runs something — the black hole reacts */
@@ -2247,7 +2267,11 @@ void main(){
   /** THE GALAXY STAGE — one full spiral galaxy per entry of the reality's
       real roster. Home galaxy centered and largest; every other galaxy is
       hoverable, clickable and focusable in its own right. */
-  private buildGalaxyStageContents(reality: RealityConfig) {
+  /* incrementing token — a fresh rebuild supersedes any pending chunked boot
+     build so a reality switch mid-boot can never interleave two rosters */
+  private galaxyChunkToken = 0;
+
+  private buildGalaxyStageContents(reality: RealityConfig, chunked = false) {
     this.dropOwnedPointsMaterials('galaxyStage');
     const preservedGeometries = new Set<THREE.BufferGeometry>();
     const preservedMaterials = new Set<THREE.Material>();
@@ -2270,9 +2294,46 @@ void main(){
     for (let c2 = 0; c2 < reality.id.length; c2++) seed = (seed * 31 + reality.id.charCodeAt(c2)) >>> 0;
     const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 
-    galaxies.forEach((gal, i) => {
-      const isHome = gal.isHomeGalaxy || i === 0;
-      const slot = isHome ? 0 : i;
+    if (!chunked) {
+      galaxies.forEach((gal, i) => {
+        this.buildGalaxyStageNode(reality, gal, i, rnd);
+      });
+      this.finalizeGalaxyStageContents();
+      return;
+    }
+    /* BOOT PATH — one galaxy per animation frame. The universe the user sees
+       at boot zoom is the home system at the origin; the galaxy roster is
+       far away and nothing needs it for several seconds, so spreading the
+       build hides every millisecond of it behind the intro veil instead of
+       freezing startup for seconds. A fresh rebuild (token) supersedes a
+       pending one. */
+    const token = ++this.galaxyChunkToken;
+    let built = 0;
+    const step = () => {
+      if (token !== this.galaxyChunkToken) return; /* superseded */
+      if (built < galaxies.length) {
+        this.buildGalaxyStageNode(reality, galaxies[built], built, rnd);
+        built += 1;
+        requestAnimationFrame(step);
+      } else {
+        this.finalizeGalaxyStageContents();
+      }
+    };
+    step();
+  }
+
+  /** The tail of buildGalaxyStageContents — shared by the sync and chunked paths. */
+  private finalizeGalaxyStageContents() {
+    this.collectPointsMaterials(this.gGalaxyContents, 'galaxyStage', 'standard');
+    if (this.lastEntries) this.syncMoons(this.lastEntries);
+  }
+
+  /** One full galaxy node of the stage: disc cloud, core glow, collider and
+      its isolated inner stellar system. Extracted so the BOOT call can spread
+      the roster across frames instead of stalling startup for seconds. */
+  private buildGalaxyStageNode(reality: RealityConfig, gal: GalaxyData, i: number, rnd: () => number) {
+    const isHome = gal.isHomeGalaxy || i === 0;
+    const slot = isHome ? 0 : i;
       const radius = isHome ? 5600 : 2600 + rnd() * 1600;
       const arms = 3 + Math.floor(rnd() * 3);
       const wind = 2.6 + rnd() * 1.2;
@@ -2359,12 +2420,6 @@ void main(){
 
       this.gGalaxyContents.add(group);
       this.galaxyStageNodes.push({ data: gal, group, collider, radius, glowMat: coreMat, discMat: pts.material as THREE.ShaderMaterial, inner, innerSys });
-    });
-
-    /* new materials need the distance-compensated uScale driver */
-    this.collectPointsMaterials(this.gGalaxyContents, 'galaxyStage', 'standard');
-    /* the fresh inner systems need their diary moons / streak rings */
-    if (this.lastEntries) this.syncMoons(this.lastEntries);
   }
 
   /** THE REAL ISOLATED INNER SYSTEM — one per non-home galaxy. Same
@@ -3802,18 +3857,19 @@ void main(){
     if (this.portal.phase !== 'idle') return;
     const innerTarget = this.findInnerBody(b.data.id);
     this.portalTargetInnerId = innerTarget ? b.data.id : null;
-    if (innerTarget) {
-      /* A portal can also be opened by a non-canvas caller. Reassert the
-         isolated galaxy frame so the camera cannot fall back to the origin. */
-      this.galaxyFocusId = innerTarget.galaxyId;
-      this.galaxyInnerFocus = true;
-      this.innerFocusBodyId = innerTarget.data.id;
-    }
-    this.focusId = this.portalTargetInnerId ? null : b.data.id;
-    this.realityFocused = false;
+    /* Snapshot the traveler's exact camera and framing BEFORE the traversal.
+       The portal is a local surface event — it must not seize the camera, so
+       no focus is assigned and the dial stays where the user left it. On
+       close, leavePortal() cuts straight back to this snapshot. */
+    this.portalSavedCam = {
+      rig: this.rig.snapshot(),
+      focusId: this.focusId,
+      galaxyFocusId: this.galaxyFocusId,
+      galaxyInnerFocus: this.galaxyInnerFocus,
+      innerFocusBodyId: this.innerFocusBodyId,
+      realityFocused: this.realityFocused,
+    };
     this.cosmicStage = 'web';
-    /* Do not zoom, orbit, or hold the camera for a local Planet Kamui. The
-       surrounding reality stays spatially fixed while its surface tears. */
     this.portalReturn = false;
     this.portalWasInner = Boolean(innerTarget);
     /* Keep the camera and orbital frame fixed. The gravity field below uses
@@ -3835,6 +3891,27 @@ void main(){
     this.portalReverse = 1;
     this.portalEject = 0;
     this.portalCloseLevel = 0;
+    /* a portal must own the whole frame: any flight still driving the dial
+       (a galaxy entry that was mid-run, a scripted warp, a latched band
+       crossing) would keep steering the camera underneath the traversal —
+       cancel them all here and hold the dial where the traveler left it.
+       The inner-focus flag is view state the traveler already earned —
+       the cancel must not strip it (an inner-world portal keeps orbiting
+       that world). */
+    const keepInnerFocus = this.galaxyInnerFocus;
+    this.cancelGalaxyEntryFlight();
+    this.galaxyInnerFocus = keepInnerFocus;
+    this.galaxyWarp = null;
+    this.galaxyWarpDrift = 0;
+    this.bandLatch = null;
+    this.rig.killZoomMomentum();
+    this.prevDialTarget = this.rig.tZoomT;
+    /* the traversal owns the screen — the traveler keeps full camera freedom
+       (orbit / pan / zoom) so the Kamui can be watched from any angle, but
+       the dial is bounded to a window around the armed framing: an
+       impatient scroll can no longer race it six decades out mid-animation
+       and force the close to slam it back (the "unstable camera" on open) */
+    this.rig.lockInput(true, 0.14);
     /* Capture every vortex-capable point cloud once, at arm time: while the
        portal is live the field will bend, spin and draw these points toward
        the core — "everything near it is attracted" — without moving any
@@ -3862,6 +3939,21 @@ void main(){
     this.portal.phase = 'out';
     this.portal.t = 1;
     this.portal.fired = false;
+    /* Cut the camera straight back to the exact pre-open framing. The reverse
+       traversal then plays from the user's own vantage point — no zoom slam
+       toward the anchor, no damped sideways glide. */
+    const saved = this.portalSavedCam;
+    if (saved) {
+      this.focusId = saved.focusId;
+      this.galaxyFocusId = saved.galaxyFocusId;
+      this.galaxyInnerFocus = saved.galaxyInnerFocus;
+      this.innerFocusBodyId = saved.innerFocusBodyId;
+      this.realityFocused = saved.realityFocused;
+      this.rig.restore(saved.rig);
+      this.prevDialTarget = saved.rig.tZoomT;
+      this.grabCooldown = Math.max(this.grabCooldown, 0.9);
+      this.portalSavedCam = null;
+    }
     /* While the destination was open the forward traversal may have fully
        settled to idle (finishEntry), which clears the inner target and the
        embedded singularity — re-arm both so the reverse has its subject. */
@@ -4085,15 +4177,24 @@ void main(){
     this.syncBodies(reality.bodies);
     this.syncMoons(reality.entries);
     /* rebuild the GALAXY STAGE from this reality's REAL roster — one full
-       spiral per major galaxy — and tint the cluster stage's hot gas */
-    this.buildGalaxyStageContents(reality);
+       spiral per major galaxy — and tint the cluster stage's hot gas.
+       The boot call spreads the roster across frames (nothing at boot zoom
+       needs it for seconds) so the veil lifts without the multi-second
+       startup stall; user-triggered reality switches build synchronously. */
+    const bootCall = this.skipNextCompile;
+    this.buildGalaxyStageContents(reality, bootCall);
     const gasTint = new THREE.Color(reality.colorB);
     this.clusterGasMats.forEach((m) => {
       m.color.copy(m.userData.baseColor as THREE.Color).lerp(gasTint, 0.42);
     });
     /* precompile anything this reality added (moons, new materials) so the
-       first frame after a reality switch never stalls on shader compilation */
-    this.renderer.compile(this.scene, this.camera);
+       first frame after a reality switch never stalls on shader compilation.
+       Skipped on the boot call — the constructor compiled this exact scene
+       moments ago, and compiling it again doubled the startup freeze. (The
+       boot's chunked galaxy roster compiles lazily out at the galaxy band,
+       where the entry warp masks it.) */
+    if (bootCall) this.skipNextCompile = false;
+    else this.renderer.compile(this.scene, this.camera);
 
     // 4. Clean up any invalid selection / focus
     if (this.selectedId && !reality.bodies.some((b) => b.id === this.selectedId) && this.selectedId !== 'anchor') {
@@ -4453,39 +4554,29 @@ void main(){
       /* Return traversal runs longer — it carries a full re-form → eject →
          settle sequence instead of a plain decay. */
       this.portal.t = Math.max(0, this.portal.t - dt / (this.portalReturn ? 1.5 : 1.15));
-      if (this.portal.t <= 0) {
-        const returningInner = this.portalWasInner || Boolean(this.portalTargetInnerId);
-        this.portal.phase = 'idle';
-        this.portalTargetInnerId = null;
-        this.portalReverse = 1;
-        this.portalEject = 0;
-        this.portalCloseLevel = 0;
-        this.kamuiWarpFx = 0;
-        this.portalPointSets.length = 0;
-        if (this.portalReturn) {
-          this.portalReturn = false;
-          this.portalWasInner = false;
-          this.focusId = null;
-          this.selectedId = null;
-          if (returningInner) {
-            /* Inner-world return: land back at that galaxy's star system. */
-            this.innerFocusBodyId = null;
-            this.rig.setZoomTarget(CameraRig.zoomTOf(150));
-            this.prevDialTarget = CameraRig.zoomTOf(150);
-            this.cb.onSelectInnerWorld?.(null);
-          } else {
-            /* Home-system return: release the body and restore the system frame. */
-            this.galaxyFocusId = null;
-            this.galaxyInnerFocus = false;
-            this.innerFocusBodyId = null;
-            this.rig.setZoomTarget(0.15);
-            this.rig.setOrbit(null, 1.12);
-            this.rig.clearPan();
-            this.prevDialTarget = 0.15;
-          }
-        }
-        this.cb.onPortalDone();
+    if (this.portal.t <= 0) {
+      const returningInner = this.portalWasInner || Boolean(this.portalTargetInnerId);
+      this.portal.phase = 'idle';
+      this.portalTargetInnerId = null;
+      this.portalReverse = 1;
+      this.portalEject = 0;
+      this.portalCloseLevel = 0;
+      this.kamuiWarpFx = 0;
+      this.portalPointSets.length = 0;
+      this.portalSavedCam = null;
+      /* the traversal is over — the traveler has the rig back */
+      this.rig.lockInput(false);
+      if (this.portalReturn) {
+        this.portalReturn = false;
+        this.portalWasInner = false;
+        this.selectedId = null;
+        /* The camera was already cut back to the traveler's pre-open framing
+           by leavePortal(); nothing left to move here. Only the App's
+           inner-world selection card needs releasing. */
+        if (returningInner) this.cb.onSelectInnerWorld?.(null);
       }
+      this.cb.onPortalDone();
+    }
     }
     const phaseProgress = this.portal.t * this.portal.t * (3 - 2 * this.portal.t);
     let ease = this.portal.phase === 'out'
@@ -4508,15 +4599,17 @@ void main(){
       } else {
         ease = 0.18 * (1 - smooth((rt - 0.52) / 0.48));
       }
-      this.kamuiWarpFx = this.portalEject * 0.85;
+      /* no fov kick here — a planetary close must feel like the field
+         settling, not like a lens punch (the "random zoom" pulse) */
     }
     /* This value feeds only the embedded body field. Macro Kamui systems keep
        their own geometry and remain completely independent. */
     this.portalVisualT = this.portal.phase === 'idle' ? 0 : ease;
 
-    /* cinematic fov kick — during the Kamui tunnel the fov blows wide open
-       (the hyperspace stretch), then snaps back at the ejection */
-    const targetFov = 50 + ease * 14 - this.coreT * 4 + this.kamuiWarpFx * 28;
+    /* cinematic fov kick — only the macro Kamui warp stretches the lens now.
+       Planet/vault portals keep the fov pinned: the old ease-driven punch
+       (wide → snap back) read as random zoom pulsing on every open. */
+    const targetFov = 50 - this.coreT * 4 + this.kamuiWarpFx * 28;
     this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, dt * 4);
     this.camera.updateProjectionMatrix();
 
@@ -4711,8 +4804,9 @@ void main(){
          inner system → zoom out → back to that galaxy’s frame (in front of
          the specific galaxy you visited); galaxy frame → zoom out → the open
          field; zooming INTO a home-galaxy frame dives THROUGH it into the
-         anchor star system. */
-      if (this.cosmicStage === 'web' && this.galaxyFocusId && this.rig.atFocusMax && this.rig.zoomTrend > 0) {
+         anchor star system. A live portal keeps the framing frozen — the
+         restore on close expects the armed focus state to still be here. */
+      if (this.cosmicStage === 'web' && this.portal.phase === 'idle' && this.galaxyFocusId && this.rig.atFocusMax && this.rig.zoomTrend > 0) {
         if (this.innerFocusBodyId) {
           this.releaseInnerWorld(); /* world → system frame */
           this.grabCooldown = 0.35;
@@ -4726,7 +4820,7 @@ void main(){
           this.grabCooldown = 0.6;
         }
       }
-      if (this.cosmicStage === 'web' && this.galaxyFocusId && this.rig.atFocusMin && this.rig.zoomTrend < 0) {
+      if (this.cosmicStage === 'web' && this.portal.phase === 'idle' && this.galaxyFocusId && this.rig.atFocusMin && this.rig.zoomTrend < 0) {
         const node = this.galaxyStageNodes.find((n) => n.data.id === this.galaxyFocusId);
         if (node && node.data.isHomeGalaxy && !this.galaxyInnerFocus) {
           this.galaxyFocusId = null;
@@ -4854,12 +4948,17 @@ void main(){
     /* the galaxy warp's fold — the focus is pulled along +z mid-bend and the
        −z counter-fold brings the destination back into view */
     if (this.galaxyWarp) this._vFocusScratch.z += this.galaxyWarpDrift;
-    if (this.portal.phase !== 'idle') this.rig.holdFocus(this._vFocusScratch);
+    /* NOTE: no holdFocus while a planet/vault portal is live — pinning the
+       focus to the target body used to glide the camera hundreds of units
+       sideways (the "pendulum" sweep). The portal is a local surface event;
+       the traveler's framing stays exactly where it was. */
     this.rig.update(dt, {
       focus: this._vFocusScratch,
       focused: !!activeFb || this.realityFocused || galaxyFocusActive,
       focusRadius: focusRadiusParam,
-      portalEase: ease,
+      /* no distance squeeze for planet portals — the 45% dolly-in and its
+         release on close was the zoom-in/zoom-out pulse */
+      portalEase: 0,
       focusMin,
       focusMax,
     });
@@ -4873,7 +4972,15 @@ void main(){
     this.updateCore(dt);
     this.updateHover();
 
-    if (this.rendering) this.composer.render();
+    if (this.rendering) {
+      this.composer.render();
+      /* one-shot: the first fully rendered frame means shader compilation and
+         scene building are done — the App lifts its intro veil on this */
+      if (!this.firstFrameFired) {
+        this.firstFrameFired = true;
+        try { this.cb.onFirstFrame?.(); } catch { /* veil lift must never crash the loop */ }
+      }
+    }
     if (frameStarted) recordFrame(performance.now() - frameStarted);
   };
   private clock = new THREE.Clock();

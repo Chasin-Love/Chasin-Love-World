@@ -73,9 +73,18 @@ html, body {
 @keyframes introVeil {
   0% { opacity: 1; }
   55% { opacity: 1; }   /* absolute darkness holds while the name lives */
-  100% { opacity: 0; }  /* the darkness lifts — you are already home underneath */
+  100% { opacity: 1; }  /* the darkness HOLDS — the universe underneath may
+                           still be compiling; .intro-veil.lift does the fade
+                           once the first frame has actually rendered */
 }
 .intro-veil { animation: introVeil 4.4s ease-in-out both; }
+.intro-veil.lift { animation: introLift 1.3s ease-out forwards; }
+
+@keyframes introLift {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @keyframes introTrack {
   0% { opacity: 0; }
   20% { opacity: 1; }

@@ -59,6 +59,14 @@ export interface RigFrame {
   focusMax?: number;
 }
 
+/** Plain-number camera placement, savable/restorable across a portal. */
+export interface RigSnapshot {
+  zoomT: number; tZoomT: number;
+  theta: number; tTheta: number;
+  phi: number; tPhi: number;
+  pan: [number, number, number];
+}
+
 export class CameraRig {
   readonly camera: THREE.PerspectiveCamera;
 
@@ -90,6 +98,12 @@ export class CameraRig {
   private panKeys: Record<string, boolean> = {};
   private dragging = false;
   private panning = false;
+  /* while a portal traversal owns the screen the traveler keeps FULL camera
+     freedom (orbit / pan / zoom) — the Kamui is watched from any angle now.
+     Only the zoom dial is bounded: a wheel fury mid-portal used to race it
+     six decades outward and the close then hard-cut it back — the "unstable
+     zoom" slam. The clamp keeps that slam bounded to the window. */
+  private dialLock: { ref: number; window: number } | null = null;
   /* exponential moving average of drag velocity (px/s) for the release fling */
   private dragVX = 0;
   private dragVY = 0;
@@ -218,6 +232,27 @@ export class CameraRig {
       lands so the momentum it absorbed can't push the dial back out */
   killZoomMomentum() { this.zoomVel = 0; }
 
+  /** Traversal lock for a scripted sequence that owns the screen (the
+      Planet/Vault Kamui). The traveler keeps every camera control — orbit,
+      pan, keys, zoom — but when `dialWindow` > 0 the zoom dial is clamped
+      to that window around the framing captured at lock time, so a wheel
+      fury mid-portal can't race the dial six decades out and slam the
+      close's hard restore. Momentum absorbed before the lock dies here so
+      it can't seep out the moment the lock lifts. */
+  lockInput(v: boolean, dialWindow = 0) {
+    if (v) {
+      this.zoomVel = 0;
+      this.orbitVX = 0; this.orbitVY = 0;
+      this.panVel.set(0, 0, 0);
+      this.dragVX = 0; this.dragVY = 0;
+      this.dragging = false;
+      this.panning = false;
+      this.dialLock = dialWindow > 0 ? { ref: this.tZoomT, window: dialWindow } : null;
+    } else {
+      this.dialLock = null;
+    }
+  }
+
   /** live wheel velocity (zoomT/s) — the engine reads it to detect the user
       pulling at a stage's edge, which is what fires the Kamui warp */
   get zoomVelocity(): number { return this.zoomVel; }
@@ -275,6 +310,33 @@ export class CameraRig {
     return clamp(Math.log(Math.max(dist, DIST_BASE) / DIST_BASE) / Math.log(DIST_SPAN), 0, 1);
   }
 
+  /* ------------------------- snapshot / restore ------------------------- */
+
+  /** The exact camera placement (dial + orbit + pan), captured as plain
+      numbers so a portal can cut the rig back to where its traveler was. */
+  snapshot(): RigSnapshot {
+    return {
+      zoomT: this.zoomT, tZoomT: this.tZoomT,
+      theta: this.theta, tTheta: this.tTheta,
+      phi: this.phi, tPhi: this.tPhi,
+      pan: [this.panOffset.x, this.panOffset.y, this.panOffset.z],
+    };
+  }
+
+  /** Hard-cut to a snapshot — current AND target channels, all momentum
+      killed. Used when a portal closes: the camera returns to the exact
+      pre-open framing with no easing flight, zoom slam, or sideways glide. */
+  restore(s: RigSnapshot) {
+    this.zoomT = s.zoomT; this.tZoomT = s.tZoomT;
+    this.theta = s.theta; this.tTheta = s.tTheta;
+    this.phi = s.phi; this.tPhi = s.tPhi;
+    this.panOffset.set(s.pan[0], s.pan[1], s.pan[2]);
+    this.zoomVel = 0;
+    this.orbitVX = 0; this.orbitVY = 0;
+    this.panVel.set(0, 0, 0);
+    this.dragVX = 0; this.dragVY = 0;
+  }
+
   /* -------------------------------- frame -------------------------------- */
 
   update(dt: number, s: RigFrame) {
@@ -298,6 +360,11 @@ export class CameraRig {
     if (Math.abs(this.zoomVel) > 1e-5) {
       this.tZoomT = clamp(this.tZoomT + this.zoomVel * dt, 0, 1);
       this.zoomVel *= Math.exp(-ZOOM_FRICTION * dt);
+    }
+    /* traversal dial clamp — holds the dial near the framing the lock was
+        armed at, whatever the input channel (wheel, pinch, scripted) */
+    if (this.dialLock) {
+      this.tZoomT = clamp(this.tZoomT, this.dialLock.ref - this.dialLock.window, this.dialLock.ref + this.dialLock.window);
     }
 
     /* keyboard pan — arrows / WASD, speed proportional to altitude */

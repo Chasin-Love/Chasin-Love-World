@@ -28,11 +28,19 @@ interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean
 const MAX_RECT = (): WinRect => ({ x: 12, y: 12, w: window.innerWidth - 24, h: window.innerHeight - 24 });
 
 /* bump on every shipped build — lets you confirm the running bundle is current */
-export const BUILD = 'R28';
+export const BUILD = 'R30';
 
 const MEANINGS: Meaning[] = ['memory', 'idea', 'person', 'dream', 'project', 'moment', 'unresolved', 'chapter'];
 
 function AsyncOverlay({ label = 'LOADING' }: { label?: string }) {
+  /* never flash for cache-hot loads — the dark veil appears only when the
+     chunk genuinely still needs time (>250ms) */
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 250);
+    return () => clearTimeout(t);
+  }, []);
+  if (!slow) return null;
   return (
     <div className="fixed inset-0 z-200 grid place-items-center bg-void/80 backdrop-blur-sm pointer-events-none">
       <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-teal-ice/80 animate-pulse">{label}</span>
@@ -74,7 +82,14 @@ export default function App() {
   const [zTop, setZTop] = useState(0);
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [entered, setEntered] = useState<string | null>(null);
-  const [intro, setIntro] = useState(true);
+  /* intro veil: mounted until lifted, lifted only when the title sequence is
+     done AND the engine has rendered its first frame (shader compilation and
+     scene building happen behind the opaque veil — the old code lifted it on a
+     blind 4.4s timer, exposing a frozen universe for seconds) */
+  const [introGone, setIntroGone] = useState(false);
+  const [introLift, setIntroLift] = useState(false);
+  const [minIntroDone, setMinIntroDone] = useState(false);
+  const [engineReady, setEngineReady] = useState(false);
   const [cosmicSettings, setCosmicSettings] = useState<CosmicWebSettings>({
     mode: 'simulation',
     showMatterDensity: true,
@@ -94,11 +109,28 @@ export default function App() {
     modeRef.current = mode;
   }, [mode]);
 
+  /* the title sequence runs 4.4s (keep in sync with .intro-veil / .intro-track /
+     .intro-sub in index.css); the 12s cap is a safety net so a WebGL failure
+     can never trap the user on the veil */
   useEffect(() => {
-    /* keep in sync with .intro-veil / .intro-track / .intro-sub (4.4s in index.css) */
-    const t = setTimeout(() => setIntro(false), 4400);
-    return () => clearTimeout(t);
+    const t = setTimeout(() => setMinIntroDone(true), 4400);
+    const s = setTimeout(() => setEngineReady(true), 12000);
+    return () => { clearTimeout(t); clearTimeout(s); };
   }, []);
+
+  /* lift the darkness once BOTH the title has played and the universe has
+     actually rendered a frame. The unmount timer lives in its own effect so
+     the lift re-render can't clear it (a shared effect used to cancel its
+     own timer on the introLift re-run, leaving the veil mounted forever). */
+  useEffect(() => {
+    if (!minIntroDone || !engineReady || introLift) return;
+    setIntroLift(true);
+  }, [minIntroDone, engineReady, introLift]);
+  useEffect(() => {
+    if (!introLift) return;
+    const t = setTimeout(() => setIntroGone(true), 1400);
+    return () => clearTimeout(t);
+  }, [introLift]);
 
   /* announce the running build so you can confirm the bundle is current */
   useEffect(() => {
@@ -227,6 +259,7 @@ export default function App() {
       },
       onPortalDone: () => undefined,
       onContext: (id, x, y) => setMenu({ id, x, y }),
+      onFirstFrame: () => setEngineReady(true),
       onScaleLabel: (l) => setLabel(l),
       onSimDate: () => undefined,
       onSelectReality: (realityId) => {
@@ -309,6 +342,37 @@ export default function App() {
     document.addEventListener('visibilitychange', apply);
     return () => document.removeEventListener('visibilitychange', apply);
   }, []);
+
+  /* prefetch the heavy lazy panes AFTER the intro veil is gone — kicking it
+     off at engine-ready competed with the first frames and the title timer
+     for the main thread (the dev-server transform of VaultUI takes seconds),
+     which held the black veil long past the title. Starting it once the
+     universe is live keeps boot clean; by the time the user opens the Vault /
+     Core / a diary, its chunk is already in the module cache */
+  useEffect(() => {
+    if (!introGone) return;
+    let cancelled = false;
+    const load = () => {
+      if (cancelled) return;
+      void import('./ui/VaultUI');
+      void import('./ui/CoreMode');
+      void import('./ui/DiaryWindow');
+      void import('./components/lineage/CosmicLineageModal');
+      void import('./components/console/CoreConsole');
+      void import('./components/realities/RealityAdvancedModal');
+    };
+    const gate = window.setTimeout(() => {
+      if (typeof window.requestIdleCallback === 'function') {
+        const h = window.requestIdleCallback(load, { timeout: 2500 });
+        /* the callback handle needs no cancel once the gate fired — cancelled
+           covers unmount before the gate */
+        if (cancelled) window.cancelIdleCallback(h);
+      } else {
+        window.setTimeout(load, 0);
+      }
+    }, 1500);
+    return () => { cancelled = true; clearTimeout(gate); };
+  }, [introGone]);
 
   /* ------------------------------ keyboard ------------------------------ */
   useEffect(() => {
@@ -491,9 +555,11 @@ export default function App() {
       {/* ambient vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(130% 100% at 50% 45%, transparent 55%, rgba(2,4,9,0.5) 100%)' }} />
 
-      {/* opening veil — absolute darkness, the name, then a smooth fade home */}
-      {intro && (
-        <div className="intro-veil fixed inset-0 z-35 pointer-events-none flex flex-col items-center justify-center" style={{ background: '#04060c' }}>
+      {/* opening veil — absolute darkness, the name, then a smooth fade home.
+          It stays fully opaque until the engine's first rendered frame, so all
+          boot-time compilation happens invisibly behind it. */}
+      {!introGone && (
+        <div className={`intro-veil fixed inset-0 z-35 pointer-events-none flex flex-col items-center justify-center ${introLift ? 'lift' : ''}`} style={{ background: '#04060c' }}>
           <div className="intro-track font-display font-medium text-paper/90 text-[clamp(20px,3.4vw,34px)]" style={{ letterSpacing: '0.5em', textIndent: '0.5em' }}>
             MY UNIVERSE
           </div>
