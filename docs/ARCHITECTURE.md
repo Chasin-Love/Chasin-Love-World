@@ -1,10 +1,11 @@
-# MY UNIVERSE — System Analysis & Architecture Record
+# MY UNIVERSE — Architecture Record
 
 > **Document Type:** Deep sector-by-sector analysis of the live codebase (September 2026 audit).
 > **Purpose:** Durable understanding to guide every future upgrade wave. Complements `README.md`
 > (which is the reconstruction blueprint) by documenting *what actually is*, including the
 > subsystems the README predates (reality daemon, Quantum Bin, native engine card, server CRUD).
-> **Status:** Authoritative audit snapshot before the "Foundation & Health" upgrade wave.
+> **Status:** Authoritative record. Foundation (Wave 1) and Desktop (Wave 2) are complete;
+> the debt register and roadmap below reflect the current tree.
 
 ---
 

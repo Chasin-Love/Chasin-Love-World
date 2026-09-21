@@ -1,4 +1,29 @@
 # 🌌 MY UNIVERSE — DEFINITIVE ARCHITECTURAL BLUEPRINT & COSMIC DOCUMENTARY
+
+## Quickstart
+
+**MY UNIVERSE** is an offline-first personal cosmos: planets are living diary entries, the
+Eventide Black Hole hosts an encrypted vault with a copy-on-write filesystem, and the
+multiverse is navigable across 11 cosmological scales. Web (React 18 + TypeScript + Vite +
+Three.js), desktop (Tauri 2 + C++ core), Node dev server with a reality disk daemon.
+
+```bash
+npm install        # install dependencies
+npm run dev        # dev cosmos on http://localhost:3000
+npm run build      # production bundle in dist/
+npm run typecheck  # strict TypeScript verification
+npm run desktop:dev / desktop:build   # Tauri desktop shell
+```
+
+| Folder | Role |
+| :--- | :--- |
+| `src/` | The app: React UI, 3D engine, physics, realities, vault, backend |
+| `server/` | Node side: dev host, reality folder API, disk daemon |
+| `src-tauri/` | Desktop shell (Rust) — where the C++ core compiles in |
+| `public/` | Vendored offline assets: Pyodide runtime + fonts |
+| `scripts/` | Toolchain, icon and WASM build helpers |
+| `docs/` | [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) — sector-by-sector audit, debt register & roadmap |
+
 > **Document Type:** Master System Specification & Reconstruction Blueprint  
 > **Target Audience:** Future Generations of Artificial Intelligence & Human Software Architects  
 > **System Agenda:** Hyper-Detailed Real Universe Simulation · Real-Time WebGL Graphics · Living Planetary Digital Diary · Universal Cryptographic Vault & CoW Filesystem  

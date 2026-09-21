@@ -4,7 +4,7 @@
 | .github | CI recipe — builds your Windows/Linux installers on every push. | Edit when changing builds. |
 | .zcode | Local AI-tooling session data (leftover plans). Untracked from git now. | Safe to delete. |
 | dist | Compiled output of npm run build. It reappeared because we built — it's not source. | Regenerable, safe to delete. |
-| docs | SYSTEM_ANALYSIS.md — the full architecture record of your project. | Read/reference. |
+| docs | ARCHITECTURE.md — the full architecture record of your project. | Read/reference. |
 | node_modules | Installed npm dependencies. | Regenerable (npm install). |
 | public | Static assets served as-is: the vendored Python runtime (pyodide/) and fonts (fonts/). | Keep — this is your offline capability. |
 | scripts | Helper tooling: Windows toolchain installer, icon generator, WASM build script. | Occasionally. |
