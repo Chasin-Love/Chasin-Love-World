@@ -192,3 +192,55 @@ export async function realityApi<T = unknown>(path: string, body?: unknown, meth
     return null;
   }
 }
+
+/* --------------------- reliable mutations + retry queue -------------------- */
+
+const MAX_OP_RETRIES = 5;
+interface PendingOp { path: string; body: unknown; method: 'GET' | 'POST'; tries: number }
+const opQueue: PendingOp[] = [];
+let flushing = false;
+
+function diskOpSucceeded(res: unknown): boolean {
+  if (res === null || res === undefined) return false;
+  if (typeof res === 'object' && 'success' in (res as Record<string, unknown>)) {
+    return (res as Record<string, unknown>).success === true;
+  }
+  return true;
+}
+
+/**
+ * A reality disk mutation that is actually reliable: awaited, success-checked,
+ * and queued for automatic retry when the daemon is unreachable. Resolves to
+ * `true` only when the disk operation truly succeeded.
+ */
+export async function syncedRealityApi(path: string, body?: unknown, method: 'POST' = 'POST'): Promise<boolean> {
+  const res = await realityApi(path, body, method);
+  if (diskOpSucceeded(res)) return true;
+
+  opQueue.push({ path, body, method, tries: 1 });
+  return false;
+}
+
+/** Retry every queued disk mutation. Called by the realitySync poll loop. */
+export async function flushDiskQueue(): Promise<number> {
+  if (flushing || opQueue.length === 0) return opQueue.length;
+  flushing = true;
+  try {
+    for (let i = opQueue.length - 1; i >= 0; i--) {
+      const op = opQueue[i];
+      const res = await realityApi(op.path, op.body, op.method);
+      if (diskOpSucceeded(res)) {
+        opQueue.splice(i, 1);
+      } else {
+        op.tries += 1;
+        if (op.tries > MAX_OP_RETRIES) {
+          console.warn('[sync] dropping disk op after max retries:', op.path);
+          opQueue.splice(i, 1);
+        }
+      }
+    }
+  } finally {
+    flushing = false;
+  }
+  return opQueue.length;
+}

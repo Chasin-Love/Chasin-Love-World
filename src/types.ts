@@ -266,12 +266,38 @@ export interface TrashedReality {
   folderName?: string;
 }
 
+/* ------------------------- reality ⇄ disk sync ------------------------- */
+
+/** One bin folder as reported by the disk daemon (src/realities/bin/). */
+export interface BinFolderInfo {
+  folderName: string;
+  path: string;
+  trashedAt: number;
+}
+
+/** Live mirror health, published every poll by the realitySync reconciler. */
+export interface DiskSyncState {
+  connected: boolean;       /* last poll reached the disk daemon */
+  lastSyncTime: number;     /* timestamp of the last successful poll */
+  scanCount: number;        /* daemon scan counter */
+  activeFolders: string[];  /* reality folders currently on disk */
+  binDetails: BinFolderInfo[];
+  operationsLog: { timestamp: number; type: string; details: string }[];
+  pendingOps: number;       /* queued disk mutations awaiting retry */
+  lastError: string | null;
+}
+
 export interface UniverseState {
   activeRealityId?: string;
   customRealityDescriptions?: Record<string, string>;
   customRealities?: any[];
   deletedRealityIds?: string[];
   binRealities?: TrashedReality[];
+  /* realityId → disk folder name — recorded at create/rename time so every
+     bin operation can address the exact folder (no fragile name matching) */
+  realityFolders?: Record<string, string>;
+  /* live disk-mirror telemetry (ephemeral — never persisted) */
+  diskSync?: DiskSyncState;
   /* user-authored major-galaxy rosters — fully replaces the deterministic
      defaults for that reality (created/renamed/edited/deleted galaxies) */
   customGalaxies?: Record<string, GalaxyData[]>;

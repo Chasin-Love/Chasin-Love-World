@@ -7,13 +7,19 @@
 import { useSyncExternalStore } from 'react';
 import type {
   Attachment,
+  BinFolderInfo,
   BodyKind,
   CosmicBody,
   DiaryEntry,
+  DiskSyncState,
+  EfsScrubReport,
   FileVersion,
   Meaning,
   UniverseState,
   VaultSecrets,
+  VaultFile,
+  VfsNode,
+  VfsShadow,
 } from './types';
 import {
   getReality,
@@ -22,6 +28,8 @@ import {
   computeAllRealities,
   setRuntimeRealities,
   createGalaxyData,
+  folderNameForReality,
+  deriveFolderName,
   RealityConfig,
   RealityMetaOverride,
   GalaxyData,
@@ -36,8 +44,8 @@ import {
   efsScrub, efsSubtreeIds, efsHeal, efsUniqueName, EFS_ROOT, migrateLegacyVault,
 } from './backend';
 import { recordPersistence } from './performance';
-import { desktopStore, realityApi } from './desktop/adapter';
-import type { EfsScrubReport, VaultFile, VfsNode, VfsShadow } from './types';
+import { desktopStore, realityApi, syncedRealityApi } from './desktop/adapter';
+import { toast } from './ui/toast';
 
 
 
@@ -45,6 +53,17 @@ const STORAGE_KEY = 'my-universe:v4';
 const DAY_MS = 86400000;
 const DIARY_INLINE_LIMIT = 256 * 1024;
 const DIARY_PAYLOAD_PREFIX = 'diary:';
+
+const EMPTY_DISK_SYNC: DiskSyncState = {
+  connected: false,
+  lastSyncTime: 0,
+  scanCount: 0,
+  activeFolders: [],
+  binDetails: [],
+  operationsLog: [],
+  pendingOps: 0,
+  lastError: null,
+};
 
 export function newId(): string {
   try {
@@ -80,6 +99,8 @@ function createSnapshot(s: UniverseState): UniverseState {
     customRealityMeta: s.customRealityMeta
       ? Object.fromEntries(Object.entries(s.customRealityMeta).map(([k, v]) => [k, { ...v }]))
       : {},
+    realityFolders: { ...(s.realityFolders ?? {}) },
+    diskSync: s.diskSync ?? EMPTY_DISK_SYNC,
     bodies: [...s.bodies],
     entries: [...s.entries],
     connections: [...s.connections],
@@ -141,6 +162,8 @@ function loadState(): UniverseState {
         if (!Array.isArray(parsed.deletedRealityIds)) parsed.deletedRealityIds = [];
         if (!parsed.customGalaxies || typeof parsed.customGalaxies !== 'object') parsed.customGalaxies = {};
         if (!parsed.customRealityMeta || typeof parsed.customRealityMeta !== 'object') parsed.customRealityMeta = {};
+        if (!parsed.realityFolders || typeof parsed.realityFolders !== 'object') parsed.realityFolders = {};
+        delete parsed.diskSync;
         if (!Array.isArray(parsed.vault)) parsed.vault = [];
         if (!Array.isArray(parsed.vaultTrash)) parsed.vaultTrash = [];
         parsed.vault = normalizeVaultFiles(parsed.vault);
@@ -246,6 +269,8 @@ function persistState() {
     try {
       const slim = {
         ...state,
+        /* diskSync is live telemetry — ephemeral, never persisted */
+        diskSync: undefined,
         vaultUsers: state.vaultUsers.map((u) => {
           const n = { ...u };
           if (n.avatar && n.avatar.length > 2_600_000) n.avatar = null;
@@ -269,6 +294,13 @@ function persistState() {
 function notify() {
   snapshot = createSnapshot(state);
   persistState();
+  listeners.forEach((listener) => listener());
+}
+
+/** Publishes to React without touching localStorage — used by the high
+    frequency diskSync telemetry (3s poll) so storage isn't hammered. */
+function notifyNoPersist() {
+  snapshot = createSnapshot(state);
   listeners.forEach((listener) => listener());
 }
 
@@ -384,6 +416,26 @@ function commitGalaxyRoster(realityId: string, roster: GalaxyData[], note: strin
   notify();
 }
 
+/** Best-known disk folder for a reality: the recorded state map → the
+    build-time map for base realities → the display name (server sanitizes). */
+function diskFolderFor(realityId: string, displayName?: string): string | undefined {
+  return state.realityFolders?.[realityId] ?? folderNameForReality(realityId) ?? displayName;
+}
+
+/** Proposes a fresh, collision-free folder name for a new reality. */
+function uniqueFolderFor(name: string, realityId: string): string {
+  const base = deriveFolderName(name);
+  const used = new Set<string>(Object.values(state.realityFolders ?? {}));
+  for (const r of RAW_REALITIES) {
+    const f = folderNameForReality(r.id);
+    if (f) used.add(f);
+  }
+  for (const f of state.diskSync?.activeFolders ?? []) used.add(f);
+  if (!used.has(base)) return base;
+  const suffix = realityId.split('-').slice(-1)[0] || newId().slice(0, 4);
+  return `${base}_${suffix}`;
+}
+
 export const actions = {
   /* -------------------------- Multiverse & Lore -------------------------- */
   switchReality(realityId: string) {
@@ -439,11 +491,22 @@ export const actions = {
     const cleanName = name.trim();
     actions.updateRealityMeta(realityId, { name: cleanName });
 
-    // Synchronize folder renaming to backend disk
-    void realityApi('/api/realities/rename-folder', { realityId, newName: cleanName });
+    // Synchronize folder renaming to backend disk (folder-aware matching)
+    const folderName = diskFolderFor(realityId);
+    void realityApi<{ success?: boolean; newFolderName?: string }>(
+      '/api/realities/rename-folder',
+      { realityId, newName: cleanName, folderName }
+    ).then((res) => {
+      if (res?.success && res.newFolderName) {
+        actions.rememberRealityFolder(realityId, res.newFolderName);
+      } else if (!res?.success) {
+        toast(`⚠ "${cleanName}" renamed in the multiverse — the disk folder rename will retry`, 'warn');
+        void syncedRealityApi('/api/realities/rename-folder', { realityId, newName: cleanName, folderName });
+      }
+    });
   },
 
-  createReality(newReality: RealityConfig) {
+  async createReality(newReality: RealityConfig) {
     if (!state.customRealities) state.customRealities = [];
     state.customRealities = [...state.customRealities.filter((x) => x.id !== newReality.id), newReality];
     // If it was previously in bin, remove from bin
@@ -457,11 +520,22 @@ export const actions = {
     audit(`[Multiverse Nexus] Manifested new parallel reality: ${newReality.name}`);
     notify();
 
-    // Synchronize to backend disk folder in real time
-    void realityApi('/api/realities/create-folder', newReality);
+    // Disk mirror: propose the folder name ourselves so every later bin
+    // operation can address it exactly; the server sanitizes + confirms it.
+    const proposed = uniqueFolderFor(newReality.name, newReality.id);
+    const res = await realityApi<{ success?: boolean; folderName?: string }>(
+      '/api/realities/create-folder',
+      { ...newReality, folderName: proposed }
+    );
+    if (res?.success) {
+      actions.rememberRealityFolder(newReality.id, res.folderName ?? proposed);
+    } else {
+      toast(`⚠ "${newReality.name}" exists in the multiverse, but its disk folder could not be created — the sync engine will retry`, 'warn');
+      void syncedRealityApi('/api/realities/create-folder', { ...newReality, folderName: proposed });
+    }
   },
 
-  deleteReality(realityId: string) {
+  async deleteReality(realityId: string) {
     // Protect core default reality from deletion
     if (realityId === 'sol-prime') return;
 
@@ -473,6 +547,7 @@ export const actions = {
     }
 
     // Preserve in Quantum Bin (Dustbin / Recycle Bin)
+    const folderName = diskFolderFor(realityId, doomedReality?.name);
     if (doomedReality) {
       if (!state.binRealities) state.binRealities = [];
       const trashedItem: any = {
@@ -485,6 +560,7 @@ export const actions = {
         description: doomedReality.description,
         deletedAt: Date.now(),
         originalConfig: doomedReality,
+        folderName,
       };
       state.binRealities = [
         ...state.binRealities.filter((b) => b.id !== realityId),
@@ -521,10 +597,13 @@ export const actions = {
     notify();
 
     // Synchronize disk transfer to src/realities/bin/
-    void realityApi('/api/realities/bin/move-to-bin', { realityId, folderName: doomedReality?.name });
+    const ok = await syncedRealityApi('/api/realities/bin/move-to-bin', { realityId, folderName });
+    if (!ok) {
+      toast(`⚠ ${doomedReality?.name ?? realityId} collapsed in the multiverse, but its disk folder could not reach the bin — will retry`, 'warn');
+    }
   },
 
-  restoreReality(realityId: string) {
+  async restoreReality(realityId: string) {
     if (!state.binRealities) return;
     const trashed = state.binRealities.find((b) => b.id === realityId);
     if (!trashed) return;
@@ -547,11 +626,19 @@ export const actions = {
     audit(`[Multiverse Nexus] Restored reality from Quantum Bin: ${trashed.name}`);
     notify();
 
-    // Synchronize restore on disk
-    void realityApi('/api/realities/bin/restore', { realityId });
+    // Synchronize restore on disk — folderName makes the match exact
+    const ok = await syncedRealityApi('/api/realities/bin/restore', {
+      realityId,
+      folderName: diskFolderFor(realityId, trashed.folderName),
+    });
+    if (ok) {
+      if (trashed.folderName) actions.rememberRealityFolder(realityId, trashed.folderName);
+    } else {
+      toast(`⚠ ${trashed.name} restored in the multiverse, but its disk folder is still in the bin — will retry`, 'warn');
+    }
   },
 
-  purgeRealityFromBin(realityId: string) {
+  async purgeRealityFromBin(realityId: string) {
     if (!state.binRealities) return;
     const item = state.binRealities.find((b) => b.id === realityId);
     state.binRealities = state.binRealities.filter((b) => b.id !== realityId);
@@ -559,10 +646,16 @@ export const actions = {
     notify();
 
     // Permanently wipe on disk
-    void realityApi('/api/realities/bin/purge', { realityId });
+    const ok = await syncedRealityApi('/api/realities/bin/purge', {
+      realityId,
+      folderName: diskFolderFor(realityId, item?.folderName),
+    });
+    if (!ok) {
+      toast(`⚠ ${item?.name ?? realityId} purged from the bin index, but its disk folder remains — will retry`, 'warn');
+    }
   },
 
-  emptyRealityBin() {
+  async emptyRealityBin() {
     if (!state.binRealities?.length) return;
     const count = state.binRealities.length;
     state.binRealities = [];
@@ -570,7 +663,58 @@ export const actions = {
     notify();
 
     // Empty bin on disk
-    void realityApi('/api/realities/bin/empty', {});
+    const ok = await syncedRealityApi('/api/realities/bin/empty', {});
+    if (!ok) {
+      toast('⚠ Quantum Bin emptied in the multiverse, but the disk folders could not be cleared — will retry', 'warn');
+    }
+  },
+
+  /* ------------------------- disk mirror telemetry ----------------------- */
+
+  setDiskSync(patch: Partial<DiskSyncState>) {
+    state.diskSync = { ...(state.diskSync ?? EMPTY_DISK_SYNC), ...patch };
+    notifyNoPersist();
+  },
+
+  rememberRealityFolder(realityId: string, folder: string) {
+    if (state.realityFolders?.[realityId] === folder) return;
+    state.realityFolders = { ...(state.realityFolders ?? {}), [realityId]: folder };
+    notify();
+  },
+
+  /** Tracks an orphaned folder discovered in src/realities/bin/ so it can be
+      restored or purged from the Quantum Bin UI. */
+  adoptBinFolder(info: BinFolderInfo) {
+    if (!state.binRealities) state.binRealities = [];
+    if (state.binRealities.some((b) => b.folderName === info.folderName)) return;
+    const pretty =
+      info.folderName.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim() ||
+      info.folderName;
+    state.binRealities = [
+      ...state.binRealities,
+      {
+        id: `disk-${info.folderName.toLowerCase()}`,
+        name: pretty,
+        spectral: 'Recovered Disk Folder',
+        colorA: '#f43f5e',
+        colorB: '#8b5cf6',
+        description: 'Discovered in src/realities/bin by the disk daemon — adopted so it can be restored or purged.',
+        deletedAt: info.trashedAt,
+        folderName: info.folderName,
+      },
+    ];
+    audit(`[Quantum Bin] Adopted orphaned disk folder: src/realities/bin/${info.folderName}`);
+    notify();
+  },
+
+  /** Deletes an orphaned bin folder directly by its exact disk name. */
+  async purgeBinFolder(folderName: string) {
+    const ok = await syncedRealityApi('/api/realities/bin/purge', { folderName });
+    if (ok) {
+      toast(`src/realities/bin/${folderName} permanently deleted`);
+    } else {
+      toast(`⚠ Could not delete src/realities/bin/${folderName} — will retry`, 'warn');
+    }
   },
 
   /* -------------------- Major Galaxies of a Reality ---------------------- */

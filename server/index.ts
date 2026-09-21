@@ -129,11 +129,11 @@ async function startServer() {
 
   // API: Rename reality folder
   app.post('/api/realities/rename-folder', (req, res) => {
-    const { realityId, newName } = req.body;
+    const { realityId, newName, folderName } = req.body;
     if (!realityId || !newName) {
       return res.status(400).json({ success: false, error: 'realityId and newName are required' });
     }
-    const result = realityDaemon.renameRealityFolder(realityId, newName);
+    const result = realityDaemon.renameRealityFolder(realityId, newName, folderName);
     if (!result.success) {
       return res.status(400).json(result);
     }

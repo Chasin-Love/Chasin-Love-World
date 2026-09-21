@@ -318,7 +318,7 @@ class RealitySyncDaemon {
     }
   }
 
-  public renameRealityFolder(realityId: string, newName: string): { success: boolean; newFolderName?: string; error?: string } {
+  public renameRealityFolder(realityId: string, newName: string, folderName?: string): { success: boolean; newFolderName?: string; error?: string } {
     this.ensureDirectories();
 
     if (realityId === 'sol-prime') {
@@ -338,7 +338,18 @@ class RealitySyncDaemon {
       const items = fs.readdirSync(this.realitiesDir, { withFileTypes: true });
       let oldFolderName = '';
 
-      for (const dirent of items) {
+      /* folderName (when the client knows it) is the exact, unambiguous
+         address — cleaned ids can't match camelCase folders of custom
+         realities like reality-xxxx → chasinLove */
+      const cleanFolder = folderName ? sanitizeFolderName(folderName) : '';
+      if (cleanFolder) {
+        const direct = path.join(this.realitiesDir, cleanFolder);
+        if (isInside(this.realitiesDir, direct) && fs.existsSync(direct)) {
+          oldFolderName = cleanFolder;
+        }
+      }
+
+      if (!oldFolderName) for (const dirent of items) {
         if (!dirent.isDirectory()) continue;
         if (dirent.name === 'bin' || dirent.name === 'solPrime') continue;
 

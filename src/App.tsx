@@ -7,6 +7,7 @@ import type { WinRect } from './ui/DiaryWindow';
 import { PhysicsHUD } from './ui/PhysicsHUD';
 import { ErrorBoundary, IcLink, ToastHost, useUniverse } from './ui/bits';
 import { toast } from './ui/toast';
+import { startRealitySync } from './sync/realitySync';
 import { perfMark } from './performance';
 import { MultiverseBar } from './components/hud/MultiverseBar';
 import { RealityHoverCard } from './components/hud/RealityHoverCard';
@@ -52,6 +53,11 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<UniverseEngine | null>(null);
   const state = useUniverse();
+
+  /* continuous reality ⇄ disk reconciler — one poll loop for the whole app */
+  useEffect(() => {
+    startRealitySync();
+  }, []);
 
   const [mode, setMode] = useState<'space' | 'core' | 'vault'>('space');
   const modeRef = useRef(mode);

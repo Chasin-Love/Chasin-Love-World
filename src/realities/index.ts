@@ -13,6 +13,11 @@ export * from './solPrime';
 // Dynamically discover all reality configurations across all subfolders
 const realityModules = import.meta.glob<{ [key: string]: any }>('./*/index.ts', { eager: true });
 
+/* realityId → disk folder name, derived from the build-time glob keys. This
+   is the authoritative address map for base realities — bin operations send
+   the exact folder instead of guessing from display names. */
+const folderById = new Map<string, string>([['sol-prime', 'solPrime']]);
+
 function collectRawRealities(): any[] {
   const map = new Map<string, any>();
   map.set('sol-prime', solPrimeReality);
@@ -21,15 +26,18 @@ function collectRawRealities(): any[] {
     // Ignore anything inside the bin recycle directory
     if (path.includes('/bin/') || path.startsWith('./bin/')) continue;
 
+    const folderMatch = path.match(/^\.\/([^/]+)\/index\.ts$/);
     for (const val of Object.values(mod)) {
       if (Array.isArray(val)) {
         val.forEach((item) => {
           if (item && item.id && !map.has(item.id)) {
             map.set(item.id, item);
+            if (folderMatch) folderById.set(item.id, folderMatch[1]);
           }
         });
       } else if (val && typeof val === 'object' && val.id && !map.has(val.id)) {
         map.set(val.id, val);
+        if (folderMatch) folderById.set(val.id, folderMatch[1]);
       }
     }
   }
@@ -38,6 +46,23 @@ function collectRawRealities(): any[] {
 }
 
 export const RAW_REALITIES: any[] = collectRawRealities();
+
+/** The disk folder that backs a base reality ('chronos-paradox' →
+    'chronosParadox'). Custom realities are tracked in state.realityFolders. */
+export function folderNameForReality(id: string): string | undefined {
+  return folderById.get(id);
+}
+
+/** Mirrors the server's create-folder naming rule so the client can propose
+    the folder name itself (the server sanitizes and may confirm it). */
+export function deriveFolderName(name: string): string {
+  const rawSanitized = name.replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
+  const words = rawSanitized.split(/[\s-_]+/).filter(Boolean);
+  const camel = words
+    .map((w, idx) => (idx === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .join('');
+  return camel || `reality_${Date.now()}`;
+}
 
 /**
  * Cosmological 3D Golden Spiral structural layout algorithm for parallel bubble universes orbiting the central Core.
@@ -177,7 +202,14 @@ export function computeAllRealities(
   const deletedSet = new Set(deletedIds || []);
   const baseList = RAW_REALITIES.filter((r) => !deletedSet.has(r.id));
   const customList = (customRealities || []).filter((r) => !deletedSet.has(r.id));
-  const combined = [...baseList, ...customList];
+  /* dedup by id: a reality restored/kept on disk (glob) and still present in
+     customRealities (state) must render once, not twice */
+  const seen = new Set<string>();
+  const combined = [...baseList, ...customList].filter((r) => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
   const total = combined.length;
 
   return combined.map((r, i) => buildRealityConfig(r, i, total, customDescriptions, customGalaxies, customRealityMeta));
