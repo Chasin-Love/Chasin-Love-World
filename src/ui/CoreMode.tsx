@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BodyKind, CosmicBody, Meaning, UniverseState, VaultFile } from '../types';
 import { MEANING_LABEL, MEANINGS } from '../types';
 import { actions } from '../state';
 import {
-  fmtBytes, fmtDate, fmtStamp,
-  computeStats, eventsOf, snapshotAt,
+  fmtDate, fmtStamp,
+  eventsOf,
   getStoredPayload, putStoredPayload,
 } from '../backend';
 import { useUniverse } from './bits';
@@ -170,23 +170,24 @@ export default function CoreMode({ onClose, onInspect, onTemporal, onEnterWorld 
   const [selectedMeaning, setSelectedMeaning] = useState<Meaning | 'all'>('all');
   const [selectedKind, setSelectedKind] = useState<BodyKind | 'all'>('all');
 
-  const max = Date.now();
+  /* the timeline window is frozen at open — recomputing `max` per render used
+     to tear the playback rAF loop down and rebuild it every frame */
+  const max = useMemo(() => Date.now(), []);
   const events = useMemo(() => eventsOf(state), [state]);
-  const min = events.length ? Math.min(events[0].t, max - 30 * 86400000) : max - 365 * 86400000;
+  const min = useMemo(
+    () => (events.length ? Math.min(events[0].t, max - 30 * 86400000) : max - 365 * 86400000),
+    [events, max]
+  );
   const isPast = max - t > MINUTE;
   const asOf = isPast ? t : undefined;
-
-  const stats = useMemo(() => computeStats(state, asOf), [state, asOf]);
-  const snap = useMemo(() => (asOf ? snapshotAt(state, asOf) : null), [state, asOf]);
-  const laterCount = asOf
-    ? state.bodies.filter((b) => b.id !== 'anchor' && b.createdAt > asOf).length +
-      state.entries.filter((e) => e.createdAt > asOf).length
-    : 0;
 
   useEffect(() => { onTemporal(isPast ? t : null); }, [t, isPast, onTemporal]);
   useEffect(() => () => onTemporal(null), [onTemporal]);
 
-  /* temporal playback loop — throttled to ~25fps state updates to keep WebGL smooth and prevent UI jank */
+  /* temporal playback loop — throttled to ~25fps state updates to keep WebGL smooth and prevent UI jank.
+     Current position lives in a ref so the effect deps stay stable (no per-frame teardown). */
+  const tRef = useRef(t);
+  useEffect(() => { tRef.current = t; }, [t]);
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
@@ -198,11 +199,15 @@ export default function CoreMode({ onClose, onInspect, onTemporal, onEnterWorld 
       const elapsed = n - lastUpdate;
       if (elapsed >= 40) {
         lastUpdate = n;
-        setT((cur) => {
-          const next = cur + elapsed * (span / 12000);
-          if (next >= max) { setPlaying(false); return max; }
-          return next;
-        });
+        const next = tRef.current + elapsed * (span / 12000);
+        if (next >= max) {
+          tRef.current = max;
+          setT(max);
+          setPlaying(false);
+          return; /* reached the present — stop scheduling */
+        }
+        tRef.current = next;
+        setT(next);
       }
       raf = requestAnimationFrame(loop);
     };
@@ -275,8 +280,11 @@ export default function CoreMode({ onClose, onInspect, onTemporal, onEnterWorld 
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
+  const reader = new FileReader();
+  reader.onerror = () => {
+    toast('Failed to read the backup file', 'warn');
+  };
+  reader.onload = async (evt) => {
       try {
         const parsed: unknown = JSON.parse(evt.target?.result as string);
         const versioned = isUniverseBackup(parsed);
@@ -630,6 +638,15 @@ function WorldEditor({ body, onClose, onEnterWorld }: { body: CosmicBody; onClos
   const [confirmDel, setConfirmDel] = useState(false);
   const [confirmPage, setConfirmPage] = useState<string | null>(null);
   const pages = state.entries.filter((e) => e.planetId === body.id).sort((a, b) => b.createdAt - a.createdAt);
+  /* the Anchor Star and the Eventide Black Hole are load-bearing — removeBody
+     refuses them, so the UI must never offer a dissolve button that no-ops */
+  const protectedBody = body.id === 'anchor' || body.id === 'eventide';
+  /* pending confirm timers — cleared on unmount so they can't fire stale */
+  const timersRef = useRef<number[]>([]);
+  useEffect(() => () => { timersRef.current.forEach((id) => clearTimeout(id)); }, []);
+  const later = (fn: () => void, ms: number) => {
+    timersRef.current.push(window.setTimeout(fn, ms));
+  };
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); onClose(); } };
@@ -672,7 +689,17 @@ function WorldEditor({ body, onClose, onEnterWorld }: { body: CosmicBody; onClos
           </label>
 
           <div>
-            <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-paper/50 block mb-2">Meaning — Core Representation</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-paper/50">Meaning — Core Representation</span>
+              {meaning !== null && (
+                <button
+                  onClick={() => setMeaning(null)}
+                  className="font-mono text-[9px] tracking-[0.18em] uppercase text-paper/40 hover:text-paper transition-colors"
+                >
+                  ✕ clear meaning
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(MEANING_DESC) as (keyof typeof MEANING_DESC)[]).map((m) => {
                 const active = meaning === m;
@@ -733,7 +760,7 @@ function WorldEditor({ body, onClose, onEnterWorld }: { body: CosmicBody; onClos
                     </button>
                   ) : (
                     <button
-                      onClick={() => { setConfirmPage(p.id); setTimeout(() => setConfirmPage((c) => (c === p.id ? null : c)), 2600); }}
+                      onClick={() => { setConfirmPage(p.id); later(() => setConfirmPage((c) => (c === p.id ? null : c)), 2600); }}
                       className="p-1 rounded text-paper/40 hover:text-rose-400 transition-colors"
                     >
                       <Icon d="trash" size={13} />
@@ -744,27 +771,40 @@ function WorldEditor({ body, onClose, onEnterWorld }: { body: CosmicBody; onClos
             </div>
           </div>
 
-          <div className="border border-rose-500/40 rounded-xl p-4 bg-rose-950/25 flex items-center justify-between gap-4">
-            <div>
-              <p className="font-mono text-[9.5px] tracking-[0.24em] uppercase text-rose-300 font-semibold">Dissolve World</p>
-              <p className="text-[11.5px] text-paper/50 mt-0.5">Permanently removes this world and all attached diary pages.</p>
+          {protectedBody ? (
+            <div className="border border-teal-ice/25 rounded-xl p-4 bg-teal-ice/5 flex items-center gap-4">
+              <div>
+                <p className="font-mono text-[9.5px] tracking-[0.24em] uppercase text-teal-ice font-semibold">Protected Celestial Body</p>
+                <p className="text-[11.5px] text-paper/50 mt-0.5">
+                  {body.id === 'eventide'
+                    ? 'The Eventide Black Hole anchors the Universal Vault — it cannot be dissolved.'
+                    : 'The Anchor Star regulates this continuum — it cannot be dissolved.'}
+                </p>
+              </div>
             </div>
-            {confirmDel ? (
-              <button
-                onClick={() => { actions.deleteBody(body.id); toast(`${body.name} dissolved`); onClose(); }}
-                className="shrink-0 font-mono text-[9.5px] tracking-[0.2em] uppercase px-4 py-2 rounded-lg bg-rose-500/35 border border-rose-500 text-rose-100 hover:bg-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)] transition-all"
-              >
-                Confirm Dissolve
-              </button>
-            ) : (
-              <button
-                onClick={() => { setConfirmDel(true); setTimeout(() => setConfirmDel(false), 3000); }}
-                className="shrink-0 font-mono text-[9.5px] tracking-[0.2em] uppercase px-4 py-2 rounded-lg border border-rose-500/40 text-rose-300 hover:bg-rose-500/15 transition-all"
-              >
-                Dissolve
-              </button>
-            )}
-          </div>
+          ) : (
+            <div className="border border-rose-500/40 rounded-xl p-4 bg-rose-950/25 flex items-center justify-between gap-4">
+              <div>
+                <p className="font-mono text-[9.5px] tracking-[0.24em] uppercase text-rose-300 font-semibold">Dissolve World</p>
+                <p className="text-[11.5px] text-paper/50 mt-0.5">Permanently removes this world and all attached diary pages.</p>
+              </div>
+              {confirmDel ? (
+                <button
+                  onClick={() => { actions.deleteBody(body.id); toast(`${body.name} dissolved`); onClose(); }}
+                  className="shrink-0 font-mono text-[9.5px] tracking-[0.2em] uppercase px-4 py-2 rounded-lg bg-rose-500/35 border border-rose-500 text-rose-100 hover:bg-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)] transition-all"
+                >
+                  Confirm Dissolve
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setConfirmDel(true); later(() => setConfirmDel(false), 3000); }}
+                  className="shrink-0 font-mono text-[9.5px] tracking-[0.2em] uppercase px-4 py-2 rounded-lg border border-rose-500/40 text-rose-300 hover:bg-rose-500/15 transition-all"
+                >
+                  Dissolve
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-solar/20 bg-slate-950/50 flex justify-end gap-3">

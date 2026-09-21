@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { RealityConfig, RAW_REALITIES } from '../../realities';
 import { X, Sparkles, Plus, Orbit, Globe, Compass, Shield, Check } from 'lucide-react';
 
@@ -31,6 +31,20 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
   const [planetsCount, setPlanetsCount] = useState(5);
   const [galaxyCount, setGalaxyCount] = useState(4);
 
+  /* Escape closes only this modal — the Core Console's own Escape handler
+     defers while the forge modal is open. Hooks stay unconditional. */
+  useEffect(() => {
+    if (!isOpen) return;
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', h, true);
+    return () => window.removeEventListener('keydown', h, true);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleCreate = (e: React.FormEvent) => {
@@ -55,9 +69,15 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
 
     onCreate(payload);
 
+    /* full form reset — everything back to defaults after manifesting */
     setName('');
     setCodeName('');
     setDescription('');
+    setSpectral('Class B Blue Luminary · Binary Companion');
+    setColorA('#00f5d4');
+    setColorB('#8b5cf6');
+    setPlanetsCount(5);
+    setGalaxyCount(4);
     onClose();
   };
 
@@ -72,14 +92,18 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-2xl animate-fade-in"
-      onClick={onClose}
+      onClick={(e) => {
+        /* keep the click from bubbling to the Core Console's closable root */
+        e.stopPropagation();
+        onClose();
+      }}
     >
       <div
         className="relative w-full max-w-xl rounded-3xl border border-cyan-400/30 bg-slate-950/30 backdrop-blur-3xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.65),0_0_40px_rgba(6,182,212,0.18),inset_0_1px_1px_rgba(255,255,255,0.2)] text-slate-100 flex flex-col gap-4 max-h-[90vh] overflow-y-auto custom-scroll select-none relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Specular glass reflection */}
-        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/70 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-[1px] bg-linear-to-r from-transparent via-cyan-400/70 to-transparent pointer-events-none" />
         <div className="absolute -top-20 -right-20 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header */}
@@ -259,7 +283,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
 
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold shadow-[0_0_20px_rgba(6,182,212,0.4)] border border-cyan-300/40 backdrop-blur-md transition-all font-mono"
+              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold shadow-[0_0_20px_rgba(6,182,212,0.4)] border border-cyan-300/40 backdrop-blur-md transition-all font-mono"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Manifest Reality</span>

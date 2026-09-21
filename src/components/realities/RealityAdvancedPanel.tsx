@@ -103,6 +103,8 @@ export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGal
     if (identity.starColor && identity.starColor !== reality.starColor) patch.starColor = identity.starColor;
     if (!Object.keys(patch).length) return;
     actions.updateRealityMeta(realityId, patch);
+    /* a name change also mirrors the disk folder rename through the daemon */
+    if (patch.name) actions.renameReality(realityId, patch.name);
     toast('Reality reweaved — the multiverse ring has been redrawn');
   };
 

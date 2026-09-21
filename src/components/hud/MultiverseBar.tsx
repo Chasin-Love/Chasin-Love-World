@@ -5,6 +5,7 @@ import { actions, getState, useUniverse } from '../../state';
 import { Globe, Sparkles, Orbit, Layers, ChevronRight, Compass, Zap, Eye, Edit3, Shield, ShieldCheck, Flame, X, Plus, Trash2, CircleDot } from 'lucide-react';
 import { CreateRealityModal } from '../realities/CreateRealityModal';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
+import { toast } from '../../ui/toast';
 
 interface MultiverseBarProps {
   activeRealityId: string;
@@ -52,6 +53,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
   const [galaxyMenuOpen, setGalaxyMenuOpen] = useState(false);
   const [selectedPreview, setSelectedPreview] = useState<RealityConfig | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const universeState = useUniverse();
   const allRealities: RealityConfig[] = REALITIES;
@@ -60,7 +62,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
   const hierarchyStages = HIERARCHY_STAGES;
 
   const activeStageIndex = hierarchyStages.findIndex(s => currentScaleLabel.toUpperCase().includes(s.key));
-  const currentIdx = activeStageIndex !== -1 ? activeStageIndex : (currentScaleLabel.includes('SURFACE') || currentScaleLabel.includes('APPROACH') ? 10 : 10);
+  const currentIdx = activeStageIndex !== -1 ? activeStageIndex : 10;
 
   const handleCreateReality = (params: {
     name: string;
@@ -80,7 +82,14 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
     if (realityId === 'sol-prime') {
       return;
     }
+    /* two-step confirm — matches the Core Console's erase flow */
+    if (confirmDeleteId !== realityId) {
+      setConfirmDeleteId(realityId);
+      return;
+    }
+    setConfirmDeleteId(null);
     actions.deleteReality(realityId);
+    toast(`✦ Reality transferred to the Quantum Bin`);
     if (selectedPreview?.id === realityId) {
       setSelectedPreview(null);
     }
@@ -300,7 +309,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/30 backdrop-blur-2xl animate-fade-in">
           <div className="relative w-full max-w-4xl max-h-[85vh] bg-slate-950/20 backdrop-blur-3xl border border-cyan-400/25 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_40px_rgba(6,182,212,0.12),inset_0_1px_1px_rgba(255,255,255,0.18)] flex flex-col overflow-hidden text-slate-100 relative">
             {/* Specular glass reflection */}
-            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 top-0 h-[1px] bg-linear-to-r from-transparent via-cyan-400/60 to-transparent pointer-events-none" />
 
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4.5 border-b border-white/10 bg-white/[0.02]">
@@ -412,13 +421,31 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                         )}
 
                         {!isProtected && (
-                          <button
-                            onClick={(e) => handleDeleteReality(e, r.id)}
-                            className="p-1.5 rounded-lg text-xs flex items-center justify-center bg-red-500/10 hover:bg-red-500/25 text-red-300 hover:text-red-100 border border-red-500/30 transition-all backdrop-blur-md cursor-pointer"
-                            title="Delete this reality branch"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          confirmDeleteId === r.id ? (
+                            <span className="flex items-center gap-1">
+                              <button
+                                onClick={(e) => handleDeleteReality(e, r.id)}
+                                className="px-2 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-wider bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/60 transition-all cursor-pointer animate-in zoom-in-90"
+                                title="Confirm — move to the Quantum Bin"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }}
+                                className="px-2 py-1.5 rounded-lg text-[10px] font-mono bg-white/[0.08] hover:bg-white/[0.16] text-slate-300 border border-white/10 transition-all cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => handleDeleteReality(e, r.id)}
+                              className="p-1.5 rounded-lg text-xs flex items-center justify-center bg-red-500/10 hover:bg-red-500/25 text-red-300 hover:text-red-100 border border-red-500/30 transition-all backdrop-blur-md cursor-pointer"
+                              title="Delete this reality branch"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )
                         )}
 
                         <button
@@ -561,7 +588,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                           onWarpReality(selectedPreview.id);
                           setIsOpen(false);
                         }}
-                        className="flex-1 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-md cursor-pointer"
+                        className="flex-1 py-2.5 bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-md cursor-pointer"
                       >
                         <Zap className="w-4 h-4" />
                         <span>Travel to {selectedPreview.name}</span>

@@ -1,66 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { Trash2, RefreshCw, RotateCcw, AlertTriangle, ShieldCheck, Activity, Folder, Sparkles, CheckCircle2, Clock, Globe } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, RefreshCw, RotateCcw, ShieldCheck, ShieldX, Activity, Folder, CheckCircle2, Clock, HardDriveDownload } from 'lucide-react';
 import { actions, useUniverse } from '../../state';
-import { realityApi } from '../../desktop/adapter';
+import { reconcileNow } from '../../sync/realitySync';
 import { toast } from '../../ui/toast';
 import { TrashedReality } from '../../types';
 
-interface DaemonStatus {
-  active: boolean;
-  lastScanTime: number;
-  scanCount: number;
-  activeFolders: string[];
-  binFolders: string[];
-  operationsLog: { timestamp: number; type: string; details: string }[];
+/** Prettifies a disk folder name for the "orphaned folder" row. */
+function folderDisplay(name: string): string {
+  return name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim() || name;
 }
 
 export const QuantumBinTab: React.FC = () => {
   const state = useUniverse();
   const binRealities: TrashedReality[] = state.binRealities || [];
-  const [daemonStatus, setDaemonStatus] = useState<DaemonStatus | null>(null);
-  const [diskBin, setDiskBin] = useState<{ folderName: string; path: string; trashedAt: number }[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const diskSync = state.diskSync;
+  const connected = diskSync?.connected ?? false;
+  const [manualSync, setManualSync] = useState(false);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const [confirmPurgeId, setConfirmPurgeId] = useState<string | null>(null);
 
-  const fetchStatus = async () => {
-    try {
-      setIsLoading(true);
-      const [daemonRes, binRes] = await Promise.all([
-        realityApi<DaemonStatus>('/api/realities/daemon-status', undefined, 'GET'),
-        realityApi<{ bin: { folderName: string; path: string; trashedAt: number }[] }>('/api/realities/bin', undefined, 'GET'),
-      ]);
-      if (daemonRes) setDaemonStatus(daemonRes);
-      if (binRes && binRes.bin) setDiskBin(binRes.bin);
-    } catch (e) {
-      console.warn('Could not fetch daemon status:', e);
-    } finally {
-      setIsLoading(false);
-    }
+  /* Disk truth: bin folders on disk that no tracked bin reality claims —
+     surfaced so nothing in src/realities/bin/ is invisible to the user. */
+  const trackedFolders = new Set(
+    binRealities.map((b) => (b.folderName ?? '').toLowerCase()).filter(Boolean)
+  );
+  const orphanFolders = (diskSync?.binDetails ?? []).filter(
+    (b) => !trackedFolders.has(b.folderName.toLowerCase())
+  );
+
+  const handleManualSync = async () => {
+    setManualSync(true);
+    reconcileNow();
+    /* give the poll cycle a moment so the spinner reads as a real action */
+    setTimeout(() => setManualSync(false), 600);
   };
 
-  useEffect(() => {
-    fetchStatus();
-    const timer = setInterval(fetchStatus, 3000);
-    return () => clearInterval(timer);
-  }, []);
-
   const handleRestore = (realityId: string, name: string) => {
-    actions.restoreReality(realityId);
-    toast(`✦ Reality ${name} restored from Quantum Bin to active continuum!`);
-    fetchStatus();
+    void actions.restoreReality(realityId).then(() => {
+      toast(`✦ Reality ${name} restored from Quantum Bin to active continuum!`);
+    });
   };
 
   const handlePurge = (realityId: string, name: string) => {
-    actions.purgeRealityFromBin(realityId);
-    toast(`Reality ${name} permanently purged from disk.`);
-    fetchStatus();
+    setConfirmPurgeId(null);
+    void actions.purgeRealityFromBin(realityId).then(() => {
+      toast(`Reality ${name} permanently purged from disk.`);
+    });
   };
 
   const handleEmptyBin = () => {
     actions.emptyRealityBin();
     setConfirmEmpty(false);
     toast('Quantum Bin completely emptied.');
-    fetchStatus();
   };
 
   return (
@@ -88,12 +79,12 @@ export const QuantumBinTab: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchStatus}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-slate-300 hover:text-white transition-all cursor-pointer"
+            onClick={handleManualSync}
+            disabled={manualSync}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-slate-300 hover:text-white transition-all cursor-pointer disabled:opacity-60"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Sync Disk</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${manualSync ? 'animate-spin' : ''}`} />
+            <span>Sync Now</span>
           </button>
 
           {binRealities.length > 0 && (
@@ -125,46 +116,79 @@ export const QuantumBinTab: React.FC = () => {
         </div>
       </div>
 
-      {/* CONTINUOUS REALITY DAEMON STATUS CARD */}
-      <div className="p-4 rounded-2xl bg-slate-900/40 border border-cyan-500/20 backdrop-blur-xl">
+      {/* REALITY DAEMON — HONEST LIVE HEALTH */}
+      <div className="p-4 cc-panel">
         <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2 flex-wrap gap-2">
           <div className="flex items-center gap-2 text-cyan-300 font-mono text-xs uppercase tracking-wider">
             <Activity className="w-4 h-4 text-cyan-400 animate-pulse" />
-            <span>Continuously Scanning Reality Daemon (Node.js/TypeScript)</span>
+            <span>Reality Disk Daemon — Live Telemetry</span>
           </div>
-          <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-            Live Daemon Scan Loop Active · 3000ms
+          <span
+            className={`text-[10px] font-mono flex items-center gap-1.5 ${
+              connected ? 'text-emerald-400' : 'text-rose-400'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full inline-block ${
+                connected ? 'bg-emerald-400 animate-ping' : 'bg-rose-400'
+              }`}
+            />
+            {connected ? `Connected · scanning every 3000ms` : 'Offline'}
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs mb-3">
           <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
             <span className="text-[10px] text-slate-400 block">Total Scans Executed</span>
-            <span className="text-sm font-bold text-white">{daemonStatus?.scanCount ?? 0}</span>
+            <span className="text-sm font-bold text-white">{diskSync?.scanCount ?? 0}</span>
           </div>
           <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
             <span className="text-[10px] text-slate-400 block">Active Disk Folders</span>
-            <span className="text-sm font-bold text-cyan-300">{daemonStatus?.activeFolders?.length ?? 0}</span>
+            <span className="text-sm font-bold text-cyan-300">{diskSync?.activeFolders?.length ?? 0}</span>
           </div>
           <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
-            <span className="text-[10px] text-slate-400 block">Quantum Bin Folders</span>
-            <span className="text-sm font-bold text-rose-300">{daemonStatus?.binFolders?.length ?? diskBin.length}</span>
+            <span className="text-[10px] text-slate-400 block">Bin Folders On Disk</span>
+            <span className="text-sm font-bold text-rose-300">{diskSync?.binDetails?.length ?? 0}</span>
           </div>
           <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
             <span className="text-[10px] text-slate-400 block">Daemon Health</span>
-            <span className="text-sm font-bold text-emerald-400 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" /> Nominal
+            <span
+              className={`text-sm font-bold flex items-center gap-1 ${
+                connected ? 'text-emerald-400' : 'text-rose-400'
+              }`}
+            >
+              {connected ? (
+                <>
+                  <ShieldCheck className="w-3.5 h-3.5" /> Nominal
+                </>
+              ) : (
+                <>
+                  <ShieldX className="w-3.5 h-3.5" /> Unreachable
+                </>
+              )}
             </span>
           </div>
         </div>
 
+        {/* Offline banner with an honest fix hint */}
+        {!connected && (
+          <div className="mb-3 p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 font-mono text-[10px] text-rose-200">
+            {diskSync?.lastError ??
+              'The reality daemon is unreachable.'}{' '}
+            Disk mirroring resumes automatically once the server is back — queued operations
+            {(diskSync?.pendingOps ?? 0) > 0 && (
+              <span className="text-amber-300 font-bold"> ({diskSync?.pendingOps}) </span>
+            )}
+            will flush on reconnect.
+          </div>
+        )}
+
         {/* Operations Activity Log */}
-        {daemonStatus?.operationsLog && daemonStatus.operationsLog.length > 0 && (
-          <div className="mt-2 p-2.5 rounded-xl bg-slate-950/60 border border-white/5 font-mono text-[10px] text-slate-400 max-h-24 overflow-y-auto custom-scroll">
+        {connected && diskSync?.operationsLog && diskSync.operationsLog.length > 0 && (
+          <div className="mt-1 p-2.5 rounded-xl bg-slate-950/60 border border-white/5 font-mono text-[10px] text-slate-400 max-h-24 overflow-y-auto custom-scroll">
             <div className="text-[9px] uppercase tracking-wider text-cyan-400/80 mb-1">Daemon Audit Stream:</div>
-            {daemonStatus.operationsLog.slice(0, 5).map((log, idx) => (
-              <div key={idx} className="flex items-center gap-2 truncate py-0.5">
+            {diskSync.operationsLog.map((log, idx) => (
+              <div key={`${log.timestamp}-${idx}`} className="flex items-center gap-2 truncate py-0.5">
                 <span className="text-slate-500">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
                 <span className="text-cyan-300 font-bold">{log.type}:</span>
                 <span className="text-slate-300 truncate">{log.details}</span>
@@ -223,7 +247,9 @@ export const QuantumBinTab: React.FC = () => {
                   </p>
 
                   <div className="p-2 rounded-xl bg-black/40 border border-white/5 font-mono text-[9.5px] text-slate-400 flex items-center justify-between">
-                    <span className="truncate">📁 src/realities/bin/{item.name.replace(/[^a-zA-Z0-9]/g, '')}/</span>
+                    <span className="truncate">
+                      📁 src/realities/bin/{item.folderName ?? item.name.replace(/[^a-zA-Z0-9]/g, '')}/
+                    </span>
                     <span className="text-slate-500 flex items-center gap-1 shrink-0">
                       <Clock className="w-3 h-3" />
                       {new Date(item.deletedAt).toLocaleTimeString()}
@@ -232,23 +258,83 @@ export const QuantumBinTab: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-                  <button
-                    onClick={() => handlePurge(item.id, item.name)}
-                    className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 text-xs font-mono transition-all cursor-pointer"
-                  >
-                    Purge Permanently
-                  </button>
+                  {confirmPurgeId === item.id ? (
+                    <>
+                      <button
+                        onClick={() => handlePurge(item.id, item.name)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer animate-in zoom-in-90"
+                      >
+                        Confirm Purge
+                      </button>
+                      <button
+                        onClick={() => setConfirmPurgeId(null)}
+                        className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-[10px] font-mono"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setConfirmPurgeId(item.id)}
+                        className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 text-xs font-mono transition-all cursor-pointer"
+                      >
+                        Purge Permanently
+                      </button>
 
-                  <button
-                    onClick={() => handleRestore(item.id, item.name)}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs font-mono shadow-[0_0_15px_rgba(16,185,129,0.35)] transition-all cursor-pointer"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>✦ Restore Reality</span>
-                  </button>
+                      <button
+                        onClick={() => handleRestore(item.id, item.name)}
+                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs font-mono shadow-[0_0_15px_rgba(16,185,129,0.35)] transition-all cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>✦ Restore Reality</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ORPHANED DISK FOLDERS — disk truth the state doesn't track */}
+        {orphanFolders.length > 0 && (
+          <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-400/30 space-y-2.5">
+            <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-wider text-amber-300">
+              <HardDriveDownload className="w-3.5 h-3.5" />
+              Unclaimed folders discovered in src/realities/bin/ ({orphanFolders.length})
+            </div>
+            <p className="font-mono text-[9.5px] text-slate-400">
+              These exist on disk but aren't tracked in the multiverse index. Adopt them to enable
+              one-click restore, or delete them permanently.
+            </p>
+            <div className="space-y-2">
+              {orphanFolders.map((f) => (
+                <div
+                  key={f.folderName}
+                  className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-black/30 border border-white/5 font-mono text-[10px]"
+                >
+                  <span className="text-slate-300 truncate">
+                    📁 src/realities/bin/{f.folderName}/
+                    <span className="text-slate-500"> · trashed {new Date(f.trashedAt).toLocaleString()}</span>
+                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => actions.adoptBinFolder(f)}
+                      className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 uppercase tracking-wider cursor-pointer"
+                    >
+                      Adopt
+                    </button>
+                    <button
+                      onClick={() => actions.purgeBinFolder(f.folderName)}
+                      className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border border-white/10 uppercase tracking-wider cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

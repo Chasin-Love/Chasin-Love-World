@@ -15,6 +15,7 @@ export const CppNativeEngineCard: React.FC = () => {
   const [opsPerSec, setOpsPerSec] = useState<number | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [parity, setParity] = useState<number | null>(null);
+  const [parityBackend, setParityBackend] = useState<string | null>(null);
   const [busy, setBusy] = useState<'bench' | 'parity' | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [tier, setTier] = useState<QualityTier>(() => getQualityTier());
@@ -47,6 +48,8 @@ export const CppNativeEngineCard: React.FC = () => {
       setLatencyMs(latency);
       setStatus(cosmosBridge.getStatus());
       toast(`✦ ${res.backend} RK4 benchmark: ${(res.opsPerSec / 1_000_000).toFixed(2)} Mops/sec`);
+    } catch (err) {
+      toast(`⚠ Benchmark failed: ${err instanceof Error ? err.message : String(err)}`, 'warn');
     } finally {
       setBusy(null);
     }
@@ -57,23 +60,48 @@ export const CppNativeEngineCard: React.FC = () => {
     try {
       const res = await cosmosBridge.verifyParity();
       setParity(res.maxDelta);
+      setParityBackend(res.backend);
       const ok = res.maxDelta < 1e-9 || res.backend === 'typescript';
       toast(ok
         ? `✦ Parity verified — max relative Δ ${res.maxDelta.toExponential(1)}`
         : `⚠ Parity drift ${res.maxDelta.toExponential(1)} vs TS reference`);
+    } catch (err) {
+      toast(`⚠ Parity check failed: ${err instanceof Error ? err.message : String(err)}`, 'warn');
     } finally {
       setBusy(null);
     }
   };
 
   const copyCommand = (key: string, text: string) => {
-    navigator.clipboard?.writeText(text);
-    setCopiedKey(key);
-    toast('Command copied to clipboard');
-    setTimeout(() => setCopiedKey(null), 2000);
+    const done = () => {
+      setCopiedKey(key);
+      toast('Command copied to clipboard');
+      setTimeout(() => setCopiedKey(null), 2000);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+      fallbackCopy(text, done);
+    }
   };
 
   const backend = BACKEND_LABEL[status.backend] ?? BACKEND_LABEL.typescript;
+
+  /* execCommand fallback for non-secure contexts (http://LAN, older webviews) */
+  const fallbackCopy = (text: string, done: () => void) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      done();
+    } catch {
+      toast('⚠ Clipboard unavailable — copy the command manually', 'warn');
+    }
+  };
   const commands = {
     desktop: 'npm run desktop:build',
     linux: 'cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j$(nproc)',
@@ -147,14 +175,15 @@ export const CppNativeEngineCard: React.FC = () => {
         </div>
       </div>
 
-      {/* Parity receipt */}
+      {/* Parity receipt — same criterion as the toast: the TS reference tier
+          trivially matches itself, so it always reads as verified */}
       {parity !== null && (
         <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950/70 border border-white/10 font-mono text-[11px]">
-          {parity < 1e-9
+          {(parity < 1e-9 || parityBackend === 'typescript')
             ? <BadgeCheck className="w-4 h-4 text-emerald-400" />
             : <BadgeX className="w-4 h-4 text-amber-400" />}
-          <span className={parity < 1e-9 ? 'text-emerald-300' : 'text-amber-300'}>
-            {parity < 1e-9 ? 'Numerical parity verified' : 'Parity drift detected'} — max relative Δ {parity.toExponential(1)} vs TS reference
+          <span className={(parity < 1e-9 || parityBackend === 'typescript') ? 'text-emerald-300' : 'text-amber-300'}>
+            {(parity < 1e-9 || parityBackend === 'typescript') ? 'Numerical parity verified' : 'Parity drift detected'} — max relative Δ {parity.toExponential(1)} vs TS reference
           </span>
         </div>
       )}

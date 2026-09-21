@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   X, Zap, Globe, Sparkles, Orbit, Trash2, ChevronDown, ChevronRight,
-  Activity, Plus, ShieldCheck, Crosshair, Wind, Compass, Search,
-  Edit2, Palette, Check, Layers, Disc, Sun, Radio, Sliders, ExternalLink,
-  Cpu, Maximize2, RefreshCw, BarChart2, Eye
+  Plus, ShieldCheck, Crosshair, Wind, Compass, Search,
+  Edit2, Palette, Check, Layers, Disc, Sun, Radio, ExternalLink,
+  Cpu, Database
 } from 'lucide-react';
-import { REALITIES, getReality, createNewRealityConfig, RealityConfig, GalaxyData } from '../../realities';
+import { REALITIES, getReality, createNewRealityConfig, RealityConfig } from '../../realities';
 import { actions, useUniverse } from '../../state';
+import type { DiskSyncState } from '../../types';
 import { toast } from '../../ui/toast';
 import { prettyPrint } from '../../ui/format';
 import { CreateRealityModal } from '../realities/CreateRealityModal';
@@ -26,8 +27,18 @@ interface Props {
 
 type Tab = 'dashboard' | 'realities' | 'hierarchy' | 'bin';
 
+/* Per-tab accent color — the whole deck recolors via the --cc CSS variable
+   keyed off the plate's data-accent attribute (see index.css). */
+const TAB_ACCENTS: Record<Tab, string> = {
+  dashboard: '#22d3ee',
+  realities: '#f2c178',
+  hierarchy: '#a78bfa',
+  bin: '#fb7185',
+};
+
 /* ------------------------------------------------------------------ */
-/* 1. Live 3D Holographic Backdrop                                    */
+/* 1. Live 3D Holographic Backdrop — perspective starfield + rotating  */
+/*    cosmic-web spheres, mouse parallax (2D canvas, 3D projection)    */
 /* ------------------------------------------------------------------ */
 function CoreBackdrop() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -47,34 +58,75 @@ function CoreBackdrop() {
     };
     window.addEventListener('resize', onResize);
 
-    interface Star {
-      x: number;
-      y: number;
-      z: number;
-      r: number;
-      tw: number;
-      color: string;
-    }
-    interface Shooter {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      life: number;
-      max: number;
-      color: string;
-    }
+    /* --- mouse parallax --- */
+    const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+    const onMouse = (e: MouseEvent) => {
+      mouse.tx = (e.clientX / w - 0.5) * 2;
+      mouse.ty = (e.clientY / h - 0.5) * 2;
+    };
+    window.addEventListener('mousemove', onMouse);
 
+    /* --- 3D helpers --- */
+    const FOV = 620;
+    const project = (x: number, y: number, z: number) => {
+      const scale = FOV / Math.max(1, FOV + z);
+      return {
+        sx: w / 2 + mouse.x * 40 + x * scale,
+        sy: h / 2 + mouse.y * 40 + y * scale,
+        scale,
+      };
+    };
+
+    /* --- perspective starfield flying past the camera --- */
+    interface Star3 { x: number; y: number; z: number; r: number; color: string }
     const starColors = ['#00f5d4', '#38bdf8', '#8b5cf6', '#ec4899', '#ffffff', '#fbbf24'];
-    const stars: Star[] = Array.from({ length: 220 }, () => ({
-      x: Math.random() * w,
-      y: Math.random() * h,
-      z: 0.2 + Math.random() * 0.8,
-      r: 0.5 + Math.random() * 1.5,
-      tw: Math.random() * Math.PI * 2,
+    const STAR_COUNT = 460;
+    const STARS: Star3[] = Array.from({ length: STAR_COUNT }, () => ({
+      x: (Math.random() - 0.5) * 2400,
+      y: (Math.random() - 0.5) * 1600,
+      z: Math.random() * 1400,
+      r: 0.6 + Math.random() * 1.7,
       color: starColors[Math.floor(Math.random() * starColors.length)],
     }));
 
+    /* --- rotating wireframe cosmic-web spheres --- */
+    interface WebSphere {
+      cx: number; cy: number; radius: number; spin: number; tilt: number;
+      hue: string; points: { x: number; y: number; z: number }[]; edges: [number, number][];
+    }
+    const makeSphere = (cfg: Omit<WebSphere, 'points' | 'edges'>, count: number): WebSphere => {
+      /* fibonacci sphere distribution */
+      const pts = Array.from({ length: count }, (_, i) => {
+        const phi = Math.acos(1 - (2 * (i + 0.5)) / count);
+        const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+        return {
+          x: Math.sin(phi) * Math.cos(theta),
+          y: Math.cos(phi),
+          z: Math.sin(phi) * Math.sin(theta),
+        };
+      });
+      /* connect each point to its 2 nearest neighbors */
+      const edges: [number, number][] = [];
+      pts.forEach((p, i) => {
+        const dists = pts
+          .map((q, j) => ({ j, d: (p.x - q.x) ** 2 + (p.y - q.y) ** 2 + (p.z - q.z) ** 2 }))
+          .filter((e) => e.j !== i)
+          .sort((a, b) => a.d - b.d)
+          .slice(0, 2);
+        dists.forEach((e) => {
+          if (e.j > i) edges.push([i, e.j]);
+        });
+      });
+      return { ...cfg, points: pts, edges };
+    };
+    const spheres: WebSphere[] = [
+      makeSphere({ cx: 0.16, cy: 0.24, radius: 300, spin: 0.05, tilt: 0.42, hue: '0, 245, 212' }, 70),
+      makeSphere({ cx: 0.85, cy: 0.72, radius: 380, spin: -0.035, tilt: -0.3, hue: '139, 92, 246' }, 88),
+    ];
+
+    interface Shooter {
+      x: number; y: number; vx: number; vy: number; life: number; max: number; color: string;
+    }
     const shooters: Shooter[] = [];
     let t = 0;
     let last = performance.now();
@@ -90,6 +142,9 @@ function CoreBackdrop() {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       t += dt;
+      /* ease mouse toward target for buttery parallax */
+      mouse.x += (mouse.tx - mouse.x) * Math.min(1, dt * 2.5);
+      mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 2.5);
       ctx.clearRect(0, 0, w, h);
 
       /* Chromatic Nebulae Drift */
@@ -98,48 +153,86 @@ function CoreBackdrop() {
         const cy = (n.y + Math.cos(t * n.dy * 8 + i * 2) * 0.06) * h;
         const rad = n.r * Math.min(w, h);
         const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-        g.addColorStop(0, `${n.hue}${0.16 + 0.05 * Math.sin(t * 0.8 + i)})`);
+        g.addColorStop(0, `${n.hue}${0.13 + 0.05 * Math.sin(t * 0.8 + i)})`);
         g.addColorStop(1, `${n.hue}0)`);
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, w, h);
       });
 
-      /* Holographic Grid Scanlines */
-      ctx.save();
-      ctx.strokeStyle = 'rgba(6,182,212,0.035)';
-      ctx.lineWidth = 1;
-      const gridSize = 60;
-      const shiftX = (t * 6) % gridSize;
-      const shiftY = (t * 3) % gridSize;
-      for (let x = shiftX; x < w; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, h);
-        ctx.stroke();
-      }
-      for (let y = shiftY; y < h; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      /* 3D Parallax Starfield */
-      stars.forEach((s) => {
-        s.x += s.z * 6 * dt;
-        if (s.x > w + 6) s.x = -6;
-        const a = 0.3 + 0.6 * (0.5 + 0.5 * Math.sin(t * 1.8 + s.tw));
+      /* 3D Perspective Starfield — stars fly past the camera */
+      STARS.forEach((s) => {
+        s.z -= (90 + s.r * 40) * dt;
+        if (s.z < 8) {
+          s.z = 1400;
+          s.x = (Math.random() - 0.5) * 2400;
+          s.y = (Math.random() - 0.5) * 1600;
+        }
+        const { sx, sy, scale } = project(s.x, s.y, s.z);
+        if (sx < -8 || sx > w + 8 || sy < -8 || sy > h + 8) return;
+        const depth = 1 - s.z / 1400;
+        ctx.globalAlpha = Math.min(1, 0.12 + depth * 0.75);
         ctx.fillStyle = s.color;
-        ctx.globalAlpha = a * s.z;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.arc(sx, sy, s.r * scale, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1;
+        /* warp streak on near stars */
+        if (depth > 0.82) {
+          ctx.globalAlpha = (depth - 0.82) * 2.2;
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = s.r * scale * 0.7;
+          const tail = project(s.x, s.y, s.z + 46);
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(tail.sx, tail.sy);
+          ctx.stroke();
+        }
+      });
+      ctx.globalAlpha = 1;
+
+      /* Rotating Wireframe Cosmic-Web Spheres */
+      spheres.forEach((sp, si) => {
+        const cx = sp.cx * w + mouse.x * (18 + si * 14);
+        const cy = sp.cy * h + mouse.y * (18 + si * 14);
+        const cosT = Math.cos(sp.tilt);
+        const sinT = Math.sin(sp.tilt);
+        const screen: { sx: number; sy: number; z: number }[] = [];
+
+        sp.points.forEach((p) => {
+          /* spin around Y */
+          const a = t * sp.spin + si * 2;
+          const rx = p.x * Math.cos(a) - p.z * Math.sin(a);
+          const rz = p.x * Math.sin(a) + p.z * Math.cos(a);
+          /* tilt around X */
+          const ry = p.y * cosT - rz * sinT;
+          const rz2 = p.y * sinT + rz * cosT;
+          const s = project(cx + rx * sp.radius, cy + ry * sp.radius, rz2 * sp.radius * 0.5);
+          screen.push({ sx: s.sx, sy: s.sy, z: rz2 });
+        });
+
+        /* filaments */
+        ctx.lineWidth = 1;
+        sp.edges.forEach(([i, j]) => {
+          const a = screen[i];
+          const b = screen[j];
+          const depth = 0.5 + ((a.z + b.z) / 2) * 0.5;
+          ctx.strokeStyle = `rgba(${sp.hue},${(0.26 * (1 - depth)).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.moveTo(a.sx, a.sy);
+          ctx.lineTo(b.sx, b.sy);
+          ctx.stroke();
+        });
+        /* nodes */
+        screen.forEach((p) => {
+          const depth = 0.5 + p.z * 0.5;
+          ctx.fillStyle = `rgba(${sp.hue},${(0.85 * (1 - depth) + 0.08).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(p.sx, p.sy, Math.max(0.6, 2.4 * (1 - depth)), 0, Math.PI * 2);
+          ctx.fill();
+        });
       });
 
       /* Tachyon Particle Beams */
-      if (Math.random() < dt * 0.75 && shooters.length < 3) {
+      if (Math.random() < dt * 0.65 && shooters.length < 3) {
         const fromLeft = Math.random() > 0.5;
         const colors = ['#00f5d4', '#38bdf8', '#c084fc', '#f472b6'];
         shooters.push({
@@ -180,6 +273,7 @@ function CoreBackdrop() {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('mousemove', onMouse);
     };
   }, []);
 
@@ -199,6 +293,8 @@ function HolographicMultiverseRadar({
   onSelect: (id: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /* live screen positions of the plotted reality nodes — powers click-to-warp */
+  const nodePositionsRef = useRef<{ id: string; x: number; y: number }[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -217,6 +313,7 @@ function HolographicMultiverseRadar({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
+      const nodes: { id: string; x: number; y: number }[] = [];
 
       // Radar Concentric Rings & Range Finders
       ctx.strokeStyle = 'rgba(6, 182, 212, 0.15)';
@@ -298,8 +395,12 @@ function HolographicMultiverseRadar({
         ctx.fillStyle = isActive ? '#00f5d4' : '#cbd5e1';
         ctx.font = 'bold 16px monospace';
         ctx.fillText(r.name.slice(0, 10), rx + 12, ry + 4);
+
+        // record position for click-to-warp hit-testing
+        nodes.push({ id: r.id, x: rx, y: ry });
       });
 
+      nodePositionsRef.current = nodes;
       raf = requestAnimationFrame(render);
     };
 
@@ -307,83 +408,102 @@ function HolographicMultiverseRadar({
     return () => cancelAnimationFrame(raf);
   }, [realities, activeId]);
 
+  const handleRadarClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const cy = (e.clientY - rect.top) * (canvas.height / rect.height);
+    let best: { id: string; d: number } | null = null;
+    for (const n of nodePositionsRef.current) {
+      const d = Math.hypot(n.x - cx, n.y - cy);
+      if (d < 40 && (best === null || d < best.d)) best = { id: n.id, d };
+    }
+    if (best !== null) onSelect(best.id);
+  };
+
+  const handleRadarMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const cy = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const hover = nodePositionsRef.current.some((n) => Math.hypot(n.x - cx, n.y - cy) < 40);
+    canvas.style.cursor = hover ? 'pointer' : 'default';
+  };
+
   return (
-    <div className="relative w-full aspect-square max-w-[260px] mx-auto flex items-center justify-center p-2 rounded-2xl bg-slate-950/60 border border-cyan-500/25 shadow-[inset_0_0_20px_rgba(6,182,212,0.15)]">
-      <canvas ref={canvasRef} className="w-full h-full object-contain" />
+    <div className="relative w-full aspect-square max-w-[260px] mx-auto flex items-center justify-center p-2 rounded-2xl cc-panel">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full object-contain"
+        onClick={handleRadarClick}
+        onMouseMove={handleRadarMove}
+      />
       <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-400/30 text-[9px] font-mono text-cyan-300">
         <Radio className="w-2.5 h-2.5 animate-pulse text-cyan-400" />
-        <span>RADAR 3D LIVE</span>
+        <span>RADAR 3D LIVE · CLICK TO WARP</span>
       </div>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* 3. Circular Circular Telemetry Gauge                               */
+/* 3. Multiverse Vitals — REAL live counts + disk-mirror health        */
 /* ------------------------------------------------------------------ */
-function CircularTelemetryGauge({
+function VitalTile({
   label,
   value,
   color,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   color: string;
 }) {
-  const [val, setVal] = useState(value);
-  useEffect(() => {
-    const id = setInterval(() => {
-      setVal((v) => {
-        const next = v + (Math.random() - 0.5) * 0.08;
-        return Math.max(0.65, Math.min(0.99, next));
-      });
-    }, 1800);
-    return () => clearInterval(id);
-  }, []);
-
-  const percentage = Math.round(val * 100);
-  const radius = 24;
-  const circ = 2 * Math.PI * radius;
-  const strokeDashoffset = circ - (percentage / 100) * circ;
-
   return (
-    <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-900/50 border border-white/10 backdrop-blur-md">
-      <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
-        <svg className="w-12 h-12 -rotate-90">
-          <circle
-            cx="24"
-            cy="24"
-            r={radius}
-            stroke="currentColor"
-            strokeWidth="3.5"
-            fill="transparent"
-            className="text-white/10"
-          />
-          <circle
-            cx="24"
-            cy="24"
-            r={radius}
-            stroke={color}
-            strokeWidth="3.5"
-            strokeDasharray={circ}
-            strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
-            fill="transparent"
-            className="transition-all duration-1000 ease-out"
-            style={{ filter: `drop-shadow(0 0 6px ${color}88)` }}
-          />
-        </svg>
-        <span className="absolute font-mono text-[10px] font-bold text-white tabular-nums">
-          {percentage}%
-        </span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <span className="block font-mono text-[9px] uppercase tracking-wider text-slate-400 truncate">
-          {label}
-        </span>
-        <span className="inline-block text-[11px] font-semibold font-mono" style={{ color }}>
-          NOMINAL
-        </span>
+    <div className="p-2.5 rounded-xl bg-black/25 border border-white/8 flex flex-col items-center gap-0.5">
+      <span className="font-display text-lg font-bold leading-none tabular-nums" style={{ color }}>
+        {value}
+      </span>
+      <span className="font-mono text-[8.5px] uppercase tracking-[0.18em] text-slate-400">{label}</span>
+    </div>
+  );
+}
+
+function DiskSyncStatusTile({ diskSync }: { diskSync?: DiskSyncState }) {
+  const connected = diskSync?.connected ?? false;
+  const pending = diskSync?.pendingOps ?? 0;
+  return (
+    <div
+      className={`p-2.5 rounded-xl border flex items-center gap-2.5 ${
+        connected
+          ? 'bg-emerald-500/8 border-emerald-400/30'
+          : 'bg-rose-500/10 border-rose-400/40'
+      }`}
+      title={connected ? 'Reality daemon synchronized' : diskSync?.lastError ?? 'Disk mirror offline'}
+    >
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        {connected && (
+          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+        )}
+        <span
+          className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+            connected ? 'bg-emerald-400' : 'bg-rose-400'
+          }`}
+        />
+      </span>
+      <div className="min-w-0 flex-1 font-mono text-[9.5px] leading-tight">
+        <div className={connected ? 'text-emerald-300 font-bold' : 'text-rose-300 font-bold'}>
+          {connected ? 'DISK MIRROR · LIVE' : 'DISK MIRROR · OFFLINE'}
+          {connected && pending > 0 && (
+            <span className="text-amber-300"> · {pending} op{pending > 1 ? 's' : ''} retrying</span>
+          )}
+        </div>
+        <div className="text-slate-500 truncate">
+          {connected
+            ? `scan #${diskSync?.scanCount ?? 0} · ${diskSync?.activeFolders?.length ?? 0} folders on disk`
+            : 'run npm run dev for the reality daemon'}
+        </div>
       </div>
     </div>
   );
@@ -412,13 +532,26 @@ function BentoRealityCard({
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  /* keep the rename draft in sync if the name changes elsewhere
+     (e.g. the advanced panel inside this same card) */
+  useEffect(() => {
+    setEditName(reality.name);
+  }, [reality.name]);
+
+  /* confirm-erase timer — cleared on unmount so it can't fire stale */
+  const confirmTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (confirmTimerRef.current !== null) clearTimeout(confirmTimerRef.current);
+  }, []);
+
   const galaxies = reality.galaxies || [];
   const clusters = reality.clusters || [];
   const worldsCount = reality.bodies?.length ?? 0;
 
   const handleSaveName = () => {
     if (editName.trim() && editName.trim() !== reality.name) {
-      actions.updateRealityMeta(reality.id, { name: editName.trim() });
+      /* renameReality also mirrors the disk folder rename via the daemon */
+      actions.renameReality(reality.id, editName.trim());
       toast(`Renamed reality to "${editName.trim()}"`);
     }
     setIsEditingName(false);
@@ -603,10 +736,11 @@ function BentoRealityCard({
       <div className="px-4 py-3 bg-black/30 border-t border-white/8 flex items-center justify-between gap-2">
         <button
           onClick={onWarp}
+          disabled={active}
           className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-mono uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-1.5 ${
             active
-              ? 'bg-cyan-500/30 text-cyan-100 border border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]'
-              : 'bg-white/6 hover:bg-cyan-500/20 text-slate-200 border border-white/10 hover:border-cyan-400/40'
+              ? 'bg-cyan-500/20 text-cyan-200/80 border border-cyan-400/40 cursor-default'
+              : 'bg-white/6 hover:bg-cyan-500/20 text-slate-200 border border-white/10 hover:border-cyan-400/40 cursor-pointer'
           }`}
         >
           <Zap className="w-3.5 h-3.5" />
@@ -628,7 +762,8 @@ function BentoRealityCard({
             <button
               onClick={() => {
                 setConfirmDel(true);
-                setTimeout(() => setConfirmDel(false), 2800);
+                if (confirmTimerRef.current !== null) clearTimeout(confirmTimerRef.current);
+                confirmTimerRef.current = window.setTimeout(() => setConfirmDel(false), 2800);
               }}
               className="p-2 rounded-xl text-rose-300 hover:text-rose-100 hover:bg-rose-500/20 border border-transparent hover:border-rose-400/40 transition-all"
               title="Collapse this reality"
@@ -823,13 +958,15 @@ export const CoreConsole: React.FC<Props> = ({
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        /* while the forge modal is open, Escape closes only the modal */
+        if (showCreate) return;
         e.stopImmediatePropagation();
         onClose();
       }
     };
     window.addEventListener('keydown', h, true);
     return () => window.removeEventListener('keydown', h, true);
-  }, [onClose]);
+  }, [onClose, showCreate]);
 
   return (
     <div
@@ -848,9 +985,10 @@ export const CoreConsole: React.FC<Props> = ({
         }}
       />
 
-      {/* THE 3D HOLOGRAPHIC COMMAND DECK PLATE */}
+      {/* THE 3D HOLOGRAPHIC COMMAND DECK PLATE — accent recolors with the active tab */}
       <div
-        className="core-plate relative w-full max-w-[1440px] h-[92vh] max-h-[920px] rounded-[28px] border border-cyan-400/35 bg-slate-950/70 backdrop-blur-3xl shadow-[0_35px_100px_rgba(0,0,0,0.85),0_0_70px_rgba(6,182,212,0.22),inset_0_1px_1px_rgba(255,255,255,0.25)] text-slate-100 flex flex-col overflow-hidden"
+        className="core-plate relative w-full max-w-[1440px] h-[92vh] max-h-[920px] rounded-[28px] text-slate-100 flex flex-col overflow-hidden"
+        data-accent={tab}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Specular Edge Highlighting */}
@@ -874,6 +1012,19 @@ export const CoreConsole: React.FC<Props> = ({
                 </h2>
                 <span className="text-[9.5px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
                   3D Holographic Singularity Origin (0,0,0)
+                </span>
+                <span
+                  className={`flex items-center gap-1.5 text-[9.5px] font-mono px-2 py-0.5 rounded-full border ${
+                    (state.diskSync?.connected ?? false)
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/40'
+                      : 'bg-rose-500/15 text-rose-300 border-rose-400/40'
+                  }`}
+                  title={state.diskSync?.lastError ?? 'Reality daemon telemetry'}
+                >
+                  <Database className="w-2.5 h-2.5" />
+                  {(state.diskSync?.connected ?? false)
+                    ? `DISK MIRROR LIVE${(state.diskSync?.pendingOps ?? 0) > 0 ? ` · ${(state.diskSync?.pendingOps ?? 0)} RETRYING` : ''}`
+                    : 'DISK MIRROR OFFLINE'}
                 </span>
               </div>
               <p className="font-mono text-[9.5px] tracking-[0.2em] uppercase text-cyan-300/80 truncate">
@@ -914,24 +1065,21 @@ export const CoreConsole: React.FC<Props> = ({
               {
                 id: 'bin' as Tab,
                 label: `Quantum Bin (${(state.binRealities || []).length})`,
-                icon: <Trash2 className="w-3.5 h-3.5 text-rose-400" />,
+                icon: <Trash2 className="w-3.5 h-3.5" />,
                 badge: (state.binRealities || []).length > 0 ? (state.binRealities || []).length : undefined,
               },
             ]).map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-mono uppercase tracking-wider border transition-all backdrop-blur-md cursor-pointer ${
-                  tab === t.id
-                    ? t.id === 'bin'
-                      ? 'bg-rose-500/25 text-white border-rose-400/60 shadow-[0_0_12px_rgba(244,63,94,0.35)]'
-                      : 'bg-cyan-500/25 text-white border-cyan-400/60 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
-                    : 'bg-white/4 text-slate-300 border-white/10 hover:border-cyan-400/30 hover:text-white'
+                className={`cc-tab flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-mono uppercase tracking-wider border transition-all backdrop-blur-md cursor-pointer ${
+                  tab === t.id ? 'cc-tab-active text-white' : 'bg-white/4 text-slate-300 border-white/10 hover:text-white'
                 }`}
+                style={tab === t.id ? { ['--cc' as string]: TAB_ACCENTS[t.id] } : undefined}
               >
                 {t.icon} <span>{t.label}</span>
                 {t.badge !== undefined && (
-                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold">
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold">
                     {t.badge}
                   </span>
                 )}
@@ -965,10 +1113,11 @@ export const CoreConsole: React.FC<Props> = ({
                 { id: 'all', label: 'All' },
                 { id: 'anchored', label: 'Anchor' },
                 { id: 'custom', label: 'Custom' },
+                { id: 'dense', label: 'Dense' },
               ].map((f) => (
                 <button
                   key={f.id}
-                  onClick={() => setFilterType(f.id as any)}
+                  onClick={() => setFilterType(f.id as typeof filterType)}
                   className={`px-2 py-1 rounded-lg border transition-all ${
                     filterType === f.id
                       ? 'bg-cyan-500/20 text-cyan-200 border-cyan-400/50'
@@ -1005,18 +1154,19 @@ export const CoreConsole: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {/* Singularity Telemetry Gauges */}
-                <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-xl space-y-2.5">
-                  <span className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-cyan-300 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                    Singularity Vitals — Live
+                {/* Multiverse Vitals — REAL live telemetry */}
+                <div className="p-4 cc-panel space-y-2.5">
+                  <span className="cc-panel-title flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Multiverse Vitals — Live
                   </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <CircularTelemetryGauge label="Quantum Flux" value={0.88} color="#00f5d4" />
-                    <CircularTelemetryGauge label="Spacetime Harmonic" value={0.94} color="#8b5cf6" />
-                    <CircularTelemetryGauge label="Bubble Integrity" value={0.91} color="#38bdf8" />
-                    <CircularTelemetryGauge label="Barrier Strength" value={0.96} color="#ec4899" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <VitalTile label="Realities" value={realities.length} color="#67e8f9" />
+                    <VitalTile label="Worlds" value={totalWorlds} color="#fbbf24" />
+                    <VitalTile label="Galaxies" value={totalGalaxies} color="#a78bfa" />
+                    <VitalTile label="Clusters" value={totalClusters} color="#f472b6" />
                   </div>
+                  <DiskSyncStatusTile diskSync={state.diskSync} />
                 </div>
 
                 {/* Quick Action Matrix */}

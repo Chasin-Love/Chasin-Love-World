@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { GalaxyClusterData, CosmicLineage } from '../../realities';
+import { actions, useUniverse } from '../../state';
+import { toast } from '../../ui/toast';
 import {
   Globe, Sparkles, Orbit, Layers, ArrowRight, Compass,
   ChevronRight, Disc, Activity, Eye, Zap, Shield, Sun, CircleDot, Plus
@@ -29,7 +31,10 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
 }) => {
   const [activeStep, setActiveStep] = useState<number>(0);
   const [createdItems, setCreatedItems] = useState<Record<string, string[]>>({});
-  const lineage = lineageOverride ?? cluster!.lineage;
+  const universeState = useUniverse();
+  const lineage = lineageOverride ?? cluster?.lineage;
+  if (!lineage) return null; /* crash guard: modal needs a cluster or an override */
+  const realityId = cluster?.realityId ?? lineage.reality.id;
 
   const steps = [
     {
@@ -227,13 +232,38 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
 
   const current = steps[activeStep];
 
+  /* only these two stages have real creation engines behind them today —
+     the other nine are honestly disabled instead of faking creations */
+  const canCreateHere = current?.id === 'cluster' || current?.id === 'system';
+
   const handleCreateMore = (stepId: string) => {
     const num = (createdItems[stepId]?.length || 0) + 1;
-    const newItemName = `${current.name} Branch #${num}`;
-    setCreatedItems((prev) => ({
-      ...prev,
-      [stepId]: [...(prev[stepId] || []), newItemName],
-    }));
+
+    /* "+ Create Member Galaxy" — a REAL roster entry the engine renders as a
+       new orbit ring around the reality bubble */
+    if (stepId === 'cluster' && cluster) {
+      const name = `${realityName.split(' ')[0]} Explorer Galaxy ${num}`;
+      actions.addGalaxies(realityId, 1, { names: [name] });
+      setCreatedItems((prev) => ({ ...prev, [stepId]: [...(prev[stepId] || []), name] }));
+      toast(`✦ Galaxy "${name}" materialized into the reality roster`);
+      return;
+    }
+
+    /* "+ Create Celestial Planet" — a REAL world around the active anchor
+       star (lineage explored must belong to the anchored reality) */
+    if (stepId === 'system') {
+      if (lineage.reality.id !== universeState.activeRealityId) {
+        toast('Warp to this reality first — new worlds condense around its anchored star', 'warn');
+        return;
+      }
+      const names = ['Aurelia', 'Boreas', 'Cyra', 'Daedalus', 'Eos'];
+      const cycle = Math.ceil(num / names.length);
+      const name = cycle > 1 ? `${names[(num - 1) % names.length]} ${cycle}` : names[(num - 1) % names.length];
+      actions.addBody(name, 'planet', 'idea');
+      setCreatedItems((prev) => ({ ...prev, [stepId]: [...(prev[stepId] || []), name] }));
+      toast(`✦ Planet "${name}" condensed around the anchor star`);
+      return;
+    }
   };
 
   return (
@@ -345,11 +375,23 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
                 {/* Controlled "+ Create More" Expansion Control */}
                 <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
                   <div className="text-xs text-slate-300">
-                    Custom Structures: <span className="font-mono font-bold text-cyan-300">{createdItems[current.id]?.length || 0}</span>
+                    {canCreateHere ? (
+                      <>
+                        Custom Structures: <span className="font-mono font-bold text-cyan-300">{createdItems[current.id]?.length || 0}</span>
+                      </>
+                    ) : (
+                      <span className="text-slate-500 font-mono text-[10px]">Observation stage — creation engine ships in a future wave</span>
+                    )}
                   </div>
                   <button
                     onClick={() => handleCreateMore(current.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-400/40 text-cyan-200 hover:text-white font-mono text-xs font-semibold transition-all backdrop-blur-md cursor-pointer"
+                    disabled={!canCreateHere}
+                    title={canCreateHere ? current.createLabel : 'Galaxy and planet creation are live; deeper stages need engine support that is on the roadmap'}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-mono text-xs font-semibold transition-all backdrop-blur-md ${
+                      canCreateHere
+                        ? 'bg-cyan-500/20 hover:bg-cyan-500/35 border-cyan-400/40 text-cyan-200 hover:text-white cursor-pointer'
+                        : 'bg-white/[0.03] border-white/10 text-slate-600 cursor-not-allowed'
+                    }`}
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>{current.createLabel}</span>
