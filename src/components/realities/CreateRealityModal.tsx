@@ -259,6 +259,14 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
             </div>
           </div>
 
+          {/* Live forge manifest — the counts below are GUARANTEED: the roster
+              is generated exactly once from these numbers and frozen */}
+          <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/[0.07] px-3 py-2.5 font-mono text-[10px] leading-relaxed text-cyan-200/90">
+            <span className="text-cyan-300 uppercase tracking-[0.18em]">Forge manifest · </span>
+            {galaxyCount} galaxy{galaxyCount === 1 ? '' : 'ies'} · {galaxyCount} stellar system{galaxyCount === 1 ? '' : 's'} (one per galaxy) ·{' '}
+            {planetsCount} world{planetsCount === 1 ? '' : 's'} in the home system · 1 anchor star · 1 isolated black hole vault
+          </div>
+
           {/* Lore Description */}
           <div>
             <label className="block text-[11px] font-mono uppercase text-cyan-300 mb-1">Cosmological Lore</label>

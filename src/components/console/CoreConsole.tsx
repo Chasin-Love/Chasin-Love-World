@@ -1027,7 +1027,13 @@ export const CoreConsole: React.FC<Props> = ({
   return (
     <MotionConfig reducedMotion="user">
     <div
-      className="fixed inset-0 z-100 overlay-in bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 lg:p-6 select-none"
+      className="fixed inset-0 z-100 overlay-in flex items-center justify-center p-2 sm:p-4 lg:p-6 select-none"
+      style={{
+        /* the live 3D universe stays visible behind the deck — the glass
+           reads as luxury because the cosmos glows through it */
+        background: 'linear-gradient(160deg, rgba(4,6,12,0.55) 0%, rgba(4,6,12,0.35) 45%, rgba(4,6,12,0.6) 100%)',
+        backdropFilter: 'blur(3px) saturate(1.15)',
+      }}
       onClick={onClose}
     >
       {/* 3D Holographic Backdrop */}
@@ -1067,9 +1073,6 @@ export const CoreConsole: React.FC<Props> = ({
                 <h2 className="cc-display cc-glow-title">
                   MULTIVERSE CORE COMMAND DECK
                 </h2>
-                <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
-                  3D Holographic Singularity Origin (0,0,0)
-                </span>
                 <span
                   className={`flex items-center gap-1.5 text-[9px] font-mono px-2 py-0.5 rounded-full border ${
                     (state.diskSync?.connected ?? false)
@@ -1293,19 +1296,21 @@ export const CoreConsole: React.FC<Props> = ({
                 </div>
               </motion.div>
 
-              {/* QUICK PODS — 4-col, lands directly under the radar */}
+              {/* QUICK PODS — 4-col, lands directly under the radar.
+                  Camera + Kamui pods dismiss the deck FIRST — their 3D effects
+                  play on the universe and must not fire behind the glass. */}
               <motion.div variants={rise} className="lg:col-span-4 cc-panel p-4">
                 <span className="cc-panel-title block mb-2">Singularity Quick Pods</span>
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={onZoomToCore}
+                    onClick={() => { onClose(); onZoomToCore(); }}
                     style={{ ['--btn' as string]: '34 211 238' }}
                     className="cc-btn-glass p-2.5 rounded-xl text-cyan-100 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Crosshair className="w-3.5 h-3.5" /> Frame Core
                   </button>
                   <button
-                    onClick={onTriggerKamui}
+                    onClick={() => { onClose(); onTriggerKamui(); }}
                     style={{ ['--btn' as string]: '251 113 133' }}
                     className="cc-btn-glass p-2.5 rounded-xl text-rose-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
                   >
