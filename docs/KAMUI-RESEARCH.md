@@ -5,6 +5,10 @@
 > body awakens, everything around it bends and swirls inward, nearby stars lose their
 > structure and spiral toward the core, and at the end of the swirl reality tears open
 > into a portal (dimension A → dimension B).
+>
+> **See also:** [`KAMUI-VISUAL-STORYBOARD.md`](KAMUI-VISUAL-STORYBOARD.md) — the visual/animation
+> spec built on this research, with reference images, Blender keyframes, and a live HTML mockup
+> in [`kamui-visuals/`](kamui-visuals/).
 
 ---
 
