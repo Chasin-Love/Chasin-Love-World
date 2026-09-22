@@ -15,6 +15,7 @@ import type {
   EfsScrubReport,
   FileVersion,
   Meaning,
+  RealityBucket,
   UniverseState,
   VaultSecrets,
   VaultFile,
@@ -85,9 +86,59 @@ const listeners = new Set<() => void>();
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let quotaWarnedAt = 0;
 
+/* --------------------- reality containers (buckets) ---------------------- */
+
+function emptyBucket(): RealityBucket {
+  return {
+    bodies: [],
+    entries: [],
+    connections: [],
+    vault: [],
+    vaultTrash: [],
+    efs: createVfs(),
+  };
+}
+
+/** Lazy container materialization: a bucket for a reality with no stored
+    content yet is seeded from its config's bodies/entries (the world cast it
+    was forged with) and gets a FRESH EMPTY vault — realities are isolated by
+    construction and new ones start with an empty black hole. */
+function ensureBucket(realityId: string): RealityBucket {
+  const id = realityId || 'sol-prime';
+  if (!state.realities) state.realities = {};
+  if (!state.realities[id]) {
+    const cfg = REALITIES.find((r) => r.id === id) ?? state.customRealities?.find((r: any) => r.id === id);
+    state.realities[id] = {
+      bodies: cfg ? cfg.bodies.map((b: CosmicBody) => ({ ...b })) : [],
+      entries: cfg ? (cfg.entries ?? []).map((e: DiaryEntry) => ({ ...e })) : [],
+      connections: [],
+      vault: [],
+      vaultTrash: [],
+      efs: createVfs(),
+    };
+  }
+  return state.realities[id];
+}
+
+/** The active reality's container — every action writes here. */
+function bucket(): RealityBucket {
+  return ensureBucket(state.activeRealityId || 'sol-prime');
+}
+
 function createSnapshot(s: UniverseState): UniverseState {
+  const active = s.realities?.[s.activeRealityId || 'sol-prime'] ?? emptyBucket();
   return {
     ...s,
+    /* derived views of the active reality's container — the whole app reads
+       these and therefore only ever sees the active reality's world */
+    bodies: [...active.bodies],
+    entries: [...active.entries],
+    connections: [...active.connections],
+    vault: [...active.vault],
+    vaultTrash: [...active.vaultTrash],
+    efs: active.efs
+      ? { ...active.efs, nodes: { ...active.efs.nodes }, shadows: [...active.efs.shadows], super: { ...active.efs.super } }
+      : createVfs(),
     customRealityDescriptions: s.customRealityDescriptions
       ? { ...s.customRealityDescriptions }
       : {},
@@ -102,14 +153,6 @@ function createSnapshot(s: UniverseState): UniverseState {
       : {},
     realityFolders: { ...(s.realityFolders ?? {}) },
     diskSync: s.diskSync ?? EMPTY_DISK_SYNC,
-    bodies: [...s.bodies],
-    entries: [...s.entries],
-    connections: [...s.connections],
-    vault: [...s.vault],
-    efs: s.efs
-      ? { ...s.efs, nodes: { ...s.efs.nodes }, shadows: [...s.efs.shadows], super: { ...s.efs.super } }
-      : createVfs(),
-    vaultTrash: [...s.vaultTrash],
     vaultUsers: [...s.vaultUsers],
     audit: [...s.audit],
   };
@@ -217,7 +260,49 @@ function loadState(): UniverseState {
             e.mood = undefined;
           });
         }
-        parsed.version = 3;
+
+        /* v4 — REALITY CONTAINERS: legacy flat fields (bodies/entries/
+           connections/vault/efs/vaultTrash in one bucket) migrate verbatim
+           into the Sol Prime container. Everything the user ever made belongs
+           to their home reality; new realities start fresh and isolated. */
+        if (!parsed.realities || typeof parsed.realities !== 'object') {
+          parsed.realities = {
+            [parsed.activeRealityId || 'sol-prime']: {
+              bodies: parsed.bodies ?? [],
+              entries: parsed.entries ?? [],
+              connections: parsed.connections ?? [],
+              vault: parsed.vault ?? [],
+              vaultTrash: parsed.vaultTrash ?? [],
+              efs: parsed.efs ?? createVfs(),
+            },
+          };
+        } else {
+          /* repair pass: every reality needs a complete container */
+          for (const [rid, b] of Object.entries(parsed.realities)) {
+            if (!b || typeof b !== 'object') {
+              parsed.realities[rid] = emptyBucket();
+              continue;
+            }
+            if (!Array.isArray(b.bodies)) b.bodies = [];
+            if (!Array.isArray(b.entries)) b.entries = [];
+            if (!Array.isArray(b.connections)) b.connections = [];
+            if (!Array.isArray(b.vault)) b.vault = [];
+            if (!Array.isArray(b.vaultTrash)) b.vaultTrash = [];
+            if (!b.efs || !Object.keys(b.efs.nodes ?? {}).length) b.efs = createVfs();
+          }
+        }
+        if (!parsed.realities['sol-prime']) {
+          parsed.realities['sol-prime'] = emptyBucket();
+        }
+        /* the flat fields are views, never storage — drop them from the payload */
+        delete (parsed as any).bodies;
+        delete (parsed as any).entries;
+        delete (parsed as any).connections;
+        delete (parsed as any).vault;
+        delete (parsed as any).vaultTrash;
+        delete (parsed as any).efs;
+
+        parsed.version = 4;
         const primed = primeState(parsed);
         if (healedCount > 0) {
           try {
@@ -240,7 +325,11 @@ function diaryPayloadId(id: string): string {
 }
 
 async function externalizeLargeDiaryAttachments(): Promise<void> {
-  const candidates = state.entries.flatMap((entry) => entry.attachments);
+  /* every reality's diary is externalized — attachments belong to their
+     reality's container, not to whichever one happens to be active */
+  const candidates = Object.values(state.realities ?? {}).flatMap((b) =>
+    b.entries.flatMap((entry) => entry.attachments)
+  );
   let changed = false;
 
   await Promise.all(candidates.map(async (attachment) => {
@@ -272,6 +361,14 @@ function persistState() {
         ...state,
         /* diskSync is live telemetry — ephemeral, never persisted */
         diskSync: undefined,
+        /* the derived views mirror the active container — the containers
+           themselves are the storage; strip the views to avoid duplication */
+        bodies: undefined,
+        entries: undefined,
+        connections: undefined,
+        vault: undefined,
+        vaultTrash: undefined,
+        efs: undefined,
         vaultUsers: state.vaultUsers.map((u) => {
           const n = { ...u };
           if (n.avatar && n.avatar.length > 2_600_000) n.avatar = null;
@@ -369,7 +466,7 @@ type PayloadImportStatus = {
 };
 
 function shadowReferencesFiles(fileIds: Set<string>): boolean {
-  return state.efs.shadows.some((shadow) => Object.values(shadow.tree).some((node) =>
+  return bucket().efs.shadows.some((shadow) => Object.values(shadow.tree).some((node) =>
     node.type === 'file' && Boolean(node.fileId) && fileIds.has(node.fileId!),
   ));
 }
@@ -382,8 +479,8 @@ function deleteUnreferencedPayloads(records: VaultFile[]): void {
     const removedIdsForRef = new Set(records.filter((file) => file.payloadRef === ref).map((file) => file.id));
     const referencesRemovedLive = (file: VaultFile) => file.dedupOf !== undefined && removedIdsForRef.has(file.dedupOf);
     const referencesRemovedTrash = (trash: { item: VaultFile }) => referencesRemovedLive(trash.item);
-    const referencedByLive = state.vault.some((file) => file.payloadRef === ref || referencesRemovedLive(file));
-    const referencedByTrash = state.vaultTrash.some((trash) => trash.item.payloadRef === ref || referencesRemovedTrash(trash));
+    const referencedByLive = bucket().vault.some((file) => file.payloadRef === ref || referencesRemovedLive(file));
+    const referencedByTrash = bucket().vaultTrash.some((trash) => trash.item.payloadRef === ref || referencesRemovedTrash(trash));
     if (!referencedByLive && !referencedByTrash && !shadowReferencesFiles(removedIdsForRef)) {
       void delPayload(ref).catch(() => undefined);
     }
@@ -448,14 +545,10 @@ export const actions = {
   /* -------------------------- Multiverse & Lore -------------------------- */
   switchReality(realityId: string) {
     const r = getReality(realityId, state.customRealityDescriptions);
+    /* a pure pointer flip: every reality owns its world container, so the
+       derived views re-point and nothing is reseeded, lost, or leaked */
     state.activeRealityId = r.id;
-    state.bodies = [...r.bodies];
-    state.entries = [...r.entries];
-    // Filter connections to only link celestial bodies native to this reality
-    const validBodyIds = new Set(r.bodies.map((b) => b.id));
-    state.connections = (state.connections || []).filter(
-      (c) => validBodyIds.has(c.a) && validBodyIds.has(c.b)
-    );
+    ensureBucket(r.id);
     audit(`[Dimensional Barrier] Quantum resonance shifted to Reality: ${r.name}`);
     notify();
   },
@@ -525,6 +618,18 @@ export const actions = {
       state.deletedRealityIds = state.deletedRealityIds.filter((id) => id !== newReality.id);
     }
     recomputeRealities();
+    /* seed the reality's world container from its forged config — the worlds
+       are real and clickable from the first visit; the black hole vault
+       starts fresh and empty (total isolation) */
+    state.realities = state.realities ?? {};
+    state.realities[newReality.id] = {
+      bodies: newReality.bodies.map((b) => ({ ...b })),
+      entries: (newReality.entries ?? []).map((e) => ({ ...e })),
+      connections: [],
+      vault: [],
+      vaultTrash: [],
+      efs: createVfs(),
+    };
     audit(`[Multiverse Nexus] Manifested new parallel reality: ${newReality.name}`);
     notify();
 
@@ -598,9 +703,10 @@ export const actions = {
     if (state.activeRealityId === realityId) {
       const fallback = REALITIES[0] || RAW_REALITIES[0];
       state.activeRealityId = fallback.id;
-      state.bodies = [...fallback.bodies];
-      state.entries = [...(fallback.entries || [])];
+      ensureBucket(fallback.id);
     }
+    /* the collapsed reality keeps its world container in the vault of the
+       multiverse (restore brings everything back); purge erases it */
     audit(`[Multiverse Nexus] Transferred reality to Quantum Bin: ${doomedReality?.name ?? realityId}`);
     notify();
 
@@ -650,6 +756,10 @@ export const actions = {
     if (!state.binRealities) return;
     const item = state.binRealities.find((b) => b.id === realityId);
     state.binRealities = state.binRealities.filter((b) => b.id !== realityId);
+    /* permanent erase: the reality's world container is destroyed with it */
+    if (state.realities && state.realities[realityId]) {
+      delete state.realities[realityId];
+    }
     audit(`[Multiverse Nexus] Permanently purged reality: ${item?.name ?? realityId}`);
     notify();
 
@@ -666,7 +776,12 @@ export const actions = {
   async emptyRealityBin() {
     if (!state.binRealities?.length) return;
     const count = state.binRealities.length;
+    const purgedIds = state.binRealities.map((b) => b.id);
     state.binRealities = [];
+    /* permanent erase: purge every binned reality's world container */
+    if (state.realities) {
+      for (const id of purgedIds) delete state.realities[id];
+    }
     audit(`[Multiverse Nexus] Emptied Quantum Bin (${count} realities purged)`);
     notify();
 
@@ -788,7 +903,7 @@ export const actions = {
 
   /* --------------------------- Celestial Bodies -------------------------- */
   setMeaning(id: string, meaning: CosmicBody['meaning']) {
-    const b = state.bodies.find((x) => x.id === id);
+    const b = bucket().bodies.find((x) => x.id === id);
     if (b) {
       b.meaning = meaning;
       notify();
@@ -796,7 +911,7 @@ export const actions = {
   },
 
   renameBody(id: string, name: string) {
-    const b = state.bodies.find((x) => x.id === id);
+    const b = bucket().bodies.find((x) => x.id === id);
     if (b && name.trim()) {
       b.name = name.trim();
       notify();
@@ -804,7 +919,7 @@ export const actions = {
   },
 
   setNote(id: string, note: string) {
-    const b = state.bodies.find((x) => x.id === id);
+    const b = bucket().bodies.find((x) => x.id === id);
     if (b) {
       b.note = note;
       notify();
@@ -831,16 +946,16 @@ export const actions = {
         incl: (r() - 0.5) * 0.4,
       },
     };
-    state.bodies.push(body);
+    bucket().bodies.push(body);
     notify();
     return body;
   },
 
   removeBody(id: string) {
     if (id === 'anchor' || id === 'eventide') return;
-    state.bodies = state.bodies.filter((b) => b.id !== id);
-    state.entries = state.entries.filter((e) => e.planetId !== id);
-    state.connections = state.connections.filter((c) => c.a !== id && c.b !== id);
+    bucket().bodies = bucket().bodies.filter((b) => b.id !== id);
+    bucket().entries = bucket().entries.filter((e) => e.planetId !== id);
+    bucket().connections = bucket().connections.filter((c) => c.a !== id && c.b !== id);
     notify();
   },
 
@@ -851,17 +966,17 @@ export const actions = {
   connect(a: string, b: string) {
     if (a === b) return;
     if (
-      state.connections.some(
+      bucket().connections.some(
         (c) => (c.a === a && c.b === b) || (c.a === b && c.b === a)
       )
     )
       return;
-    state.connections.push({ id: newId(), a, b, createdAt: Date.now() });
+    bucket().connections.push({ id: newId(), a, b, createdAt: Date.now() });
     notify();
   },
 
   disconnect(id: string) {
-    state.connections = state.connections.filter((c) => c.id !== id);
+    bucket().connections = bucket().connections.filter((c) => c.id !== id);
     notify();
   },
 
@@ -879,13 +994,13 @@ export const actions = {
       updatedAt: Date.now(),
       attachments: [],
     };
-    state.entries.push(e);
+    bucket().entries.push(e);
     notify();
     return e;
   },
 
   updateEntry(id: string, patch: Partial<DiaryEntry>) {
-    const e = state.entries.find((x) => x.id === id);
+    const e = bucket().entries.find((x) => x.id === id);
     if (e) {
       const safePatch = typeof patch.body === 'string'
         ? { ...patch, body: sanitizeDiaryHtml(patch.body) }
@@ -896,8 +1011,8 @@ export const actions = {
   },
 
   deleteEntry(id: string) {
-    const removed = state.entries.find((x) => x.id === id);
-    state.entries = state.entries.filter((x) => x.id !== id);
+    const removed = bucket().entries.find((x) => x.id === id);
+    bucket().entries = bucket().entries.filter((x) => x.id !== id);
     removed?.attachments.forEach((attachment) => {
       if (attachment.payloadRef) void delLocalPayload(attachment.payloadRef).catch(() => undefined);
     });
@@ -905,7 +1020,7 @@ export const actions = {
   },
 
   toggleBookmark(id: string) {
-    const e = state.entries.find((x) => x.id === id);
+    const e = bucket().entries.find((x) => x.id === id);
     if (e) {
       e.bookmarked = !e.bookmarked;
       notify();
@@ -913,7 +1028,7 @@ export const actions = {
   },
 
   addAttachment(entryId: string, att: Omit<Attachment, 'id'>) {
-    const e = state.entries.find((x) => x.id === entryId);
+    const e = bucket().entries.find((x) => x.id === entryId);
     if (e) {
       e.attachments.push({ ...att, id: newId() });
       e.updatedAt = Date.now();
@@ -923,7 +1038,7 @@ export const actions = {
   },
 
   removeAttachment(entryId: string, attId: string) {
-    const e = state.entries.find((x) => x.id === entryId);
+    const e = bucket().entries.find((x) => x.id === entryId);
     if (e) {
       const removed = e.attachments.find((a) => a.id === attId);
       e.attachments = e.attachments.filter((a) => a.id !== attId);
@@ -941,7 +1056,7 @@ export const actions = {
     attId: string,
     patch: Partial<Attachment>
   ) {
-    const e = state.entries.find((x) => x.id === entryId);
+    const e = bucket().entries.find((x) => x.id === entryId);
     const a = e?.attachments.find((x) => x.id === attId);
     if (e && a) {
       if (patch.dataUrl && a.payloadRef) {
@@ -961,17 +1076,17 @@ export const actions = {
     const activeRid = state.activeRealityId || 'sol-prime';
     const stamped = files.map((f) => ({ ...f, realityId: f.realityId ?? activeRid }));
     stamped.forEach((f) => {
-      if (!efsNodeOf(state.efs, f)) {
-        const parent = f.dirId && state.efs.nodes[f.dirId] ? f.dirId : EFS_ROOT;
-        efsAddFileNode(state.efs, f.id, parent, f.name);
+      if (!efsNodeOf(bucket().efs, f)) {
+        const parent = f.dirId && bucket().efs.nodes[f.dirId] ? f.dirId : EFS_ROOT;
+        efsAddFileNode(bucket().efs, f.id, parent, f.name);
       }
     });
-    state.vault.push(...stamped);
+    bucket().vault.push(...stamped);
     notify();
   },
 
   updateVaultFile(id: string, patch: Partial<VaultFile>) {
-    const f = state.vault.find((x) => x.id === id);
+    const f = bucket().vault.find((x) => x.id === id);
     if (f) {
       Object.assign(f, patch);
       notify();
@@ -979,18 +1094,18 @@ export const actions = {
   },
 
   efsCreateFolder(parentId: string, name: string, color?: string): string | null {
-    if (!state.efs.nodes[parentId]) return null;
-    const node = efsMkdir(state.efs, parentId, name, color);
-    audit(`[EFS] mkdir ${efsPathString(state.efs, node.id)} · gen ${state.efs.super.generation}`);
+    if (!bucket().efs.nodes[parentId]) return null;
+    const node = efsMkdir(bucket().efs, parentId, name, color);
+    audit(`[EFS] mkdir ${efsPathString(bucket().efs, node.id)} · gen ${bucket().efs.super.generation}`);
     notify();
     return node.id;
   },
 
   efsRenameNode(nodeId: string, name: string): boolean {
-    const node = state.efs.nodes[nodeId];
-    if (!efsRename(state.efs, nodeId, name)) return false;
+    const node = bucket().efs.nodes[nodeId];
+    if (!efsRename(bucket().efs, nodeId, name)) return false;
     if (node?.type === 'file' && node.fileId) {
-      const f = state.vault.find((x) => x.id === node.fileId);
+      const f = bucket().vault.find((x) => x.id === node.fileId);
       if (f) f.name = node.name;
     }
     audit(`[EFS] rename → ${name}`);
@@ -999,44 +1114,44 @@ export const actions = {
   },
 
   efsSetDirColor(nodeId: string, color?: string) {
-    const n = state.efs.nodes[nodeId];
+    const n = bucket().efs.nodes[nodeId];
     if (!n) return;
     n.color = color;
     notify();
   },
 
   efsTogglePin(nodeId: string) {
-    const n = state.efs.nodes[nodeId];
+    const n = bucket().efs.nodes[nodeId];
     if (!n) return;
     n.pinned = !n.pinned;
     notify();
   },
 
   efsSetTags(nodeId: string, tags: string[]) {
-    const n = state.efs.nodes[nodeId];
+    const n = bucket().efs.nodes[nodeId];
     if (!n) return;
     n.tags = tags.length ? tags : undefined;
     notify();
   },
 
   efsMoveNodes(nodeIds: string[], destDirId: string): number {
-    const moved = efsMove(state.efs, nodeIds, destDirId);
+    const moved = efsMove(bucket().efs, nodeIds, destDirId);
     if (moved) {
-      const nodeMap = state.efs.nodes;
-      state.vault.forEach((f) => {
+      const nodeMap = bucket().efs.nodes;
+      bucket().vault.forEach((f) => {
         const node = Object.values(nodeMap).find((n) => n.type === 'file' && n.fileId === f.id);
         if (node && node.parentId && f.dirId !== node.parentId) {
           f.dirId = node.parentId;
         }
       });
-      audit(`[EFS] moved ${moved} node(s) · gen ${state.efs.super.generation}`);
+      audit(`[EFS] moved ${moved} node(s) · gen ${bucket().efs.super.generation}`);
       notify();
     }
     return moved;
   },
 
   efsHealVault(): number {
-    const healed = efsHeal(state.efs, state.vault);
+    const healed = efsHeal(bucket().efs, bucket().vault);
     if (healed) {
       audit(`[EFS] healed ${healed} detached node(s)`);
       notify();
@@ -1047,10 +1162,10 @@ export const actions = {
   /** Zero-copy CoW clone: new tree nodes + cloned records sharing payload ids.
    *  Returns the ids of the top-level nodes created in destDirId. */
   efsCopyNodes(nodeIds: string[], destDirId: string): string[] {
-    if (!state.efs.nodes[destDirId] || state.efs.nodes[destDirId].type !== 'dir') return [];
+    if (!bucket().efs.nodes[destDirId] || bucket().efs.nodes[destDirId].type !== 'dir') return [];
     const created: string[] = [];
     const cloneFileInto = (srcNode: VfsNode, destParent: string): string | null => {
-      const orig = srcNode.fileId ? state.vault.find((f) => f.id === srcNode.fileId) : null;
+      const orig = srcNode.fileId ? bucket().vault.find((f) => f.id === srcNode.fileId) : null;
       if (!orig) return null;
       const sharesPayload = !!orig.payloadRef;
       const clone: VaultFile = {
@@ -1061,31 +1176,31 @@ export const actions = {
         versions: orig.versions ? JSON.parse(JSON.stringify(orig.versions)) : undefined,
         dedupOf: sharesPayload ? (orig.dedupOf ?? orig.id) : undefined,
       };
-      state.vault.push(clone);
-      const node = efsAddFileNode(state.efs, clone.id, destParent, srcNode.name);
+      bucket().vault.push(clone);
+      const node = efsAddFileNode(bucket().efs, clone.id, destParent, srcNode.name);
       node.tags = srcNode.tags ? [...srcNode.tags] : undefined;
       return node.id;
     };
     const copyDir = (srcDirId: string, destParent: string, nameOverride?: string): string => {
-      const src = state.efs.nodes[srcDirId];
+      const src = bucket().efs.nodes[srcDirId];
       if (!src) return '';
       const dirNode: VfsNode = {
         id: newId(),
         type: 'dir',
-        name: efsUniqueName(state.efs, destParent, nameOverride ?? src.name),
+        name: efsUniqueName(bucket().efs, destParent, nameOverride ?? src.name),
         parentId: destParent,
         createdAt: Date.now(),
         modifiedAt: Date.now(),
         color: src.color,
       };
-      state.efs.nodes[dirNode.id] = dirNode;
-      const { dirs, fileIds } = efsChildren(state.efs, srcDirId);
-      fileIds.forEach((fid) => cloneFileInto(state.efs.nodes[fid], dirNode.id));
+      bucket().efs.nodes[dirNode.id] = dirNode;
+      const { dirs, fileIds } = efsChildren(bucket().efs, srcDirId);
+      fileIds.forEach((fid) => cloneFileInto(bucket().efs.nodes[fid], dirNode.id));
       dirs.forEach((d) => copyDir(d.id, dirNode.id));
       return dirNode.id;
     };
     for (const id of nodeIds) {
-      const n = state.efs.nodes[id];
+      const n = bucket().efs.nodes[id];
       if (!n || n.id === EFS_ROOT) continue;
       if (n.type === 'file') {
         const made = cloneFileInto(n, destDirId);
@@ -1096,8 +1211,8 @@ export const actions = {
       }
     }
     if (created.length) {
-      efsBump(state.efs);
-      audit(`[EFS] forked ${created.length} object(s) into ${efsPathString(state.efs, destDirId)} · 0 payload bytes allocated`);
+      efsBump(bucket().efs);
+      audit(`[EFS] forked ${created.length} object(s) into ${efsPathString(bucket().efs, destDirId)} · 0 payload bytes allocated`);
       notify();
     }
     return created;
@@ -1105,13 +1220,13 @@ export const actions = {
 
   /** Forks a directory in place — the reflink equivalent. Returns the new dir id. */
   efsForkDir(dirId: string): string | null {
-    const src = state.efs.nodes[dirId];
+    const src = bucket().efs.nodes[dirId];
     if (!src || src.type !== 'dir' || dirId === EFS_ROOT) return null;
     const parent = src.parentId ?? EFS_ROOT;
     const made = this.efsCopyNodes([dirId], parent);
     if (made.length) {
-      const node = state.efs.nodes[made[0]];
-      if (node) node.name = efsUniqueName(state.efs, parent, `${src.name} fork`);
+      const node = bucket().efs.nodes[made[0]];
+      if (node) node.name = efsUniqueName(bucket().efs, parent, `${src.name} fork`);
       audit(`[EFS] fork '${src.name}' → zero-copy CoW clone`);
       notify();
     }
@@ -1125,21 +1240,21 @@ export const actions = {
     const doomedFiles = new Set<string>();
     const doomedNodes = new Set<string>();
     for (const id of nodeIds) {
-      const n = state.efs.nodes[id];
+      const n = bucket().efs.nodes[id];
       if (!n || id === EFS_ROOT) continue;
       if (n.type === 'file' && n.fileId) {
-        const f = state.vault.find((x) => x.id === n.fileId);
+        const f = bucket().vault.find((x) => x.id === n.fileId);
         if (f) {
           entries.push({ item: f, deletedAt: at, fromDirId: n.parentId ?? EFS_ROOT, node: { ...n } });
           doomedFiles.add(f.id);
         }
         doomedNodes.add(id);
       } else if (n.type === 'dir') {
-        const { dirIds, fileIds } = efsSubtreeIds(state.efs, id);
-        const dirNodes = dirIds.map((d) => ({ ...state.efs.nodes[d] }));
+        const { dirIds, fileIds } = efsSubtreeIds(bucket().efs, id);
+        const dirNodes = dirIds.map((d) => ({ ...bucket().efs.nodes[d] }));
         fileIds.forEach((fid) => {
-          const node = state.efs.nodes[fid];
-          const f = node?.fileId ? state.vault.find((x) => x.id === node.fileId) : null;
+          const node = bucket().efs.nodes[fid];
+          const f = node?.fileId ? bucket().vault.find((x) => x.id === node.fileId) : null;
           if (f) {
             entries.push({
               item: f, deletedAt: at,
@@ -1154,10 +1269,10 @@ export const actions = {
       }
     }
     if (!entries.length && !doomedNodes.size) return;
-    state.vaultTrash = [...state.vaultTrash, ...entries];
-    state.vault = state.vault.filter((x) => !doomedFiles.has(x.id));
-    doomedNodes.forEach((id) => { delete state.efs.nodes[id]; });
-    efsBump(state.efs);
+    bucket().vaultTrash = [...bucket().vaultTrash, ...entries];
+    bucket().vault = bucket().vault.filter((x) => !doomedFiles.has(x.id));
+    doomedNodes.forEach((id) => { delete bucket().efs.nodes[id]; });
+    efsBump(bucket().efs);
     audit(`[EFS] trashed ${entries.length} object(s)`);
     notify();
   },
@@ -1171,57 +1286,57 @@ export const actions = {
     const set = new Set(ids);
     const at = Date.now();
     const released: UniverseState['vaultTrash'] = [];
-    state.vault.forEach((f) => {
+    bucket().vault.forEach((f) => {
       if (!set.has(f.id)) return;
-      const node = efsNodeOf(state.efs, f);
+      const node = efsNodeOf(bucket().efs, f);
       released.push({
         item: f, deletedAt: at,
         fromDirId: node?.parentId ?? EFS_ROOT,
         node: node ? { ...node } : undefined,
       });
-      if (node) delete state.efs.nodes[node.id];
+      if (node) delete bucket().efs.nodes[node.id];
     });
     if (!released.length) return;
-    state.vaultTrash = [...state.vaultTrash, ...released];
-    state.vault = state.vault.filter((x) => !set.has(x.id));
-    efsBump(state.efs);
+    bucket().vaultTrash = [...bucket().vaultTrash, ...released];
+    bucket().vault = bucket().vault.filter((x) => !set.has(x.id));
+    efsBump(bucket().efs);
     notify();
   },
 
   restoreTrashed(id: string) {
-    const t = state.vaultTrash.find((x) => x.item.id === id);
+    const t = bucket().vaultTrash.find((x) => x.item.id === id);
     if (!t) return;
     /* bring back any trashed directory chain first, then the file's node */
     (t.dirNodes ?? []).forEach((d) => {
-      if (!state.efs.nodes[d.id]) state.efs.nodes[d.id] = { ...d };
+      if (!bucket().efs.nodes[d.id]) bucket().efs.nodes[d.id] = { ...d };
     });
-    if (t.node && !state.efs.nodes[t.node.id]) {
-      state.efs.nodes[t.node.id] = { ...t.node, parentId: t.fromDirId ?? EFS_ROOT };
+    if (t.node && !bucket().efs.nodes[t.node.id]) {
+      bucket().efs.nodes[t.node.id] = { ...t.node, parentId: t.fromDirId ?? EFS_ROOT };
     }
-    state.vaultTrash = state.vaultTrash.filter((x) => x.item.id !== id);
-    if (!state.vault.some((x) => x.id === t.item.id)) state.vault = [...state.vault, t.item];
-    efsBump(state.efs);
+    bucket().vaultTrash = bucket().vaultTrash.filter((x) => x.item.id !== id);
+    if (!bucket().vault.some((x) => x.id === t.item.id)) bucket().vault = [...bucket().vault, t.item];
+    efsBump(bucket().efs);
     audit(`[EFS] restored ${t.item.name}${t.dirName ? ` (from trashed dir '${t.dirName}')` : ''}`);
     notify();
   },
 
   purgeTrashed(id: string) {
-    const removed = state.vaultTrash.find((trash) => trash.item.id === id)?.item;
-    state.vaultTrash = state.vaultTrash.filter((trash) => trash.item.id !== id);
+    const removed = bucket().vaultTrash.find((trash) => trash.item.id === id)?.item;
+    bucket().vaultTrash = bucket().vaultTrash.filter((trash) => trash.item.id !== id);
     if (removed) deleteUnreferencedPayloads([removed]);
     notify();
   },
 
   purgeTrash() {
-    const removed = state.vaultTrash.map((trash) => trash.item);
-    state.vaultTrash = [];
+    const removed = bucket().vaultTrash.map((trash) => trash.item);
+    bucket().vaultTrash = [];
     deleteUnreferencedPayloads(removed);
     notify();
   },
 
   /* --------------------------- Version Control --------------------------- */
   saveVersion(id: string, label?: string) {
-    const f = state.vault.find((x) => x.id === id);
+    const f = bucket().vault.find((x) => x.id === id);
     if (!f || f.content == null) return;
     const last = f.versions?.[f.versions.length - 1];
     if (last && last.content === f.content) return;
@@ -1239,7 +1354,7 @@ export const actions = {
   /** Version snapshot from explicit text — works for payload-backed files
       whose VaultFile has no inline `content` (saveVersion skips those). */
   saveVersionContent(id: string, label: string, content: string) {
-    const f = state.vault.find((x) => x.id === id);
+    const f = bucket().vault.find((x) => x.id === id);
     if (!f || !content) return;
     const last = f.versions?.[f.versions.length - 1];
     if (last && last.content === content) return;
@@ -1255,7 +1370,7 @@ export const actions = {
   },
 
   restoreVersion(id: string, versionId: string) {
-    const f = state.vault.find((x) => x.id === id);
+    const f = bucket().vault.find((x) => x.id === id);
     const v = f?.versions?.find((x) => x.id === versionId);
     if (!f || !v || v.content == null) return;
     if (f.content !== v.content) {
@@ -1330,7 +1445,28 @@ export const actions = {
     if (!next.bodies.some((b) => b.id === 'anchor')) next.bodies.unshift(anchor);
     if (!next.bodies.some((b) => b.id === 'eventide')) next.bodies.push(eventide);
 
+    /* containerize: the imported flat snapshot becomes the container of the
+       reality it claims to be — imports never merge into another reality */
+    const importId = next.activeRealityId || 'sol-prime';
+    next.realities = {
+      [importId]: {
+        bodies: next.bodies ?? [],
+        entries: next.entries ?? [],
+        connections: next.connections ?? [],
+        vault: next.vault ?? [],
+        vaultTrash: next.vaultTrash ?? [],
+        efs: next.efs ?? createVfs(),
+      },
+    };
+    delete (next as any).bodies;
+    delete (next as any).entries;
+    delete (next as any).connections;
+    delete (next as any).vault;
+    delete (next as any).vaultTrash;
+    delete (next as any).efs;
+
     state = next;
+    ensureBucket(state.activeRealityId || 'sol-prime');
     recomputeRealities();
     notify();
     queueMicrotask(() => void externalizeLargeDiaryAttachments());
@@ -1370,50 +1506,50 @@ export const actions = {
   /* ------------------- EFS CoW: shadows, fork, integrity ----------------- */
 
   efsShadow(name: string, description?: string): VfsShadow {
-    const s = efsCreateShadow(state.efs, state.vault, name, description);
+    const s = efsCreateShadow(bucket().efs, bucket().vault, name, description);
     audit(`[EFS] shadow '${s.name}' frozen at gen ${s.generation} (${s.fileCount} files, ${s.dirCount} dirs)`);
     notify();
     return s;
   },
 
   efsDeleteShadow(shadowId: string) {
-    efsDeleteShadow(state.efs, shadowId);
+    efsDeleteShadow(bucket().efs, shadowId);
     audit('[EFS] shadow deleted');
     notify();
   },
 
   efsRestoreShadow(shadowId: string) {
-    const shadow = state.efs.shadows.find((s) => s.id === shadowId);
+    const shadow = bucket().efs.shadows.find((s) => s.id === shadowId);
     if (!shadow) return;
     /* automatic safety shadow, so rollback is always reversible */
-    efsCreateShadow(state.efs, state.vault, `pre-rollback-${Date.now().toString(36)}`, 'Automatic safety shadow before rollback');
-    state.efs.nodes = JSON.parse(JSON.stringify(shadow.tree));
+    efsCreateShadow(bucket().efs, bucket().vault, `pre-rollback-${Date.now().toString(36)}`, 'Automatic safety shadow before rollback');
+    bucket().efs.nodes = JSON.parse(JSON.stringify(shadow.tree));
     /* The restored tree defines the live vault. Reconcile metadata from both
        live and trash so a file brought back by the shadow is not lost. */
     const restoredNodes = new Map<string, VfsNode>();
-    Object.values(state.efs.nodes).forEach((node) => {
+    Object.values(bucket().efs.nodes).forEach((node) => {
       if (node.type === 'file' && node.fileId) restoredNodes.set(node.fileId, node);
     });
     const metadata = new Map<string, VaultFile>();
-    state.vault.forEach((file) => metadata.set(file.id, file));
-    state.vaultTrash.forEach((trash) => metadata.set(trash.item.id, trash.item));
+    bucket().vault.forEach((file) => metadata.set(file.id, file));
+    bucket().vaultTrash.forEach((trash) => metadata.set(trash.item.id, trash.item));
 
     /* Safety guard: If restoring a directory-only or empty legacy shadow, preserve
        all existing files and heal them into the restored directory tree */
     if (restoredNodes.size === 0 && metadata.size > 0) {
-      efsHeal(state.efs, state.vault);
-      efsBump(state.efs);
-      audit(`[EFS] rollback to '${shadow.name}' (gen ${shadow.generation}) · preserved ${state.vault.length} files`);
+      efsHeal(bucket().efs, bucket().vault);
+      efsBump(bucket().efs);
+      audit(`[EFS] rollback to '${shadow.name}' (gen ${shadow.generation}) · preserved ${bucket().vault.length} files`);
       notify();
       return;
     }
 
     /* Move any active files not present in the restored snapshot into Trash */
-    const doomed = state.vault.filter((file) => !restoredNodes.has(file.id));
+    const doomed = bucket().vault.filter((file) => !restoredNodes.has(file.id));
     if (doomed.length > 0) {
       const at = Date.now();
       doomed.forEach((file) => {
-        state.vaultTrash.push({
+        bucket().vaultTrash.push({
           item: file,
           deletedAt: at,
           fromDirId: file.dirId ?? EFS_ROOT,
@@ -1421,32 +1557,32 @@ export const actions = {
       });
     }
 
-    state.vault = [...metadata.values()]
+    bucket().vault = [...metadata.values()]
       .filter((file) => restoredNodes.has(file.id))
       .map((file) => {
         const node = restoredNodes.get(file.id)!;
-        const parent = node.parentId && state.efs.nodes[node.parentId]?.type === 'dir' ? node.parentId : EFS_ROOT;
+        const parent = node.parentId && bucket().efs.nodes[node.parentId]?.type === 'dir' ? node.parentId : EFS_ROOT;
         return { ...file, dirId: parent };
       });
-    state.vaultTrash = state.vaultTrash.filter((trash) => !restoredNodes.has(trash.item.id));
-    efsHeal(state.efs, state.vault);
-    efsBump(state.efs);
+    bucket().vaultTrash = bucket().vaultTrash.filter((trash) => !restoredNodes.has(trash.item.id));
+    efsHeal(bucket().efs, bucket().vault);
+    efsBump(bucket().efs);
     audit(`[EFS] rollback to '${shadow.name}' (gen ${shadow.generation})`);
     notify();
   },
 
   async efsRunScrub(onProgress?: (p: { done: number; total: number; current: string }) => void): Promise<EfsScrubReport> {
-    const report = await efsScrub(state.vault, getPayload, onProgress);
-    state.efs.scrub = report;
-    state.efs.super.lastScrubAt = Date.now();
+    const report = await efsScrub(bucket().vault, getPayload, onProgress);
+    bucket().efs.scrub = report;
+    bucket().efs.super.lastScrubAt = Date.now();
     audit(`[EFS scrub] ${report.filesScanned} files · ${report.errorsFound} errors · ${report.errorsCorrected} repaired — ${report.status.toUpperCase()}`);
     notify();
     return report;
   },
 
   efsRunDedup(): { collapsed: number; savedBytes: number } {
-    const rep = efsDedup(state.vault);
-    state.efs.super.dedupBytes += rep.savedBytes;
+    const rep = efsDedup(bucket().vault);
+    bucket().efs.super.dedupBytes += rep.savedBytes;
     audit(`[EFS dedup] collapsed ${rep.collapsed} duplicates · ${rep.savedBytes} bytes now shared extents`);
     notify();
     return rep;

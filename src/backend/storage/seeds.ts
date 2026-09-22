@@ -496,18 +496,24 @@ export function createInitialSeed(newIdFn: () => string): UniverseState {
   /* a genesis shadow: the tree frozen exactly as first seeded */
   efsCreateShadow(efs, vault, 'genesis', 'System initialization baseline');
 
+  const connections = [
+    conn('aurelia', 'mirror', 250),
+    conn('aurelia', 'rust', 390),
+    conn('veil', 'hollow', 130),
+    conn('goliath', 'aurelia', 440),
+    conn('cinder', 'veil', 500),
+    conn('rust', 'hollow', 60),
+  ];
+
   return {
     activeRealityId: 'sol-prime',
+    /* the seed is the Sol Prime container — the home reality starts fully formed */
+    realities: {
+      'sol-prime': { bodies, entries, connections, vault, vaultTrash: [], efs },
+    },
     bodies,
     entries,
-    connections: [
-      conn('aurelia', 'mirror', 250),
-      conn('aurelia', 'rust', 390),
-      conn('veil', 'hollow', 130),
-      conn('goliath', 'aurelia', 440),
-      conn('cinder', 'veil', 500),
-      conn('rust', 'hollow', 60),
-    ],
+    connections,
     vault,
     efs,
     vaultTrash: [],

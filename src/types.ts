@@ -287,6 +287,22 @@ export interface DiskSyncState {
   lastError: string | null;
 }
 
+/**
+ * The per-reality world container — EVERYTHING that belongs to one reality:
+ * its worlds, diary pages, links, and its black hole's vault (files, trash,
+ * and the whole Eventide file tree). Realities are isolated by construction:
+ * a bucket is only reachable through its reality, so entering reality B
+ * cannot observe reality A's content.
+ */
+export interface RealityBucket {
+  bodies: CosmicBody[];
+  entries: DiaryEntry[];
+  connections: Connection[];
+  vault: VaultFile[];
+  vaultTrash: TrashedFile[];
+  efs: VfsState;             /* this reality's own Eventide Filesystem */
+}
+
 export interface UniverseState {
   activeRealityId?: string;
   customRealityDescriptions?: Record<string, string>;
@@ -302,12 +318,17 @@ export interface UniverseState {
      defaults for that reality (created/renamed/edited/deleted galaxies) */
   customGalaxies?: Record<string, GalaxyData[]>;
   customRealityMeta?: Record<string, RealityMetaPatch>;
+  /* the per-reality world containers — the source of truth */
+  realities: Record<string, RealityBucket>;
+  /* derived views of the ACTIVE reality's container — refreshed by
+     createSnapshot on every notify so existing consumers stay reality-scoped
+     without knowing about containers. Never persisted. */
   bodies: CosmicBody[];
   entries: DiaryEntry[];
   connections: Connection[];
   vault: VaultFile[];
-  efs: VfsState;             /* the Eventide Filesystem — tree, shadows, superblock */
-  vaultTrash: TrashedFile[]; /* released matter lingers here before the final purge */
+  efs: VfsState;
+  vaultTrash: TrashedFile[];
   vaultUsers: VaultUser[];
   secrets: VaultSecrets | null;
   audit: AuditEntry[];
