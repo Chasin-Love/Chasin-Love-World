@@ -558,6 +558,7 @@ export const actions = {
     ensureBucket(r.id);
     audit(`[Dimensional Barrier] Quantum resonance shifted to Reality: ${r.name}`);
     notify();
+    void actions.exportRealityData(r.id); /* keep the reality folder's data.json current */
   },
 
   updateRealityDescription(realityId: string, description: string) {
@@ -649,6 +650,7 @@ export const actions = {
     );
     if (res?.success) {
       actions.rememberRealityFolder(newReality.id, res.folderName ?? proposed);
+      void actions.exportRealityData(newReality.id);
     } else {
       toast(`⚠ "${newReality.name}" exists in the multiverse, but its disk folder could not be created — the sync engine will retry`, 'warn');
       void syncedRealityApi('/api/realities/create-folder', { ...newReality, folderName: proposed });
@@ -797,6 +799,35 @@ export const actions = {
     if (!ok) {
       toast('⚠ Quantum Bin emptied in the multiverse, but the disk folders could not be cleared — will retry', 'warn');
     }
+  },
+
+  /* --------------------- per-reality disk mirror ------------------------- */
+
+  /** Mirrors a reality's world database into its own folder on disk
+      (src/realities/<folder>/data.json): config, worlds, diary pages and
+      vault metadata — the "everything about this reality in one place"
+      contract. Binary vault payloads stay in the encrypted payload store. */
+  async exportRealityData(realityId?: string) {
+    const id = realityId || state.activeRealityId || 'sol-prime';
+    const b = state.realities?.[id];
+    if (!b) return;
+    const cfg = REALITIES.find((r) => r.id === id) ?? RAW_REALITIES.find((r) => r.id === id);
+    const data = {
+      reality: cfg ? {
+        id: cfg.id, name: cfg.name, codeName: cfg.codeName, spectral: cfg.spectral,
+        description: cfg.description, colorA: cfg.colorA, colorB: cfg.colorB,
+        starColor: cfg.starColor, galaxyCountHint: cfg.galaxyCountHint,
+      } : { id },
+      bodies: b.bodies,
+      entries: b.entries,
+      connections: b.connections,
+      vault: b.vault,
+      vaultTrash: b.vaultTrash,
+    };
+    await realityApi<{ success?: boolean; path?: string }>(
+      '/api/realities/write-data',
+      { realityId: id, folderName: diskFolderFor(id, cfg?.name), data }
+    );
   },
 
   /* ------------------------- disk mirror telemetry ----------------------- */

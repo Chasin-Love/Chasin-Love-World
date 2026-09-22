@@ -266,6 +266,46 @@ async function startServer() {
     }
   });
 
+  // API: Write a reality's world database to its own folder (data.json).
+  // The reality-first mirror: everything that belongs to a reality — its
+  // config, worlds, diary, vault metadata — lives in that reality's folder.
+  app.post('/api/realities/write-data', (req, res) => {
+    const { realityId, folderName, data } = req.body;
+    if (!data || typeof data !== 'object') {
+      return res.status(400).json({ success: false, error: 'data object is required' });
+    }
+
+    const realitiesDir = path.join(process.cwd(), 'src', 'realities');
+    let folder = sanitizeFolderName(folderName);
+    if (!folder && realityId) {
+      // resolve by matching the sanitized reality id against folder names
+      const cleanRid = String(realityId).toLowerCase().replace(/[^a-z0-9]/g, '');
+      try {
+        const items = fs.readdirSync(realitiesDir, { withFileTypes: true });
+        for (const d of items) {
+          if (!d.isDirectory() || d.name === 'bin' || d.name === '.bin') continue;
+          if (d.name.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanRid) { folder = d.name; break; }
+        }
+      } catch { /* readdir failure handled by the existsSync guard below */ }
+    }
+    if (!folder) {
+      return res.status(400).json({ success: false, error: 'Could not resolve a reality folder' });
+    }
+
+    const dir = path.join(realitiesDir, folder);
+    if (!isInside(realitiesDir, dir) || !fs.existsSync(dir)) {
+      return res.status(400).json({ success: false, error: 'Reality folder does not exist' });
+    }
+
+    try {
+      const payload = { ...data, realityId, mirroredAt: Date.now() };
+      fs.writeFileSync(path.join(dir, 'data.json'), JSON.stringify(payload, null, 2), 'utf-8');
+      res.json({ success: true, path: `src/realities/${folder}/data.json` });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
