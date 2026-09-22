@@ -433,7 +433,7 @@ function HolographicMultiverseRadar({
   };
 
   return (
-    <div className="relative w-full aspect-square max-w-[260px] mx-auto flex items-center justify-center p-2 rounded-2xl cc-panel">
+    <div className="relative w-full aspect-square max-w-[260px] mx-auto flex items-center justify-center p-2 rounded-2xl bg-black/25 border border-white/6">
       <canvas
         ref={canvasRef}
         className="w-full h-full object-contain"
@@ -461,11 +461,11 @@ function VitalTile({
   color: string;
 }) {
   return (
-    <div className="p-2.5 rounded-xl bg-black/25 border border-white/8 flex flex-col items-center gap-0.5">
-      <span className="font-display text-lg font-bold leading-none tabular-nums" style={{ color }}>
+    <div className="p-2.5 rounded-xl bg-black/30 border border-white/6 flex flex-col items-center gap-1">
+      <span className="cc-num text-lg leading-none" style={{ color }}>
         {value}
       </span>
-      <span className="font-mono text-[8.5px] uppercase tracking-[0.18em] text-slate-400">{label}</span>
+      <span className="cc-label">{label}</span>
     </div>
   );
 }
@@ -492,7 +492,7 @@ function DiskSyncStatusTile({ diskSync }: { diskSync?: DiskSyncState }) {
           }`}
         />
       </span>
-      <div className="min-w-0 flex-1 font-mono text-[9.5px] leading-tight">
+      <div className="min-w-0 flex-1 font-mono text-[9px] leading-tight">
         <div className={connected ? 'text-emerald-300 font-bold' : 'text-rose-300 font-bold'}>
           {connected ? 'DISK MIRROR · LIVE' : 'DISK MIRROR · OFFLINE'}
           {connected && pending > 0 && (
@@ -564,10 +564,10 @@ function BentoRealityCard({
 
   return (
     <div
-      className={`group relative rounded-2xl border transition-all duration-300 backdrop-blur-xl flex flex-col justify-between overflow-hidden ${
+      className={`group relative rounded-2xl border transition-all duration-300 flex flex-col justify-between overflow-hidden ${
         active
-          ? 'bg-linear-to-b from-cyan-500/15 via-slate-900/90 to-slate-950 border-cyan-400/60 shadow-[0_0_25px_rgba(6,182,212,0.2)]'
-          : 'bg-slate-900/60 hover:bg-slate-900/80 border-white/12 hover:border-cyan-400/40 shadow-lg'
+          ? 'bg-linear-to-b from-cyan-500/12 via-[#0b1322] to-[#080e1b] border-cyan-400/50 shadow-[0_16px_40px_rgba(0,0,0,0.55),0_0_20px_rgba(6,182,212,0.15)]'
+          : 'bg-[#0d1526] border-white/8 hover:border-cyan-400/35 hover:shadow-[0_16px_40px_rgba(0,0,0,0.5)]'
       }`}
     >
       {/* Top Accent Line */}
@@ -671,34 +671,34 @@ function BentoRealityCard({
 
         {/* Telemetry Metrics Pods */}
         <div className="grid grid-cols-3 gap-2 text-center font-mono">
-          <div className="p-2 rounded-xl bg-white/4 border border-white/8 flex flex-col items-center">
-            <div className="flex items-center gap-1 text-cyan-300 text-xs font-bold">
+          <div className="p-2 rounded-xl bg-white/4 border border-white/6 flex flex-col items-center">
+            <div className="flex items-center gap-1 text-cyan-300 text-xs font-bold tabular-nums">
               <Orbit className="w-3 h-3" />
               <span>{galaxies.length}</span>
             </div>
-            <span className="text-[8.5px] uppercase tracking-wider text-slate-400 mt-0.5">Galaxies</span>
+            <span className="cc-label mt-0.5">Galaxies</span>
           </div>
 
-          <div className="p-2 rounded-xl bg-white/4 border border-white/8 flex flex-col items-center">
-            <div className="flex items-center gap-1 text-violet-300 text-xs font-bold">
+          <div className="p-2 rounded-xl bg-white/4 border border-white/6 flex flex-col items-center">
+            <div className="flex items-center gap-1 text-violet-300 text-xs font-bold tabular-nums">
               <Layers className="w-3 h-3" />
               <span>{clusters.length}</span>
             </div>
-            <span className="text-[8.5px] uppercase tracking-wider text-slate-400 mt-0.5">Clusters</span>
+            <span className="cc-label mt-0.5">Clusters</span>
           </div>
 
-          <div className="p-2 rounded-xl bg-white/4 border border-white/8 flex flex-col items-center">
-            <div className="flex items-center gap-1 text-amber-300 text-xs font-bold">
+          <div className="p-2 rounded-xl bg-white/4 border border-white/6 flex flex-col items-center">
+            <div className="flex items-center gap-1 text-amber-300 text-xs font-bold tabular-nums">
               <Sun className="w-3 h-3" />
               <span>{worldsCount}</span>
             </div>
-            <span className="text-[8.5px] uppercase tracking-wider text-slate-400 mt-0.5">Worlds</span>
+            <span className="cc-label mt-0.5">Worlds</span>
           </div>
         </div>
 
         {/* Orbiting Galaxies Preview Chips */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-[9.5px] font-mono uppercase tracking-wider text-slate-400">
+          <div className="flex items-center justify-between text-[9px] font-mono uppercase tracking-wider text-slate-400">
             <span>Contained Galaxies ({galaxies.length}):</span>
             <button
               onClick={() => setIsExpanded(!isExpanded)}
@@ -1000,21 +1000,21 @@ export const CoreConsole: React.FC<Props> = ({
             {/* Pulsing Core Gyro Sigil */}
             <div className="relative w-11 h-11 shrink-0">
               <div className="absolute inset-0 rounded-full bg-linear-to-br from-cyan-400/80 via-violet-500/70 to-pink-500/70 blur-[8px] opacity-90 animate-pulse" />
-              <div className="absolute inset-0.75 rounded-full bg-slate-950/90 border border-white/30 backdrop-blur-md flex items-center justify-center">
+              <div className="absolute inset-0.75 rounded-full bg-slate-950/90 border border-white/30 flex items-center justify-center">
                 <span className="core-sigil block w-4 h-4 rounded-full bg-linear-to-br from-cyan-300 to-pink-400 shadow-[0_0_16px_rgba(6,182,212,0.95)]" />
               </div>
             </div>
 
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="font-display text-base sm:text-lg tracking-[0.14em] font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                <h2 className="cc-display drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                   MULTIVERSE CORE COMMAND DECK
                 </h2>
-                <span className="text-[9.5px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
+                <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
                   3D Holographic Singularity Origin (0,0,0)
                 </span>
                 <span
-                  className={`flex items-center gap-1.5 text-[9.5px] font-mono px-2 py-0.5 rounded-full border ${
+                  className={`flex items-center gap-1.5 text-[9px] font-mono px-2 py-0.5 rounded-full border ${
                     (state.diskSync?.connected ?? false)
                       ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/40'
                       : 'bg-rose-500/15 text-rose-300 border-rose-400/40'
@@ -1027,7 +1027,7 @@ export const CoreConsole: React.FC<Props> = ({
                     : 'DISK MIRROR OFFLINE'}
                 </span>
               </div>
-              <p className="font-mono text-[9.5px] tracking-[0.2em] uppercase text-cyan-300/80 truncate">
+              <p className="font-mono text-[9px] tracking-[0.2em] uppercase text-cyan-300/80 truncate">
                 Status: Sovereign Continuum Active · {realities.length} Realities · {totalClusters} Clusters · {totalGalaxies} Galaxies · {totalWorlds} Worlds
               </p>
             </div>
@@ -1047,7 +1047,7 @@ export const CoreConsole: React.FC<Props> = ({
             />
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-xl bg-white/6 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-all backdrop-blur-md shrink-0 cursor-pointer"
+              className="w-9 h-9 rounded-xl bg-white/6 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-all shrink-0 cursor-pointer"
               title="Close Console (Esc)"
             >
               <X className="w-4 h-4" />
@@ -1072,7 +1072,7 @@ export const CoreConsole: React.FC<Props> = ({
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`cc-tab flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-mono uppercase tracking-wider border transition-all backdrop-blur-md cursor-pointer ${
+                className={`cc-tab flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-mono uppercase tracking-wider border transition-all cursor-pointer ${
                   tab === t.id ? 'cc-tab-active text-white' : 'bg-white/4 text-slate-300 border-white/10 hover:text-white'
                 }`}
                 style={tab === t.id ? { ['--cc' as string]: TAB_ACCENTS[t.id] } : undefined}
@@ -1134,91 +1134,60 @@ export const CoreConsole: React.FC<Props> = ({
         {/* MAIN BODY AREA (HORIZONTAL COCKPIT LAYOUT) */}
         <div className="flex-1 min-h-0 overflow-y-auto custom-scroll px-5 sm:px-7 py-4">
           {tab === 'dashboard' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-full">
-              {/* LEFT WING: 3D Holographic Radar + Core Telemetry Hub (4 cols) */}
-              <div className="lg:col-span-4 flex flex-col gap-4">
-                {/* 3D Interactive Radar */}
-                <div className="p-4 rounded-2xl bg-slate-900/60 border border-cyan-500/25 backdrop-blur-xl flex flex-col items-center">
-                  <span className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-cyan-300 mb-2 flex items-center gap-1.5 self-start">
-                    <Orbit className="w-3.5 h-3.5 text-cyan-400" />
-                    Multiverse Radar Scan
-                  </span>
-                  <HolographicMultiverseRadar
-                    realities={realities}
-                    activeId={activeRealityId}
-                    onSelect={(id) => onWarpReality(id)}
-                  />
-                  <div className="mt-3 w-full flex items-center justify-between text-[10px] font-mono text-slate-400 pt-2 border-t border-white/5">
-                    <span>Anchor: <span className="text-cyan-300 font-bold">{activeReality.name}</span></span>
-                    <button onClick={() => setTab('realities')} className="text-cyan-400 hover:text-white">View All →</button>
-                  </div>
-                </div>
-
-                {/* Multiverse Vitals — REAL live telemetry */}
-                <div className="p-4 cc-panel space-y-2.5">
-                  <span className="cc-panel-title flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Multiverse Vitals — Live
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <VitalTile label="Realities" value={realities.length} color="#67e8f9" />
-                    <VitalTile label="Worlds" value={totalWorlds} color="#fbbf24" />
-                    <VitalTile label="Galaxies" value={totalGalaxies} color="#a78bfa" />
-                    <VitalTile label="Clusters" value={totalClusters} color="#f472b6" />
-                  </div>
-                  <DiskSyncStatusTile diskSync={state.diskSync} />
-                </div>
-
-                {/* Quick Action Matrix */}
-                <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-xl">
-                  <span className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-cyan-300 block mb-2">
-                    Singularity Quick Pods
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={onZoomToCore}
-                      className="p-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-100 text-[10.5px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
-                    >
-                      <Crosshair className="w-3.5 h-3.5" /> Frame Core
-                    </button>
-                    <button
-                      onClick={onTriggerKamui}
-                      className="p-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-400/40 text-rose-200 text-[10.5px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
-                    >
-                      <Zap className="w-3.5 h-3.5" /> Kamui Warp
-                    </button>
-                    {onShowToolbar && (
-                      <button
-                        onClick={onShowToolbar}
-                        className="p-2.5 rounded-xl bg-violet-500/15 hover:bg-violet-500/30 border border-violet-400/40 text-violet-200 text-[10.5px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
-                      >
-                        <Compass className="w-3.5 h-3.5" /> Toolbar
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setShowCreate(true)}
-                      className="p-2.5 rounded-xl bg-white/6 hover:bg-white/12 border border-white/15 text-slate-200 text-[10.5px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> New Reality
-                    </button>
-                  </div>
+            /* 12-col bento: radar(4×2 rows) · vitals(8) · realities(8) ·
+               pods(4) · engine(8) · chronicle(12) — auto-placement puts pods
+               directly under the radar */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+              {/* RADAR — tall 4-col bento cell */}
+              <div className="lg:col-span-4 lg:row-span-2 cc-panel p-4 flex flex-col items-center">
+                <span className="cc-panel-title self-start mb-2">
+                  <Orbit className="w-3.5 h-3.5" />
+                  Multiverse Radar Scan
+                </span>
+                <HolographicMultiverseRadar
+                  realities={realities}
+                  activeId={activeRealityId}
+                  onSelect={(id) => onWarpReality(id)}
+                />
+                <div className="mt-auto pt-3 w-full flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-white/6">
+                  <span>Anchor: <span className="text-cyan-300 font-bold">{activeReality.name}</span></span>
+                  <button onClick={() => setTab('realities')} className="text-cyan-400 hover:text-white">View All →</button>
                 </div>
               </div>
 
-              {/* RIGHT WING: Multi-Column Bento Reality Grid (8 cols) */}
-              <div className="lg:col-span-8 flex flex-col gap-4">
+              {/* VITALS — wide 8-col strip: four figures + disk mirror */}
+              <div className="lg:col-span-8 cc-panel p-4 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-cyan-300 flex items-center gap-1.5">
-                    <Globe className="w-4 h-4 text-cyan-400" />
+                  <span className="cc-panel-title">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Multiverse Vitals
+                  </span>
+                  <span className="cc-label text-emerald-300/90 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <VitalTile label="Realities" value={realities.length} color="#67e8f9" />
+                  <VitalTile label="Worlds" value={totalWorlds} color="#fbbf24" />
+                  <VitalTile label="Galaxies" value={totalGalaxies} color="#a78bfa" />
+                  <VitalTile label="Clusters" value={totalClusters} color="#f472b6" />
+                </div>
+                <DiskSyncStatusTile diskSync={state.diskSync} />
+              </div>
+
+              {/* ACTIVE REALITIES MATRIX — 8-col beside the radar */}
+              <div className="lg:col-span-8 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="cc-panel-title">
+                    <Globe className="w-4 h-4" />
                     Active Realities Matrix ({filteredRealities.length})
                   </span>
-                  <span className="font-mono text-[9.5px] text-slate-400">
+                  <span className="cc-label">
                     Showing {filteredRealities.length} of {realities.length} branches
                   </span>
                 </div>
-
-                {/* 2-Column Responsive Bento Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {filteredRealities.map((r) => (
                     <BentoRealityCard
                       key={r.id}
@@ -1237,31 +1206,67 @@ export const CoreConsole: React.FC<Props> = ({
                     />
                   ))}
                 </div>
+              </div>
 
-                {/* C++ Native Desktop Engine Card */}
+              {/* QUICK PODS — 4-col, lands directly under the radar */}
+              <div className="lg:col-span-4 cc-panel p-4">
+                <span className="cc-panel-title block mb-2">Singularity Quick Pods</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={onZoomToCore}
+                    className="p-2.5 rounded-xl bg-cyan-500/12 hover:bg-cyan-500/28 border border-cyan-400/35 text-cyan-100 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <Crosshair className="w-3.5 h-3.5" /> Frame Core
+                  </button>
+                  <button
+                    onClick={onTriggerKamui}
+                    className="p-2.5 rounded-xl bg-rose-500/12 hover:bg-rose-500/28 border border-rose-400/35 text-rose-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <Zap className="w-3.5 h-3.5" /> Kamui Warp
+                  </button>
+                  {onShowToolbar && (
+                    <button
+                      onClick={onShowToolbar}
+                      className="p-2.5 rounded-xl bg-violet-500/12 hover:bg-violet-500/28 border border-violet-400/35 text-violet-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                    >
+                      <Compass className="w-3.5 h-3.5" /> Toolbar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowCreate(true)}
+                    className="p-2.5 rounded-xl bg-white/5 hover:bg-white/12 border border-white/12 text-slate-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> New Reality
+                  </button>
+                </div>
+              </div>
+
+              {/* C++ NATIVE ENGINE — 8-col */}
+              <div className="lg:col-span-8">
                 <CppNativeEngineCard />
+              </div>
 
-                {/* Core Live Chronicle Ticker */}
-                <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-xl mt-auto">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wind className="w-3.5 h-3.5 text-cyan-300" />
-                    <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-200">
-                      Singularity Live Chronicle
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1 max-h-24 overflow-y-auto custom-scroll">
-                    {[...state.audit].reverse().slice(0, 8).map((a, i) => (
-                      <div key={`${a.t}-${i}`} className="flex items-baseline gap-2 font-mono text-[9.5px]">
-                        <span className="text-slate-500 tabular-nums shrink-0">
-                          {new Date(a.t).toLocaleTimeString(undefined, { hour12: false })}
-                        </span>
-                        <span className="text-slate-300 truncate">{a.msg}</span>
-                      </div>
-                    ))}
-                    {state.audit.length === 0 && (
-                      <p className="text-[10px] text-slate-500">No multiverse events recorded yet.</p>
-                    )}
-                  </div>
+              {/* CORE LIVE CHRONICLE — full-width bottom rail */}
+              <div className="lg:col-span-12 cc-panel p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="cc-panel-title">
+                    <Wind className="w-3.5 h-3.5" />
+                    Singularity Live Chronicle
+                  </span>
+                  <span className="cc-label">{state.audit.length} events</span>
+                </div>
+                <div className="flex flex-col gap-1 max-h-24 overflow-y-auto custom-scroll">
+                  {[...state.audit].reverse().slice(0, 8).map((a, i) => (
+                    <div key={`${a.t}-${i}`} className="flex items-baseline gap-2 font-mono text-[9px]">
+                      <span className="text-slate-500 tabular-nums shrink-0">
+                        {new Date(a.t).toLocaleTimeString(undefined, { hour12: false })}
+                      </span>
+                      <span className="text-slate-300 truncate">{a.msg}</span>
+                    </div>
+                  ))}
+                  {state.audit.length === 0 && (
+                    <p className="text-[10px] text-slate-500">No multiverse events recorded yet.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1270,11 +1275,11 @@ export const CoreConsole: React.FC<Props> = ({
           {tab === 'realities' && (
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-cyan-300 flex items-center gap-1.5">
-                  <Globe className="w-4 h-4 text-cyan-400" />
+                <span className="cc-panel-title">
+                  <Globe className="w-4 h-4" />
                   All Parallel Realities ({filteredRealities.length})
                 </span>
-                <span className="font-mono text-[10px] text-slate-400">
+                <span className="cc-label">
                   Each reality manages its own independent physical continuum and disk folder
                 </span>
               </div>

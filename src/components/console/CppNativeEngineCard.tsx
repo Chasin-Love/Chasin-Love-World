@@ -109,23 +109,23 @@ export const CppNativeEngineCard: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-cyan-500/25 backdrop-blur-xl space-y-4">
+    <div className="cc-panel p-4 sm:p-5 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3 flex-wrap">
+      <div className="flex items-center justify-between gap-3 border-b border-white/8 pb-3 flex-wrap">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.3)]">
+          <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-400/35 text-cyan-300">
             <Cpu className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-sm font-bold text-white tracking-wide">
+              <h3 className="font-display text-[13px] font-semibold text-white tracking-wide">
                 ASTROPHYSICS SIMULATION CORE
               </h3>
               <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${backend.cls}`}>
                 {backend.text}
               </span>
             </div>
-            <p className="font-mono text-[10px] text-slate-400">
+            <p className="font-mono text-[9px] text-slate-400">
               core v{status.version} · {status.physicsFieldCount}-field telemetry · RK4 integrator
             </p>
           </div>
@@ -143,7 +143,7 @@ export const CppNativeEngineCard: React.FC = () => {
           <button
             onClick={runBenchmark}
             disabled={busy !== null}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 text-xs font-mono tracking-wider transition-all cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.25)]"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 text-xs font-mono tracking-wider transition-all cursor-pointer"
           >
             <Play className={`w-3 h-3 ${busy === 'bench' ? 'animate-spin' : ''}`} />
             <span>{busy === 'bench' ? 'Calculating...' : 'Run RK4 Benchmark'}</span>
@@ -153,23 +153,23 @@ export const CppNativeEngineCard: React.FC = () => {
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 font-mono text-xs">
-        <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
-          <span className="text-[10px] text-slate-400 block">Active Backend</span>
-          <span className="text-sm font-bold text-white">{status.backend}</span>
+        <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+          <span className="cc-label block">Active Backend</span>
+          <span className="text-sm font-bold text-white tabular-nums">{status.backend}</span>
         </div>
-        <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
-          <span className="text-[10px] text-slate-400 block">Core Version</span>
-          <span className="text-sm font-bold text-cyan-300">{status.version}</span>
+        <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+          <span className="cc-label block">Core Version</span>
+          <span className="text-sm font-bold text-cyan-300 tabular-nums">{status.version}</span>
         </div>
-        <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
-          <span className="text-[10px] text-slate-400 block">N-Body Throughput</span>
-          <span className="text-sm font-bold text-emerald-300">
+        <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+          <span className="cc-label block">N-Body Throughput</span>
+          <span className="text-sm font-bold text-emerald-300 tabular-nums">
             {opsPerSec === null ? '—' : `${(opsPerSec / 1_000_000).toFixed(2)} Mops/s`}
           </span>
         </div>
-        <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
-          <span className="text-[10px] text-slate-400 block">Step Latency</span>
-          <span className="text-sm font-bold text-amber-300">
+        <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+          <span className="cc-label block">Step Latency</span>
+          <span className="text-sm font-bold text-amber-300 tabular-nums">
             {latencyMs === null ? '—' : `${latencyMs.toFixed(1)} ms`}
           </span>
         </div>
@@ -191,11 +191,11 @@ export const CppNativeEngineCard: React.FC = () => {
       {/* Render quality tiers */}
       <div className="space-y-2 font-mono text-xs">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="text-[10.5px] uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-            <Gauge className="w-3.5 h-3.5 text-cyan-400" />
+          <div className="cc-panel-title">
+            <Gauge className="w-3.5 h-3.5" />
             <span>Render Quality Tier</span>
           </div>
-          <span className="text-[10px] text-slate-500 truncate max-w-[220px]" title={gpu}>{gpu}</span>
+          <span className="text-[9px] text-slate-500 truncate max-w-[220px]" title={gpu}>{gpu}</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
           {(['low', 'medium', 'cinematic'] as const).map((t) => (
@@ -220,8 +220,8 @@ export const CppNativeEngineCard: React.FC = () => {
 
       {/* Build commands */}
       <div className="space-y-2 font-mono text-xs">
-        <div className="text-[10.5px] uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-          <Terminal className="w-3.5 h-3.5 text-cyan-400" />
+        <div className="cc-panel-title">
+          <Terminal className="w-3.5 h-3.5" />
           <span>Build Pipelines</span>
         </div>
         <div className="space-y-1.5 text-[11px]">

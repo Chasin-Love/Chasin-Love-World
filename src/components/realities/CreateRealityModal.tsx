@@ -99,7 +99,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
       }}
     >
       <div
-        className="relative w-full max-w-xl rounded-3xl border border-cyan-400/30 bg-slate-950/30 backdrop-blur-3xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.65),0_0_40px_rgba(6,182,212,0.18),inset_0_1px_1px_rgba(255,255,255,0.2)] text-slate-100 flex flex-col gap-4 max-h-[90vh] overflow-y-auto custom-scroll select-none relative overflow-hidden"
+        className="relative w-full max-w-xl rounded-3xl border border-cyan-400/30 bg-[#0a101d] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.12)] text-slate-100 flex flex-col gap-4 max-h-[90vh] overflow-y-auto custom-scroll select-none relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Specular glass reflection */}
@@ -109,7 +109,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-3 relative z-10">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 backdrop-blur-md shadow-[0_0_15px_rgba(6,182,212,0.25)]">
+            <div className="p-2.5 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300">
               <Plus className="w-5 h-5" />
             </div>
             <div>
@@ -122,7 +122,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-white/[0.06] hover:bg-white/[0.15] border border-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors font-bold text-sm backdrop-blur-md"
+            className="w-8 h-8 rounded-xl bg-white/[0.06] hover:bg-white/[0.15] border border-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors font-bold text-sm"
           >
             ✕
           </button>
@@ -140,7 +140,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Elysium Prime, Nexus-IX"
-                className="w-full rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 px-3 py-2 text-xs text-white placeholder-slate-400 outline-none backdrop-blur-md transition-all"
+                className="w-full rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 px-3 py-2 text-xs text-white placeholder-slate-400 outline-none transition-all"
               />
             </div>
             <div>
@@ -150,7 +150,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
                 value={codeName}
                 onChange={(e) => setCodeName(e.target.value)}
                 placeholder="e.g. REALITY-21"
-                className="w-full rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 px-3 py-2 text-xs text-white placeholder-slate-400 outline-none backdrop-blur-md transition-all font-mono"
+                className="w-full rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 px-3 py-2 text-xs text-white placeholder-slate-400 outline-none transition-all font-mono"
               />
             </div>
           </div>
@@ -163,7 +163,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
               value={spectral}
               onChange={(e) => setSpectral(e.target.value)}
               placeholder="e.g. Class O Hypergiant · Azure Accretion"
-              className="w-full rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 px-3 py-2 text-xs text-white placeholder-slate-400 outline-none backdrop-blur-md transition-all font-mono"
+              className="w-full rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 px-3 py-2 text-xs text-white placeholder-slate-400 outline-none transition-all font-mono"
             />
           </div>
 
@@ -180,7 +180,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
                     setColorB(preset.colorB);
                     setSpectral(preset.spectral);
                   }}
-                  className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-cyan-400/40 text-[10px] text-slate-200 transition-all backdrop-blur-sm"
+                  className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-cyan-400/40 text-[10px] text-slate-200 transition-all"
                 >
                   <div
                     className="w-3.5 h-3.5 rounded-full shadow-inner ring-1 ring-white/20"
@@ -243,7 +243,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
                 max={12}
                 value={galaxyCount}
                 onChange={(e) => setGalaxyCount(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
-                className="w-full rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 px-3 py-2 text-xs text-white outline-none backdrop-blur-md transition-all font-mono"
+                className="w-full rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 px-3 py-2 text-xs text-white outline-none transition-all font-mono"
               />
             </div>
             <div>
@@ -254,7 +254,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
                 max={8}
                 value={planetsCount}
                 onChange={(e) => setPlanetsCount(Math.max(1, Math.min(8, Number(e.target.value) || 1)))}
-                className="w-full rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 px-3 py-2 text-xs text-white outline-none backdrop-blur-md transition-all font-mono"
+                className="w-full rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 px-3 py-2 text-xs text-white outline-none transition-all font-mono"
               />
             </div>
           </div>
@@ -267,7 +267,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe the anomalies, star system, physics, or civilization in this reality..."
-              className="w-full rounded-2xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 p-3 text-xs text-slate-100 placeholder-slate-400 outline-none leading-relaxed backdrop-blur-md transition-all resize-none"
+              className="w-full rounded-2xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 p-3 text-xs text-slate-100 placeholder-slate-400 outline-none leading-relaxed transition-all resize-none"
             />
           </div>
 
@@ -276,14 +276,14 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-slate-300 hover:text-white text-xs font-medium backdrop-blur-md transition-all"
+              className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-all"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold shadow-[0_0_20px_rgba(6,182,212,0.4)] border border-cyan-300/40 backdrop-blur-md transition-all font-mono"
+              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold border border-cyan-300/40 transition-all font-mono"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Manifest Reality</span>

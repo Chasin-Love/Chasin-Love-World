@@ -1901,21 +1901,37 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   50% { transform: scale(1.25); filter: brightness(1.5); }
 }
 
-/* ============ Core Console design system (2026 soft-spatial refresh) ============
-   The plate carries data-accent={tab}; every .cc-* primitive inside reads the
-   --cc accent variable, so the whole deck recolors per tab with zero JS. */
+/* ============ Core Console design system (stan.vision × Midrocket pass) ============
+   Layering serves hierarchy, blur has exactly one job: the shell itself — the
+   single plane that separates the deck from the cosmos behind it. Everything
+   inside sits on SOLID elevation surfaces; depth comes from a shadow scale and
+   hairline borders, never from stacking blur. Glow is state-driven only:
+   active tab, hover, live status. The plate carries data-accent={tab}; every
+   .cc-* primitive reads the --cc accent variable, so the deck recolors per tab
+   with zero JS. */
 
 .core-plate {
   --cc: 34 211 238; /* fallback = dashboard teal */
-  border: 1px solid rgb(var(--cc) / 0.32);
+
+  /* elevation scale — tunable depth in one place */
+  --elev-1: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.45);
+  --elev-2: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 16px 40px rgba(0, 0, 0, 0.55);
+
+  /* console type scale — micro · label · body · title (9 · 10 · 12 · 13) */
+  --cc-micro: 9px;
+  --cc-label: 10px;
+  --cc-body: 12px;
+  --cc-title: 13px;
+
+  border: 1px solid rgb(var(--cc) / 0.28);
   background:
     linear-gradient(165deg, rgba(11, 16, 29, 0.82) 0%, rgba(4, 6, 12, 0.88) 55%, rgba(3, 5, 10, 0.9) 100%);
-  backdrop-filter: blur(30px) saturate(1.25);
+  backdrop-filter: blur(30px) saturate(1.25); /* THE one blur — shell only */
   -webkit-backdrop-filter: blur(30px) saturate(1.25);
   box-shadow:
     0 35px 100px rgba(0, 0, 0, 0.85),
-    0 0 60px rgb(var(--cc) / 0.14),
-    inset 0 1px 1px rgba(255, 255, 255, 0.22);
+    0 0 44px rgb(var(--cc) / 0.1),
+    inset 0 1px 1px rgba(255, 255, 255, 0.18);
   transition: border-color 0.5s ease, box-shadow 0.5s ease;
 }
 .core-plate[data-accent='dashboard'] { --cc: 34 211 238; }
@@ -1934,29 +1950,58 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   );
 }
 
-/* layered inner panel — light glass that tints with the active accent */
+/* bento tile — solid layered surface, zero blur; hierarchy via surface
+   darkness + hairline, elevation via the shadow scale. Accent appears on
+   hover (state), never at rest. */
 .cc-panel {
-  background: linear-gradient(160deg, rgba(15, 23, 42, 0.55), rgba(2, 6, 23, 0.62));
-  border: 1px solid rgb(var(--cc) / 0.16);
-  border-radius: 18px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: linear-gradient(160deg, #101a2e 0%, #0a111f 55%, #070c17 100%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  box-shadow: var(--elev-1);
   transition: border-color 0.35s ease, box-shadow 0.35s ease;
 }
 .cc-panel:hover {
-  border-color: rgb(var(--cc) / 0.34);
-  box-shadow: 0 0 24px rgb(var(--cc) / 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.06);
+  border-color: rgb(var(--cc) / 0.32);
+  box-shadow: var(--elev-2), 0 0 18px rgb(var(--cc) / 0.1);
+}
+
+/* mono micro-label — the Midrocket tile eyebrow (9px · 0.2em tracking) */
+.cc-label {
+  font-family: var(--font-mono);
+  font-size: var(--cc-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(148, 163, 184, 0.85);
 }
 
 .cc-panel-title {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--cc-label);
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.2em;
   color: rgb(var(--cc));
   display: flex;
   align-items: center;
   gap: 0.375rem;
+}
+
+/* big telemetry figure — display face, tabular digits so columns align */
+.cc-num {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* fluid deck heading (variable font, clamp-scaled) */
+.cc-display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(15px, 1.4vw, 19px);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
 }
 
 .cc-tab {
