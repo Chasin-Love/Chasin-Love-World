@@ -93,16 +93,21 @@ function parseDirectoryRecord(view: DataView, offset: number): { record: IsoDire
   return { record, nextOffset: offset + length };
 }
 
-/** Recursively read directory entries from an ISO ArrayBuffer */
+/** Recursively read directory entries from an ISO ArrayBuffer.
+    `baseOffset` is the byte offset the buffer starts at relative to the disc
+    (0 = whole image), so a windowed slice of a huge ISO can be parsed without
+    loading the entire disc image into memory. */
 function readDirectoryEntries(
   buffer: ArrayBuffer,
   lba: number,
   totalBytes: number,
-  maxDepth = 5
+  maxDepth = 5,
+  baseOffset = 0
 ): IsoDirectoryRecord[] {
   if (maxDepth <= 0) return [];
   const entries: IsoDirectoryRecord[] = [];
-  const startOffset = lba * SECTOR_SIZE;
+  const startOffset = lba * SECTOR_SIZE - baseOffset;
+  if (startOffset < 0 || startOffset >= buffer.byteLength) return [];
   const endOffset = Math.min(buffer.byteLength, startOffset + totalBytes);
   const view = new DataView(buffer);
 
@@ -131,7 +136,7 @@ function readDirectoryEntries(
 
     if (record.isDirectory) {
       // Recursively read sub-directory contents
-      record.children = readDirectoryEntries(buffer, record.lba, record.size, maxDepth - 1);
+      record.children = readDirectoryEntries(buffer, record.lba, record.size, maxDepth - 1, baseOffset);
     }
 
     entries.push(record);
@@ -201,10 +206,14 @@ export async function parseIsoBlob(blob: Blob): Promise<IsoParseResult> {
       rootDirectory: rootRecord,
     };
 
-    // To read the full directory table, we load the directory sectors
-    // Read entire buffer if under 80MB, or read directory sectors selectively
-    const buffer = await blob.arrayBuffer();
-    const files = readDirectoryEntries(buffer, rootRecord.lba, rootRecord.size);
+    // Read only the directory-table window instead of buffering the entire
+    // disc image — a multi-GB ISO used to be fully loaded into RAM just to
+    // list its files. 64 MB comfortably covers any realistic directory tree.
+    const DIR_WINDOW_BYTES = 64 * 1024 * 1024;
+    const dirStart = rootRecord.lba * SECTOR_SIZE;
+    const dirLength = Math.min(rootRecord.size + SECTOR_SIZE, DIR_WINDOW_BYTES);
+    const dirBuffer = await blob.slice(dirStart, dirStart + dirLength).arrayBuffer();
+    const files = readDirectoryEntries(dirBuffer, rootRecord.lba, rootRecord.size, 5, dirStart);
 
     return {
       valid: true,

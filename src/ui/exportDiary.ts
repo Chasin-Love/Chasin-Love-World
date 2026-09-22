@@ -187,10 +187,13 @@ export async function exportDiaryDocument(
       letter-spacing: 0.15em;
       text-transform: uppercase;
     `;
-    archivalHeader.innerHTML = `
-      <span>✦ MY UNIVERSE ARCHIVE · ${planet.name} SYSTEM</span>
-      <span>RECORD ID: ${entry.id.slice(0, 8).toUpperCase()} · ${fmtDate(entry.createdAt)}</span>
-    `;
+    // Dynamic text goes in via textContent — planet names are user-editable,
+    // and an innerHTML splice here would execute markup from imported backups.
+    const archiveLabel = document.createElement('span');
+    archiveLabel.textContent = `✦ MY UNIVERSE ARCHIVE · ${planet.name} SYSTEM`;
+    const recordLabel = document.createElement('span');
+    recordLabel.textContent = `RECORD ID: ${entry.id.slice(0, 8).toUpperCase()} · ${fmtDate(entry.createdAt)}`;
+    archivalHeader.append(archiveLabel, recordLabel);
     clone.insertBefore(archivalHeader, clone.firstChild);
 
     const archivalFooter = document.createElement('div');

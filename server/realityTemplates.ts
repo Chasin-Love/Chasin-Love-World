@@ -11,12 +11,22 @@
  *                        `<folder>Surface` keyed by the reality id
  */
 
+/* Generated modules interpolate the folder name into exported identifiers
+   (`export const <folder>Reality`). A folder like "my-reality" would emit an
+   invalid identifier and, because all realities are compiled together via an
+   eager glob, one bad file white-screens the whole app — so fold everything
+   non-identifier-safe down to "_" here. */
+function ident(s: string): string {
+  const cleaned = (s ?? '').replace(/[^a-zA-Z0-9_$]/g, '_');
+  return /^[0-9]/.test(cleaned) ? `_${cleaned}` : cleaned || 'reality';
+}
+
 export function realityVarNameOf(folderName: string): string {
-  return `${folderName}Reality`;
+  return `${ident(folderName)}Reality`;
 }
 
 export function surfaceVarNameOf(folderName: string): string {
-  return `${folderName}Surface`;
+  return `${ident(folderName)}Surface`;
 }
 
 const esc = (s: string): string => JSON.stringify(s ?? '');
@@ -34,12 +44,12 @@ export function renderSurfaceModule(input: SurfaceTemplateInput): string {
   return `import { UniverseSurfaceConfig } from '../../engine/surface/types';
 
 export const ${surfaceVarNameOf(input.folderName)}: UniverseSurfaceConfig = {
-  realityId: '${input.id}',
+  realityId: ${esc(input.id)},
   name: ${esc(input.name)},
-  colorA: '${input.colorA}',
-  colorB: '${input.colorB}',
+  colorA: ${esc(input.colorA)},
+  colorB: ${esc(input.colorB)},
   deepColor: '#030108',
-  starColor: '${input.starColor}',
+  starColor: ${esc(input.starColor)},
   webFilaments: '${input.colorA}',
   nebulaIntensity: 1.0,
   dustLaneIntensity: 0.8,
@@ -73,16 +83,16 @@ const now = Date.now();
 const TAU = Math.PI * 2;
 
 export const ${realityVarNameOf(input.folderName)}: RealityConfig = {
-  id: '${input.id}',
+  id: ${esc(input.id)},
   name: ${esc(input.name)},
   codeName: ${esc(input.codeName)},
   spectral: ${esc(input.spectral)},
   description: ${esc(input.description)},
   bubblePos: [0, 0, 0],
   bubbleSize: 7500,
-  colorA: '${input.colorA}',
-  colorB: '${input.colorB}',
-  starColor: '${input.starColor}',
+  colorA: ${esc(input.colorA)},
+  colorB: ${esc(input.colorB)},
+  starColor: ${esc(input.starColor)},
   bodies: ${input.bodiesSource},
   entries: ${input.entriesSource},
 };

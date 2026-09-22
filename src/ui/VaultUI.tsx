@@ -4127,6 +4127,14 @@ export default function VaultUI({ onClose }: { onClose: () => void }) {
       ? destDirId
       : (section === 'fs' ? parent : (existingImports ? existingImports.id : (actions.efsCreateFolder(parent, 'imports') ?? parent)));
     for (const f of Array.from(files)) {
+      /* Payload sealing encrypts the whole object in memory; past ~2 GB the
+         tab used to crash with an OOM instead of explaining itself. */
+      const MAX_IMPORT_BYTES = 2 * 1024 * 1024 * 1024;
+      if (f.size > MAX_IMPORT_BYTES) {
+        toast(`${f.name} is over the 2 GB vault import limit and was skipped`, 'warn');
+        continue;
+      }
+      if (f.size > 512 * 1024 * 1024) toast(`sealing ${f.name} — a very large object, this may take a moment`, 'warn');
       const kind = kindOf(f.name, f.type);
       const base: VaultFile = {
         id: newId(), name: f.name,

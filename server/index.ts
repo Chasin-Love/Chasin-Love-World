@@ -307,9 +307,21 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌌 Multiverse Server running on http://localhost:${PORT}`);
+  });
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ Port ${PORT} is already busy — another app (or a second copy of this server) is using it.`);
+      console.error(`   Close that app first, then run "npm run dev" again.`);
+    } else {
+      console.error(`\n❌ Server failed to start: ${err.message}`);
+    }
+    process.exit(1);
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('\n❌ Fatal startup error:', err);
+  process.exit(1);
+});

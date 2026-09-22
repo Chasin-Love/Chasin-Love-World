@@ -83,6 +83,7 @@ let state: UniverseState = loadState();
 let snapshot: UniverseState = createSnapshot(state);
 const listeners = new Set<() => void>();
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let quotaWarnedAt = 0;
 
 function createSnapshot(s: UniverseState): UniverseState {
   return {
@@ -285,8 +286,15 @@ function persistState() {
       void desktopStore.writeState(serialized);
       localStorage.setItem(STORAGE_KEY, serialized);
       recordPersistence(serialized.length);
+      quotaWarnedAt = 0;
     } catch {
-      /* quota exceeded — state continues seamlessly in memory */
+      /* Storage is full. Never silent: the user must know that edits since
+         the last successful write exist only in memory. Re-alarm at most
+         once a minute so a persist-per-second loop doesn't toast-spam. */
+      if (Date.now() - quotaWarnedAt > 60_000) {
+        quotaWarnedAt = Date.now();
+        toast('storage is full — recent edits are NOT saved to disk. Free space or export a backup.', 'warn');
+      }
     }
   }, 1000);
 }

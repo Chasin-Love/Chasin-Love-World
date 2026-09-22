@@ -381,12 +381,19 @@ class RealitySyncDaemon {
 
       fs.renameSync(oldPath, newPath);
 
-      // Update index.ts inside new folder
-      const indexPath = path.join(newPath, 'index.ts');
-      if (fs.existsSync(indexPath)) {
-        let content = fs.readFileSync(indexPath, 'utf-8');
-        content = content.replace(/name:\s*['"][^'"]*['"]/, `name: '${newName.replace(/'/g, "\\'")}'`);
-        fs.writeFileSync(indexPath, content, 'utf-8');
+      /* Patch the display name in the generated modules. The new name is
+         written via JSON.stringify (a function replacement, so `$` sequences
+         in the name can't substitute) — a raw string splice here used to
+         corrupt the module when the name contained a backslash, and one
+         broken module white-screens the whole app because all realities are
+         compiled together by an eager glob. */
+      const nameLiteral = `name: ${JSON.stringify(newName)}`;
+      for (const file of ['index.ts', 'surface.ts']) {
+        const modulePath = path.join(newPath, file);
+        if (!fs.existsSync(modulePath)) continue;
+        const content = fs.readFileSync(modulePath, 'utf-8');
+        const patched = content.replace(/^(\s*)name:\s*(?:'[^']*'|"[^"]*"|`[^`]*`)/m, (_m, indent: string) => `${indent}${nameLiteral}`);
+        if (patched !== content) fs.writeFileSync(modulePath, patched, 'utf-8');
       }
 
       this.log('RENAME_FOLDER', `Renamed src/realities/${oldFolderName} -> src/realities/${newFolderName}`);
