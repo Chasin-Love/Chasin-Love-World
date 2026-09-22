@@ -42,12 +42,15 @@ function collectRawRealities(): any[] {
     for (const val of Object.values(mod)) {
       if (Array.isArray(val)) {
         val.forEach((item) => {
-          if (item && item.id && !map.has(item.id)) {
+          if (item && item.id && Array.isArray(item.bodies) && !map.has(item.id)) {
             map.set(item.id, item);
             if (folderMatch) folderById.set(item.id, folderMatch[1]);
           }
         });
-      } else if (val && typeof val === 'object' && val.id && !map.has(val.id)) {
+      } else if (val && typeof val === 'object' && val.id && Array.isArray(val.bodies) && !map.has(val.id)) {
+        /* RealityConfigs are recognizable by their `bodies` array — this keeps
+           helper exports (galaxy rosters, lineages) from being mistaken for
+           realities and becoming colorless phantom universes */
         map.set(val.id, val);
         if (folderMatch) folderById.set(val.id, folderMatch[1]);
       }

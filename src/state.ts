@@ -80,6 +80,12 @@ export function newId(): string {
 
 /* ================================ store ================================== */
 
+/* identity cache for the customRealityDescriptions view — the 3s disk-sync
+   heartbeat must NOT re-identify this object, or App's reality effect
+   re-fires engine.setReality() and rebuilds the stage under the user.
+   Declared before boot: createSnapshot runs during module initialization. */
+let descCache: { json: string; view: Record<string, string> } = { json: '{}', view: {} };
+
 let state: UniverseState = loadState();
 let snapshot: UniverseState = createSnapshot(state);
 const listeners = new Set<() => void>();
@@ -124,11 +130,6 @@ function ensureBucket(realityId: string): RealityBucket {
 function bucket(): RealityBucket {
   return ensureBucket(state.activeRealityId || 'sol-prime');
 }
-
-/* identity cache for the customRealityDescriptions view — the 3s disk-sync
-   heartbeat must NOT re-identify this object, or App's reality effect
-   re-fires engine.setReality() and rebuilds the stage under the user */
-let descCache: { json: string; view: Record<string, string> } = { json: '{}', view: {} };
 
 function createSnapshot(s: UniverseState): UniverseState {
   const active = s.realities?.[s.activeRealityId || 'sol-prime'] ?? emptyBucket();
@@ -311,12 +312,11 @@ function loadState(): UniverseState {
 
         parsed.version = 4;
         const primed = primeState(parsed);
-        if (healedCount > 0) {
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(primed));
-          } catch {
-            /* quota or storage error */
-          }
+        try {
+          /* persist the migration immediately — never rely on the next edit */
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(primed));
+        } catch {
+          /* quota or storage error */
         }
         return primed;
       }
