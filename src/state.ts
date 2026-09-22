@@ -125,8 +125,17 @@ function bucket(): RealityBucket {
   return ensureBucket(state.activeRealityId || 'sol-prime');
 }
 
+/* identity cache for the customRealityDescriptions view — the 3s disk-sync
+   heartbeat must NOT re-identify this object, or App's reality effect
+   re-fires engine.setReality() and rebuilds the stage under the user */
+let descCache: { json: string; view: Record<string, string> } = { json: '{}', view: {} };
+
 function createSnapshot(s: UniverseState): UniverseState {
   const active = s.realities?.[s.activeRealityId || 'sol-prime'] ?? emptyBucket();
+  const descJson = JSON.stringify(s.customRealityDescriptions ?? {});
+  if (descJson !== descCache.json) {
+    descCache = { json: descJson, view: { ...(s.customRealityDescriptions ?? {}) } };
+  }
   return {
     ...s,
     /* derived views of the active reality's container — the whole app reads
@@ -139,9 +148,7 @@ function createSnapshot(s: UniverseState): UniverseState {
     efs: active.efs
       ? { ...active.efs, nodes: { ...active.efs.nodes }, shadows: [...active.efs.shadows], super: { ...active.efs.super } }
       : createVfs(),
-    customRealityDescriptions: s.customRealityDescriptions
-      ? { ...s.customRealityDescriptions }
-      : {},
+    customRealityDescriptions: descCache.view,
     customRealities: s.customRealities ? [...s.customRealities] : [],
     deletedRealityIds: s.deletedRealityIds ? [...s.deletedRealityIds] : [],
     binRealities: s.binRealities ? [...s.binRealities] : [],

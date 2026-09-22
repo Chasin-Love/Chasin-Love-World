@@ -21,7 +21,7 @@ import { createBlackHole, type BlackHoleVisual } from './blackhole';
 import { createRaymarchBlackHole, updateRaymarchUniforms } from './blackholeRaymarch';
 import { canUseRaymarchBlackHole, probeCapability, pixelRatioFor, getQualityTier, QUALITY_CHANGE_EVENT } from './capability';
 import { CameraRig } from './cameraRig';
-import type { CosmicBody } from '../types';
+import type { CosmicBody, DiaryEntry } from '../types';
 import { REALITIES, RealityConfig, GalaxyClusterData, GalaxyData } from '../realities';
 import { HIERARCHY_DIALS } from '../realities/hierarchyStages';
 import { generateStellarSystemForGalaxy } from '../realities/galaxyGenerator';
@@ -441,6 +441,9 @@ export class UniverseEngine {
   private surfaceParticlesMat!: THREE.ShaderMaterial;
   private surfaceBlend = 0;
   private activeRealityId = 'sol-prime';
+  /* a galaxy dive requested before the target reality's roster landed —
+     executed by setReality once the stage is built */
+  private pendingGalaxyEntry: { realityId: string; galaxyId: string } | null = null;
   private activeReality: RealityConfig | null = null;
   private realityGroups: Record<string, THREE.Group> = {};
   private activeRealityShieldMesh: THREE.Group | null = null;
@@ -2297,6 +2300,11 @@ void main(){
     this.galaxyStagePointMats = [];
     this.innerColliderList = [];
     this.innerFocusBodyId = null;
+    /* the inhabited realm the user may be standing inside was just disposed —
+       the focus flags must follow, or a stale galaxyInnerFocus makes the next
+       click read as a background click and yank the camera to the galaxy band */
+    this.galaxyInnerFocus = false;
+    this.galaxyFocusId = null;
 
 
     const galaxies = reality.galaxies ?? [];
@@ -4138,7 +4146,7 @@ void main(){
   }
 
   /** Dimensional Barrier — strictly isolates state, star spectrum, corona, and local universe to active reality */
-  setReality(reality: RealityConfig) {
+  setReality(reality: RealityConfig, liveBodies?: CosmicBody[], liveEntries?: DiaryEntry[]) {
     perfMark('reality-rebuild-start');
     this.activeRealityId = reality.id;
     this.activeReality = reality;
@@ -4183,9 +4191,14 @@ void main(){
       });
     }
 
-    // 3. Sync celestial bodies & diary moons strictly for this reality
-    this.syncBodies(reality.bodies);
-    this.syncMoons(reality.entries);
+    // 3. Sync celestial bodies & diary moons strictly for this reality.
+    // The live container (the reality's actual worlds/pages) wins over the
+    // static config seed — user-added bodies survive the switch.
+    const bodies = liveBodies ?? reality.bodies;
+    const entries = liveEntries ?? reality.entries;
+    this.syncBodies(bodies);
+    this.syncMoons(entries);
+    this.lastEntries = entries;
     /* rebuild the GALAXY STAGE from this reality's REAL roster — one full
        spiral per major galaxy — and tint the cluster stage's hot gas.
        The boot call spreads the roster across frames (nothing at boot zoom
@@ -4207,11 +4220,11 @@ void main(){
     else this.renderer.compile(this.scene, this.camera);
 
     // 4. Clean up any invalid selection / focus
-    if (this.selectedId && !reality.bodies.some((b) => b.id === this.selectedId) && this.selectedId !== 'anchor') {
+    if (this.selectedId && !bodies.some((b) => b.id === this.selectedId) && this.selectedId !== 'anchor') {
       this.selectedId = null;
       this.cb.onSelect(null);
     }
-    if (this.focusId && !reality.bodies.some((b) => b.id === this.focusId) && this.focusId !== 'anchor') {
+    if (this.focusId && !bodies.some((b) => b.id === this.focusId) && this.focusId !== 'anchor') {
       this.focusId = null;
     }
 
@@ -4223,6 +4236,14 @@ void main(){
           this.realityGroups[id].visible = isMultiverseMode || (id === reality.id);
         }
       });
+    }
+
+    // 6. A galaxy dive queued before this roster landed executes now
+    if (this.pendingGalaxyEntry && this.pendingGalaxyEntry.realityId === reality.id) {
+      const pending = this.pendingGalaxyEntry;
+      this.pendingGalaxyEntry = null;
+      const gal = (reality.galaxies ?? []).find((g) => g.id === pending.galaxyId);
+      if (gal) this.beginGalaxyEntry(gal);
     }
     perfMeasure('reality-rebuild', 'reality-rebuild-start');
   }
@@ -4441,6 +4462,13 @@ void main(){
       from the engine's own stage (the runtime roster) — the static defaults
       may not know about user-created galaxies. */
   enterGalaxy(realityId: string, galaxyId: string) {
+    /* a dive into ANOTHER reality arrives before that reality's roster is
+       on the stage (the App switches reality then calls this synchronously).
+       Queue the dive — setReality executes it the moment the roster lands. */
+    if (this.activeRealityId !== realityId) {
+      this.pendingGalaxyEntry = { realityId, galaxyId };
+      return;
+    }
     const gal =
       this.galaxyStageNodes.find((n) => n.data.id === galaxyId)?.data
       ?? (this.cosmicStage === 'multiverse'

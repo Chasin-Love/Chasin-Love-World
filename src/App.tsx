@@ -403,7 +403,13 @@ export default function App() {
         if (mode === 'core') closeCore();
         else { eng.enterCoreMode(); eng.setConnections(getState().connections.map((c) => [c.a, c.b] as [string, string])); setMode('core'); setAudioMode('core'); }
       }
-      if (e.key === 'v' || e.key === 'V') { if (mode === 'space') eng.focusOn('eventide'); }
+      if (e.key === 'v' || e.key === 'V') {
+        if (mode === 'space') {
+          /* find THIS reality's black hole — the vault body id is per-reality */
+          const vaultBody = getState().bodies.find((b) => b.kind === 'vault');
+          if (vaultBody) eng.focusOn(vaultBody.id);
+        }
+      }
       if (e.key === 'g' || e.key === 'G') { if (mode === 'space') { setShowCosmicHud((v) => !v); toast(showCosmicHud ? 'survey HUD stowed' : '✦ scientific survey HUD online'); } }      if (e.key === 'm' || e.key === 'M') { const m = toggleMute(); toast(m ? 'silence — the universe mutes' : 'the hum returns'); }
       if (e.key === ' ') { e.preventDefault(); eng.setPaused(!eng.pausedNow); setPaused(eng.pausedNow); toast(paused ? 'time flows' : 'time held'); }
     };
@@ -456,7 +462,9 @@ export default function App() {
     const eng = engineRef.current;
     if (!eng) return;
     const r = getReality(state.activeRealityId || 'sol-prime', state.customRealityDescriptions);
-    eng.setReality(r);
+    /* the live container (this reality's actual worlds/pages) feeds the
+       engine — user-added bodies survive every warp */
+    eng.setReality(r, state.bodies, state.entries);
   }, [state.activeRealityId, state.customRealityDescriptions]);
 
   /* EXISTENCE SYNC — the 3D multiverse is rebuilt from the live reality list
@@ -480,20 +488,30 @@ export default function App() {
   }, [galSig, metaSig, customIdsSig, deletedSig]);
 
   /* keep the living structure in sync — new worlds form, dissolved worlds vanish,
-     and moons always mirror the diary pages of their planet */
+     and moons always mirror the diary pages of their planet. Signature-guarded:
+     the store hands out fresh view identities on every notify (including the 3s
+     disk-sync heartbeat), and re-pushing identical rosters at the engine is
+     wasted churn at best and stage churn at worst. */
+  const bodiesSig = useMemo(() => JSON.stringify(state.bodies), [state.bodies]);
+  const entriesSig = useMemo(() => JSON.stringify(state.entries), [state.entries]);
+  const connectionsSig = useMemo(() => JSON.stringify(state.connections), [state.connections]);
   useEffect(() => {
     const eng = engineRef.current;
     if (!eng) return;
-    eng.syncBodies(state.bodies);
-    eng.syncMoons(state.entries);
-    eng.setConnections(state.connections.map((c) => [c.a, c.b] as [string, string]));
-  }, [state.bodies, state.entries, state.connections]);
+    eng.syncBodies(JSON.parse(bodiesSig) as typeof state.bodies);
+    eng.syncMoons(JSON.parse(entriesSig) as typeof state.entries);
+    eng.setConnections((JSON.parse(connectionsSig) as typeof state.connections).map((c) => [c.a, c.b] as [string, string]));
+  }, [bodiesSig, entriesSig, connectionsSig]);
 
-  /* close diary windows whose world has dissolved */
+  /* close diary windows whose world has dissolved — a body counts as alive
+     if the active container knows it OR the engine still resolves it (inner
+     realms of non-home galaxies live only inside the engine) */
   useEffect(() => {
-    setWins((cur) => cur.filter((w) => state.bodies.some((b) => b.id === w.planetId)));
-    setEntered((cur) => (cur && !state.bodies.some((b) => b.id === cur) ? null : cur));
-  }, [state.bodies]);
+    setWins((cur) => cur.filter((w) =>
+      state.bodies.some((b) => b.id === w.planetId) || engineRef.current?.getInnerBody(w.planetId)
+    ));
+    setEntered((cur) => (cur && !state.bodies.some((b) => b.id === cur) && !engineRef.current?.getInnerBody(cur) ? null : cur));
+  }, [bodiesSig]);
 
   /* ------------------------------ helpers ------------------------------ */
 
