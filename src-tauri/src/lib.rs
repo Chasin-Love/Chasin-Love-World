@@ -252,6 +252,7 @@ fn reality_create_folder(
     bodies: Option<String>,
     entries: Option<String>,
     folder_name: Option<String>,
+    galaxy_count_hint: Option<u32>,
 ) -> Result<serde_json::Value, String> {
     let folder = realities::create_folder(
         id,
@@ -265,6 +266,7 @@ fn reality_create_folder(
         bodies.unwrap_or_default(),
         entries.unwrap_or_else(|| "[]".into()),
         folder_name,
+        galaxy_count_hint,
     )?;
     Ok(serde_json::json!({ "success": true, "folderName": folder }))
 }

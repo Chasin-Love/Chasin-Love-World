@@ -72,6 +72,9 @@ export interface RealityTemplateInput {
   bodiesSource: string;
   /** JSON string (already serialized) for the `entries:` field. */
   entriesSource: string;
+  /** Requested galaxy count — persisted into the module so the roster is
+      regenerated deterministically instead of re-rolled. */
+  galaxyCountHint?: number;
 }
 
 export function renderRealityModule(input: RealityTemplateInput): string {
@@ -94,7 +97,7 @@ export const ${realityVarNameOf(input.folderName)}: RealityConfig = {
   colorB: ${esc(input.colorB)},
   starColor: ${esc(input.starColor)},
   bodies: ${input.bodiesSource},
-  entries: ${input.entriesSource},
+  entries: ${input.entriesSource},${input.galaxyCountHint != null ? `\n  galaxyCountHint: ${Math.max(1, Math.min(12, Math.round(input.galaxyCountHint)))},` : ''}
 };
 
 export * from './surface';

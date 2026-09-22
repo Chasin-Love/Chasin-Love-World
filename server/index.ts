@@ -155,6 +155,7 @@ async function startServer() {
         bodies = [],
         entries = [],
         folderName: customFolderName,
+        galaxyCountHint,
       } = req.body;
 
       if (!name || typeof name !== 'string') {
@@ -206,11 +207,12 @@ async function startServer() {
           colorB,
           starColor,
           folderName,
-          bodiesSource: bodies.length > 0
-            ? JSON.stringify(bodies, null, 2)
-            : defaultBodiesSource(cleanId, name, colorA, colorB),
-          entriesSource: JSON.stringify(entries, null, 2),
-        }),
+        bodiesSource: bodies.length > 0
+          ? JSON.stringify(bodies, null, 2)
+          : defaultBodiesSource(cleanId, name, colorA, colorB),
+        entriesSource: JSON.stringify(entries, null, 2),
+        galaxyCountHint: typeof galaxyCountHint === 'number' ? galaxyCountHint : undefined,
+      }),
         'utf-8',
       );
 

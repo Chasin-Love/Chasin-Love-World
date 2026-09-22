@@ -9,7 +9,7 @@ import { CosmicLineage, GalaxyClusterData, GalaxyData } from './hierarchyTypes';
 import type { CosmicBody, Palette } from '../types';
 
 /* deterministic string hash → uint32 seed */
-function seedOf(str: string): number {
+export function seedOf(str: string): number {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);
@@ -19,7 +19,7 @@ function seedOf(str: string): number {
 }
 
 /* mulberry32 — small, stable, good enough for layout aesthetics */
-function prng(seed: number): () => number {
+export function prng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a |= 0; a = (a + 0x6d2b79f5) | 0;
@@ -170,7 +170,10 @@ export function generateGalaxiesForReality(params: {
 }): GalaxyData[] {
   const { realityId, realityName, colorA, colorB, clusters, anchorStarName, worldsCount, galaxyCountHint } = params;
   const rnd = prng(seedOf(`galaxies::${realityId}`));
-  const count = Math.max(1, Math.min(12, galaxyCountHint ?? 3 + Math.floor(rnd() * 3))); /* 3–5 majors by default */
+  /* the requested count is law — when no hint exists the roster is exactly
+     ONE home galaxy, never a random roll. Randomness below is placement and
+     naming only. */
+  const count = Math.max(1, Math.min(12, galaxyCountHint ?? 1));
 
   const galaxies: GalaxyData[] = [];
   const usedNames = new Set<string>();

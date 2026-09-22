@@ -30,6 +30,9 @@ export interface RealityConfig {
   /* major galaxies — the multiverse view draws ONE ellipse orbit around the
      reality bubble per entry, so this list IS the reality's visible ring */
   galaxies?: GalaxyData[];
+  /* the galaxy count requested at the forge — persisted so the roster can be
+     regenerated deterministically (recolor etc.) without ever re-rolling */
+  galaxyCountHint?: number;
   homeLineage?: CosmicLineage;
 }
 

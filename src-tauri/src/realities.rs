@@ -330,6 +330,7 @@ pub fn create_folder(
     bodies_json: String,
     entries_json: String,
     folder_name: Option<String>,
+    galaxy_count_hint: Option<u32>,
 ) -> Result<String, String> {
     if name.trim().is_empty() {
         return Err("Reality name is required".into());
@@ -397,7 +398,7 @@ pub fn create_folder(
     fs::write(target.join("surface.ts"), surface).map_err(|e| e.to_string())?;
 
     let index = format!(
-        "import {{ RealityConfig }} from '../types';\nimport {{ {sv} }} from './surface';\n\nconst day = 86400000;\nconst now = Date.now();\nconst TAU = Math.PI * 2;\n\nexport const {v}: RealityConfig = {{\n  id: '{cid}',\n  name: {name},\n  codeName: {cn},\n  spectral: {sp},\n  description: {desc},\n  bubblePos: [0, 0, 0],\n  bubbleSize: 7500,\n  colorA: '{ca}',\n  colorB: '{cb}',\n  starColor: '{sc}',\n  bodies: {bodies},\n  entries: {entries},\n}};\n\nexport * from './surface';\n",
+        "import {{ RealityConfig }} from '../types';\nimport {{ {sv} }} from './surface';\n\nconst day = 86400000;\nconst now = Date.now();\nconst TAU = Math.PI * 2;\n\nexport const {v}: RealityConfig = {{\n  id: '{cid}',\n  name: {name},\n  codeName: {cn},\n  spectral: {sp},\n  description: {desc},\n  bubblePos: [0, 0, 0],\n  bubbleSize: 7500,\n  colorA: '{ca}',\n  colorB: '{cb}',\n  starColor: '{sc}',\n  bodies: {bodies},\n  entries: {entries},{hint}\n}};\n\nexport * from './surface';\n",
         sv = surface_var,
         v = var_name,
         cid = clean_id,
@@ -414,6 +415,9 @@ pub fn create_folder(
             bodies_json
         },
         entries = entries_json,
+        hint = galaxy_count_hint
+            .map(|h| format!("\n  galaxyCountHint: {},", h.clamp(1, 12)))
+            .unwrap_or_default(),
     );
     fs::write(target.join("index.ts"), index).map_err(|e| e.to_string())?;
     Ok(folder)

@@ -152,6 +152,7 @@ function mapRealityEndpoint<T = unknown>(path: string, body: unknown): { cmd: st
           bodies: JSON.stringify(cfg.bodies ?? []),
           entries: JSON.stringify(cfg.entries ?? []),
           folderName: cfg.folderName ?? null,
+          galaxyCountHint: typeof cfg.galaxyCountHint === 'number' ? cfg.galaxyCountHint : null,
         },
       };
     }

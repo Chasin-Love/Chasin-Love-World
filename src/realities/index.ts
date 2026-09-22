@@ -1,7 +1,7 @@
 import { RealityConfig, RealityMetaOverride } from './types';
 import { solPrimeReality } from './solPrime';
 import { generateClustersForReality } from './clusterGenerator';
-import { generateGalaxiesForReality } from './galaxyGenerator';
+import { generateGalaxiesForReality, prng, seedOf } from './galaxyGenerator';
 import { GalaxyData } from './hierarchyTypes';
 
 export * from './types';
@@ -12,6 +12,18 @@ export * from './solPrime';
 
 // Dynamically discover all reality configurations across all subfolders
 const realityModules = import.meta.glob<{ [key: string]: any }>('./*/index.ts', { eager: true });
+
+/* the wide world-name pool — realities draw their cast from here, seeded by
+   their own id, so every reality gets a distinct set of worlds */
+const WORLD_NAME_POOL = [
+  'Aethelgard', 'Celestia', 'Vesperion', 'Chronos', 'Astraea', 'Hyperion', 'Zephyria',
+  'Elysium', 'Nocturne', 'Pyros', 'Meridian', 'Solmara', 'Veyra', 'Ossia', 'Thalor',
+  'Nyxara', 'Auralith', 'Kaelis', 'Dravenna', 'Solarine', 'Umbris', 'Faelora',
+  'Tessara', 'Orivane', 'Lumenor', 'Cindara', 'Maristel', 'Quorin', 'Halcyra',
+  'Serenno', 'Avieth', 'Corvane', 'Ithralis', 'Ysolde', 'Peridion', 'Vantress',
+  'Ondrim', 'Calyx', 'Miravel', 'Zephyrion', 'Elandor', 'Ravassa', 'Solaris',
+  'Nimbrethil', 'Ardentis', 'Vespera', 'Oculon', 'Terravox',
+];
 
 /* realityId → disk folder name, derived from the build-time glob keys. This
    is the authoritative address map for base realities — bin operations send
@@ -150,27 +162,36 @@ export function buildRealityConfig(
   /* the anchor star's aura — user-picked via the control panel's presets */
   const effStarColor = meta?.starColor || r.starColor || effColorA;
 
+  /* an explicit roster on the config wins (solPrime ships its captured one);
+     otherwise generate — clusters sized to the requested galaxy count */
+  const clusterCount = r.clusters?.length ?? Math.max(1, Math.min(12, r.galaxyCountHint ?? 1));
   const { clusters, homeLineage } = generateClustersForReality(
     r.id,
     effName,
     effColorA,
     effColorB,
     updatedBodies,
-    bubbleSize
+    bubbleSize,
+    clusterCount
   );
 
   /* major galaxies — one ellipse orbit around the bubble per galaxy.
-     User-authored roster wins; otherwise a deterministic default roster. */
-  const galaxies: GalaxyData[] = customGalaxies?.[r.id] || generateGalaxiesForReality({
-    realityId: r.id,
-    realityName: effName,
-    colorA: effColorA,
-    colorB: effColorB,
-    clusters,
-    anchorStarName: updatedBodies[0]?.name ?? `${effName} Anchor Star`,
-    worldsCount: updatedBodies.length,
-    galaxyCountHint: r.galaxyCountHint,
-  });
+     Precedence: user-authored roster (state) → explicit roster on the config
+     → deterministic generation from the persisted galaxyCountHint. An
+     explicitly emptied roster stays empty (?? not ||). The home galaxy's
+     color always follows the reality's live colorA. */
+  const galaxyRoster: GalaxyData[] = customGalaxies?.[r.id]
+    ?? r.galaxies?.map((g: GalaxyData) => (g.isHomeGalaxy ? { ...g, color: effColorA } : g))
+    ?? generateGalaxiesForReality({
+      realityId: r.id,
+      realityName: effName,
+      colorA: effColorA,
+      colorB: effColorB,
+      clusters,
+      anchorStarName: updatedBodies[0]?.name ?? `${effName} Anchor Star`,
+      worldsCount: updatedBodies.length,
+      galaxyCountHint: r.galaxyCountHint,
+    });
 
   const desc = customDescriptions && customDescriptions[r.id] ? customDescriptions[r.id] : r.description;
 
@@ -187,7 +208,7 @@ export function buildRealityConfig(
     bubbleSize,
     bodies: updatedBodies,
     clusters: r.clusters || clusters,
-    galaxies: customGalaxies?.[r.id] || galaxies,
+    galaxies: galaxyRoster,
     homeLineage: r.homeLineage || homeLineage,
   };
 }
@@ -279,9 +300,15 @@ export function createNewRealityConfig(params: {
     orbit: { a: 210, speed: TAU / 12000, phase: 1.2, incl: -0.1 },
   };
 
-  const planetNames = [
-    'Aethelgard', 'Celestia', 'Vesperion', 'Chronos', 'Astraea', 'Hyperion', 'Zephyria', 'Elysium', 'Nocturne', 'Pyros'
-  ];
+  /* world names are drawn from a wide pool, seeded by this reality's own id —
+     no two realities ever spawn the same cast of worlds */
+  const nameRnd = prng(seedOf(`worlds::${id}::${params.name}`));
+  const shuffled = [...WORLD_NAME_POOL];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(nameRnd() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const planetNames = shuffled.slice(0, 8);
 
   const generatedBodies = [anchorStar];
   const count = Math.min(8, Math.max(1, params.planetsCount));
