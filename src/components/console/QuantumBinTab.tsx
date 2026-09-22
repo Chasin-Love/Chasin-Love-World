@@ -218,7 +218,7 @@ export const QuantumBinTab: React.FC = () => {
             {binRealities.map((item) => (
               <div
                 key={item.id}
-                className="p-4 rounded-2xl bg-[#131019] border border-rose-500/25 hover:border-rose-400/45 flex flex-col justify-between gap-3 transition-all hover:shadow-[0_16px_40px_rgba(0,0,0,0.5)]"
+                className="p-4 rounded-2xl bg-[rgba(19,16,25,0.66)] border border-rose-500/25 hover:border-rose-400/45 flex flex-col justify-between gap-3 transition-all hover:shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_16px_rgba(251,113,133,0.1)]"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">

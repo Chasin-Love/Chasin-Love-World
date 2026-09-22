@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence, MotionConfig, type Variants } from 'framer-motion';
 import {
   X, Zap, Globe, Sparkles, Orbit, Trash2, ChevronDown, ChevronRight,
   Plus, ShieldCheck, Crosshair, Wind, Compass, Search,
@@ -34,6 +35,27 @@ const TAB_ACCENTS: Record<Tab, string> = {
   realities: '#f2c178',
   hierarchy: '#a78bfa',
   bin: '#fb7185',
+};
+
+/* Quantum Glass motion system — staggered deck entrance + tab transitions.
+   Transform/opacity only; MotionConfig reducedMotion="user" in the main
+   component disables it for users who prefer reduced motion. */
+const deckStagger: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.055, delayChildren: 0.04 } },
+};
+const rise: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 130, damping: 19 } },
+};
+/* the realities-matrix panel rises AND orchestrates its own cards */
+const matrixRise: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 130, damping: 19, staggerChildren: 0.05, delayChildren: 0.08 },
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -78,7 +100,7 @@ function CoreBackdrop() {
     };
 
     /* --- perspective starfield flying past the camera --- */
-    interface Star3 { x: number; y: number; z: number; r: number; color: string }
+    interface Star3 { x: number; y: number; z: number; r: number; color: string; phase: number; tw: number }
     const starColors = ['#00f5d4', '#38bdf8', '#8b5cf6', '#ec4899', '#ffffff', '#fbbf24'];
     const STAR_COUNT = 460;
     const STARS: Star3[] = Array.from({ length: STAR_COUNT }, () => ({
@@ -87,6 +109,8 @@ function CoreBackdrop() {
       z: Math.random() * 1400,
       r: 0.6 + Math.random() * 1.7,
       color: starColors[Math.floor(Math.random() * starColors.length)],
+      phase: Math.random() * Math.PI * 2,
+      tw: 1.2 + Math.random() * 2.8,
     }));
 
     /* --- rotating wireframe cosmic-web spheres --- */
@@ -147,13 +171,15 @@ function CoreBackdrop() {
       mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 2.5);
       ctx.clearRect(0, 0, w, h);
 
-      /* Chromatic Nebulae Drift */
+      /* Chromatic Nebulae Drift — the cyan/violet pair slowly breathes
+         against each other, a violet↔cyan tide across the void */
       nebulae.forEach((n, i) => {
         const cx = (n.x + Math.sin(t * n.dx * 8 + i) * 0.06) * w;
         const cy = (n.y + Math.cos(t * n.dy * 8 + i * 2) * 0.06) * h;
         const rad = n.r * Math.min(w, h);
+        const breath = i < 2 ? 0.72 + 0.28 * Math.sin(t * 0.35 + (i === 0 ? 0 : Math.PI)) : 1;
         const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-        g.addColorStop(0, `${n.hue}${0.13 + 0.05 * Math.sin(t * 0.8 + i)})`);
+        g.addColorStop(0, `${n.hue}${(0.13 + 0.05 * Math.sin(t * 0.8 + i)) * breath})`);
         g.addColorStop(1, `${n.hue}0)`);
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, w, h);
@@ -170,7 +196,8 @@ function CoreBackdrop() {
         const { sx, sy, scale } = project(s.x, s.y, s.z);
         if (sx < -8 || sx > w + 8 || sy < -8 || sy > h + 8) return;
         const depth = 1 - s.z / 1400;
-        ctx.globalAlpha = Math.min(1, 0.12 + depth * 0.75);
+        /* twinkle — each star breathes on its own phase */
+        ctx.globalAlpha = Math.min(1, (0.12 + depth * 0.75) * (0.72 + 0.28 * Math.sin(t * s.tw + s.phase)));
         ctx.fillStyle = s.color;
         ctx.beginPath();
         ctx.arc(sx, sy, s.r * scale, 0, Math.PI * 2);
@@ -347,6 +374,14 @@ function HolographicMultiverseRadar({
       ctx.closePath();
       ctx.fill();
 
+      // Expanding Resonance Pulse from the Singularity Core
+      const pulseR = (angle * 44) % 236;
+      ctx.strokeStyle = `rgba(6, 182, 212, ${(0.34 * (1 - pulseR / 236)).toFixed(3)})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, pulseR, 0, Math.PI * 2);
+      ctx.stroke();
+
       // Central Astral Singularity Core
       const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 24);
       coreGrad.addColorStop(0, '#ffffff');
@@ -375,14 +410,15 @@ function HolographicMultiverseRadar({
         ctx.ellipse(cx, cy, radius, radius * 0.7, 0, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Node Glow
-        const orbG = ctx.createRadialGradient(rx, ry, 0, rx, ry, isActive ? 16 : 10);
+        // Node Glow — the anchored reality breathes
+        const nodeR = isActive ? 14 + 3 * Math.sin(angle * 6) : 10;
+        const orbG = ctx.createRadialGradient(rx, ry, 0, rx, ry, nodeR);
         orbG.addColorStop(0, r.colorA);
         orbG.addColorStop(0.7, r.colorB);
         orbG.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = orbG;
         ctx.beginPath();
-        ctx.arc(rx, ry, isActive ? 16 : 10, 0, Math.PI * 2);
+        ctx.arc(rx, ry, nodeR, 0, Math.PI * 2);
         ctx.fill();
 
         // Node Core Dot
@@ -433,15 +469,15 @@ function HolographicMultiverseRadar({
   };
 
   return (
-    <div className="relative w-full aspect-square max-w-[260px] mx-auto flex items-center justify-center p-2 rounded-2xl bg-black/25 border border-white/6">
+    <div className="cc-radar-frame relative w-full aspect-square max-w-[260px] mx-auto flex items-center justify-center p-2 rounded-2xl">
       <canvas
         ref={canvasRef}
         className="w-full h-full object-contain"
         onClick={handleRadarClick}
         onMouseMove={handleRadarMove}
       />
-      <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-400/30 text-[9px] font-mono text-cyan-300">
-        <Radio className="w-2.5 h-2.5 animate-pulse text-cyan-400" />
+      <div className="cc-badge absolute top-2 left-2">
+        <Radio className="w-2.5 h-2.5 animate-pulse" />
         <span>RADAR 3D LIVE · CLICK TO WARP</span>
       </div>
     </div>
@@ -461,7 +497,7 @@ function VitalTile({
   color: string;
 }) {
   return (
-    <div className="p-2.5 rounded-xl bg-black/30 border border-white/6 flex flex-col items-center gap-1">
+    <div className="cc-vital p-2.5 flex flex-col items-center gap-1" style={{ ['--tile' as string]: color }}>
       <span className="cc-num text-lg leading-none" style={{ color }}>
         {value}
       </span>
@@ -563,18 +599,27 @@ function BentoRealityCard({
   };
 
   return (
-    <div
-      className={`group relative rounded-2xl border transition-all duration-300 flex flex-col justify-between overflow-hidden ${
+    <motion.div
+      variants={rise}
+      whileHover={{ y: -3 }}
+      className={`group relative rounded-2xl border transition-[border-color,box-shadow] duration-300 flex flex-col justify-between overflow-hidden ${
         active
-          ? 'bg-linear-to-b from-cyan-500/12 via-[#0b1322] to-[#080e1b] border-cyan-400/50 shadow-[0_16px_40px_rgba(0,0,0,0.55),0_0_20px_rgba(6,182,212,0.15)]'
-          : 'bg-[#0d1526] border-white/8 hover:border-cyan-400/35 hover:shadow-[0_16px_40px_rgba(0,0,0,0.5)]'
+          ? 'bg-linear-to-b from-cyan-500/14 via-[rgba(11,19,34,0.78)] to-[rgba(8,14,27,0.82)] border-cyan-400/55 shadow-[0_16px_40px_rgba(0,0,0,0.55),0_0_26px_rgba(6,182,212,0.2)] cc-sheen'
+          : 'bg-[rgba(13,21,38,0.66)] border-white/8 hover:border-cyan-400/35 hover:shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_16px_rgba(6,182,212,0.1)]'
       }`}
     >
-      {/* Top Accent Line */}
+      {/* Top Accent Line — the anchored reality's line carries a travelling spark */}
       <div
-        className="h-1 w-full"
+        className="relative h-1 w-full overflow-hidden"
         style={{ background: `linear-gradient(90deg, ${reality.colorA}, ${reality.colorB})` }}
-      />
+      >
+        {active && (
+          <div
+            className="cc-line-sheen absolute inset-y-0 left-0 w-1/4 bg-white/60"
+            style={{ filter: 'blur(2px)' }}
+          />
+        )}
+      </div>
 
       {/* Card Header */}
       <div className="p-4 flex flex-col gap-3">
@@ -637,7 +682,7 @@ function BentoRealityCard({
           </div>
 
           {active && (
-            <span className="px-2 py-0.5 rounded-full bg-cyan-500/25 border border-cyan-400/50 text-[8.5px] font-mono font-bold uppercase tracking-wider text-cyan-200 shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+            <span className="px-2 py-0.5 rounded-full bg-cyan-500/25 border border-cyan-400/60 text-[8.5px] font-mono font-bold uppercase tracking-wider text-cyan-200 shadow-[0_0_14px_rgba(6,182,212,0.55)]">
               ANCHORED
             </span>
           )}
@@ -737,11 +782,12 @@ function BentoRealityCard({
         <button
           onClick={onWarp}
           disabled={active}
-          className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-mono uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-1.5 ${
+          className={`cc-btn-glass flex-1 py-1.5 px-3 rounded-xl text-xs font-mono uppercase tracking-wider font-bold flex items-center justify-center gap-1.5 ${
             active
-              ? 'bg-cyan-500/20 text-cyan-200/80 border border-cyan-400/40 cursor-default'
-              : 'bg-white/6 hover:bg-cyan-500/20 text-slate-200 border border-white/10 hover:border-cyan-400/40 cursor-pointer'
+              ? 'text-cyan-200 shadow-[0_0_15px_rgba(6,182,212,0.35),inset_0_0_12px_rgba(6,182,212,0.12)] cursor-default'
+              : 'text-slate-200 cursor-pointer'
           }`}
+          style={active ? { ['--btn' as string]: '6 182 212', borderColor: 'rgba(34,211,238,0.45)' } : undefined}
         >
           <Zap className="w-3.5 h-3.5" />
           <span>{active ? 'Anchored' : 'Warp to Reality'}</span>
@@ -780,7 +826,7 @@ function BentoRealityCard({
           <RealityAdvancedPanel realityId={reality.id} onEnterGalaxy={onEnterGalaxy} />
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -969,6 +1015,7 @@ export const CoreConsole: React.FC<Props> = ({
   }, [onClose, showCreate]);
 
   return (
+    <MotionConfig reducedMotion="user">
     <div
       className="fixed inset-0 z-100 overlay-in bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 lg:p-6 select-none"
       onClick={onClose}
@@ -1007,7 +1054,7 @@ export const CoreConsole: React.FC<Props> = ({
 
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="cc-display drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                <h2 className="cc-display cc-glow-title">
                   MULTIVERSE CORE COMMAND DECK
                 </h2>
                 <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
@@ -1027,9 +1074,20 @@ export const CoreConsole: React.FC<Props> = ({
                     : 'DISK MIRROR OFFLINE'}
                 </span>
               </div>
-              <p className="font-mono text-[9px] tracking-[0.2em] uppercase text-cyan-300/80 truncate">
-                Status: Sovereign Continuum Active · {realities.length} Realities · {totalClusters} Clusters · {totalGalaxies} Galaxies · {totalWorlds} Worlds
-              </p>
+              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                <span className="cc-badge">
+                  <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+                  Sovereign Continuum Active
+                </span>
+                {[
+                  `${realities.length} Realities`,
+                  `${totalClusters} Clusters`,
+                  `${totalGalaxies} Galaxies`,
+                  `${totalWorlds} Worlds`,
+                ].map((s) => (
+                  <span key={s} className="cc-badge cc-badge-dim">{s}</span>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -1133,13 +1191,26 @@ export const CoreConsole: React.FC<Props> = ({
 
         {/* MAIN BODY AREA (HORIZONTAL COCKPIT LAYOUT) */}
         <div className="flex-1 min-h-0 overflow-y-auto custom-scroll px-5 sm:px-7 py-4">
+          <AnimatePresence mode="wait">
           {tab === 'dashboard' && (
             /* 12-col bento: radar(4×2 rows) · vitals(8) · realities(8) ·
                pods(4) · engine(8) · chronicle(12) — auto-placement puts pods
                directly under the radar */
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+            <motion.div
+              className="grid grid-cols-1 lg:grid-cols-12 gap-3"
+              variants={deckStagger}
+              initial="hidden"
+              animate="show"
+            >
               {/* RADAR — tall 4-col bento cell */}
-              <div className="lg:col-span-4 lg:row-span-2 cc-panel p-4 flex flex-col items-center">
+              <motion.div variants={rise} className="lg:col-span-4 lg:row-span-2 cc-panel p-4 flex flex-col items-center">
                 <span className="cc-panel-title self-start mb-2">
                   <Orbit className="w-3.5 h-3.5" />
                   Multiverse Radar Scan
@@ -1150,13 +1221,16 @@ export const CoreConsole: React.FC<Props> = ({
                   onSelect={(id) => onWarpReality(id)}
                 />
                 <div className="mt-auto pt-3 w-full flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-white/6">
-                  <span>Anchor: <span className="text-cyan-300 font-bold">{activeReality.name}</span></span>
-                  <button onClick={() => setTab('realities')} className="text-cyan-400 hover:text-white">View All →</button>
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.9)] shrink-0" />
+                    <span className="truncate">Anchor: <span className="text-cyan-300 font-bold">{activeReality.name}</span></span>
+                  </span>
+                  <button onClick={() => setTab('realities')} className="text-cyan-400 hover:text-white shrink-0">View All →</button>
                 </div>
-              </div>
+              </motion.div>
 
               {/* VITALS — wide 8-col strip: four figures + disk mirror */}
-              <div className="lg:col-span-8 cc-panel p-4 flex flex-col gap-2.5">
+              <motion.div variants={rise} className="lg:col-span-8 cc-panel p-4 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
                   <span className="cc-panel-title">
                     <ShieldCheck className="w-3.5 h-3.5" />
@@ -1174,10 +1248,10 @@ export const CoreConsole: React.FC<Props> = ({
                   <VitalTile label="Clusters" value={totalClusters} color="#f472b6" />
                 </div>
                 <DiskSyncStatusTile diskSync={state.diskSync} />
-              </div>
+              </motion.div>
 
               {/* ACTIVE REALITIES MATRIX — 8-col beside the radar */}
-              <div className="lg:col-span-8 flex flex-col gap-3">
+              <motion.div variants={matrixRise} className="lg:col-span-8 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <span className="cc-panel-title">
                     <Globe className="w-4 h-4" />
@@ -1206,54 +1280,57 @@ export const CoreConsole: React.FC<Props> = ({
                     />
                   ))}
                 </div>
-              </div>
+              </motion.div>
 
               {/* QUICK PODS — 4-col, lands directly under the radar */}
-              <div className="lg:col-span-4 cc-panel p-4">
+              <motion.div variants={rise} className="lg:col-span-4 cc-panel p-4">
                 <span className="cc-panel-title block mb-2">Singularity Quick Pods</span>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={onZoomToCore}
-                    className="p-2.5 rounded-xl bg-cyan-500/12 hover:bg-cyan-500/28 border border-cyan-400/35 text-cyan-100 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                    style={{ ['--btn' as string]: '34 211 238' }}
+                    className="cc-btn-glass p-2.5 rounded-xl text-cyan-100 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Crosshair className="w-3.5 h-3.5" /> Frame Core
                   </button>
                   <button
                     onClick={onTriggerKamui}
-                    className="p-2.5 rounded-xl bg-rose-500/12 hover:bg-rose-500/28 border border-rose-400/35 text-rose-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                    style={{ ['--btn' as string]: '251 113 133' }}
+                    className="cc-btn-glass p-2.5 rounded-xl text-rose-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Zap className="w-3.5 h-3.5" /> Kamui Warp
                   </button>
                   {onShowToolbar && (
                     <button
                       onClick={onShowToolbar}
-                      className="p-2.5 rounded-xl bg-violet-500/12 hover:bg-violet-500/28 border border-violet-400/35 text-violet-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                      style={{ ['--btn' as string]: '167 139 250' }}
+                      className="cc-btn-glass p-2.5 rounded-xl text-violet-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Compass className="w-3.5 h-3.5" /> Toolbar
                     </button>
                   )}
                   <button
                     onClick={() => setShowCreate(true)}
-                    className="p-2.5 rounded-xl bg-white/5 hover:bg-white/12 border border-white/12 text-slate-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                    className="cc-btn-glass p-2.5 rounded-xl text-slate-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" /> New Reality
                   </button>
                 </div>
-              </div>
+              </motion.div>
 
               {/* C++ NATIVE ENGINE — 8-col */}
-              <div className="lg:col-span-8">
+              <motion.div variants={rise} className="lg:col-span-8">
                 <CppNativeEngineCard />
-              </div>
+              </motion.div>
 
               {/* CORE LIVE CHRONICLE — full-width bottom rail */}
-              <div className="lg:col-span-12 cc-panel p-4">
+              <motion.div variants={rise} className="lg:col-span-12 cc-panel p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="cc-panel-title">
                     <Wind className="w-3.5 h-3.5" />
                     Singularity Live Chronicle
                   </span>
-                  <span className="cc-label">{state.audit.length} events</span>
+                  <span className="cc-badge cc-badge-dim">{state.audit.length} events</span>
                 </div>
                 <div className="flex flex-col gap-1 max-h-24 overflow-y-auto custom-scroll">
                   {[...state.audit].reverse().slice(0, 8).map((a, i) => (
@@ -1268,11 +1345,19 @@ export const CoreConsole: React.FC<Props> = ({
                     <p className="text-[10px] text-slate-500">No multiverse events recorded yet.</p>
                   )}
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
+            </motion.div>
           )}
 
           {tab === 'realities' && (
+            <motion.div
+              key="realities"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <span className="cc-panel-title">
@@ -1285,7 +1370,12 @@ export const CoreConsole: React.FC<Props> = ({
               </div>
 
               {/* 3-Column Bento Reality Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <motion.div
+                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+                variants={deckStagger}
+                initial="hidden"
+                animate="show"
+              >
                 {filteredRealities.map((r) => (
                   <BentoRealityCard
                     key={r.id}
@@ -1303,7 +1393,7 @@ export const CoreConsole: React.FC<Props> = ({
                     onEnterGalaxy={onEnterGalaxy}
                   />
                 ))}
-              </div>
+              </motion.div>
 
               {filteredRealities.length === 0 && (
                 <div className="p-12 text-center rounded-2xl bg-white/2 border border-white/5 font-mono text-xs text-slate-400">
@@ -1311,19 +1401,37 @@ export const CoreConsole: React.FC<Props> = ({
                 </div>
               )}
             </div>
+            </motion.div>
           )}
 
           {tab === 'hierarchy' && (
-            <DeepHierarchyExplorer
-              realities={realities}
-              onEnterGalaxy={onEnterGalaxy}
-              onWarpReality={onWarpReality}
-            />
+            <motion.div
+              key="hierarchy"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              <DeepHierarchyExplorer
+                realities={realities}
+                onEnterGalaxy={onEnterGalaxy}
+                onWarpReality={onWarpReality}
+              />
+            </motion.div>
           )}
 
           {tab === 'bin' && (
-            <QuantumBinTab />
+            <motion.div
+              key="bin"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              <QuantumBinTab />
+            </motion.div>
           )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -1337,5 +1445,6 @@ export const CoreConsole: React.FC<Props> = ({
         }}
       />
     </div>
+    </MotionConfig>
   );
 };
