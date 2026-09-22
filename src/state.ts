@@ -269,34 +269,84 @@ function loadState(): UniverseState {
           });
         }
 
-        /* v4 — REALITY CONTAINERS: legacy flat fields (bodies/entries/
-           connections/vault/efs/vaultTrash in one bucket) migrate verbatim
-           into the Sol Prime container. Everything the user ever made belongs
-           to their home reality; new realities start fresh and isolated. */
+        /* v4 — REALITY CONTAINERS. Legacy ownership rules:
+             - worlds/diary/links: the old switchReality reseeded these from
+               the active reality's seed, so they belong to whichever reality
+               was active when the snapshot was taken;
+             - vault/trash/EFS tree: the old vault was ONE GLOBAL bucket —
+               it belongs to the home reality (Sol Prime).
+           Every other known reality receives its config-seeded container. */
         if (!parsed.realities || typeof parsed.realities !== 'object') {
+          const flatActive = parsed.activeRealityId || 'sol-prime';
+          const clone = <T,>(list: T[]): T[] => (Array.isArray(list) ? list.map((x) => ({ ...x })) : []);
           parsed.realities = {
-            [parsed.activeRealityId || 'sol-prime']: {
-              bodies: parsed.bodies ?? [],
-              entries: parsed.entries ?? [],
-              connections: parsed.connections ?? [],
-              vault: parsed.vault ?? [],
-              vaultTrash: parsed.vaultTrash ?? [],
+            [flatActive]: {
+              bodies: clone(parsed.bodies ?? []),
+              entries: clone(parsed.entries ?? []),
+              connections: clone(parsed.connections ?? []),
+              vault: [],
+              vaultTrash: [],
+              efs: createVfs(),
+            },
+            'sol-prime': {
+              bodies: [],
+              entries: [],
+              connections: [],
+              vault: clone(parsed.vault ?? []),
+              vaultTrash: clone(parsed.vaultTrash ?? []),
               efs: parsed.efs ?? createVfs(),
             },
           };
+          /* the active reality IS sol-prime → merge the two partial buckets */
+          if (flatActive === 'sol-prime') {
+            parsed.realities['sol-prime'] = {
+              bodies: clone(parsed.bodies ?? []),
+              entries: clone(parsed.entries ?? []),
+              connections: clone(parsed.connections ?? []),
+              vault: clone(parsed.vault ?? []),
+              vaultTrash: clone(parsed.vaultTrash ?? []),
+              efs: parsed.efs ?? createVfs(),
+            };
+          }
         } else {
           /* repair pass: every reality needs a complete container */
-          for (const [rid, b] of Object.entries(parsed.realities)) {
-            if (!b || typeof b !== 'object') {
-              parsed.realities[rid] = emptyBucket();
-              continue;
-            }
+          for (const [, b] of Object.entries(parsed.realities)) {
+            if (!b || typeof b !== 'object') continue;
             if (!Array.isArray(b.bodies)) b.bodies = [];
             if (!Array.isArray(b.entries)) b.entries = [];
             if (!Array.isArray(b.connections)) b.connections = [];
             if (!Array.isArray(b.vault)) b.vault = [];
             if (!Array.isArray(b.vaultTrash)) b.vaultTrash = [];
             if (!b.efs || !Object.keys(b.efs.nodes ?? {}).length) b.efs = createVfs();
+          }
+        }
+
+        /* container seeding: every KNOWN reality without live content receives
+           its config's world cast — a newly discovered disk reality, a freshly
+           migrated home universe, or an empty migration artifact all end up
+           with the worlds their config promises */
+        const known = computeAllRealities(
+          parsed.customRealities, parsed.deletedRealityIds,
+          parsed.customRealityDescriptions, parsed.customGalaxies,
+          parsed.customRealityMeta as Record<string, RealityMetaOverride>
+        );
+        for (const cfg of known) {
+          const b = parsed.realities[cfg.id];
+          const isEmpty = !b || (
+            (!b.bodies || b.bodies.length === 0) &&
+            (!b.entries || b.entries.length === 0) &&
+            (!b.connections || b.connections.length === 0)
+          );
+          if (isEmpty && (cfg.bodies.length > 0 || (cfg.entries ?? []).length > 0)) {
+            parsed.realities[cfg.id] = {
+              bodies: cfg.bodies.map((x) => ({ ...x })),
+              entries: (cfg.entries ?? []).map((x) => ({ ...x })),
+              connections: [],
+              /* keep any legacy global vault already attributed to this bucket */
+              vault: b?.vault ?? [],
+              vaultTrash: b?.vaultTrash ?? [],
+              efs: b?.efs ?? createVfs(),
+            };
           }
         }
         if (!parsed.realities['sol-prime']) {
