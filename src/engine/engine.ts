@@ -553,6 +553,7 @@ export class UniverseEngine {
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, next));
       this.composer?.setPixelRatio(Math.min(window.devicePixelRatio, next));
       if (getQualityTier() !== 'cinematic') this.disableAllRaymarchHoles();
+      if (getQualityTier() === 'cinematic' && this.exoPlates.length === 0) this.buildExoplanetPlates();
     };
     window.addEventListener(QUALITY_CHANGE_EVENT, this.onQualityChange);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -2234,31 +2235,7 @@ void main(){
 
     /* distant exoplanet horizon plates — procedural worlds drifting in the
        deep web, billboarded each frame; uOpacity is band-gated in tick */
-    if (getQualityTier() === 'cinematic') {
-      const specs = [
-        { pos: [135000, -26000, -86000], size: 8200, atm: '#7fd4ff' },
-        { pos: [-152000, 34000, 61000], size: 10400, atm: '#ffb98a' },
-        { pos: [42000, 68000, -178000], size: 6400, atm: '#c9a6ff' },
-      ] as const;
-      for (const s of specs) {
-        const mat = new THREE.ShaderMaterial({
-          vertexShader: exoplanetPlateVert,
-          fragmentShader: exoplanetPlateFrag,
-          uniforms: {
-            uTime: { value: 0 },
-            uSunDir: { value: new THREE.Vector3(0.3, 0.3, 1).normalize() },
-            uColorAtm: { value: new THREE.Color(s.atm) },
-            uOpacity: { value: 0 },
-          },
-          transparent: true, depthWrite: false,
-        });
-        const plate = new THREE.Mesh(new THREE.PlaneGeometry(s.size, s.size), mat);
-        plate.position.set(s.pos[0], s.pos[1], s.pos[2]);
-        plate.renderOrder = 2;
-        this.exoPlates.push(plate);
-        this.gWeb.add(plate);
-      }
-    }
+    this.buildExoplanetPlates();
 
     this.scene.add(this.gWeb);
 
@@ -4264,6 +4241,36 @@ void main(){
     this.kamuiPulseFromZoom = this.rig.tZoomT;
     this.rig.killZoomMomentum();
     this.grabCooldown = 1.2;
+  }
+
+  /** Distant exoplanet horizon plates (cinematic tier): procedural billboard
+      worlds drifting in the deep cosmic web. Built once; a tier upgrade
+      after boot rebuilds them via onQualityChange. */
+  private buildExoplanetPlates() {
+    if (getQualityTier() !== 'cinematic' || this.exoPlates.length > 0) return;
+    const specs = [
+      { pos: [135000, -26000, -86000], size: 8200, atm: '#7fd4ff' },
+      { pos: [-152000, 34000, 61000], size: 10400, atm: '#ffb98a' },
+      { pos: [42000, 68000, -178000], size: 6400, atm: '#c9a6ff' },
+    ] as const;
+    for (const s of specs) {
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: exoplanetPlateVert,
+        fragmentShader: exoplanetPlateFrag,
+        uniforms: {
+          uTime: { value: 0 },
+          uSunDir: { value: new THREE.Vector3(0.3, 0.3, 1).normalize() },
+          uColorAtm: { value: new THREE.Color(s.atm) },
+          uOpacity: { value: 0 },
+        },
+        transparent: true, depthWrite: false,
+      });
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(s.size, s.size), mat);
+      plate.position.set(s.pos[0], s.pos[1], s.pos[2]);
+      plate.renderOrder = 2;
+      this.exoPlates.push(plate);
+      this.gWeb.add(plate);
+    }
   }
 
   /** Pan and zoom camera to the supreme Multiverse Core {Demon} */
