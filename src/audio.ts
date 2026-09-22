@@ -1,10 +1,9 @@
 /* procedural spatial audio — ambient drones per mode + tiny interaction SFX */
-
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let muted = localStorage.getItem('my-universe:muted') === '1';
 let droneNodes: AudioNode[] = [];
-let mode: 'space' | 'diary' | 'vault' | 'core' = 'space';
+let currentMode: 'space' | 'diary' | 'vault' | 'core' = 'space';
 let rec: MediaRecorder | null = null;
 let recChunks: Blob[] = [];
 let recStream: MediaStream | null = null;
@@ -32,7 +31,7 @@ function ensure(createIfMissing = true): AudioContext | null {
 export function initAudio() {
   userInteracted = true;
   ensure(true);
-  setAudioMode(mode);
+  setAudioMode(currentMode);
 }
 
 export function isMuted() { return muted; }
@@ -61,7 +60,6 @@ export function chime(base = 660) { tone(base, 0.5, 'sine', 0.12); tone(base * 1
 export function sfxTick() { tone(1240, 0.06, 'triangle', 0.05); }
 export function sfxPage() { tone(320, 0.18, 'sine', 0.06); tone(240, 0.22, 'sine', 0.04, 0.05); }
 export function sfxConnect() { tone(520, 0.3, 'sine', 0.07); tone(780, 0.35, 'sine', 0.05, 0.1); }
-export function sfxPortal() { tone(90, 1.2, 'sawtooth', 0.05); tone(180, 1.0, 'sine', 0.06, 0.15); }
 
 /* ------------------------------ ambience ------------------------------- */
 
@@ -71,7 +69,7 @@ function killDrone() {
 }
 
 export function setAudioMode(m: 'space' | 'diary' | 'vault' | 'core') {
-  mode = m;
+  currentMode = m;
   const c = ensure();
   if (!c || !master) return;
   const dest: AudioNode = master;
@@ -193,5 +191,3 @@ function fakePeaks(size: number): number[] {
   for (let i = 0; i < n; i++) out.push(0.25 + 0.75 * Math.abs(Math.sin(i * 0.9 + size * 0.00001)) * (0.4 + 0.6 * Math.sin(i * 0.23 + 2)));
   return out;
 }
-
-export function getMode() { return mode; }

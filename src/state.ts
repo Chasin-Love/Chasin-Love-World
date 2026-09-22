@@ -978,31 +978,6 @@ export const actions = {
     }
   },
 
-  deleteVaultFile(id: string) {
-    const removed = state.vault.find((x) => x.id === id);
-    if (removed) {
-      const node = efsNodeOf(state.efs, removed);
-      if (node) delete state.efs.nodes[node.id];
-      state.vault = state.vault.filter((x) => x.id !== id);
-      deleteUnreferencedPayloads([removed]);
-    }
-    efsBump(state.efs);
-    notify();
-  },
-
-  deleteVaultFiles(ids: string[]) {
-    const set = new Set(ids);
-    const removed = state.vault.filter((file) => set.has(file.id));
-    removed.forEach((file) => {
-      const node = efsNodeOf(state.efs, file);
-      if (node) delete state.efs.nodes[node.id];
-    });
-    state.vault = state.vault.filter((file) => !set.has(file.id));
-    deleteUnreferencedPayloads(removed);
-    efsBump(state.efs);
-    notify();
-  },
-
   efsCreateFolder(parentId: string, name: string, color?: string): string | null {
     if (!state.efs.nodes[parentId]) return null;
     const node = efsMkdir(state.efs, parentId, name, color);

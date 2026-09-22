@@ -15,15 +15,12 @@ interface MultiverseBarProps {
   onEnterGalaxy?: (galaxyId: string) => void;
   onOpenCoreConsole?: () => void;
   onWarpReality: (id: string) => void;
-  onZoomToMultiverse: () => void;
   onZoomToSystem: () => void;
   onZoomToHierarchy?: (stageIndex: number) => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onEditRealityLore?: (reality: RealityConfig) => void;
   onInspectLineage?: (cluster: GalaxyClusterData) => void;
-  onZoomToDemonCore?: () => void;
-  onTriggerKamui?: () => void;
   onCloseBar?: () => void;
   kamuiKey?: number;
 }
@@ -36,15 +33,12 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
   onEnterGalaxy,
   onOpenCoreConsole,
   onWarpReality,
-  onZoomToMultiverse,
   onZoomToSystem,
   onZoomToHierarchy,
   onZoomIn,
   onZoomOut,
   onEditRealityLore,
   onInspectLineage,
-  onZoomToDemonCore,
-  onTriggerKamui,
   onCloseBar,
   kamuiKey = 0,
 }) => {
@@ -112,12 +106,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
         <div className="pointer-events-auto flex items-center gap-2 bg-slate-950/15 hover:bg-slate-950/25 backdrop-blur-md border border-cyan-400/25 hover:border-cyan-400/40 rounded-full px-4 py-1.5 text-xs shadow-[0_4px_24px_rgba(0,0,0,0.35)] transition-all">
           {/* Core Controller Badge — opens the Multiverse Core Console */}
           <button
-            onClick={() => {
-              if (onOpenCoreConsole) { onOpenCoreConsole(); return; }
-              if (onTriggerKamui) onTriggerKamui();
-              if (onZoomToDemonCore) onZoomToDemonCore();
-              else onZoomToMultiverse();
-            }}
+            onClick={() => onOpenCoreConsole?.()}
             className="kamui-demon-badge flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-950/35 hover:bg-red-900/50 border border-red-500/50 hover:border-red-400 text-red-300 hover:text-white transition-all font-mono text-[11px] font-bold shadow-[0_0_10px_rgba(255,23,68,0.35)] cursor-pointer backdrop-blur-sm"
             title="The Astral Core at (0,0,0) — click to open the Multiverse Core Console (create, rename & collapse realities, forge galaxies)"
           >

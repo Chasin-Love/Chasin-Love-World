@@ -4246,11 +4246,6 @@ void main(){
     this.rig.clearPan();
   }
 
-  /** Pin the galaxy whose name should ride the GALAXY scale label */
-  setActiveGalaxy(name: string | null) {
-    this.activeGalaxyName = name;
-  }
-
   private cancelGalaxyEntryFlight() {
     const f = this.galaxyEntryFlight;
     if (!f) return;

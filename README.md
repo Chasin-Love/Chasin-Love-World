@@ -199,8 +199,9 @@ In standard personal computing, files, notes, and records are treated as static 
     │   ├── hierarchyStages.ts  # Single source for stage labels, dials & descriptions
     │   ├── clusterGenerator.ts # Galaxy cluster distribution algorithms
     │   ├── galaxyGenerator.ts  # Galactic spiral arm generator
-    │   ├── solPrime/           # The home reality (protected baseline)
-    │   ├── biolumePrimordial/ … vesperaTwilight/  # Canonical parallel realities
+    │   ├── solPrime/           # The home reality (protected baseline — the only
+    │   │                       #  canonical reality; new ones are forged via the
+    │   │                       #  Core Console and stored as folders here)
     │   └── bin/                # Quantum Bin: deleted realities awaiting restore/purge
     │
     ├── desktop/                # Desktop adapter — single seam between web & Tauri

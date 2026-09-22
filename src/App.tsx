@@ -815,10 +815,6 @@ export default function App() {
             chime(880);
             engineRef.current?.resetView();
           }}
-          onZoomToMultiverse={() => {
-            engineRef.current?.zoomToMultiverse();
-            toast('Camera set to Multiverse Scale');
-          }}
           onZoomToSystem={() => {
             engineRef.current?.zoomToSystem();
             toast('Camera focused on Stellar System');
@@ -839,17 +835,6 @@ export default function App() {
           onInspectLineage={(cluster) => {
             setActiveLineageCluster(cluster);
             chime(720);
-          }}
-          onZoomToDemonCore={() => {
-            engineRef.current?.zoomToDemonCore();
-            setKamuiKey((k) => k + 1);
-            toast('✦ Kamui: Focused on Core');
-            chime(960);
-          }}
-          onTriggerKamui={() => {
-            engineRef.current?.triggerKamui();
-            setKamuiKey((k) => k + 1);
-            chime(960);
           }}
           onCloseBar={() => {
             setShowMultiverseBar(false);

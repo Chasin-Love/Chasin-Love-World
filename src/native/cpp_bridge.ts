@@ -451,18 +451,3 @@ function keplerPositionTS(
 }
 
 export const cosmosBridge = new CosmosBridge();
-
-/* Back-compat shim for the old diagnostic card API. */
-export class CppCosmosBridge {
-  static getInstance(): CppCosmosBridge {
-    return new CppCosmosBridge();
-  }
-  runRK4Benchmark(bodyCount = 256, iterations = 100): { opsPerSec: number; latencyMs: number } {
-    const t0 = performance.now();
-    (cosmosBridge as unknown as { tsRk4Burn: (n: number, i: number) => void }).tsRk4Burn(bodyCount, iterations);
-    const latencyMs = Math.max(0.1, performance.now() - t0);
-    return { opsPerSec: (bodyCount * bodyCount * iterations) / (latencyMs / 1000), latencyMs };
-  }
-}
-
-export const cppCosmos = CppCosmosBridge.getInstance();

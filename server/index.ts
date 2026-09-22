@@ -264,34 +264,6 @@ async function startServer() {
     }
   });
 
-  // RESTful DELETE alias
-  app.delete('/api/realities/:id', (req, res) => {
-    const realityId = req.params.id;
-    if (realityId === 'sol-prime' || realityId === 'solPrime') {
-      return res.status(400).json({ success: false, error: 'Sol Prime cannot be deleted.' });
-    }
-    const realitiesDir = path.join(process.cwd(), 'src', 'realities');
-    try {
-      const items = fs.readdirSync(realitiesDir, { withFileTypes: true });
-      for (const d of items) {
-        if (!d.isDirectory() || d.name === 'solPrime') continue;
-        const cleanRid = realityId.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const cleanDir = d.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (cleanDir === cleanRid) {
-          const target = path.join(realitiesDir, d.name);
-          // d.name comes from readdir so it is already a direct child, but
-          // assert containment before the recursive delete regardless.
-          if (!isInside(realitiesDir, target)) continue;
-          fs.rmSync(target, { recursive: true, force: true });
-          return res.json({ success: true, deleted: d.name });
-        }
-      }
-      res.json({ success: true, message: 'Cleaned up' });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
