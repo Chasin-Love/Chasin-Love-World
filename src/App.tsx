@@ -9,6 +9,7 @@ import { ErrorBoundary, IcLink, ToastHost, useUniverse } from './ui/bits';
 import { toast } from './ui/toast';
 import { startRealitySync } from './sync/realitySync';
 import { perfMark } from './performance';
+import { publishSimDate } from './simClock';
 import { MultiverseBar } from './components/hud/MultiverseBar';
 import { RealityHoverCard } from './components/hud/RealityHoverCard';
 import { ClusterHoverCard } from './components/hud/ClusterHoverCard';
@@ -107,6 +108,7 @@ export default function App() {
     showCoordinates: true,
   });
   const [showMultiverseBar, setShowMultiverseBar] = useState(false);
+  const [showCosmicHud, setShowCosmicHud] = useState(false);
   const [kamuiKey, setKamuiKey] = useState(0);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -267,7 +269,7 @@ export default function App() {
       onContext: (id, x, y) => setMenu({ id, x, y }),
       onFirstFrame: () => setEngineReady(true),
       onScaleLabel: (l) => setLabel(l),
-      onSimDate: () => undefined,
+      onSimDate: publishSimDate,
       onSelectReality: (realityId) => {
         actions.switchReality(realityId);
         const r = getReality(realityId, getState().customRealityDescriptions);
@@ -300,6 +302,7 @@ export default function App() {
         toast('✦ Multiverse Core Console online');
       },
       onSelectDemonCore: () => {
+        engineRef.current?.triggerKamui();
         setKamuiKey((k) => k + 1);
         setShowMultiverseBar(true);
         toast('✦ Kamui: Core Activated');
@@ -401,13 +404,29 @@ export default function App() {
         else { eng.enterCoreMode(); eng.setConnections(getState().connections.map((c) => [c.a, c.b] as [string, string])); setMode('core'); setAudioMode('core'); }
       }
       if (e.key === 'v' || e.key === 'V') { if (mode === 'space') eng.focusOn('eventide'); }
-      if (e.key === 'm' || e.key === 'M') { const m = toggleMute(); toast(m ? 'silence — the universe mutes' : 'the hum returns'); }
+      if (e.key === 'g' || e.key === 'G') { if (mode === 'space') { setShowCosmicHud((v) => !v); toast(showCosmicHud ? 'survey HUD stowed' : '✦ scientific survey HUD online'); } }      if (e.key === 'm' || e.key === 'M') { const m = toggleMute(); toast(m ? 'silence — the universe mutes' : 'the hum returns'); }
       if (e.key === ' ') { e.preventDefault(); eng.setPaused(!eng.pausedNow); setPaused(eng.pausedNow); toast(paused ? 'time flows' : 'time held'); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, menu, showKeys, paused]);
+  }, [mode, menu, showKeys, paused, showCosmicHud]);
+
+  /* the engine reports shader compile failures on this channel — surface
+     them instead of letting visuals silently degrade (throttled so a GPU
+     with many failing programs can't toast-spam) */
+  useEffect(() => {
+    let lastWarn = 0;
+    const onShaderError = (e: Event) => {
+      const detail = (e as CustomEvent).detail ?? {};
+      console.error('[UNIVERSE] shader compile failed:', detail.log ?? detail);
+      if (Date.now() - lastWarn < 5000) return;
+      lastWarn = Date.now();
+      toast('a cosmic shader failed to compile — visuals may look degraded', 'warn');
+    };
+    window.addEventListener('eventide-shader-error', onShaderError);
+    return () => window.removeEventListener('eventide-shader-error', onShaderError);
+  }, []);
 
   /* idle chrome fade */
   useEffect(() => {
@@ -760,7 +779,7 @@ export default function App() {
             <p className="font-mono text-[9px] tracking-[0.3em] uppercase text-solar/80 mb-4">hidden keys</p>
             {[
               ['H', 'return home'], ['C', 'anchor star core'], ['V', 'find the vault'],
-              ['SPACE', 'hold / release time'], ['M', 'mute the hum'], ['?', 'this list'], ['ESC', 'leave'],
+              ['G', 'scientific survey HUD'], ['SPACE', 'hold / release time'], ['M', 'mute the hum'], ['?', 'this list'], ['ESC', 'leave'],
             ].map(([k, d]) => (
               <div key={k} className="flex items-center justify-between py-1.5 border-b border-line/40 last:border-0">
                 <span className="font-mono text-[10px] text-solar">{k}</span>
@@ -786,6 +805,15 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Scientific survey HUD — summoned with G, rides the cosmic scale ladder */}
+      {showCosmicHud && mode === 'space' && (
+        <CosmicWebHUD
+          settings={cosmicSettings}
+          onUpdateSettings={(patch) => setCosmicSettings((cur) => ({ ...cur, ...patch }))}
+          scaleLabel={label}
+        />
       )}
 
       {showMultiverseBar && (
@@ -1037,6 +1065,7 @@ export default function App() {
           onTriggerKamui={() => {
             engineRef.current?.triggerKamui();
             setKamuiKey((k) => k + 1);
+            toast('✦ Kamui warp — reality bent and released');
             chime(960);
           }}
           onShowToolbar={() => {

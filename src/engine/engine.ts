@@ -337,7 +337,8 @@ export class UniverseEngine {
   /* major galaxies orbiting each reality bubble — ONE ellipse per galaxy */
   private galaxyNodes: RuntimeGalaxyNode[] = [];
   private multiverseMats: THREE.ShaderMaterial[] = [];
-  private exoplanetPlateMat!: THREE.ShaderMaterial;
+  /* distant exoplanet horizon plates in the deep web (high/cinematic tiers) */
+  private exoPlates: THREE.Mesh[] = [];
   private clouds: { mat: THREE.ShaderMaterial; px: number }[] = [];
   private levelSprites: { mat: THREE.SpriteMaterial; base: number; level: 'neighborhood' | 'cluster' | 'supercluster' | 'beacon' | 'web' | 'multiverse' }[] = [];
   /* every Points material inside the six level groups — uScale is
@@ -399,6 +400,10 @@ export class UniverseEngine {
   private kamuiSuckDrift = 0;
   private kamuiTunnel!: THREE.Group;
   private kamuiTunnelMats: THREE.ShaderMaterial[] = [];
+  /* In-place Kamui burst (Core Console pod / Demon Core click): the same
+     tear-suck-tunnel-settle script fired without changing stage or dial. */
+  private kamuiPulse: number | null = null;
+  private kamuiPulseFromZoom = 0;
   /* the cold-open — the first 5.2 seconds are a Kamui arrival: the tunnel
      slows, the walls part, your star ignites, the system builds one world
      at a time, the sky arrives last */
@@ -2226,6 +2231,34 @@ void main(){
       true,
     );
     this.gWeb.add(hubPts);
+
+    /* distant exoplanet horizon plates — procedural worlds drifting in the
+       deep web, billboarded each frame; uOpacity is band-gated in tick */
+    if (getQualityTier() === 'cinematic') {
+      const specs = [
+        { pos: [135000, -26000, -86000], size: 8200, atm: '#7fd4ff' },
+        { pos: [-152000, 34000, 61000], size: 10400, atm: '#ffb98a' },
+        { pos: [42000, 68000, -178000], size: 6400, atm: '#c9a6ff' },
+      ] as const;
+      for (const s of specs) {
+        const mat = new THREE.ShaderMaterial({
+          vertexShader: exoplanetPlateVert,
+          fragmentShader: exoplanetPlateFrag,
+          uniforms: {
+            uTime: { value: 0 },
+            uSunDir: { value: new THREE.Vector3(0.3, 0.3, 1).normalize() },
+            uColorAtm: { value: new THREE.Color(s.atm) },
+            uOpacity: { value: 0 },
+          },
+          transparent: true, depthWrite: false,
+        });
+        const plate = new THREE.Mesh(new THREE.PlaneGeometry(s.size, s.size), mat);
+        plate.position.set(s.pos[0], s.pos[1], s.pos[2]);
+        plate.renderOrder = 2;
+        this.exoPlates.push(plate);
+        this.gWeb.add(plate);
+      }
+    }
 
     this.scene.add(this.gWeb);
 
@@ -4219,11 +4252,18 @@ void main(){
 
 
   /**
-   * Retained for the Core UI API, but intentionally does not create a
-   * screen-space effect. Macro Kamui transitions own their geometry directly.
+   * Fire the Kamui jutsu in place: reality tears at the Astral Core, the
+   * surroundings bend into the swirl, the tunnel passes, and the view
+   * settles back where it started. No stage change — the visual experience
+   * of the warp without a destination.
    */
   triggerKamui(_targetUv?: THREE.Vector2) {
-    /* The removed portal compositor used to be driven from here. */
+    if (this.bootIntro || this.kamuiFlight !== null || this.kamuiPulse !== null
+      || this.galaxyEntryFlight !== null || this.galaxyWarp !== null) return;
+    this.kamuiPulse = 0;
+    this.kamuiPulseFromZoom = this.rig.tZoomT;
+    this.rig.killZoomMomentum();
+    this.grabCooldown = 1.2;
   }
 
   /** Pan and zoom camera to the supreme Multiverse Core {Demon} */
@@ -4742,6 +4782,45 @@ void main(){
         if (this.kamuiTunnel.visible) this.kamuiTunnel.visible = false;
         this.galaxyInnerFocus = w.endInner;
         if (!w.endInner && w.toDial <= 0.3) this.galaxyFocusId = null; /* arrived inside the home system */
+        this.prevDialTarget = this.rig.tZoomT;
+      }
+    } else if (this.kamuiPulse !== null) {
+      /* KAMUI PULSE — the jutsu fired in place. The same four beats as the
+         macro warp (TEAR → SUCK → TUNNEL → SETTLE) with no stage change:
+         reality bends around the Astral Core and the dial returns home. */
+      this.kamuiPulse = Math.min(1, this.kamuiPulse + dt / 2.4);
+      const t = this.kamuiPulse;
+      this.rig.killZoomMomentum();
+      this.kamuiWarpFx = Math.sin(Math.min(t, 0.92) / 0.92 * Math.PI);
+      const tw0 = 0.3, tw1 = 0.68;
+      if (t > tw0 && t < tw1) {
+        const k = (t - tw0) / (tw1 - tw0);
+        this.kamuiTunnel.visible = true;
+        this.kamuiTunnel.position.z = THREE.MathUtils.lerp(-1600000, 1600000, k);
+        this.kamuiTunnel.rotation.z += dt * (3.5 + k * 6);
+        this.kamuiTunnelMats.forEach((m) => {
+          m.uniforms.uTime.value = this.clockT;
+          m.uniforms.uSpin.value = this.kamuiTunnel.rotation.z;
+          m.uniforms.uOpacity.value = Math.sin(k * Math.PI) * 0.85;
+        });
+      } else if (this.kamuiTunnel.visible) this.kamuiTunnel.visible = false;
+      /* the bend — the web whirls around the Astral Core */
+      const R = 22000 + t * 70000;
+      this.webVortexMats.forEach((m) => {
+        (m.uniforms.uVortexC.value as THREE.Vector3).set(0, 0, 0);
+        m.uniforms.uVortexR.value = R;
+        m.uniforms.uVortexS.value = 1;
+        m.uniforms.uVortexT.value = this.clockT;
+      });
+      /* the suck and the settle — the dial dives a breath toward the tear,
+         then eases back to exactly where it started */
+      this.rig.setZoomTarget(this.kamuiPulseFromZoom + Math.sin(t * Math.PI) * 0.05);
+      if (t >= 1) {
+        this.kamuiPulse = null;
+        this.kamuiWarpFx = 0;
+        this.webVortexMats.forEach((m) => { m.uniforms.uVortexS.value = 0; });
+        if (this.kamuiTunnel.visible) this.kamuiTunnel.visible = false;
+        this.rig.setZoomTarget(this.kamuiPulseFromZoom);
         this.prevDialTarget = this.rig.tZoomT;
       }
     } else if (this.bootIntro) {
@@ -5520,7 +5599,20 @@ void main(){
         orb.scale.set(orbScale, orbScale, orbScale);
       });
     }
-    if (this.exoplanetPlateMat) this.exoplanetPlateMat.uniforms.uTime.value = this.clockT;
+    if (this.exoPlates.length) {
+      /* fade the horizon plates in as the deep web opens up and out as the
+         multiverse scale takes over; sun points back at the camera so the
+         procedural surface stays lit from any viewing angle */
+      const t = this.rig.tZoomT;
+      const band = THREE.MathUtils.smoothstep(t, 0.62, 0.72) * (1 - THREE.MathUtils.smoothstep(t, 0.9, 0.96));
+      for (const p of this.exoPlates) {
+        p.quaternion.copy(this.camera.quaternion);
+        const m = p.material as THREE.ShaderMaterial;
+        m.uniforms.uTime.value = this.clockT;
+        (m.uniforms.uSunDir.value as THREE.Vector3).copy(this.camera.position).sub(p.position).normalize();
+        m.uniforms.uOpacity.value = band * 0.9;
+      }
+    }
     (this.webLineMat.uniforms.uOpacity as { value: number }).value = wins.web * 0.17;
     this.gWeb.rotation.y = this.clockT * 0.0017;
     this.gSupercluster.rotation.y = this.clockT * 0.0011;

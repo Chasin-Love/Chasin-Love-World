@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence, MotionConfig, type Variants } from 'framer-motion';
 import {
   X, Zap, Globe, Sparkles, Orbit, Trash2, ChevronDown, ChevronRight,
@@ -16,6 +16,7 @@ import { RealityAdvancedPanel } from '../realities/RealityAdvancedPanel';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
 import { QuantumBinTab } from './QuantumBinTab';
 import { CppNativeEngineCard } from './CppNativeEngineCard';
+import { getSimDate, subscribeSimDate } from '../../simClock';
 
 interface Props {
   onClose: () => void;
@@ -506,8 +507,17 @@ function VitalTile({
   );
 }
 
-function DiskSyncStatusTile({ diskSync }: { diskSync?: DiskSyncState }) {
-  const connected = diskSync?.connected ?? false;
+/* the engine broadcasts the in-universe simulation date every 0.25s —
+   this tile subscribes directly, so only the tile re-renders, never the deck */
+function SimClockTile() {
+  const simDate = useSyncExternalStore(subscribeSimDate, getSimDate);
+  const label = simDate
+    ? new Date(simDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    : '—';
+  return <VitalTile label="Universe Epoch" value={label} color="#38bdf8" />;
+}
+
+function DiskSyncStatusTile({ diskSync }: { diskSync?: DiskSyncState }) {  const connected = diskSync?.connected ?? false;
   const pending = diskSync?.pendingOps ?? 0;
   return (
     <div
@@ -1247,6 +1257,7 @@ export const CoreConsole: React.FC<Props> = ({
                   <VitalTile label="Galaxies" value={totalGalaxies} color="#a78bfa" />
                   <VitalTile label="Clusters" value={totalClusters} color="#f472b6" />
                 </div>
+                <SimClockTile />
                 <DiskSyncStatusTile diskSync={state.diskSync} />
               </motion.div>
 
