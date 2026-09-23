@@ -320,6 +320,9 @@ export default function App() {
       loadedEngine = engine;
       perfMark('engine-ready');
       (window as any).__ENGINE__ = engine;
+      /* debug affordance, same contract as __ENGINE__ — console/tooling can
+         drive the store without reaching through React */
+      (window as any).__ACTIONS__ = actions;
 
       boot = () => { initAudio(); if (boot) window.removeEventListener('pointerdown', boot); };
       window.addEventListener('pointerdown', boot);

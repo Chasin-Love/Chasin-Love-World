@@ -208,52 +208,63 @@ function loadState(): UniverseState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as UniverseState;
-      if (parsed && Array.isArray(parsed.bodies) && parsed.bodies.length) {
+      /* v3 payloads carry flat fields; v4+ payloads carry reality containers.
+         Either shape is valid storage — accepting only the flat shape here
+         used to drop container payloads to a fresh seed on every reload. */
+      const hasFlat = Array.isArray(parsed.bodies);
+      const hasContainers = Boolean(parsed.realities && typeof parsed.realities === 'object');
+      if (parsed && (hasFlat || hasContainers)) {
         if (!parsed.activeRealityId) parsed.activeRealityId = 'sol-prime';
         if (!Array.isArray(parsed.customRealities)) parsed.customRealities = [];
         if (!Array.isArray(parsed.deletedRealityIds)) parsed.deletedRealityIds = [];
+        if (!Array.isArray(parsed.binRealities)) parsed.binRealities = [];
         if (!parsed.customGalaxies || typeof parsed.customGalaxies !== 'object') parsed.customGalaxies = {};
         if (!parsed.customRealityMeta || typeof parsed.customRealityMeta !== 'object') parsed.customRealityMeta = {};
         if (!parsed.realityFolders || typeof parsed.realityFolders !== 'object') parsed.realityFolders = {};
-        delete parsed.diskSync;
-        if (!Array.isArray(parsed.vault)) parsed.vault = [];
-        if (!Array.isArray(parsed.vaultTrash)) parsed.vaultTrash = [];
-        parsed.vault = normalizeVaultFiles(parsed.vault);
-        parsed.vaultTrash = parsed.vaultTrash.map((trash) => ({
-          ...trash,
-          item: normalizeLegacyLock(trash.item),
-        }));
         if (!Array.isArray(parsed.vaultUsers)) parsed.vaultUsers = [];
         if (!Array.isArray(parsed.audit)) parsed.audit = [];
-        parsed.entries = sanitizeDiaryEntries(parsed.entries);
-
-        /* v3: the old flat folder-string system + the btrfs simulation were
-           replaced by EFS — build the tree from legacy paths once, then strip
-           every legacy field so it never persists again */
-        if (!parsed.efs || !Object.keys(parsed.efs.nodes ?? {}).length) {
-          migrateLegacyVault(parsed);
-        }
-        /* guarantee reachability: every vault record must have a tree node,
-           otherwise the File Manager would hide what Everything shows */
-        let healedCount = efsHeal(parsed.efs, parsed.vault);
-
-        /* if vault was wiped by an empty rollback, restore initial seed files safely */
-        if (parsed.vault.length === 0 && parsed.vaultTrash.length === 0) {
-          const freshSeed = createInitialSeed(newId);
-          parsed.vault = freshSeed.vault;
-          healedCount += efsHeal(parsed.efs, parsed.vault);
+        if (hasFlat) {
+          if (!Array.isArray(parsed.vault)) parsed.vault = [];
+          if (!Array.isArray(parsed.vaultTrash)) parsed.vaultTrash = [];
+          parsed.vault = normalizeVaultFiles(parsed.vault);
+          parsed.vaultTrash = parsed.vaultTrash.map((trash) => ({
+            ...trash,
+            item: normalizeLegacyLock(trash.item),
+          }));
+          parsed.entries = sanitizeDiaryEntries(parsed.entries);
         }
 
-        /* ensure genesis shadow contains file nodes if it was created on an older version */
-        parsed.efs?.shadows?.forEach((shadow) => {
-          if (shadow.name === 'genesis' && shadow.fileCount === 0) {
-            const freshSeed = createInitialSeed(newId);
-            shadow.tree = JSON.parse(JSON.stringify(freshSeed.efs.nodes));
-            shadow.fileCount = Object.values(shadow.tree).filter((n) => n.type === 'file').length;
-            shadow.dirCount = Object.values(shadow.tree).filter((n) => n.type === 'dir').length;
-            healedCount++;
+        delete parsed.diskSync;
+        if (hasFlat) {
+          /* v3: the old flat folder-string system + the btrfs simulation were
+             replaced by EFS — build the tree from legacy paths once, then strip
+             every legacy field so it never persists again */
+          if (!parsed.efs || !Object.keys(parsed.efs.nodes ?? {}).length) {
+            migrateLegacyVault(parsed);
           }
-        });
+          /* guarantee reachability: every vault record must have a tree node,
+             otherwise the File Manager would hide what Everything shows */
+          let healedCount = efsHeal(parsed.efs, parsed.vault);
+
+          /* if vault was wiped by an empty rollback, restore initial seed files safely */
+          if (parsed.vault.length === 0 && parsed.vaultTrash.length === 0) {
+            const freshSeed = createInitialSeed(newId);
+            parsed.vault = freshSeed.vault;
+            healedCount += efsHeal(parsed.efs, parsed.vault);
+          }
+
+          /* ensure genesis shadow contains file nodes if it was created on an older version */
+          parsed.efs?.shadows?.forEach((shadow) => {
+            if (shadow.name === 'genesis' && shadow.fileCount === 0) {
+              const freshSeed = createInitialSeed(newId);
+              shadow.tree = JSON.parse(JSON.stringify(freshSeed.efs.nodes));
+              shadow.fileCount = Object.values(shadow.tree).filter((n) => n.type === 'file').length;
+              shadow.dirCount = Object.values(shadow.tree).filter((n) => n.type === 'dir').length;
+              healedCount++;
+            }
+          });
+          void healedCount;
+        }
 
         const legacy = parsed as unknown as Record<string, unknown>;
         delete legacy.vaultFolders;
@@ -263,7 +274,7 @@ function loadState(): UniverseState {
         delete legacy.btrfsSuperblock;
         delete legacy.activeSubvolId;
 
-        if (!parsed.version || parsed.version < 2) {
+        if (hasFlat && (!parsed.version || parsed.version < 2)) {
           parsed.entries.forEach((e) => {
             e.mood = undefined;
           });
@@ -352,6 +363,27 @@ function loadState(): UniverseState {
         if (!parsed.realities['sol-prime']) {
           parsed.realities['sol-prime'] = emptyBucket();
         }
+
+        /* v4.1 — ownership repair. The first v4 migration attributed the old
+           GLOBAL vault to whichever reality happened to be active. Vault files
+           carry a realityId stamp written at seal time; a bucket whose vault
+           holds only sol-prime-stamped (or unstamped legacy) files is holding
+           them in trust — return them (with trash and the EFS tree) to the
+           home reality, unless the home vault already has content. */
+        const home = parsed.realities['sol-prime'];
+        for (const [rid, b] of Object.entries(parsed.realities)) {
+          if (rid === 'sol-prime' || !b || !Array.isArray(b.vault) || b.vault.length === 0) continue;
+          const allForeign = b.vault.every((f) => !f.realityId || f.realityId === 'sol-prime');
+          if (allForeign && home.vault.length === 0) {
+            home.vault = b.vault;
+            home.vaultTrash = b.vaultTrash ?? [];
+            home.efs = b.efs ?? createVfs();
+            b.vault = [];
+            b.vaultTrash = [];
+            b.efs = createVfs();
+          }
+        }
+
         /* the flat fields are views, never storage — drop them from the payload */
         delete (parsed as any).bodies;
         delete (parsed as any).entries;
