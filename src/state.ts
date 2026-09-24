@@ -403,8 +403,17 @@ function loadState(): UniverseState {
         return primed;
       }
     }
-  } catch {
-    /* fallback to fresh seed on parse failure */
+  } catch (err) {
+    /* the stored payload is corrupt — never silently overwrite the evidence:
+       preserve the broken raw string under :recovery so it can be repaired
+       by hand or by a future migration, THEN fall back to a fresh seed */
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) localStorage.setItem(`${STORAGE_KEY}:recovery`, raw);
+    } catch { /* recovery snapshot best-effort */ }
+    console.error('[state] stored universe failed to load — preserved at "my-universe:v4:recovery":', err);
+    /* module init runs before React mounts — defer so the toast host exists */
+    setTimeout(() => toast('stored universe was corrupt — a fresh seed loaded. The original was preserved in recovery storage.', 'warn'), 2500);
   }
   return primeState(createInitialSeed(newId));
 }
@@ -466,20 +475,33 @@ function persistState() {
           return n;
         }),
       };
-      const serialized = JSON.stringify(slim);
-      /* Desktop tier: real file in the OS app-data dir (no 5MB quota). The
-         localStorage write still runs as a fast cache + web fallback. */
+      const serialized = JSON.stringify(slim);  /* Desktop tier: real file in the OS app-data dir (no 5MB quota). The
+     localStorage write still runs as a fast cache + web fallback. */
       void desktopStore.writeState(serialized);
       localStorage.setItem(STORAGE_KEY, serialized);
       recordPersistence(serialized.length);
       quotaWarnedAt = 0;
-    } catch {
-      /* Storage is full. Never silent: the user must know that edits since
-         the last successful write exist only in memory. Re-alarm at most
-         once a minute so a persist-per-second loop doesn't toast-spam. */
+    } catch (err) {
+      /* Storage is full or the payload itself failed to serialize. Never
+         silent: the user must know that edits since the last successful
+         write exist only in memory. Re-alarm at most once a minute so a
+         persist-per-second loop doesn't toast-spam. */
       if (Date.now() - quotaWarnedAt > 60_000) {
         quotaWarnedAt = Date.now();
-        toast('storage is full — recent edits are NOT saved to disk. Free space or export a backup.', 'warn');
+        const msg = err instanceof Error ? err.message : String(err);
+        const isQuota = /quota|exceeded|full/i.test(msg);
+        toast(
+          isQuota
+            ? 'storage is full — recent edits are NOT saved to disk. Free space or export a backup.'
+            : `state serialization failed (${msg.slice(0, 60)}) — recent edits are NOT saved. A backup export is strongly advised.`,
+          'warn',
+        );
+        /* keep the last good snapshot so a fixable failure never overwrites
+           a healthy store with a fresh seed */
+        try {
+          const lastGood = localStorage.getItem(STORAGE_KEY);
+          if (lastGood) localStorage.setItem(`${STORAGE_KEY}:recovery`, lastGood);
+        } catch { /* recovery snapshot best-effort */ }
       }
     }
   }, 1000);
@@ -906,10 +928,16 @@ export const actions = {
       vault: b.vault,
       vaultTrash: b.vaultTrash,
     };
-    await realityApi<{ success?: boolean; path?: string }>(
+    /* a reliable disk mutation, not a fire-and-forget: data.json IS the
+       reality's world database mirror — a dropped write used to vanish until
+       the next unrelated switch. The retry queue owns it now. */
+    const ok = await syncedRealityApi(
       '/api/realities/write-data',
       { realityId: id, folderName: diskFolderFor(id, cfg?.name), data }
     );
+    if (!ok) {
+      toast(`⚠ "${cfg?.name ?? id}" world database could not reach its disk folder — will retry`, 'warn');
+    }
   },
 
   /* ------------------------- disk mirror telemetry ----------------------- */

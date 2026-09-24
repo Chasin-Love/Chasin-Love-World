@@ -30,6 +30,9 @@ export class PhotoDome {
   /* crossfade: fades OUT the previous reality's sky while the new one enters */
   private fadeK = 0;         /* 0..1 — 1 = fully entered a photo sky */
   private prevTexture: THREE.Texture | null = null;
+  /* apply sequencing — a superseded texture load (two reality switches in a
+     row) must never win: last-CHOSEN sky renders, not last-finished load */
+  private applySeq = 0;
 
   private vert = /* glsl */ `
     varying vec2 vUv;
@@ -187,6 +190,7 @@ export class PhotoDome {
     glowColor: string,
   ): Promise<void> {
     if (!this.mat) return;
+    const seq = ++this.applySeq;
     this.blend = spec?.blend ?? this.blend;
     this.dim = spec?.dim ?? this.dim;
     this.blur = spec?.blur ?? this.blur;
@@ -195,6 +199,9 @@ export class PhotoDome {
     (this.mat.uniforms.uGlowColor.value as THREE.Color).set(glowColor);
 
     const tex = spec ? await this.loadTexture(spec.url) : null;
+    /* a newer apply superseded this one while the texture was loading —
+       abandon silently; the newer apply owns the dome */
+    if (seq !== this.applySeq) return;
     const u = this.mat.uniforms;
     u.uMap.value = tex;
     u.uHasMap.value = tex ? 1 : 0;

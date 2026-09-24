@@ -115,18 +115,28 @@ export function getActiveSkySpec(realityId: string): ActiveSkySpec | null {
 
 /* ------------------------------ disk calls ------------------------------ */
 
+const EMPTY_SKY: SkyManifest = {
+  version: 1,
+  activeId: null,
+  photos: [],
+  settings: { blend: 0.85, dim: 0.45, blur: 0.12, vignette: 0.55, drift: 0.3 },
+};
+
 export async function fetchSky(realityId: string): Promise<SkyManifest> {
-  const res = await realityApi<{ success?: boolean; manifest?: SkyManifest }>(
-    `/api/realities/sky/status?folder=${encodeURIComponent(skyFolderForReality(realityId))}`,
-    undefined,
-    'GET',
-  );
-  const manifest = res?.manifest;
-  if (!manifest) {
-    /* desktop-native or server hiccup — an empty sky keeps the cosmos pure */
-    return adopt(realityId, { version: 1, activeId: null, photos: [], settings: { blend: 0.85, dim: 0.45, blur: 0.12, vignette: 0.55, drift: 0.3 } }, true);
-  }
-  return adopt(realityId, manifest, true);
+  try {
+    const res = await realityApi<{ success?: boolean; manifest?: SkyManifest }>(
+      `/api/realities/sky/status?folder=${encodeURIComponent(skyFolderForReality(realityId))}`,
+      undefined,
+      'GET',
+    );
+    if (res?.manifest) return adopt(realityId, res.manifest, true);
+  } catch { /* fall through to the cache-preservation path */ }
+  /* No answer (desktop-native or server hiccup): keep any healthy cached
+     manifest — a transient network blip must never wipe a real sky. Only
+     adopt a genuine empty sky when nothing better is known. */
+  const cached = cache.get(realityId);
+  if (!cached) adopt(realityId, EMPTY_SKY, true);
+  return cache.get(realityId) ?? EMPTY_SKY;
 }
 
 /** Fetch once (cached) then announce — used at boot and on reality switch. */

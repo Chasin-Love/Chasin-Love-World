@@ -44,6 +44,21 @@ function publish(patch: Partial<DiskSyncState>) {
 
 async function tick() {
   timer = null;
+  try {
+    await tickBody();
+  } catch (err) {
+    /* the heartbeat must NEVER die: one thrown error used to cancel the
+       schedule chain and the disk mirror went silent forever */
+    consecutiveFailures += 1;
+    publish({
+      connected: false,
+      lastError: `disk sync cycle failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+    schedule(consecutiveFailures >= 3 ? OFFLINE_INTERVAL : DEGRADED_INTERVAL);
+  }
+}
+
+async function tickBody() {
   await flushDiskQueue();
 
   const [status, binRes] = await Promise.all([
