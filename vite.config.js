@@ -24,6 +24,15 @@ export default defineConfig({
     port: 3000,
     strictPort: true,
     allowedHosts: true,
+    watch: {
+      /* The reality daemon + create-folder flow write reality modules into
+         src/realities/ at runtime. The build-time reality glob picks those
+         up and FULL-PAGE-RELOADS the dev app mid-warp — the engine state
+         dies under the user (the "clicks bounce back to the galaxy stage"
+         bug). Watcher-off: new disk realities go live on next boot, while
+         the running session uses its in-state customRealities copy. */
+      ignored: ["**/src/realities/**"],
+    },
   },
   build: {
     chunkSizeWarningLimit: 1100,

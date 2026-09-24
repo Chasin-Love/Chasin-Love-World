@@ -29,7 +29,10 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
   const [colorB, setColorB] = useState('#8b5cf6');
   const [description, setDescription] = useState('');
   const [planetsCount, setPlanetsCount] = useState(5);
-  const [galaxyCount, setGalaxyCount] = useState(4);
+  /* the requested count is law — default to the minimal honest universe:
+     ONE galaxy, ONE stellar system (the pre-v11 default of 4 made creations
+     feel like the engine ignored the user's command) */
+  const [galaxyCount, setGalaxyCount] = useState(1);
 
   /* Escape closes only this modal — the Core Console's own Escape handler
      defers while the forge modal is open. Hooks stay unconditional. */

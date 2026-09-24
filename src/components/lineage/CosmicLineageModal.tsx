@@ -18,6 +18,8 @@ interface CosmicLineageModalProps {
   realityName: string;
   onClose: () => void;
   onWarpToReality: (realityId: string) => void;
+  /** Fly the camera to this rung of the 11-stage ladder (closes the modal). */
+  onZoomToStage: (stageIndex: number) => void;
 }
 
 export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
@@ -28,6 +30,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
   realityName,
   onClose,
   onWarpToReality,
+  onZoomToStage,
 }) => {
   const [activeStep, setActiveStep] = useState<number>(0);
   const [createdItems, setCreatedItems] = useState<Record<string, string[]>>({});
@@ -232,9 +235,27 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
 
   const current = steps[activeStep];
 
-  /* only these two stages have real creation engines behind them today —
-     the other nine are honestly disabled instead of faking creations */
+  /* the two stages with REAL creation engines behind them */
   const canCreateHere = current?.id === 'cluster' || current?.id === 'system';
+
+  /* every rung of the ladder maps to a real camera dial — no dead buttons */
+  const STAGE_INDEX: Record<string, number> = {
+    multiverse: 0, reality: 1, web: 2, complex: 3, supercluster: 4,
+    cluster: 5, galaxy: 6, region: 7, arm: 8, starforming: 9, system: 10,
+  };
+  const stageIdx = STAGE_INDEX[current?.id ?? 'multiverse'] ?? 0;
+  const belongsToActiveReality = lineage.reality.id === universeState.activeRealityId;
+
+  const handleStageButton = () => {
+    if (canCreateHere) {
+      handleCreateMore(current.id);
+      return;
+    }
+    /* navigation stages: fly the camera to this rung. A lineage that belongs
+       to another reality first carries the dimensional barrier over. */
+    if (!belongsToActiveReality) onWarpToReality(lineage.reality.id);
+    onZoomToStage(stageIdx);
+  };
 
   const handleCreateMore = (stepId: string) => {
     const num = (createdItems[stepId]?.length || 0) + 1;
@@ -372,7 +393,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
                   {current.description}
                 </div>
 
-                {/* Controlled "+ Create More" Expansion Control */}
+                {/* Creation where an engine exists — real camera flight everywhere else */}
                 <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
                   <div className="text-xs text-slate-300">
                     {canCreateHere ? (
@@ -380,21 +401,20 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
                         Custom Structures: <span className="font-mono font-bold text-cyan-300">{createdItems[current.id]?.length || 0}</span>
                       </>
                     ) : (
-                      <span className="text-slate-500 font-mono text-[10px]">Observation stage — creation engine ships in a future wave</span>
+                      <span className="text-slate-500 font-mono text-[10px]">Observation stage — the button flies the camera to this rung</span>
                     )}
                   </div>
                   <button
-                    onClick={() => handleCreateMore(current.id)}
-                    disabled={!canCreateHere}
-                    title={canCreateHere ? current.createLabel : 'Galaxy and planet creation are live; deeper stages need engine support that is on the roadmap'}
+                    onClick={handleStageButton}
+                    title={canCreateHere ? current.createLabel : 'Fly the camera to this stage of the ladder'}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-mono text-xs font-semibold transition-all backdrop-blur-md ${
                       canCreateHere
                         ? 'bg-cyan-500/20 hover:bg-cyan-500/35 border-cyan-400/40 text-cyan-200 hover:text-white cursor-pointer'
-                        : 'bg-white/[0.03] border-white/10 text-slate-600 cursor-not-allowed'
+                        : 'bg-violet-500/15 hover:bg-violet-500/30 border-violet-400/40 text-violet-200 hover:text-white cursor-pointer'
                     }`}
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>{current.createLabel}</span>
+                    <span>{canCreateHere ? current.createLabel : 'Fly to this stage'}</span>
                   </button>
                 </div>
 

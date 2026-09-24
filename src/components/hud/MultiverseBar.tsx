@@ -66,6 +66,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
     colorA: string;
     colorB: string;
     planetsCount: number;
+    galaxyCount?: number;
   }) => {
     const newConfig = createNewRealityConfig(params);
     actions.createReality(newConfig);

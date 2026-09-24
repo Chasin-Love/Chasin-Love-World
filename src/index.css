@@ -2162,6 +2162,97 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 .animate-in.slide-in-from-bottom-2 { animation: ccRiseIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .animate-fade-in { animation: ccFadeIn 0.3s ease both; }
 
+/* ============ Core Console — LUXURY PASS (Audi-matrix light design) ============
+   Design language borrowed from the automotive luxury the owner loves:
+   light is SCARCE and PRECISE. One narrow white-gold beam and one accent
+   beam sweep the rim slowly (matrix LED signature), an aurora pool glows
+   beneath the glass like showroom floor lighting, and the glass itself
+   deepens (more layers, tighter hairlines, calmer borders). Everything
+   here OVERRIDES the Quantum Glass pass above — keep both, this wins. */
+
+.core-plate {
+  /* aurora under-glow: two slow ambient light pools baked into the plate's
+     own background — no extra DOM, no extra blur planes */
+  background:
+    radial-gradient(58% 42% at 18% -6%, rgb(var(--cc) / 0.14), transparent 70%),
+    radial-gradient(50% 40% at 88% 108%, rgb(var(--cc) / 0.10), transparent 72%),
+    linear-gradient(165deg, rgba(12, 17, 31, 0.68) 0%, rgba(5, 8, 15, 0.78) 55%, rgba(3, 5, 10, 0.84) 100%);
+  box-shadow:
+    0 45px 120px rgba(0, 0, 0, 0.85),
+    0 0 90px rgb(var(--cc) / 0.12),
+    0 2px 3px rgba(0, 0, 0, 0.6),
+    inset 0 1px 1px rgba(255, 255, 255, 0.26),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+  transition: border-color 0.6s ease, box-shadow 0.6s ease;
+}
+.core-plate:hover {
+  border-color: rgb(var(--cc) / 0.4);
+}
+
+/* matrix rim: two precise opposing beams — a white-gold signature and an
+   accent beam — sweeping a mostly-dark rim, slow and deliberate */
+.core-plate::before {
+  background: conic-gradient(
+    from var(--core-spin, 0deg),
+    rgba(255, 255, 255, 0) 0deg,
+    rgba(255, 240, 200, 0.95) 14deg,
+    rgb(var(--cc) / 0.85) 26deg,
+    rgb(var(--cc) / 0.12) 44deg,
+    rgba(255, 255, 255, 0) 70deg,
+    rgba(255, 255, 255, 0) 180deg,
+    rgba(255, 240, 200, 0.55) 194deg,
+    rgb(var(--cc) / 0.4) 206deg,
+    rgba(255, 255, 255, 0) 232deg,
+    rgba(255, 255, 255, 0) 360deg
+  );
+  animation: coreSpin 14s linear infinite;
+  opacity: 0.9;
+}
+
+/* glass panes: calmer at rest, warmer on approach */
+.cc-panel {
+  background: linear-gradient(
+    160deg,
+    rgba(17, 26, 47, 0.38) 0%,
+    rgba(10, 17, 32, 0.48) 55%,
+    rgba(7, 11, 22, 0.55) 100%
+  );
+  border-radius: 18px;
+}
+.cc-panel:hover {
+  box-shadow: var(--elev-2), 0 0 30px rgb(var(--cc) / 0.14);
+}
+
+/* vital tiles: premium approach lift with a soft accent breath */
+.cc-vital {
+  background: linear-gradient(165deg, rgba(15, 24, 44, 0.5), rgba(6, 10, 20, 0.62));
+}
+.cc-vital:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.5),
+    0 0 20px color-mix(in srgb, var(--tile, #67e8f9) 24%, transparent);
+}
+
+/* action buttons: gold-white signature on hover — the luxury tell */
+.cc-btn-glass {
+  border-radius: 12px;
+}
+.cc-btn-glass:hover {
+  border-color: rgb(var(--btn, var(--cc)) / 0.6);
+  background:
+    linear-gradient(165deg, rgba(255, 244, 214, 0.10), rgba(255, 255, 255, 0.02)),
+    rgb(var(--btn, var(--cc)) / 0.10);
+  box-shadow:
+    0 0 18px rgb(var(--btn, var(--cc)) / 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+/* luxury motion mercy additions */
+@media (prefers-reduced-motion: reduce) {
+  .core-plate::before { animation: none; }
+}
+
 /* motion mercy — kill the ambient loops for users who prefer stillness */
 @media (prefers-reduced-motion: reduce) {
   .core-plate::before,

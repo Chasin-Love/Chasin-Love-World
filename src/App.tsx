@@ -1010,6 +1010,11 @@ export default function App() {
             cluster={activeLineageCluster}
             realityName={getReality(activeLineageCluster.realityId, state.customRealityDescriptions).name}
             onClose={() => setActiveLineageCluster(null)}
+            onZoomToStage={(stageIndex) => {
+              engineRef.current?.zoomToHierarchy(stageIndex);
+              chime(720);
+              setActiveLineageCluster(null);
+            }}
             onWarpToReality={(realityId) => {
               actions.switchReality(realityId);
               const r = getReality(realityId, state.customRealityDescriptions);
@@ -1030,6 +1035,11 @@ export default function App() {
             subjectLabel={lineageGalaxy.galaxy.name}
             realityName={lineageGalaxy.realityName}
             onClose={() => setLineageGalaxy(null)}
+            onZoomToStage={(stageIndex) => {
+              engineRef.current?.zoomToHierarchy(stageIndex);
+              chime(720);
+              setLineageGalaxy(null);
+            }}
             onWarpToReality={(realityId) => {
               actions.switchReality(realityId);
               const r = getReality(realityId, state.customRealityDescriptions);

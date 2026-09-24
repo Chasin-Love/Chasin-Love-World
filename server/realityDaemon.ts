@@ -73,6 +73,17 @@ class RealitySyncDaemon {
     }, intervalMs);
   }
 
+  /** Folders the app itself wrote recently (create-folder, data mirror).
+      Auto-repair skips them for a grace window so the daemon never races
+      the app and rewrites a module that was just authored — that rewrite
+      was the second trigger of the dev-mode full-reload storm. */
+  private recentlyWritten = new Map<string, number>();
+  private static GRACE_MS = 20000;
+
+  markRecentlyWritten(folderName: string) {
+    this.recentlyWritten.set(folderName.toLowerCase(), Date.now());
+  }
+
   public stop() {
     if (this.intervalId) {
       clearInterval(this.intervalId);
@@ -93,6 +104,11 @@ class RealitySyncDaemon {
       for (const dirent of items) {
         if (!dirent.isDirectory()) continue;
         if (dirent.name === 'bin' || dirent.name === '.bin') continue;
+
+        /* grace window — the app owns this folder's files for now */
+        const markedAt = this.recentlyWritten.get(dirent.name.toLowerCase());
+        if (markedAt && Date.now() - markedAt < RealitySyncDaemon.GRACE_MS) continue;
+        if (markedAt) this.recentlyWritten.delete(dirent.name.toLowerCase());
 
         const folderPath = path.join(this.realitiesDir, dirent.name);
         const indexPath = path.join(folderPath, 'index.ts');

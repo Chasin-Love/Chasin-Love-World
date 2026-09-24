@@ -328,7 +328,10 @@ export function generateStellarSystemForGalaxy(gal: GalaxyData): CosmicBody[] {
   const rnd = prng(seedOf(`system::${gal.id}::${sys.starName}`));
   const tint = gal.color || '#38bdf8';
   const now = Date.now();
-  const worlds = Math.max(4, Math.min(9, sys.worldsCount || 5));
+  /* a FIXED legible roster (deterministic per galaxy id) — not a random roll
+     per lineage lookup, which made non-home systems appear to disobey the
+     user's requested counts */
+  const worlds = 5;
 
   const bodies: CosmicBody[] = [
     {
@@ -393,15 +396,19 @@ export function generateStellarSystemForGalaxy(gal: GalaxyData): CosmicBody[] {
     orbit: { a: 220 + rnd() * 18, speed: TAU / 10000, phase: rnd() * TAU, incl: -0.15 + rnd() * 0.3 },
   });
 
-  /* a stellar nursery at the system edge — the Wisp Nebula grammar */
+  /* a stellar nursery at the system edge — the Wisp Nebula grammar; the
+     name is drawn from a seeded pool so foreign systems don't all ship
+     the identical "Veil Nebula" label */
   const nebTints = [
     { deep: '#0a2a2c', base: '#2f8f83', high: '#9fe8d8', atmo: '#6fc2b4', ice: '#e8fff8' },
     { deep: '#14092a', base: '#4a2f8f', high: '#b89ae8', atmo: '#8a6fc2', ice: '#f0e8ff' },
     { deep: '#2a120a', base: '#8f4a2f', high: '#e8b89a', atmo: '#c27f6f', ice: '#fff0e8' },
   ];
+  const NEBULA_NAMES = ['Veil', 'Wisp', 'Cradle', 'Shroud', 'Halo', 'Mantle', 'Shimmer'];
+  const nebulaName = NEBULA_NAMES[seedOf(gal.id) % NEBULA_NAMES.length];
   bodies.push({
     id: `${gal.id}-nebula`,
-    name: `${sys.starName.split(' ')[0]} Veil Nebula`,
+    name: `${sys.starName.split(' ')[0]} ${nebulaName} Nebula`,
     kind: 'nebula', meaning: null,
     note: `A stellar nursery drifting at the edge of the ${sys.starName} system.`,
     createdAt: now, radius: 7,

@@ -190,31 +190,40 @@ async function startServer() {
 
       const cleanId = id || folderName.toLowerCase().replace(/[^a-z0-9]/g, '-');
 
-      fs.writeFileSync(
-        path.join(targetDir, 'surface.ts'),
-        renderSurfaceModule({ id: cleanId, name, colorA, colorB, starColor, folderName }),
-        'utf-8',
-      );
-      fs.writeFileSync(
-        path.join(targetDir, 'index.ts'),
-        renderRealityModule({
-          id: cleanId,
-          name,
-          codeName: codeName || `REALITY-${folderName.toUpperCase()}`,
-          spectral: spectral || 'Quantum Singularity',
-          description: description || `The ${name} continuum realm.`,
-          colorA,
-          colorB,
-          starColor,
-          folderName,
+      /* The create flow can fire more than once (double-submit, retry queue
+         + live call). Only write when content differs — every identical
+         write is a Vite watcher event, and watcher events on src/realities
+         full-page-reload the dev app (the mid-warp reload storm). */
+      const nextSurface = renderSurfaceModule({ id: cleanId, name, colorA, colorB, starColor, folderName });
+      const nextIndex = renderRealityModule({
+        id: cleanId,
+        name,
+        codeName: codeName || `REALITY-${folderName.toUpperCase()}`,
+        spectral: spectral || 'Quantum Singularity',
+        description: description || `The ${name} continuum realm.`,
+        colorA,
+        colorB,
+        starColor,
+        folderName,
         bodiesSource: bodies.length > 0
           ? JSON.stringify(bodies, null, 2)
           : defaultBodiesSource(cleanId, name, colorA, colorB),
         entriesSource: JSON.stringify(entries, null, 2),
         galaxyCountHint: typeof galaxyCountHint === 'number' ? galaxyCountHint : undefined,
-      }),
-        'utf-8',
-      );
+      });
+      const surfacePath = path.join(targetDir, 'surface.ts');
+      const indexPath = path.join(targetDir, 'index.ts');
+      const changed =
+        !fs.existsSync(surfacePath) || fs.readFileSync(surfacePath, 'utf-8') !== nextSurface ||
+        !fs.existsSync(indexPath) || fs.readFileSync(indexPath, 'utf-8') !== nextIndex;
+      if (!changed) {
+        realityDaemon.markRecentlyWritten(folderName);
+        return res.json({ success: true, folderName, deduped: true });
+      }
+
+      fs.writeFileSync(surfacePath, nextSurface, 'utf-8');
+      fs.writeFileSync(indexPath, nextIndex, 'utf-8');
+      realityDaemon.markRecentlyWritten(folderName);
 
       console.log(`[API] Created reality folder on disk: src/realities/${folderName}`);
 
@@ -298,8 +307,21 @@ async function startServer() {
     }
 
     try {
-      const payload = { ...data, realityId, mirroredAt: Date.now() };
-      fs.writeFileSync(path.join(dir, 'data.json'), JSON.stringify(payload, null, 2), 'utf-8');
+      const dataFile = path.join(dir, 'data.json');
+      const next = JSON.stringify({ ...data, realityId, mirroredAt: Date.now() }, null, 2);
+      /* data.json is not a module — Vite ignores it — but keep writes honest:
+         skip when the content is byte-identical (minus the timestamp). */
+      let skip = false;
+      try {
+        const prev = JSON.parse(fs.readFileSync(dataFile, 'utf-8'));
+        const { mirroredAt: _prevTs, ...prevRest } = prev;
+        const { mirroredAt: _nextTs, ...nextRest } = JSON.parse(next);
+        skip = JSON.stringify(prevRest) === JSON.stringify(nextRest);
+      } catch { /* first write or unreadable — write */ }
+      if (!skip) {
+        fs.writeFileSync(dataFile, next, 'utf-8');
+        realityDaemon.markRecentlyWritten(folder);
+      }
       res.json({ success: true, path: `src/realities/${folder}/data.json` });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
