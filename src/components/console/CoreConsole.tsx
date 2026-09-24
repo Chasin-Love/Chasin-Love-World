@@ -12,6 +12,7 @@ import type { DiskSyncState } from '../../types';
 import { toast } from '../../ui/toast';
 import { prettyPrint } from '../../ui/format';
 import { CreateRealityModal } from '../realities/CreateRealityModal';
+import { CoreSigil } from './CoreSigil';
 import { RealityAdvancedPanel } from '../realities/RealityAdvancedPanel';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
 import { QuantumBinTab } from './QuantumBinTab';
@@ -1088,12 +1089,12 @@ export const CoreConsole: React.FC<Props> = ({
         {/* TOP COMMAND HEADER BAR */}
         <div className="shrink-0 flex items-center justify-between gap-4 px-5 sm:px-7 py-3.5 border-b border-cyan-500/20 bg-white/4">
           <div className="flex items-center gap-3.5 min-w-0">
-            {/* Pulsing Core Gyro Sigil */}
-            <div className="relative w-11 h-11 shrink-0">
-              <div className="absolute inset-0 rounded-full bg-linear-to-br from-cyan-400/80 via-violet-500/70 to-pink-500/70 blur-[8px] opacity-90 animate-pulse" />
-              <div className="absolute inset-0.75 rounded-full bg-slate-950/90 border border-white/30 flex items-center justify-center">
-                <span className="core-sigil block w-4 h-4 rounded-full bg-linear-to-br from-cyan-300 to-pink-400 shadow-[0_0_16px_rgba(6,182,212,0.95)]" />
-              </div>
+            {/* THE CORE SIGIL — a live-rendered 3D gyroscope instrument:
+                60 escapement-stepping bezel ticks, three true-axis gimbal
+                rings, geodesic cage, breathing plasma core, one orbiting
+                satellite. Accent-tinted by the active tab. */}
+            <div className="shrink-0 rounded-full p-1 bg-white/5 border border-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_0_24px_rgb(var(--cc)/0.25)]">
+              <CoreSigil size={54} />
             </div>
 
             <div className="min-w-0">
