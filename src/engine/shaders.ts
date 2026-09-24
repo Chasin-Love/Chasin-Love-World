@@ -762,6 +762,14 @@ void main(){
 export const coronaFrag = /* glsl */ `
 uniform float uTime; uniform float uBoost;
 uniform vec3 uColorA; uniform vec3 uColorB;
+/* THE SENTIMENT AURORA — the reality's emotional spectrum, recency-weighted.
+   uAuroraA/B hold the two strongest mood colors; uAuroraMask picks which of
+   the five mood weights flows through each ray. uAuroraIntensity is the
+   overall loudness, uAuroraStorm the turbulence (heavy/burning tear it). */
+uniform vec3 uAuroraA; uniform vec3 uAuroraB;
+uniform float uAuroraMaskA; uniform float uAuroraMaskB;
+uniform float uAuroraIntensity; uniform float uAuroraStorm;
+uniform float uEchoBloom;
 varying vec2 vUv;
 ${NOISE}
 
@@ -807,9 +815,24 @@ void main(){
   // Blend colors radially and structurally
   vec3 col = mix(deep, warm, inner * streaks + wisps * 0.5);
   col = mix(col, ultraHot, pow(inner, 3.0));
-  
+
+  // THE SENTIMENT AURORA — each ray carries one of the reality's two
+  // strongest mood colors. The band rides high-latitude rays (|ang| near
+  // the poles reads as the classic auroral oval), stormy spectra tear the
+  // band apart into ragged curtains.
+  float bandA = uAuroraMaskA * streaks * (0.5 + 0.5 * sin(angDist * 2.0 + t * 3.0));
+  float bandB = uAuroraMaskB * streaks * (0.5 + 0.5 * sin(angDist * 2.6 - t * 2.2 + 1.7));
+  float tear = uAuroraStorm * (fbm3(vec3(cos(angDist) * 2.0, sin(angDist) * 2.0, t * 5.0)) - 0.5) * 1.6;
+  bandA = max(0.0, bandA + tear);
+  bandB = max(0.0, bandB - tear);
+  float auroraK = (bandA + bandB) * uAuroraIntensity * smoothstep(0.25, 0.75, r);
+  vec3 auroraCol = uAuroraA * bandA + uAuroraB * bandB;
+  auroraCol += vec3(1.0, 0.95, 0.85) * uEchoBloom * 0.6 * streaks;
+  col += auroraCol * 0.9;
+
   // Opacity masking
   float a = (inner * streaks * 0.9 + outer * 0.3 * (0.3 + 0.7*streaks) + wisps * 0.45);
+  a += auroraK * 0.5;
   
   // Hide the center slightly so it doesn't wash out the star completely (additive blending)
   float starMask = smoothstep(0.15, 0.20, r);

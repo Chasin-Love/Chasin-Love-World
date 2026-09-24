@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Globe, Sun, Orbit, Search, Layers, Database, Cpu, Zap, Crosshair,
-  Compass, Radio, Sparkles, CircleDot,
+  Compass, Radio, Sparkles, CircleDot, BookOpen, Star,
 } from 'lucide-react';
 import { REALITIES } from '../../realities';
 import { HIERARCHY_STAGES } from '../../realities/hierarchyStages';
@@ -26,6 +26,8 @@ export interface PaletteApi {
   onZoomStage: (stageIndex: number) => void;
   onFrameCore: () => void;
   onKamui: () => void;
+  onOpenMemory: (entryId: string, planetId: string) => void;
+  onConstellate: (bodyIds: string[]) => void;
 }
 
 interface Cmd {
@@ -51,6 +53,7 @@ export const CommandPalette: React.FC<{ onClose: () => void; api: PaletteApi }> 
 
   const commands = useMemo<Cmd[]>(() => {
     const out: Cmd[] = [];
+    const q = query.trim().toLowerCase();
 
     /* realities — the dimensional barrier honored by the App's warp handler */
     for (const r of REALITIES) {
@@ -122,6 +125,51 @@ export const CommandPalette: React.FC<{ onClose: () => void; api: PaletteApi }> 
       });
     });
 
+    /* THE MEMORIES — full-text retrieval across the active reality's pages */
+    if (q.length >= 2) {
+      const bodyName = new Map(state.bodies.map((b) => [b.id, b.name] as const));
+      const hits = state.entries
+        .filter((e) => !e.archived)
+        .map((e) => {
+          const hay = `${e.title} ${e.body.replace(/<[^>]*>/g, ' ')} ${e.tags.join(' ')}`.toLowerCase();
+          const score = (e.title.toLowerCase().includes(q) ? 2 : 0) + (hay.includes(q) ? 1 : 0);
+          return { e, score };
+        })
+        .filter((h) => h.score > 0)
+        .sort((a, b) => (b.score - a.score) || (b.e.createdAt - a.e.createdAt))
+        .slice(0, 6);
+      for (const { e } of hits) {
+        out.push({
+          id: `memory:${e.id}`,
+          label: e.title || 'untitled page',
+          hint: `${e.mood ?? 'calm'} · ${bodyName.get(e.planetId) ?? 'a world'} · ${new Date(e.createdAt).toLocaleDateString()}`,
+          keywords: `memory diary page entry ${e.title} ${e.tags.join(' ')} ${e.body.slice(0, 80)}`,
+          icon: <BookOpen className="w-3.5 h-3.5" />,
+          section: 'Memories',
+          accent: '#f2a0b0',
+          run: () => api.onOpenMemory(e.id, e.planetId),
+        });
+      }
+    }
+
+    /* THE CONSTELLATION SEARCH — pages answer as one constellation */
+    {
+      const tagged = state.entries.filter((e) => !e.archived && e.tags.includes(q));
+      const planetIds = [...new Set(tagged.map((e) => e.planetId))].slice(0, 12);
+      if (planetIds.length > 1) {
+        out.push({
+          id: 'constellation:tag',
+          label: `Constellation: “${q}” — ${planetIds.length} worlds`,
+          hint: tagged.length + ' pages share this star-sign',
+          keywords: `constellation tag #${q} connect sky linked memories ${q}`,
+          icon: <Sparkles className="w-3.5 h-3.5" />,
+          section: 'Constellation',
+          accent: '#f2c178',
+          run: () => api.onConstellate(planetIds),
+        });
+      }
+    }
+
     /* powers */
     out.push(
       {
@@ -166,7 +214,7 @@ export const CommandPalette: React.FC<{ onClose: () => void; api: PaletteApi }> 
       },
     );
     return out;
-  }, [state.bodies, activeId, api]);
+  }, [state.bodies, state.entries, activeId, api, query]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

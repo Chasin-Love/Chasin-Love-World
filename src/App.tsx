@@ -9,6 +9,7 @@ import { ErrorBoundary, IcLink, ToastHost, useUniverse } from './ui/bits';
 import { toast } from './ui/toast';
 import { startRealitySync } from './sync/realitySync';
 import { ensureSkyFor, onSkyChanged } from './sky/skyRegistry';
+import { computeAurora, onThisDay } from './sentiment/sentiment';
 import { perfMark } from './performance';
 import { publishSimDate } from './simClock';
 import { MultiverseBar } from './components/hud/MultiverseBar';
@@ -32,7 +33,26 @@ interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean
 const MAX_RECT = (): WinRect => ({ x: 12, y: 12, w: window.innerWidth - 24, h: window.innerHeight - 24 });
 
 /* bump on every shipped build — lets you confirm the running bundle is current */
-export const BUILD = 'R32';
+export const BUILD = 'R33';
+
+/* THE ECHO SHOWER TOAST — one glass banner the day a memory returns.
+   Auto-fades; re-keyed only when the shower's membership changes. */
+const EchoShowerToast: React.FC<{ signal: string; onDone: () => void }> = ({ signal, onDone }) => {
+  useEffect(() => {
+    const t = setTimeout(onDone, 5600);
+    return () => clearTimeout(t);
+  }, [signal, onDone]);
+  const n = signal.split(',').filter(Boolean).length;
+  return (
+    <div className="fixed top-24 left-1/2 -translate-x-1/2 z-95 rise-in pointer-events-none">
+      <div className="px-5 py-2 rounded-full border border-solar/40 bg-abyss/85 backdrop-blur-md shadow-[0_0_24px_rgba(242,193,120,0.15)]">
+        <p className="font-mono text-[9px] tracking-[0.3em] uppercase text-solar">
+          ✦ cosmic echo — {n === 1 ? 'a memory returns today' : `${n} memories return today`} · golden meteors carry them
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const MEANINGS: Meaning[] = ['memory', 'idea', 'person', 'dream', 'project', 'moment', 'unresolved', 'chapter'];
 
@@ -114,6 +134,9 @@ export default function App() {
   const [showMultiverseBar, setShowMultiverseBar] = useState(false);
   const [showCosmicHud, setShowCosmicHud] = useState(false);
   const [kamuiKey, setKamuiKey] = useState(0);
+  /* THE COSMIC ECHO — the memory meteor under the pointer (for the card) */
+  const [echoHover, setEchoHover] = useState<{ entryId: string; planetId: string; title: string; x: number; y: number } | null>(null);
+  const [echoFlash, setEchoFlash] = useState<string | null>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -272,6 +295,14 @@ export default function App() {
       onPortalDone: () => undefined,
       onContext: (id, x, y) => setMenu({ id, x, y }),
       onFirstFrame: () => setEngineReady(true),
+      onEchoOpen: (entryId, planetId, title) => {
+        /* a memory meteor was caught — reopen the page it remembers */
+        chime(740);
+        toast(`✦ Echo caught: "${title.slice(0, 40)}"`);
+        openDiaryForRef.current?.(planetId);
+        void entryId;
+      },
+      onHoverEcho: (echo, x, y) => setEchoHover(echo ? { ...echo, x: x ?? 0, y: y ?? 0 } : null),
       onScaleLabel: (l) => setLabel(l),
       onSimDate: publishSimDate,
       onSelectReality: (realityId) => {
@@ -486,6 +517,24 @@ export default function App() {
     }
   }, [state.connections, mode]);
 
+  /* THE SENTIMENT AURORA — the active reality's mood weather, damped in the
+     engine; re-derived only when the diary actually changes (signature-gated
+     against the 3s disk-sync heartbeats) */
+  const entriesSigAurora = useMemo(() => JSON.stringify(state.entries), [state.entries]);
+  useEffect(() => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    const entries = JSON.parse(entriesSigAurora) as typeof state.entries;
+    eng.setSentimentAurora(computeAurora(entries));
+    /* THE COSMIC ECHO — arm today's shower (idempotent inside the engine) */
+    const echoes = onThisDay(entries).slice(0, 8);
+    eng.armEchoShower(echoes.map((e) => ({ entryId: e.entry.id, planetId: e.planetId, title: e.entry.title })));
+    if (echoes.length > 0) {
+      const key = echoes.map((e) => e.entry.id).join(',');
+      setEchoFlash((prev) => (prev === key ? prev : key));
+    }
+  }, [entriesSigAurora]);
+
   /* sync reality and dimensional barrier when active reality shifts */
   useEffect(() => {
     const eng = engineRef.current;
@@ -579,6 +628,10 @@ export default function App() {
   const maximizeWin = (key: string) => setWins((cur) => cur.map((w) => (w.key === key ? { ...w, maximized: !w.maximized } : w)));
 
   /* open (or raise) a diary window for a world — used by constellation links */
+  /* openDiaryFor lives in a ref so the engine boot effect can call the
+     latest version without re-booting the engine */
+  const openDiaryForRef = useRef<(id: string) => void>(() => {});
+
   const openDiaryFor = useCallback((id: string) => {
     setAudioMode('diary');
     setWins((cur) => {
@@ -596,6 +649,7 @@ export default function App() {
       }];
     });
   }, []);
+  useEffect(() => { openDiaryForRef.current = openDiaryFor; }, [openDiaryFor]);
 
   const onTemporal = useCallback((ms: number | null) => {
     engineRef.current?.setTemporal(ms);
@@ -623,6 +677,26 @@ export default function App() {
   return (
     <div className="fixed inset-0 overflow-hidden bg-void">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ cursor: 'grab', touchAction: 'none' }} />
+
+      {/* THE COSMIC ECHO — the memory meteor under the pointer */}
+      {echoHover && !advancedReality && !coreConsoleOpen && (
+        <div
+          className="fixed z-95 pointer-events-none rise-in"
+          style={{
+            left: Math.min(echoHover.x + 14, window.innerWidth - 260),
+            top: Math.min(echoHover.y + 14, window.innerHeight - 120),
+          }}
+        >
+          <div className="px-3 py-2 rounded-lg border border-solar/40 bg-abyss/90 backdrop-blur-md max-w-60">
+            <p className="font-mono text-[8px] tracking-[0.26em] uppercase text-solar/80">cosmic echo · a memory returns</p>
+            <p className="text-[11.5px] text-paper/90 leading-snug mt-1 line-clamp-2">{echoHover.title}</p>
+            <p className="font-mono text-[8.5px] text-slate-dim mt-1">click to reopen the page</p>
+          </div>
+        </div>
+      )}
+
+      {/* echo shower arrival toast — once per distinct shower */}
+      {echoFlash && <EchoShowerToast signal={echoFlash} onDone={() => setEchoFlash(null)} />}
 
       {/* ambient vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(130% 100% at 50% 45%, transparent 55%, rgba(2,4,9,0.5) 100%)' }} />
@@ -857,6 +931,22 @@ export default function App() {
               },
               onOpenVault: () => { setMode('vault'); setAudioMode('vault'); },
               onOpenConsole: () => { setCoreConsoleOpen(true); chime(960); },
+              onOpenMemory: (entryId, planetId) => {
+                setMode('space');
+                chime(740);
+                const eng = engineRef.current;
+                if (eng) {
+                  eng.pulseConstellation([planetId]);
+                }
+                openDiaryForRef.current?.(planetId);
+                void entryId;
+              },
+              onConstellate: (planetIds) => {
+                setMode('space');
+                engineRef.current?.pulseConstellation(planetIds);
+                chime(700);
+                toast(`✦ ${planetIds.length} worlds answer in the sky`);
+              },
               onZoomStage: (i) => { engineRef.current?.zoomToHierarchy(i); chime(720); },
               onFrameCore: () => { engineRef.current?.zoomToCore(); chime(720); },
               onKamui: () => {

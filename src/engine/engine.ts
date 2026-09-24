@@ -30,6 +30,7 @@ import { cosmosBridge } from '../native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../performance';
 import { isDesktop } from '../desktop/adapter';
 import { ensureSkyFor, getActiveSkySpec, type ActiveSkySpec } from '../sky/skyRegistry';
+import { MOOD_HEX, type AuroraSignal, type EchoEntry } from '../sentiment/sentiment';
 import {
   WEB_CEILING, WEB_EDGE_TRIGGER, WARP_ZOOM_VEL,
   MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,
@@ -77,6 +78,10 @@ export interface EngineCallbacks {
      intro veil until then, so shader compilation and scene building never
      surface as a frozen universe */
   onFirstFrame?: () => void;
+  /* THE COSMIC ECHO — a memory meteor was clicked: reopen its diary page */
+  onEchoOpen?: (entryId: string, planetId: string, title: string) => void;
+  /* echo meteor hover — App shows a small memory card near the pointer */
+  onHoverEcho?: (echo: { entryId: string; planetId: string; title: string } | null, x?: number, y?: number) => void;
 }
 
 /** Everything the App needs to present a clicked inner world. */
@@ -523,6 +528,25 @@ export class UniverseEngine {
   private activeSkySpec: ActiveSkySpec | null = null;
   private skyApplying = false;
 
+  /* THE SENTIMENT AURORA — live emotional state of the active reality,
+     damped toward the latest signal so mood shifts read as weather, not cuts */
+  private auroraTarget: AuroraSignal | null = null;
+  private auroraCur = { maskA: 0, maskB: 0, intensity: 0, storm: 0, echo: 0 };
+  private auroraColA = new THREE.Color('#f2c178');
+  private auroraColB = new THREE.Color('#7fc4e8');
+
+  /* THE COSMIC ECHO — one shower of on-this-day meteors per day, each
+     meteor a memory you can click to reopen */
+  private echoMeteors: (ShootingMeteor & { entryId: string; planetId: string; title: string })[] = [];
+  private echoArmedDay = '';
+  private echoShowerClock = 0;
+  private echoHoverId: string | null = null;
+  private echoGroup: THREE.Group | null = null;
+  private echoColliders: THREE.Sprite[] = [];
+  private lastEchoHover = false;
+  /* constellation pulse registry — atmosphere strength envelopes */
+  private pulses: { mat: THREE.ShaderMaterial; base: number; until: number }[] = [];
+
   private onVaultPulse = (event: Event) => {
     const detail = (event as CustomEvent<{ intensity?: number }>).detail;
     this.vaultPulse = Math.min(1.5, this.vaultPulse + (detail?.intensity ?? 1));
@@ -752,7 +776,13 @@ export class UniverseEngine {
 
     /* organic shader corona — rays breathe, no layered sprite rings */
     this.coronaMat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uBoost: { value: 1 } },
+      uniforms: {
+        uTime: { value: 0 }, uBoost: { value: 1 },
+        uAuroraA: { value: new THREE.Color('#f2c178') }, uAuroraB: { value: new THREE.Color('#7fc4e8') },
+        uAuroraMaskA: { value: 0 }, uAuroraMaskB: { value: 0 },
+        uAuroraIntensity: { value: 0 }, uAuroraStorm: { value: 0 },
+        uEchoBloom: { value: 0 },
+      },
       vertexShader: coronaVert, fragmentShader: coronaFrag,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     });
@@ -1189,6 +1219,54 @@ export class UniverseEngine {
       m.life = R() * m.maxLife; // stagger initial life times
       this.meteors.push(m);
     }
+
+    /* THE COSMIC ECHO POOL — eight head-glow sprites waiting for today's
+       on-this-day memories. Inert until armEchoShower() fills them. */
+    const echoGroup = new THREE.Group();
+    echoGroup.visible = false;
+    for (let i = 0; i < 8; i++) {
+      const echoTex = makeGlowTexture(128, [
+        [0, 'rgba(255,250,235,1)'],
+        [0.2, 'rgba(255,236,180,0.95)'],
+        [0.5, 'rgba(242,193,120,0.5)'],
+        [1, 'rgba(242,193,120,0)'],
+      ]);
+      const headSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: echoTex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+      const lineGeom = new THREE.BufferGeometry();
+      lineGeom.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0], 3));
+      lineGeom.setAttribute('color', new THREE.Float32BufferAttribute([1, 0.92, 0.7, 0.9, 0.6, 0.3], 3));
+      const line = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+      const g = new THREE.Group();
+      g.add(headSprite); g.add(line);
+      echoGroup.add(g);
+      const echo = {
+        pos: new THREE.Vector3(), vel: new THREE.Vector3(), len: 1, life: 0, maxLife: 1,
+        headSprite, line, lineGeom, size: 1,
+        entryId: '', planetId: '', title: '',
+      };
+      this.echoMeteors.push(echo);
+      this.echoColliders.push(headSprite);
+      (headSprite as THREE.Sprite & { echoEntryId?: string }).echoEntryId = '';
+    }
+    this.scene.add(echoGroup);
+    this.echoGroup = echoGroup;
+  }
+
+  private resetEchoMeteor(m: (ShootingMeteor & { entryId: string; planetId: string; title: string }), far: boolean) {
+    const R = Math.random;
+    /* echo meteors live in the intimate shell — 220..520 units — so they
+       read at system scale and are actually clickable */
+    const r = 240 + R() * 280;
+    const theta = R() * Math.PI * 2, phi = Math.acos(2 * R() - 1);
+    m.pos.set(r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi) * 0.6, r * Math.sin(phi) * Math.sin(theta));
+    const speed = 14 + R() * 30;
+    const dir = new THREE.Vector3((R() - 0.5) * 2, (R() - 0.5) * 0.5, (R() - 0.5) * 2).normalize();
+    m.vel.copy(dir).multiplyScalar(speed);
+    m.len = 10 + R() * 26;
+    m.life = far ? -R() * 26 : 0;
+    m.maxLife = 14 + R() * 10;
+    m.size = 2.2 + R() * 2.2;
+    m.headSprite.scale.setScalar(m.size);
   }
 
   private resetMeteor(m: ShootingMeteor) {
@@ -1210,6 +1288,7 @@ export class UniverseEngine {
     /* the meteors sleep through the birth — absolute darkness comes first */
     if (this.bootIntro && this.clockT < 2.4) {
       this.meteors.forEach((m) => { m.headSprite.visible = false; m.line.visible = false; });
+      this.updateEchoMeteors(dt);
       return;
     }
     this.meteors.forEach((m) => {
@@ -1232,6 +1311,140 @@ export class UniverseEngine {
       m.headSprite.material.opacity = fade * 0.95;
       (m.line.material as THREE.LineBasicMaterial).opacity = fade * 0.8;
     });
+    this.updateEchoMeteors(dt);
+  }
+
+  /* THE COSMIC ECHO — each armed meteor is one memory from this calendar day
+     in an earlier year. Slow, golden, close to home. Click one to reopen the
+     page it remembers. The shower runs all day; meteors respawn. */
+  private updateEchoMeteors(dt: number) {
+    if (!this.echoGroup) return;
+    const active = this.echoMeteors.some((m) => m.entryId !== '');
+    this.echoGroup.visible = active;
+    if (!active) return;
+    this.echoShowerClock += dt;
+    let anyVisible = false;
+    for (const m of this.echoMeteors) {
+      if (m.entryId === '') { m.headSprite.visible = false; m.line.visible = false; continue; }
+      m.life += dt;
+      if (m.life >= m.maxLife) { this.resetEchoMeteor(m, true); continue; }
+      if (m.life < 0) { m.headSprite.visible = false; m.line.visible = false; continue; }
+      anyVisible = true;
+      m.headSprite.visible = true; m.line.visible = true;
+      m.pos.addScaledVector(m.vel, dt);
+      m.headSprite.position.copy(m.pos);
+      const tail = m.pos.clone().sub(m.vel.clone().normalize().multiplyScalar(m.len));
+      const attr = m.lineGeom.getAttribute('position') as THREE.BufferAttribute;
+      attr.setXYZ(0, m.pos.x, m.pos.y, m.pos.z);
+      attr.setXYZ(1, tail.x, tail.y, tail.z);
+      attr.needsUpdate = true;
+      const fade = Math.min(1, Math.sin((m.life / m.maxLife) * Math.PI) * 1.4);
+      const hoverGlow = this.echoHoverId === m.entryId ? 1 : 0;
+      m.headSprite.material.opacity = fade * (0.8 + hoverGlow * 0.2);
+      m.headSprite.scale.setScalar(m.size * (1 + hoverGlow * 0.5));
+      (m.line.material as THREE.LineBasicMaterial).opacity = fade * 0.85;
+    }
+    this.echoGroup.visible = anyVisible;
+  }
+
+  /** Arm today's shower — one entry per meteor, up to 8 (App computes the echoes).
+      Idempotent: re-arming with the same memory set on the same day is a no-op,
+      so diary edits never restart the shower. */
+  armEchoShower(echoes: { entryId: string; planetId: string; title: string }[]): void {
+    const dayKey = new Date().toDateString();
+    const sig = `${dayKey}::${echoes.map((e) => e.entryId).join(',')}`;
+    if (sig === this.echoArmedDay) return;
+    this.echoArmedDay = sig;
+    this.echoMeteors.forEach((m, i) => {
+      const e = echoes[i];
+      if (!e) { m.entryId = ''; (m.headSprite as THREE.Sprite & { echoEntryId?: string }).echoEntryId = ''; return; }
+      m.entryId = e.entryId;
+      m.planetId = e.planetId;
+      m.title = e.title;
+      (m.headSprite as THREE.Sprite & { echoEntryId?: string }).echoEntryId = e.entryId;
+      this.resetEchoMeteor(m, i > 0); /* the first streaks immediately */
+    });
+  }
+
+  /** Which echo meteor is under the pointer, if any. */
+  private pickEcho(): string | null {
+    if (!this.echoGroup || !this.echoGroup.visible) return null;
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    this.raycaster.far = this.currentDist() * 3 + 120;
+    const visible = this.echoColliders.filter((s) => s.visible && s.parent?.visible);
+    if (!visible.length) return null;
+    const hits = this.raycaster.intersectObjects(visible, false);
+    for (const h of hits) {
+      const id = (h.object as THREE.Sprite & { echoEntryId?: string }).echoEntryId;
+      if (id) return id;
+    }
+    return null;
+  }
+
+  /* ------------------------- the sentiment aurora ------------------------- */
+
+  /** Feed the latest recency-weighted mood spectrum (from src/sentiment). */
+  setSentimentAurora(signal: AuroraSignal): void {
+    this.auroraTarget = signal;
+  }
+
+  private updateAurora(dt: number): void {
+    if (!this.coronaMat) return;
+    const t = this.auroraTarget;
+    const cur = this.auroraCur;
+    if (t) {
+      /* two strongest mood colors drive the band */
+      let iA = 0, iB = 1;
+      const w = t.weights;
+      for (let i = 1; i < w.length; i++) if (w[i] > w[iA]) iA = i;
+      for (let i = 0; i < w.length; i++) if (i !== iA && w[i] > w[iB]) iB = i;
+      this.auroraColA.set(MOOD_HEX[iA]);
+      this.auroraColB.set(MOOD_HEX[iB]);
+      const k = Math.min(1, dt * 1.6);
+      cur.maskA += (w[iA] - cur.maskA) * k;
+      cur.maskB += (w[iB] - cur.maskB) * k;
+      cur.intensity += (t.intensity - cur.intensity) * k;
+      cur.storm += (t.storm - cur.storm) * k;
+    }
+    cur.echo += ((this.echoMeteors.some((m) => m.entryId !== '' && m.life > 0) ? 0.55 : 0) - cur.echo) * Math.min(1, dt * 2);
+    const u = this.coronaMat.uniforms;
+    (u.uAuroraA.value as THREE.Color).copy(this.auroraColA);
+    (u.uAuroraB.value as THREE.Color).copy(this.auroraColB);
+    u.uAuroraMaskA.value = cur.maskA;
+    u.uAuroraMaskB.value = cur.maskB;
+    u.uAuroraIntensity.value = cur.intensity;
+    u.uAuroraStorm.value = cur.storm;
+    u.uEchoBloom.value = cur.echo;
+  }
+
+  /** Memory Constellation Search: pulse the given worlds' atmospheres gold
+      for ~4s so the search results visibly answer from the sky. */
+  pulseConstellation(bodyIds: string[]): number {
+    let n = 0;
+    for (const b of this.bodies) {
+      if (!bodyIds.includes(b.data.id)) continue;
+      const atmoMat = b.atmo?.material as THREE.ShaderMaterial | undefined;
+      if (atmoMat?.uniforms?.uStrength) {
+        this.pulses.push({ mat: atmoMat, base: (atmoMat.uniforms.uStrength.value as number) ?? 0.85, until: performance.now() + 4000 });
+        n++;
+      }
+    }
+    return n;
+  }
+
+  /* the pulse envelopes live in the frame loop so they decay cleanly */
+  private updatePulses(now: number): void {
+    for (let i = this.pulses.length - 1; i >= 0; i--) {
+      const p = this.pulses[i];
+      const remain = p.until - now;
+      if (remain <= 0 || !p.mat.uniforms.uStrength) {
+        if (p.mat.uniforms.uStrength) p.mat.uniforms.uStrength.value = p.base;
+        this.pulses.splice(i, 1);
+        continue;
+      }
+      const k = Math.min(1, remain / 4000);
+      p.mat.uniforms.uStrength.value = p.base + (Math.sin(now * 0.012) * 0.5 + 0.5) * 1.5 * k;
+    }
   }
 
   private buildMultiverse(customRealitiesList?: RealityConfig[]) {
@@ -3560,6 +3773,9 @@ void main(){
     // plus the worlds of any isolated inner stellar system you're diving in
     if (d <= 1400) {
       this.raycaster.far = d * 3 + 120;
+      /* echo meteors first — a memory streak outranks the empty space it crosses */
+      const echoId = this.pickEcho();
+      if (echoId) return `echo:${echoId}`;
       const list = this.innerColliderList.length > 0 ? this.colliderList.concat(this.innerColliderList) : this.colliderList;
       const hits = this.raycaster.intersectObjects(list, false);
       for (const h of hits) {
@@ -3599,6 +3815,16 @@ void main(){
 
   private handleClick() {
     const id = this.pick();
+    /* THE COSMIC ECHO — clicking a memory meteor reopens its page */
+    if (id && id.startsWith('echo:')) {
+      const entryId = id.slice(5);
+      const echo = this.echoMeteors.find((m) => m.entryId === entryId);
+      if (echo) {
+        this.selectedId = null;
+        this.cb.onEchoOpen?.(echo.entryId, echo.planetId, echo.title);
+      }
+      return;
+    }
     /* THE ASTRAL CORE — one click opens the Multiverse Core Console */
     if (id === 'multiverse-core') {
       if (this.cb.onSelectCore) this.cb.onSelectCore();
@@ -5132,6 +5358,8 @@ void main(){
     });
     this.updateBodies(dt);
     this.updateMeteors(dt);
+    this.updateAurora(dt);
+    this.updatePulses(performance.now());
     this.updateLevels(dt);
     this.updatePortalGravity();
     this.updatePortalSingularity();
@@ -6048,6 +6276,16 @@ void main(){
     if (!this.pointerMoved && !this.dragging) return;
     this.pointerMoved = false;
     const id = this.pick();
+    /* echo hover: resolve to the memory's id so App can show its card */
+    this.echoHoverId = id && id.startsWith('echo:') ? id.slice(5) : null;
+    if (this.echoHoverId) {
+      this.lastEchoHover = true;
+      const echo = this.echoMeteors.find((m) => m.entryId === this.echoHoverId);
+      this.cb.onHoverEcho?.(echo ? { entryId: echo.entryId, planetId: echo.planetId, title: echo.title } : null, this.mouseScreenX, this.mouseScreenY);
+    } else if (this.lastEchoHover) {
+      this.cb.onHoverEcho?.(null);
+      this.lastEchoHover = false;
+    }
     if (id !== this.hoveredId) {
       this.hoveredId = id;
       this.cb.onHover(id, this.mouseScreenX, this.mouseScreenY);
@@ -6126,6 +6364,18 @@ void main(){
     this.renderer.domElement.removeEventListener('webglcontextrestored', this.onContextRestored);
     window.removeEventListener('resize', this.resize);
     window.removeEventListener('eventide-vault-pulse', this.onVaultPulse);
+    if (this.echoGroup) {
+      this.scene.remove(this.echoGroup);
+      this.echoGroup.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.geometry) m.geometry.dispose();
+        const mat = m.material as THREE.Material | undefined;
+        if (mat) mat.dispose();
+      });
+      this.echoGroup = null;
+    }
+    this.echoMeteors = [];
+    this.echoColliders = [];
     this.canvas.style.touchAction = this.originalTouchAction;
     this.rig.dispose();
     this.disposeObject3D(this.scene);
