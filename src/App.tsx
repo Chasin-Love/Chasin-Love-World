@@ -8,6 +8,7 @@ import { PhysicsHUD } from './ui/PhysicsHUD';
 import { ErrorBoundary, IcLink, ToastHost, useUniverse } from './ui/bits';
 import { toast } from './ui/toast';
 import { startRealitySync } from './sync/realitySync';
+import { ensureSkyFor, onSkyChanged } from './sky/skyRegistry';
 import { perfMark } from './performance';
 import { publishSimDate } from './simClock';
 import { MultiverseBar } from './components/hud/MultiverseBar';
@@ -31,7 +32,7 @@ interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean
 const MAX_RECT = (): WinRect => ({ x: 12, y: 12, w: window.innerWidth - 24, h: window.innerHeight - 24 });
 
 /* bump on every shipped build — lets you confirm the running bundle is current */
-export const BUILD = 'R31';
+export const BUILD = 'R32';
 
 const MEANINGS: Meaning[] = ['memory', 'idea', 'person', 'dream', 'project', 'moment', 'unresolved', 'chapter'];
 
@@ -319,6 +320,9 @@ export default function App() {
          and gives Kamui a valid reality target on the first interaction. */
       const initialState = getState();
       engine.setReality(getReality(initialState.activeRealityId || 'sol-prime', initialState.customRealityDescriptions));
+      /* Sky Studio: pull this reality's photo sky (its own folder) once the
+         engine is live — setReality already applied the cached spec if any */
+      void ensureSkyFor(initialState.activeRealityId || 'sol-prime');
       engine.setRendering(modeRef.current !== 'vault');
       loadedEngine = engine;
       perfMark('engine-ready');
@@ -444,6 +448,19 @@ export default function App() {
     };
     window.addEventListener('eventide-shader-error', onShaderError);
     return () => window.removeEventListener('eventide-shader-error', onShaderError);
+  }, []);
+
+  /* Sky Studio — live updates: an upload/activation/slider change re-applies
+     the active reality's photo sky instantly (other realities just warm the
+     cache so their warp-in is instant) */
+  useEffect(() => {
+    return onSkyChanged((realityId) => {
+      const eng = engineRef.current;
+      if (!eng) return;
+      if ((getState().activeRealityId || 'sol-prime') === realityId) {
+        void eng.applyActiveSky();
+      }
+    });
   }, []);
 
   /* idle chrome fade */

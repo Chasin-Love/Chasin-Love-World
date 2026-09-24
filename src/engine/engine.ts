@@ -28,6 +28,8 @@ import { generateStellarSystemForGalaxy } from '../realities/galaxyGenerator';
 import { calculateKeplerPosition, calculatePhysics } from '../physics/physicsEngine';
 import { cosmosBridge } from '../native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../performance';
+import { isDesktop } from '../desktop/adapter';
+import { ensureSkyFor, getActiveSkySpec, type ActiveSkySpec } from '../sky/skyRegistry';
 import {
   WEB_CEILING, WEB_EDGE_TRIGGER, WARP_ZOOM_VEL,
   MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,
@@ -514,6 +516,12 @@ export class UniverseEngine {
   private disposed = false;
   private canvas: HTMLCanvasElement;
   private originalTouchAction = '';
+
+  /* THE SKY STUDIO — the active reality's photo sky (from its own assets
+     folder). Desktop fetches the registry itself so a device that never ran
+     the web server still gets its skies. */
+  private activeSkySpec: ActiveSkySpec | null = null;
+  private skyApplying = false;
 
   private onVaultPulse = (event: Event) => {
     const detail = (event as CustomEvent<{ intensity?: number }>).detail;
@@ -3842,7 +3850,32 @@ void main(){
   }
   setPaused(p: boolean) { this.paused = p; }
   get pausedNow() { return this.paused; }
-  setRendering(v: boolean) { this.rendering = v; }
+  setRendering(v: boolean) {
+    this.rendering = v;
+    this.surfaceManager?.getPhotoDome().setVisible(v);
+  }
+
+  /* THE SKY STUDIO — apply this reality's photo sky (its own assets folder
+     on disk). Null spec = the pure procedural cosmos. Desktop fetches the
+     registry itself so a device that never ran the web server still gets
+     its skies. The crossfade + texture load run off the render loop. */
+  async applyActiveSky(): Promise<void> {
+    if (isDesktop()) {
+      try {
+        await ensureSkyFor(this.activeRealityId);
+      } catch { /* keep whatever cache already holds */ }
+    }
+    this.activeSkySpec = getActiveSkySpec(this.activeRealityId);
+    this.skyApplying = true;
+    try {
+      await this.surfaceManager.getPhotoDome().apply(
+        this.activeSkySpec,
+        this.activeReality?.starColor || '#38bdf8',
+      );
+    } finally {
+      this.skyApplying = false;
+    }
+  }
 
   setTemporal(asOf: number | null) {
     this.bodies.forEach((b) => {
@@ -4178,6 +4211,9 @@ void main(){
     if (this.surfaceManager) {
       this.surfaceManager.setReality(reality);
     }
+    // Sky Studio: bring this reality's own photo sky to the dome (fire-and-forget;
+    // the photo dome crossfades while the rest of the reality builds)
+    void this.applyActiveSky();
 
     // 1. Update Anchor Star shader uniforms & corona palette
     const colA = new THREE.Color(reality.colorA);

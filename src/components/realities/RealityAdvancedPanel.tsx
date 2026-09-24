@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import {
   Palette, BookOpen, Orbit, Save, RotateCcw, Check, Sparkles,
+  Image as ImageIcon, Upload, Trash2, Eye,
 } from 'lucide-react';
 import { getReality, RAW_REALITIES, RealityMetaOverride } from '../../realities';
 import { actions, useUniverse } from '../../state';
 import { toast } from '../../ui/toast';
 import { GalaxyRoster } from '../hud/GalaxyRoster';
+import {
+  ensureSkyFor, uploadSkyPhoto, activateSkyPhoto, deleteSkyPhoto,
+  saveSkySettings, onSkyChanged, skyAssetUrl,
+  type SkyManifest, type SkySettings,
+} from '../../sky/skyRegistry';
 
-type Tab = 'identity' | 'lore' | 'galaxies';
+type Tab = 'identity' | 'lore' | 'galaxies' | 'sky';
 
 interface PanelProps {
   realityId: string;
@@ -61,7 +67,185 @@ function darkenHex(hex: string, k: number): string {
   return `#${[r, g, b].map((c) => clamp255(c * (1 - k)).toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** The full reality workbench — identity, lore and its major-galaxy ring.
+/* ------------------------------ SKY STUDIO ------------------------------ */
+/* Every reality keeps its own photo sky in its OWN folder:
+   src/realities/<folder>/sky.json + assets/. Reality A's photo can never
+   leak into Reality B — total isolation, like every other reality file. */
+const SKY_SLIDERS: { key: keyof SkySettings; label: string; hint: string }[] = [
+  { key: 'blend', label: 'Presence', hint: 'photo ↔ procedural cosmos balance' },
+  { key: 'dim', label: 'Depth', hint: 'darken the photo so stars read over it' },
+  { key: 'blur', label: 'Nebula', hint: 'soften the photo into cosmic haze' },
+  { key: 'vignette', label: 'Vignette', hint: 'edges fall into real space' },
+  { key: 'drift', label: 'Drift', hint: 'slow parallax breathing' },
+];
+
+const SkyStudioTab: React.FC<{ realityId: string }> = ({ realityId }) => {
+  const [sky, setSky] = useState<SkyManifest | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void ensureSkyFor(realityId).then((m) => { if (alive) setSky(m); });
+    const off = onSkyChanged((rid, m) => { if (rid === realityId) setSky(m); });
+    return () => { alive = false; off(); };
+  }, [realityId]);
+
+  const handleFiles = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      const m = await uploadSkyPhoto(realityId, file);
+      setSky(m);
+      toast(`✦ "${file.name}" now hangs in this reality's sky`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'the sky rejected that photo', 'warn');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const patchSettings = (key: keyof SkySettings, value: number) => {
+    if (!sky) return;
+    const next = { ...sky, settings: { ...sky.settings, [key]: value } };
+    setSky(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void saveSkySettings(realityId, next.settings).then(setSky).catch(() => undefined);
+    }, 250);
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-xl border border-white/10 bg-white/3 p-3 flex flex-col gap-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-cyan-300">Reality Sky</span>
+          <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400">
+            {sky?.activeId ? 'photo sky active' : 'pure procedural cosmos'}
+          </span>
+        </div>
+        <p className="text-[9.5px] text-slate-400 leading-relaxed">
+          Upload any picture — it is stored inside this reality's own folder and becomes
+          its personal universe backdrop. Other realities keep theirs; no photo ever
+          crosses the dimensional barrier. The real 3D star shells keep shining over it.
+        </p>
+        <div
+          role="button"
+          tabIndex={0}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); void handleFiles(e.dataTransfer.files); }}
+          onClick={() => fileRef.current?.click()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click(); }}
+          className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed px-4 py-6 text-center cursor-pointer transition-all ${
+            dragOver
+              ? 'border-cyan-400 bg-cyan-500/15 shadow-[0_0_18px_rgba(6,182,212,0.3)]'
+              : 'border-white/20 bg-white/2 hover:border-cyan-400/50 hover:bg-white/5'
+          }`}
+        >
+          <Upload className={`w-5 h-5 ${busy ? 'animate-pulse text-cyan-300' : 'text-slate-300'}`} />
+          <span className="text-[12px] text-slate-200">{busy ? 'Raising the sky…' : 'Drop a photo here, or click to choose'}</span>
+          <span className="font-mono text-[9px] text-slate-400 uppercase tracking-wider">png · jpg · webp · gif · avif — up to 6 MB</span>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+          className="hidden"
+          onChange={(e) => { void handleFiles(e.target.files); e.currentTarget.value = ''; }}
+        />
+      </div>
+
+      {sky && sky.photos.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {sky.photos.map((p) => {
+            const active = sky.activeId === p.id;
+            return (
+              <div
+                key={p.id}
+                className={`relative group rounded-xl overflow-hidden border transition-all ${
+                  active ? 'border-cyan-400 shadow-[0_0_14px_rgba(6,182,212,0.35)]' : 'border-white/10 hover:border-white/30'
+                }`}
+              >
+                <img src={skyAssetUrl(realityId, p.file)} alt={p.name} className="w-full h-20 object-cover" loading="lazy" />
+                {active && (
+                  <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-cyan-500/85 text-[8px] font-mono uppercase tracking-wider text-white shadow">
+                    active
+                  </span>
+                )}
+                <div className="absolute inset-0 flex items-center justify-center gap-1.5 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {!active && (
+                    <button
+                      title="Make this the sky"
+                      onClick={async () => {
+                        try { setSky(await activateSkyPhoto(realityId, p.id)); toast('This reality now sails under a new sky'); }
+                        catch (err) { toast(err instanceof Error ? err.message : 'activation failed', 'warn'); }
+                      }}
+                      className="p-1.5 rounded-lg bg-cyan-500/85 hover:bg-cyan-400 text-white transition-colors"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    title="Remove from this reality's sky"
+                    onClick={async () => {
+                      if (!window.confirm(`Remove "${p.name}" from this reality's sky? The photo is deleted from its folder.`)) return;
+                      try { setSky(await deleteSkyPhoto(realityId, p.id)); toast('The photo dissolved from the sky'); }
+                      catch (err) { toast(err instanceof Error ? err.message : 'delete failed', 'warn'); }
+                    }}
+                    className="p-1.5 rounded-lg bg-rose-600/85 hover:bg-rose-500 text-white transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {sky?.activeId && (
+        <button
+          onClick={async () => {
+            try { setSky(await activateSkyPhoto(realityId, null)); toast('Returned to the pure procedural cosmos'); }
+            catch (err) { toast(err instanceof Error ? err.message : 'failed', 'warn'); }
+          }}
+          className="self-start px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-slate-300 hover:text-white text-[11px] font-mono uppercase tracking-wider transition-all"
+        >
+          Return to the pure procedural cosmos
+        </button>
+      )}
+
+      {sky?.activeId && (
+        <div className="rounded-xl border border-white/10 bg-white/3 p-3 flex flex-col gap-2.5">
+          <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-cyan-300">Sky Mood</span>
+          {SKY_SLIDERS.map((s) => (
+            <label key={s.key} className="block">
+              <span className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.22em] text-cyan-300/80 mb-1">
+                {s.label}
+                <span className="text-slate-400 normal-case tracking-normal">{Math.round((sky.settings[s.key] ?? 0) * 100)}%</span>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round((sky.settings[s.key] ?? 0) * 100)}
+                onChange={(e) => patchSettings(s.key, Number(e.target.value) / 100)}
+                className="w-full accent-cyan-400"
+              />
+              <span className="text-[9.5px] text-slate-400">{s.hint}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** The full reality workbench — identity, lore, galaxies and its own sky.
     Shared by the Core Console (embedded) and the double-click modal. */
 export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGalaxyId, onEnterGalaxy }) => {
   const state = useUniverse();
@@ -135,6 +319,7 @@ export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGal
     { id: 'identity', label: 'Identity', icon: <Palette className="w-3.5 h-3.5" /> },
     { id: 'lore', label: 'Lore', icon: <BookOpen className="w-3.5 h-3.5" /> },
     { id: 'galaxies', label: `Galaxies (${reality.galaxies?.length ?? 0})`, icon: <Orbit className="w-3.5 h-3.5" /> },
+    { id: 'sky', label: 'Sky', icon: <ImageIcon className="w-3.5 h-3.5" /> },
   ];
 
   return (
@@ -327,6 +512,9 @@ export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGal
           onEnterGalaxy={(gid) => onEnterGalaxy?.(realityId, gid)}
         />
       )}
+
+      {/* SKY — this reality's own photo backdrop */}
+      {tab === 'sky' && <SkyStudioTab realityId={realityId} />}
     </div>
   );
 };

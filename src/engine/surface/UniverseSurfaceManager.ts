@@ -3,6 +3,7 @@ import type { RealityConfig } from '../../realities/types';
 import { universeSurfaceVert, universeSurfaceFrag } from './surfaceShaders';
 import { getSurfaceConfigForReality } from './surfacePresets';
 import { makeGlowTexture } from '../math';
+import { PhotoDome } from './photoDome';
 import type { UniverseSurfaceConfig, UniverseSurfaceUpdateParams } from './types';
 
 /**
@@ -27,6 +28,9 @@ export class UniverseSurfaceManager {
   private gNeighborhood = new THREE.Group();
   private levelSprites: { mat: THREE.SpriteMaterial; base: number }[] = [];
   private currentConfig: UniverseSurfaceConfig;
+  /* the Sky Studio's photo layer — sits between the procedural cosmos and
+     the far stars, owned per reality */
+  private photoDome = new PhotoDome();
 
   constructor(scene: THREE.Scene, initialReality?: RealityConfig | string | null) {
     this.scene = scene;
@@ -35,6 +39,7 @@ export class UniverseSurfaceManager {
     this.buildDeepNebulae();
     this.buildFarStars();
     this.buildNeighborhood();
+    this.photoDome.build(scene);
   }
 
   /**
@@ -348,6 +353,9 @@ export class UniverseSurfaceManager {
     u.uNebulaIntensity.value = this.currentConfig.nebulaIntensity;
     u.uDustLaneIntensity.value = this.currentConfig.dustLaneIntensity;
     u.uStarDensity.value = this.currentConfig.starDensity;
+
+    /* the photo dome switches reality with its own crossfade */
+    this.photoDome.setReality(this.currentConfig.realityId);
   }
 
   /**
@@ -365,6 +373,10 @@ export class UniverseSurfaceManager {
       this.backdropMat.uniforms.uTime.value = clockT;
       (this.backdropMat.uniforms.uVortexDir.value as THREE.Vector3).copy(vortexDir);
     }
+
+    /* the uploaded photo sky obeys the same sky visibility + Kamui tear as
+       the procedural dome */
+    this.photoDome.update({ clockT, kamuiErase, skyVisible });
 
     // Neighborhood visibility and smooth opacity fade
     this.gNeighborhood.visible = neighborhoodVisibility > 0.01;
@@ -396,6 +408,11 @@ export class UniverseSurfaceManager {
     return this.backdropMat;
   }
 
+  /** The Sky Studio layer — apply/refresh this reality's photo sky. */
+  public getPhotoDome(): PhotoDome {
+    return this.photoDome;
+  }
+
   public getSkyDomeMesh(): THREE.Mesh {
     return this.skyDomeMesh;
   }
@@ -405,6 +422,7 @@ export class UniverseSurfaceManager {
   }
 
   public dispose(): void {
+    this.photoDome.dispose(this.scene);
     if (this.skyDomeMesh) {
       this.scene.remove(this.skyDomeMesh);
       this.skyDomeMesh.geometry.dispose();
