@@ -2287,7 +2287,9 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   .core-plate::before,
   .core-sigil,
   .cc-sheen::after,
-  .cc-line-sheen {
+  .cc-line-sheen,
+  .forge-ring-outer,
+  .forge-ring-inner {
     animation: none;
   }
   .cc-vital,
@@ -2297,6 +2299,14 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 }
 
 /* slim scrollbars for console panels (previously referenced but undefined) */
+
+/* THE FORGE SEAL — machined ring rotation for the ThinkingCloudTooltip's
+   precision SVG instrument. Inner reticle counter-rotates; hover accelerates
+   the outer graduations via the button's hover state. */
+.forge-ring-outer { animation: forgeSpin 26s linear infinite; }
+.forge-ring-inner { animation: forgeSpin 15s linear infinite reverse; }
+.forge-seal:hover .forge-ring-outer { animation-duration: 9s; }
+@keyframes forgeSpin { to { transform: rotate(360deg); } }
 
 /* THE GLASS CARD — the shared frosted pane for console sub-surfaces (reality
    cards, hierarchy columns). White frost + hairline + light-caught top edge:
