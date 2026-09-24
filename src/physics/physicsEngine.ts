@@ -94,7 +94,74 @@ const BODY_PROFILES: Record<string, { eccentricity: number; density: number; alb
 /**
  * Calculates complete astrophysics telemetry for a given body under real physical laws.
  */
+/* ---------------- Round-9 efficiency: time-invariant memoization ----------------
+   Of the 41 fields `calculatePhysics` derives, only ~8 actually change with
+   simTimeSec (the orbital anomaly family: meanAnomaly/trueAnomaly/current-
+   Distance/currentVelocity/force/potential/field/centripetal + insolation &
+   temperature). Everything else — mass, gravity, escape velocity, radii,
+   Roche, GR constants, axial data — is CONSTANT per body. The render loop
+   used to recompute all 41 per body per frame just to read eccentricity.
+   This memo keeps the full result per body-id keyed by the orbit shape +
+   radius + kind that determine it, then mutates only the live fields on
+   each call. First call per body = full solve; every later call ≈ free. */
+const _physMemo = new Map<string, { sig: string; data: BodyPhysicsData }>();
+
+function _physSignature(body: CosmicBody): string {
+  return `${body.orbit.a}|${body.orbit.phase}|${body.orbit.incl}|${body.radius}|${body.kind}|${body.id in BODY_PROFILES ? 'p' : 'g'}`;
+}
+
 export function calculatePhysics(body: CosmicBody, simTimeSec: number = 0): BodyPhysicsData {
+  const sig = _physSignature(body);
+  const memo = _physMemo.get(body.id);
+  const stable = memo && memo.sig === sig;
+
+  if (!stable) {
+    const fresh = computePhysicsFresh(body, simTimeSec);
+    _physMemo.set(body.id, { sig, data: fresh });
+    return fresh;
+  }
+
+  const d = memo!.data;
+  const profile = BODY_PROFILES[body.id] || { eccentricity: 0.05, density: 3.5, albedo: 0.3 };
+  const e = d.eccentricity;
+
+  /* — live orbital state (the only time-varying part) — */
+  const a_AU = d.a_AU;
+  const meanAnomaly = (body.orbit.phase + simTimeSec * (body.orbit.speed || 0.01)) % (2 * Math.PI);
+  let E = meanAnomaly;
+  for (let i = 0; i < 5; i++) {
+    E = E - (E - e * Math.sin(E) - meanAnomaly) / (1 - e * Math.cos(E));
+  }
+  const trueAnomaly = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
+  const currentDistanceAU = a_AU > 0 ? (a_AU * (1 - e * e)) / (1 + e * Math.cos(trueAnomaly)) : 0;
+  const v_earth = 29.78;
+  const currentVelocityKms = (a_AU > 0 && currentDistanceAU > 0)
+    ? v_earth * Math.sqrt(Math.max(0, 2 / currentDistanceAU - 1 / a_AU))
+    : 0;
+
+  const M_centralStar = CONSTANTS.M_sun;
+  const currentDistMeters = currentDistanceAU * CONSTANTS.AU;
+  const gravitationalForceN = currentDistMeters > 0 ? (CONSTANTS.G * M_centralStar * d.massKg) / Math.pow(currentDistMeters, 2) : 0;
+  const gravitationalPotentialJ = currentDistMeters > 0 ? -(CONSTANTS.G * M_centralStar * d.massKg) / currentDistMeters : 0;
+  const orbitalFieldMs2 = currentDistMeters > 0 ? (CONSTANTS.G * M_centralStar) / Math.pow(currentDistMeters, 2) : 0;
+  const currentVelMs = currentVelocityKms * 1000;
+  const centripetalForceN = currentDistMeters > 0 ? (d.massKg * Math.pow(currentVelMs, 2)) / currentDistMeters : 0;
+
+  const stellarFluxWm2 = currentDistMeters > 0 ? CONSTANTS.L_sun / (4 * Math.PI * Math.pow(currentDistMeters, 2)) : 0;
+
+  d.currentDistanceAU = currentDistanceAU;
+  d.currentVelocityKms = currentVelocityKms;
+  d.gravitationalForceN = gravitationalForceN;
+  d.gravitationalPotentialJ = gravitationalPotentialJ;
+  d.orbitalFieldMs2 = orbitalFieldMs2;
+  d.centripetalForceN = centripetalForceN;
+  d.stellarFluxWm2 = stellarFluxWm2;
+  d.solarFluxRelative = stellarFluxWm2 / 1361.0;
+  return d;
+}
+
+/** The original full 41-field solve — now called once per body signature. */
+function computePhysicsFresh(body: CosmicBody, simTimeSec: number): BodyPhysicsData {
   const profile = BODY_PROFILES[body.id] || { eccentricity: 0.05, density: 3.5, albedo: 0.3 };
   const e = body.orbit.a > 0 ? profile.eccentricity : 0;
 

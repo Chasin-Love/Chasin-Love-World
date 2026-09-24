@@ -21,6 +21,7 @@ const VaultUI = lazy(() => import('./ui/VaultUI'));
 const CosmicLineageModal = lazy(() => import('./components/lineage/CosmicLineageModal').then((module) => ({ default: module.CosmicLineageModal })));
 const CoreConsole = lazy(() => import('./components/console/CoreConsole').then((module) => ({ default: module.CoreConsole })));
 const RealityAdvancedModal = lazy(() => import('./components/realities/RealityAdvancedModal').then((module) => ({ default: module.RealityAdvancedModal })));
+const CommandPalette = lazy(() => import('./components/console/CommandPalette').then((module) => ({ default: module.CommandPalette })));
 import { GalaxyHoverCard } from './components/hud/GalaxyHoverCard';
 import { getReality, type RealityConfig, type GalaxyClusterData, type GalaxyData } from './realities';
 
@@ -84,6 +85,8 @@ export default function App() {
   const [paused, setPaused] = useState(false);
   const [showPhysics, setShowPhysics] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
+  /* the Ctrl+K command palette — retrieval for a universe */
+  const [showPalette, setShowPalette] = useState(false);
   const [idle, setIdle] = useState(false);
   const [wins, setWins] = useState<Win[]>([]);
   const [zTop, setZTop] = useState(0);
@@ -394,6 +397,12 @@ export default function App() {
       const eng = engineRef.current;
       if (!eng) return;
       if (e.key === '?') { setShowKeys((v) => !v); return; }
+      /* Ctrl+K / Cmd+K — the command palette (works in every mode) */
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setShowPalette((v) => !v);
+        return;
+      }
       if (e.key === 'Escape') {
         if (menu) setMenu(null);
         else if (showKeys) setShowKeys(false);
@@ -790,6 +799,57 @@ export default function App() {
           <ErrorBoundary label="THE VAULT">
             <VaultUI onClose={closeVault} />
           </ErrorBoundary>
+        </Suspense>
+      )}
+
+      {/* THE COMMAND PALETTE — Ctrl+K: retrieval across the whole universe */}
+      {showPalette && (
+        <Suspense fallback={<AsyncOverlay label="OPENING COMMAND PALETTE" />}>
+          <CommandPalette
+            onClose={() => setShowPalette(false)}
+            api={{
+              onWarpReality: (id) => {
+                actions.switchReality(id);
+                const r = getReality(id, state.customRealityDescriptions);
+                toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
+                chime(880);
+                engineRef.current?.resetView();
+              },
+              onEnterGalaxy: (rid, gid) => {
+                const r = getReality(rid, state.customRealityDescriptions);
+                const gal = r.galaxies?.find((g) => g.id === gid);
+                if (!gal) return;
+                if ((getState().activeRealityId || 'sol-prime') !== rid) {
+                  actions.switchReality(rid);
+                  toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
+                  chime(880);
+                }
+                engineRef.current?.enterGalaxy(rid, gid);
+                toast(`⌖ ${gal.name} — ${r.name}`);
+                chime(760);
+              },
+              onFocusBody: (id) => {
+                setMode('space');
+                engineRef.current?.focusOn(id);
+                chime(720);
+              },
+              onDiveBody: (id) => {
+                setMode('space');
+                engineRef.current?.portalTo(id);
+                chime(660);
+              },
+              onOpenVault: () => { setMode('vault'); setAudioMode('vault'); },
+              onOpenConsole: () => { setCoreConsoleOpen(true); chime(960); },
+              onZoomStage: (i) => { engineRef.current?.zoomToHierarchy(i); chime(720); },
+              onFrameCore: () => { engineRef.current?.zoomToCore(); chime(720); },
+              onKamui: () => {
+                engineRef.current?.triggerKamui();
+                setKamuiKey((k) => k + 1);
+                toast('✦ Kamui: Core Activated');
+                chime(960);
+              },
+            }}
+          />
         </Suspense>
       )}
 

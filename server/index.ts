@@ -343,8 +343,12 @@ async function startServer() {
     });
   }
 
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌌 Multiverse Server running on http://localhost:${PORT}`);
+  /* Round-9 hardening: the disk-mirror API can create/delete reality source
+     folders — it must never sit open on the LAN by default. Loopback unless
+     the operator explicitly opts in with HOST=0.0.0.0 (or --host). */
+  const HOST = process.env.HOST ?? '127.0.0.1';
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`🌌 Multiverse Server running on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}${HOST === '0.0.0.0' ? ' (LAN-exposed — set HOST=127.0.0.1 to close)' : ''}`);
   });
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
