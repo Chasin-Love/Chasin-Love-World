@@ -1,12 +1,21 @@
 {
   "version": 1,
-  "activeId": null,
-  "photos": [],
+  "activeId": "sky-mufg64tp-p3pd4",
+  "photos": [
+    {
+      "id": "sky-mufg64tp-p3pd4",
+      "file": "assets/sky-mufg64tp-p3pd4.jpg",
+      "name": "cca40309-771b-4829-9325380a9.png",
+      "mime": "image/jpeg",
+      "size": 407751,
+      "addedAt": 1790249232889
+    }
+  ],
   "settings": {
-    "blend": 0.85,
-    "dim": 0.45,
-    "blur": 0.12,
-    "vignette": 0.55,
-    "drift": 0.3
+    "blend": 0.8,
+    "dim": 0.46,
+    "blur": 0.19,
+    "vignette": 0.51,
+    "drift": 0.34
   }
 }
