@@ -116,7 +116,7 @@ interface RuntimeBody {
   streakRing?: THREE.Mesh;
   streakTarget?: number;
   streakDays?: number;
-  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number }[];
+  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number }[];
   extras?: THREE.ShaderMaterial[];
   orbitLine?: THREE.LineLoop;
   ghost: number;
@@ -144,7 +144,7 @@ interface InnerPlanet {
   spinMesh?: THREE.Mesh;
   spinRate?: number;
   cloudSpinRate?: number;
-  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number }[];
+  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number }[];
   orbitLine?: THREE.LineLoop;
   streakRing?: THREE.Mesh;
   streakTarget?: number;
@@ -816,9 +816,15 @@ export class UniverseEngine {
         },
         vertexShader: planetVert, fragmentShader: planetFrag, transparent: true,
       });
-      /* tilted spin axis — the world turns under a fixed sun */
+      /* tilted spin axis — REAL OBLIQUITY from the physics engine: BODY_PROFILES
+         carries each world's measured axial tilt (Venus 177.4°, Uranus 97.8°,
+         Pluto 122.5°…); generated worlds fall back to a seeded spread.
+         Order YXZ so the obliquity leans away from the spin pole. */
+      const physData = calculatePhysics(data);
       const tilt = new THREE.Group();
-      tilt.rotation.z = 0.35 + hash(data.id.length, 2) * 0.5;
+      tilt.rotation.order = 'YXZ';
+      tilt.rotation.y = hash(data.id.length, 4) * Math.PI * 2;
+      tilt.rotation.z = (physData.axialTiltDeg * Math.PI) / 180;
       g.add(tilt);
       /* Extra tessellation is intentional: Kamui displaces the actual sphere
          in object space, so the surface needs vertices to bend. */
@@ -826,8 +832,11 @@ export class UniverseEngine {
       tilt.add(mesh);
       rb.mat = mat;
 
-      /* each world keeps its own day length */
-      const retrograde = hash(3, data.id.length) > 0.82 ? -1 : 1;
+      /* each world keeps its own day length — DIRECTION IS PHYSICS, NOT RANDOM:
+         obliquity past 90° means the world was knocked over and spins
+         retrograde (Venus, Uranus, Pluto); below 90° keeps the prograde
+         sense the birth cloud spun up. */
+      const retrograde = physData.axialTiltDeg > 90 ? -1 : 1;
       rb.spinMesh = mesh;
       rb.spinRate = retrograde * (Math.PI * 2) / (24 + hash(data.id.length, 5) * 52);
 
@@ -880,7 +889,9 @@ export class UniverseEngine {
         const ringMesh = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 96, 1), rm);
         ringMesh.rotation.x = -Math.PI / 2 + 0.32;
         ringMesh.renderOrder = 3;
-        g.add(ringMesh);
+        /* rings form in the equatorial plane — parent them to the tilted
+           spin group so they obey the same obliquity as their world */
+        tilt.add(ringMesh);
         rb.ringMat = rm; rb.ringMesh = ringMesh;
       }
       /* moons are generated dynamically — one per diary page (see syncMoons) */
@@ -2669,14 +2680,18 @@ void main(){
         },
         vertexShader: planetVert, fragmentShader: planetFrag, transparent: true,
       });
-      /* tilted spin axis — the world turns under a fixed sun */
+      /* tilted spin axis — REAL OBLIQUITY, same law as the home system */
+      const physData = calculatePhysics(data);
       const tilt = new THREE.Group();
-      tilt.rotation.z = 0.35 + hash(data.id.length, 2) * 0.5;
+      tilt.rotation.order = 'YXZ';
+      tilt.rotation.y = hash(data.id.length, 4) * Math.PI * 2;
+      tilt.rotation.z = (physData.axialTiltDeg * Math.PI) / 180;
       g.add(tilt);
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(data.radius, 40, 28), mat);
       tilt.add(mesh);
       const ip: InnerPlanet = { data, group: g, mat, moons: [], hoverT: 0 };
-      const retrograde = hash(3, data.id.length) > 0.82 ? -1 : 1;
+      /* spin direction follows obliquity: >90° = retrograde world */
+      const retrograde = physData.axialTiltDeg > 90 ? -1 : 1;
       ip.spinMesh = mesh;
       ip.spinRate = retrograde * (Math.PI * 2) / (24 + hash(data.id.length, 5) * 52);
 
@@ -2729,7 +2744,7 @@ void main(){
         const ringMesh = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 96, 1), rm);
         ringMesh.rotation.x = -Math.PI / 2 + 0.32;
         ringMesh.renderOrder = 3;
-        g.add(ringMesh);
+        tilt.add(ringMesh);
         ip.ringMat = rm;
         ip.ringMesh = ringMesh;
         /* the giant carries a small court of moons */
@@ -2744,6 +2759,7 @@ void main(){
             a: data.radius * (1.75 + 0.55 * mi) + data.radius * 1.5,
             speed: (Math.PI * 2) / (14 + mi * 8),
             phase: seed * 6.28,
+            incl: 0.18 + seed * 0.3,
           });
         }
       }
@@ -2953,7 +2969,12 @@ void main(){
       }
       p.moons.forEach((m) => {
         const ma = m.phase + this.simDays * m.speed;
-        m.mesh.position.set(Math.cos(ma) * m.a, Math.sin(ma * 0.7) * m.a * 0.12, Math.sin(ma) * m.a);
+        /* each moon rides its OWN inclined plane — no shared moon-sheet */
+        m.mesh.position.set(
+          Math.cos(ma) * m.a,
+          Math.sin(ma * 0.7) * m.a * 0.12 * Math.cos(m.incl ?? 0) + Math.sin(ma) * m.a * Math.sin(m.incl ?? 0),
+          Math.sin(ma) * m.a * Math.cos(m.incl ?? 0),
+        );
       });
 
       /* orbit ring — driven ONLY by hover, exactly like the home system */
@@ -4060,6 +4081,7 @@ void main(){
           a: b.data.radius * (1.75 + 0.55 * i) + (b.data.rings ? b.data.radius * 1.5 : 0),
           speed: (Math.PI * 2) / (14 + i * 8),
           phase: seed * 6.28,
+          incl: 0.18 + seed * 0.3,
         });
       }
     });
@@ -4105,6 +4127,7 @@ void main(){
             a: p.data.radius * (1.75 + 0.55 * i) + (p.data.rings ? p.data.radius * 1.5 : 0),
             speed: (Math.PI * 2) / (14 + i * 8),
             phase: seed * 6.28,
+            incl: 0.18 + seed * 0.3,
           });
         }
       }
@@ -5308,7 +5331,12 @@ void main(){
 
       b.moons.forEach((m) => {
         const ma = m.phase + this.simDays * m.speed;
-        m.mesh.position.set(Math.cos(ma) * m.a, Math.sin(ma * 0.7) * m.a * 0.12, Math.sin(ma) * m.a);
+        /* each moon rides its OWN inclined plane — no shared moon-sheet */
+        m.mesh.position.set(
+          Math.cos(ma) * m.a,
+          Math.sin(ma * 0.7) * m.a * 0.12 * Math.cos(m.incl ?? 0) + Math.sin(ma) * m.a * Math.sin(m.incl ?? 0),
+          Math.sin(ma) * m.a * Math.cos(m.incl ?? 0),
+        );
         m.mesh.visible = b.fade * sysW * (1 - b.ghost) > 0.05;
       });
 
@@ -5378,8 +5406,28 @@ void main(){
       }
     }
 
-    /* anchor — axial spin & core interface ember lerp */
+    /* anchor — axial spin, then GRAVITY MADE VISIBLE: the star's barycentric
+       wobble, the real radial-velocity method used to find exoplanets. Every
+       major world tugs the star with amplitude ∝ m_p/a, each tug advancing at
+       that world's own orbital rate — quasi-periodic drift, not a loop. */
     this.anchorGroup.rotation.y += dt * 0.08; /* Axial rotation around polar axis */
+    if (!this.coreActive && !this.kamuiPulse && !this.portalLocalCenter.lengthSq()) {
+      let wobbleX = 0, wobbleY = 0, wobbleZ = 0;
+      for (let i = 0; i < this.bodies.length; i++) {
+        const wb = this.bodies[i];
+        /* planets, dwarfs AND the vault black hole — every mass tugs the star */
+        if (wb.data.kind !== 'planet' && wb.data.kind !== 'dwarf' && wb.data.kind !== 'vault') continue;
+        const aAU = Math.max(0.1, wb.data.orbit.a / 52); /* Aurelia = 1 AU */
+        const mEarth = Math.pow(Math.max(0.05, wb.data.radius / 2.05), 3);
+        const amp = Math.min(0.22, 0.028 * (mEarth / aAU));
+        const ang = i * 2.39996 + this.simDays * (wb.data.orbit.speed || 0.01);
+        const inc = wb.data.orbit.incl;
+        wobbleX += Math.cos(ang) * amp;
+        wobbleY += Math.sin(ang) * amp * Math.sin(inc);
+        wobbleZ += Math.sin(ang) * amp * Math.cos(inc);
+      }
+      this.anchorGroup.position.set(wobbleX, wobbleY, wobbleZ);
+    }
     const starMesh = this.anchorGroup.userData.starMesh as THREE.Mesh;
     if (starMesh) starMesh.rotation.y += dt * 0.15;
 

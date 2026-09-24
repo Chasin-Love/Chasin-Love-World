@@ -441,10 +441,12 @@ function keplerPositionTS(
   }
   const trueAnomaly = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
   const currentRadius = (a * (1 - e * e)) / (1 + e * Math.cos(trueAnomaly));
+  /* true-3D inclined plane — mirrors physicsEngine.calculateKeplerPosition */
+  const zPlane = Math.sin(trueAnomaly) * currentRadius;
   return {
     x: Math.cos(trueAnomaly) * currentRadius,
-    y: Math.sin(trueAnomaly + phase) * currentRadius * inclination,
-    z: Math.sin(trueAnomaly) * currentRadius,
+    y: zPlane * Math.sin(inclination),
+    z: zPlane * Math.cos(inclination),
     trueAnomaly,
     currentRadius,
   };

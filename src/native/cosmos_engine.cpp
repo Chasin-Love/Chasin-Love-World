@@ -271,9 +271,11 @@ inline void keplerSolve(double a, double e, double phase, double incl,
         2.0 * std::atan2(std::sqrt(1.0 + e) * std::sin(E / 2.0),
                          std::sqrt(1.0 - e) * std::cos(E / 2.0));
     const double currentRadius = (a * (1.0 - e * e)) / (1.0 + e * std::cos(trueAnomaly));
+    /* TRUE 3D inclined plane — exact port of physicsEngine.calculateKeplerPosition */
     const double x = std::cos(trueAnomaly) * currentRadius;
-    const double z = std::sin(trueAnomaly) * currentRadius;
-    const double y = std::sin(trueAnomaly + phase) * currentRadius * incl;
+    const double zPlane = std::sin(trueAnomaly) * currentRadius;
+    const double y = zPlane * std::sin(incl);
+    const double z = zPlane * std::cos(incl);
 
     out[0] = x; out[1] = y; out[2] = z;
     out[3] = trueAnomaly; out[4] = currentRadius;

@@ -78,17 +78,17 @@ export interface BodyPhysicsData {
 }
 
 /* Preset physical profiles based on cosmic body characteristics */
-const BODY_PROFILES: Record<string, { eccentricity: number; density: number; albedo: number }> = {
-  anchor:  { eccentricity: 0.0,    density: 1.41, albedo: 0.00 },
-  cinder:  { eccentricity: 0.2056, density: 5.43, albedo: 0.12 },  /* Mercury analogue */
-  veil:    { eccentricity: 0.0067, density: 5.24, albedo: 0.77 },  /* Venus analogue */
-  aurelia: { eccentricity: 0.0167, density: 5.51, albedo: 0.30 },  /* Earth analogue */
-  rust:    { eccentricity: 0.0934, density: 3.93, albedo: 0.25 },  /* Mars analogue */
-  goliath: { eccentricity: 0.0489, density: 1.33, albedo: 0.52 },  /* Jupiter analogue */
-  mirror:  { eccentricity: 0.0444, density: 1.90, albedo: 0.85 },  /* Ice world analogue */
-  hollow:  { eccentricity: 0.2488, density: 1.85, albedo: 0.14 },  /* Pluto analogue */
-  wisp:    { eccentricity: 0.1500, density: 0.001, albedo: 0.40 }, /* Nebula */
-  eventide:{ eccentricity: 0.0000, density: 1e12, albedo: 0.00 },  /* Black Hole / Vault */
+const BODY_PROFILES: Record<string, { eccentricity: number; density: number; albedo: number; tiltDeg?: number }> = {
+  anchor:  { eccentricity: 0.0,    density: 1.41, albedo: 0.00, tiltDeg: 7.25 },
+  cinder:  { eccentricity: 0.2056, density: 5.43, albedo: 0.12, tiltDeg: 0.03 },  /* Mercury analogue */
+  veil:    { eccentricity: 0.0067, density: 5.24, albedo: 0.77, tiltDeg: 177.4 }, /* Venus analogue: RETROGRADE axial spin */
+  aurelia: { eccentricity: 0.0167, density: 5.51, albedo: 0.30, tiltDeg: 23.44 }, /* Earth analogue */
+  rust:    { eccentricity: 0.0934, density: 3.93, albedo: 0.25, tiltDeg: 25.19 }, /* Mars analogue */
+  goliath: { eccentricity: 0.0453, density: 1.33, albedo: 0.52, tiltDeg: 3.13 },  /* Jupiter analogue */
+  mirror:  { eccentricity: 0.0444, density: 1.90, albedo: 0.85, tiltDeg: 97.77 }, /* Uranus analogue: rolls on its side */
+  hollow:  { eccentricity: 0.2488, density: 1.85, albedo: 0.14, tiltDeg: 122.5 }, /* Pluto analogue: retrograde spin, inclined orbit */
+  wisp:    { eccentricity: 0.1500, density: 0.001, albedo: 0.40, tiltDeg: 12.0 }, /* Nebula */
+  eventide:{ eccentricity: 0.0000, density: 1e12, albedo: 0.00, tiltDeg: 30.0 },  /* Black Hole / Vault */
 };
 
 /**
@@ -286,7 +286,12 @@ function computePhysicsFresh(body: CosmicBody, simTimeSec: number): BodyPhysicsD
   const axialRotationPeriodDays = body.kind === 'star' ? 25.05 : 1.0 + (radiusKm / 6371) * 0.5;
   /* v_spin = 2 * pi * R / T */
   const axialSpinVelocityKms = (2 * Math.PI * radiusKm) / (axialRotationPeriodDays * 86400);
-  const axialTiltDeg = body.kind === 'star' ? 7.25 : 23.44; /* Solar 7.25° vs Earth 23.44° obliquity */
+  /* Obliquity: per-body axial tilt from the physical profile (real solar
+     system values; tilts >90° — Venus 177.4°, Uranus 97.8°, Pluto 122.5° —
+     physically read as retrograde spin), else a deterministic seeded roll
+     across the obliquity range observed in real exoplanet systems. */
+  const tiltSeed = ((body.id.charCodeAt(0) + body.id.length * 31 + body.radius * 7.3) % 97) / 97;
+  const axialTiltDeg = profile.tiltDeg ?? (body.kind === 'star' ? 7.25 : 8 + tiltSeed * 55);
 
   /* Galactic Orbit around Supermassive Black Hole (Sagittarius A*) */
   const galacticRadiusKpc = 8.18; /* 8.18 kiloparsecs ≈ 26,700 light-years */
@@ -367,10 +372,16 @@ export function calculateKeplerPosition(
   /* Distance r(theta) = a * (1 - e^2) / (1 + e * cos(nu)) */
   const currentRadius = (a * (1 - e * e)) / (1 + e * Math.cos(trueAnomaly));
 
-  /* Position in orbital plane */
+  /* TRUE 3D inclined orbit: rotate the in-plane position about the node
+     line (X axis) by the inclination. Every world rides its own plane and
+     crosses the ecliptic at its ascending/descending nodes — the old
+     vertical sine wobble pinned every world to one apparent flat sheet.
+     Inclination arrives in radians (seeds use real solar-system values:
+     Mercury 7°, Mars 1.85°, Pluto 17.2°, the vault −12°). */
   const x = Math.cos(trueAnomaly) * currentRadius;
-  const z = Math.sin(trueAnomaly) * currentRadius;
-  const y = Math.sin(trueAnomaly + phase) * currentRadius * inclination;
+  const zPlane = Math.sin(trueAnomaly) * currentRadius;
+  const y = zPlane * Math.sin(inclination);
+  const z = zPlane * Math.cos(inclination);
 
   return { x, y, z, trueAnomaly, currentRadius };
 }
