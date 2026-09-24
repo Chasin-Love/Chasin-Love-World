@@ -26,6 +26,9 @@ import { KindGlyph, TilePreview } from './VaultBits';
 
 type SortKey = 'name' | 'kind' | 'size' | 'date';
 type CtxMenu = { x: number; y: number; nodeId: string } | null;
+type FxTab = { id: string; cwd: string; history: string[]; hIndex: number };
+type ViewMode = 'grid' | 'list';
+type BrowseMode = { kind: 'dir' } | { kind: 'tag'; tag: string } | { kind: 'recents' };
 
 const DIR_COLORS = ['', '#6fc2b4', '#7fc4e8', '#b49ae8', '#f2c178', '#e0785a', '#9fd8a8'];
 
@@ -37,7 +40,21 @@ export function FileManager({ onOpen, onImport, onLock }: {
   const state = useUniverse();
   const vfs = state.efs;
 
-  const [cwdId, setCwdId] = useState(EFS_ROOT);
+  const [tabs, setTabs] = useState<FxTab[]>([{ id: 't0', cwd: EFS_ROOT, history: [EFS_ROOT], hIndex: 0 }]);
+  const [activeTab, setActiveTab] = useState(0);
+  const [splitView, setSplitView] = useState(false);
+  const [bCwdId, setBCwdId] = useState(EFS_ROOT);
+  const [focusPane, setFocusPane] = useState<'a' | 'b'>('a');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [browse, setBrowse] = useState<BrowseMode>({ kind: 'dir' });
+  const cwdId = browse.kind === 'dir' ? tabs[activeTab].cwd : EFS_ROOT;
+  const setCwdId = (id: string) => {
+    if (browse.kind !== 'dir') { setBrowse({ kind: 'dir' }); }
+    setTabs((prev) => prev.map((t, i) => (i === activeTab
+      ? { ...t, cwd: id, history: [...t.history.slice(0, t.hIndex + 1), id], hIndex: t.hIndex + 1 }
+      : t)));
+  };
+  const [selB, setSelB] = useState<Set<string>>(() => new Set());
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([EFS_ROOT]));
   const [sel, setSel] = useState<Set<string>>(() => new Set());
   const [anchorId, setAnchorId] = useState<string | null>(null);
@@ -125,6 +142,37 @@ export function FileManager({ onOpen, onImport, onLock }: {
   const activeFiles = useMemo(() => state.vault, [state.vault]);
 
   const cwd = vfs.nodes[cwdId] ?? vfs.nodes[EFS_ROOT];
+  const goBack = () => {
+    if (browse.kind !== 'dir') return;
+    const t = tabs[activeTab];
+    if (t.hIndex > 0) setTabs((prev) => prev.map((x, i) => (i === activeTab ? { ...x, hIndex: x.hIndex - 1 } : x)));
+  };
+  const goForward = () => {
+    if (browse.kind !== 'dir') return;
+    const t = tabs[activeTab];
+    if (t.hIndex < t.history.length - 1) setTabs((prev) => prev.map((x, i) => (i === activeTab ? { ...x, hIndex: x.hIndex + 1 } : x)));
+  };
+  /* THE SMART COLLECTIONS (Spacedrive patterns) — tag view + recents */
+  const allTags = useMemo(() => {
+    const m = new Map<string, number>();
+    Object.values(vfs.nodes).forEach((n) => (n.tags ?? []).forEach((tg) => m.set(tg, (m.get(tg) ?? 0) + 1)));
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [vfs.nodes]);
+  const tagFiles = useMemo(() => {
+    if (browse.kind !== 'tag') return null;
+    const out: { node: VfsNode; file: VaultFile | null }[] = [];
+    Object.values(vfs.nodes).forEach((n) => {
+      if (!(n.tags ?? []).includes(browse.tag)) return;
+      if (n.type === 'file' && n.fileId) out.push({ node: n, file: fileById.get(n.fileId) ?? null });
+      else out.push({ node: n, file: null });
+    });
+    return out;
+  }, [browse, vfs.nodes, fileById]);
+  const recentFiles = useMemo(() => {
+    if (browse.kind !== 'recents') return null;
+    return [...state.vault].sort((a, b) => b.addedAt - a.addedAt).slice(0, 40);
+  }, [browse, state.vault]);
+
   const breadcrumb = useMemo(() => efsPath(vfs, cwdId), [vfs, cwdId]);
 
   const cwdDirs = useMemo(() => kidsOf(cwdId).dirs, [childrenMap, cwdId]);
@@ -409,12 +457,43 @@ export function FileManager({ onOpen, onImport, onLock }: {
         paste();
       } else if (e.key === 'Backspace' && cwdId !== EFS_ROOT && !query) {
         e.preventDefault(); goUp();
+      } else if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); goBack(); }
+      else if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); goForward(); }
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 't') {
+        e.preventDefault();
+        setTabs((prev) => [...prev, { id: `t${Date.now()}`, cwd: cwdId, history: [cwdId], hIndex: 0 }]);
+        setActiveTab(tabs.length);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'w' && tabs.length > 1) {
+        e.preventDefault();
+        setTabs((prev) => prev.filter((_, j) => j !== activeTab));
+        setActiveTab((a) => (a > 0 ? a - 1 : 0));
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        /* THE DOUBLE COMMANDER PASS — arrows walk the visible objects; the
+           grid counts 4 cards per row, the details view walks one at a time */
+        e.preventDefault();
+        if (!visibleIds.length) return;
+        const cur = anchorId && visibleIds.includes(anchorId) ? visibleIds.indexOf(anchorId) : -1;
+        const cols = viewMode === 'list' ? 1 : 4;
+        let next: number;
+        if (cur === -1) next = 0;
+        else if (e.key === 'ArrowDown') next = Math.min(visibleIds.length - 1, cur + cols);
+        else if (e.key === 'ArrowUp') next = Math.max(0, cur - cols);
+        else if (e.key === 'ArrowRight') next = Math.min(visibleIds.length - 1, cur + 1);
+        else next = Math.max(0, cur - 1);
+        const id = visibleIds[next];
+        setSel(new Set([id]));
+        setAnchorId(id);
+      } else if (e.key === 'Enter' && singleNode) {
+        /* Enter opens what the arrows landed on */
+        e.preventDefault();
+        if (singleNode.type === 'dir') enter(singleNode.id);
+        else if (singleFile) (singleFile.lock ? onLock(singleFile) : onOpen(singleFile));
       } else if (e.key === 'Escape') { setSel(new Set()); setCtx(null); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel, singleNode, visibleIds, clip, cwdId, query, renaming]);
+  }, [sel, singleNode, visibleIds, clip, cwdId, query, renaming, viewMode, tabs, activeTab, browse]);
 
   useEffect(() => {
     const close = () => setCtx(null);
@@ -478,6 +557,38 @@ export function FileManager({ onOpen, onImport, onLock }: {
   };
 
   const rootDirs = kidsOf(EFS_ROOT).dirs;
+
+  /* ---------------- PANE B (dual pane, Double Commander) ---------------- */
+  const bDirs = useMemo(() => [...kidsOf(bCwdId).dirs], [childrenMap, bCwdId]);
+  const bFiles = useMemo(() => {
+    const seen = new Set<string>();
+    const list: VaultFile[] = [];
+    kidsOf(bCwdId).fileIds.forEach((nid) => {
+      const f = fileById.get(vfs.nodes[nid]?.fileId ?? '');
+      if (f && !seen.has(f.id)) { seen.add(f.id); list.push(f); }
+    });
+    state.vault.forEach((f) => {
+      if ((f.dirId ?? EFS_ROOT) === bCwdId && !seen.has(f.id)) { seen.add(f.id); list.push(f); }
+    });
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [childrenMap, bCwdId, fileById, vfs.nodes, state.vault]);
+  const bVisibleIds = useMemo(() => [...bDirs.map((d) => d.id), ...bFiles.map((f) => fileNodeById.get(f.id)?.id ?? '').filter(Boolean)], [bDirs, bFiles, fileNodeById]);
+  const bCwd = vfs.nodes[bCwdId] ?? vfs.nodes[EFS_ROOT];
+  const bBreadcrumb = useMemo(() => efsPath(vfs, bCwdId), [vfs, bCwdId]);
+
+  /* cross-pane CoW: fork pane A's clipboard selection into pane B */
+  const forkAToB = () => {
+    if (!clip?.nodeIds.length) { toast('copy or cut in the left pane first', 'warn'); return; }
+    if (clip.mode === 'cut') {
+      const n = actions.efsMoveNodes(clip.nodeIds, bCwdId);
+      toast(n ? `moved ${n} into ${bCwd.name}` : 'nothing moved');
+      setClip(null);
+    } else {
+      const made = actions.efsCopyNodes(clip.nodeIds, bCwdId);
+      toast(made.length ? `forked ${made.length} into ${bCwd.name} · 0 bytes allocated` : 'nothing forked');
+    }
+  };
 
   /* --- context menu --- */
   const MenuBtn = ({ label, onClick, danger, icon }: { label: string; onClick: () => void; danger?: boolean; icon?: React.ReactNode }) => (
@@ -627,7 +738,7 @@ export function FileManager({ onOpen, onImport, onLock }: {
     </div>
   );
 
-  /* --- main listing --- */
+  /* --- main listing --- (grid or details, per viewMode) */
   const listing = searchHits ? (
     <div className="flex-1 min-h-0 overflow-y-auto thin-scroll p-3" data-mq="1">
       <p className="font-mono text-[8.5px] tracking-[0.24em] uppercase text-slate-dim px-1 pb-2">{searchHits.length} hits across the vault</p>
@@ -663,56 +774,94 @@ export function FileManager({ onOpen, onImport, onLock }: {
         </div>
       )}
 
-      {sortedDirs.length > 0 && (
-        <>
-          <p className="font-mono text-[8px] tracking-[0.3em] uppercase text-slate-dim px-1 pb-2 pt-1">directories</p>
-          <div className="fm-tile-grid pb-2">
-            {sortedDirs.map((d) => (
-              <div key={d.id} {...rowProps(d, null)}
-                className={`fm-card ${sel.has(d.id) ? 'sel' : ''} ${dropTarget === d.id ? 'drop' : ''}`}>
-                <span className="fm-tile-icon" style={{ color: d.color || 'rgba(111,194,180,0.85)' }}><IcFolder size={30} /></span>
-                <NameOrInput node={d} className="fm-name text-center w-full mt-2.5 text-[12.5px]" />
-                <span className="fm-tile-sub mt-1">{kidsOf(d.id).totalCount} item{kidsOf(d.id).totalCount === 1 ? '' : 's'}</span>
-                {d.pinned && <span className="absolute top-1.5 right-2 text-solar text-[9px]" title="pinned">◆</span>}
+      {viewMode === 'list' ? (
+        /* THE DETAILS VIEW (Files pattern) — compact rows, real columns */
+        <div className="fm-tile-grid !grid-cols-1 gap-0">
+          <div className="flex items-center gap-3 px-3 py-1 border-b border-line/50 font-mono text-[7.5px] tracking-[0.24em] uppercase text-slate-dim">
+            <span className="flex-1">name</span><span className="w-16">kind</span>
+            <span className="w-16 text-right">size</span><span className="w-22 text-right">modified</span>
+          </div>
+          {sortedDirs.map((d) => (
+            <div key={d.id} {...rowProps(d, null)}
+              className={`flex items-center gap-3 px-3 py-1.5 border-b border-line/25 cursor-pointer hover:bg-teal-ice/5 ${sel.has(d.id) ? 'sel bg-teal-ice/10' : ''} ${dropTarget === d.id ? 'drop' : ''}`}>
+              <span className="shrink-0" style={{ color: d.color || 'rgba(111,194,180,0.85)' }}><IcFolder size={13} /></span>
+              <NameOrInput node={d} className="flex-1 text-[11.5px]" />
+              <span className="w-16 font-mono text-[9px] text-slate-dim">dir</span>
+              <span className="w-16 font-mono text-[9px] text-slate-dim text-right tabular-nums">—</span>
+              <span className="w-22 font-mono text-[9px] text-slate-dim text-right">{fmtDate(d.modifiedAt)}</span>
+            </div>
+          ))}
+          {sortedFiles.map((f) => {
+            const node = fileNodeById.get(f.id) ?? {
+              id: 'vnode-' + f.id, type: 'file' as const, name: f.name,
+              parentId: f.dirId ?? EFS_ROOT, fileId: f.id, createdAt: f.addedAt, modifiedAt: f.addedAt,
+            };
+            return (
+              <div key={node.id} {...rowProps(node, f)}
+                className={`flex items-center gap-3 px-3 py-1.5 border-b border-line/25 cursor-pointer hover:bg-teal-ice/5 ${sel.has(node.id) ? 'sel bg-teal-ice/10' : ''}`}>
+                <span className="shrink-0 text-slate-soft"><KindGlyph kind={f.kind} size={13} /></span>
+                <NameOrInput node={node} className="flex-1 text-[11.5px]" />
+                <span className="w-16 font-mono text-[9px] text-slate-dim">{f.kind}</span>
+                <span className="w-16 font-mono text-[9px] text-slate-dim text-right tabular-nums">{fmtBytes(f.size)}</span>
+                <span className="w-22 font-mono text-[9px] text-slate-dim text-right">{fmtDate(f.addedAt)}</span>
               </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {sortedFiles.length > 0 && (
+            );
+          })}
+        </div>
+      ) : (
         <>
-          <p className="font-mono text-[8px] tracking-[0.3em] uppercase text-slate-dim px-1 pb-2 pt-1">objects</p>
-          <div className="fm-tile-grid">
-            {sortedFiles.map((f) => {
-              const node = fileNodeById.get(f.id) ?? {
-                id: 'vnode-' + f.id,
-                type: 'file' as const,
-                name: f.name,
-                parentId: f.dirId ?? EFS_ROOT,
-                fileId: f.id,
-                createdAt: f.addedAt,
-                modifiedAt: f.addedAt,
-              };
-              return (
-                <div key={node.id} {...rowProps(node, f)}
-                  className={`fm-card text-left ${sel.has(node.id) ? 'sel' : ''}`}>
-                  <div className="w-full flex items-start justify-between px-0.5">
-                    <span className="text-slate-soft"><KindGlyph kind={f.kind} /></span>
-                    <span className="flex items-center gap-1.5">
-                      {f.dedupOf && <span className="fm-tag-shared">shared</span>}
-                      {f.payloadMissing && <span className="fm-tag-sealed text-solar">missing</span>}
-                      {f.sealed && !f.payloadMissing && <span className="fm-tag-sealed">sealed</span>}
-                      {f.lock && <IcLock size={11} className="text-solar" />}
-                    </span>
+          {sortedDirs.length > 0 && (
+            <>
+              <p className="font-mono text-[8px] tracking-[0.3em] uppercase text-slate-dim px-1 pb-2 pt-1">directories</p>
+              <div className="fm-tile-grid pb-2">
+                {sortedDirs.map((d) => (
+                  <div key={d.id} {...rowProps(d, null)}
+                    className={`fm-card ${sel.has(d.id) ? 'sel' : ''} ${dropTarget === d.id ? 'drop' : ''}`}>
+                    <span className="fm-tile-icon" style={{ color: d.color || 'rgba(111,194,180,0.85)' }}><IcFolder size={30} /></span>
+                    <NameOrInput node={d} className="fm-name text-center w-full mt-2.5 text-[12.5px]" />
+                    <span className="fm-tile-sub mt-1">{kidsOf(d.id).totalCount} item{kidsOf(d.id).totalCount === 1 ? '' : 's'}</span>
+                    {d.pinned && <span className="absolute top-1.5 right-2 text-solar text-[9px]" title="pinned">◆</span>}
                   </div>
-                  <div className="fm-tile-preview mt-2"><TilePreview f={f} /></div>
-                  <NameOrInput node={node} className="fm-name text-center w-full mt-2 text-[11.5px]" />
-                  <span className="fm-tile-sub mt-1">{fmtBytes(f.size)}</span>
-                </div>
-              );
-            })}
-          </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {sortedFiles.length > 0 && (
+            <>
+              <p className="font-mono text-[8px] tracking-[0.3em] uppercase text-slate-dim px-1 pb-2 pt-1">objects</p>
+              <div className="fm-tile-grid">
+                {sortedFiles.map((f) => {
+                  const node = fileNodeById.get(f.id) ?? {
+                    id: 'vnode-' + f.id,
+                    type: 'file' as const,
+                    name: f.name,
+                    parentId: f.dirId ?? EFS_ROOT,
+                    fileId: f.id,
+                    createdAt: f.addedAt,
+                    modifiedAt: f.addedAt,
+                  };
+                  return (
+                    <div key={node.id} {...rowProps(node, f)}
+                      className={`fm-card text-left ${sel.has(node.id) ? 'sel' : ''}`}>
+                      <div className="w-full flex items-start justify-between px-0.5">
+                        <span className="text-slate-soft"><KindGlyph kind={f.kind} /></span>
+                        <span className="flex items-center gap-1.5">
+                          {f.dedupOf && <span className="fm-tag-shared">shared</span>}
+                          {f.payloadMissing && <span className="fm-tag-sealed text-solar">missing</span>}
+                          {f.sealed && !f.payloadMissing && <span className="fm-tag-sealed">sealed</span>}
+                          {f.lock && <IcLock size={11} className="text-solar" />}
+                        </span>
+                      </div>
+                      <div className="fm-tile-preview mt-2"><TilePreview f={f} /></div>
+                      <NameOrInput node={node} className="fm-name text-center w-full mt-2 text-[11.5px]" />
+                      <span className="fm-tile-sub mt-1">{fmtBytes(f.size)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
@@ -722,6 +871,22 @@ export function FileManager({ onOpen, onImport, onLock }: {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* toolbar */}
       <div className="fx-scan flex items-center gap-2.5 px-4 h-12 border-b border-line/50 shrink-0 flex-wrap bg-[#070b1a]/45">
+        <button onClick={goBack} disabled={browse.kind !== 'dir'}
+          title="back" className="shrink-0 p-1.5 border border-line/60 text-slate-dim hover:text-teal-ice hover:border-teal-ice/40 transition-colors disabled:opacity-30">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M15 18l-6-6 6-6" /></svg>
+        </button>
+        <button onClick={goForward}
+          title="forward" className="shrink-0 p-1.5 border border-line/60 text-slate-dim hover:text-teal-ice hover:border-teal-ice/40 transition-colors">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 18l6-6-6-6" /></svg>
+        </button>
+        <button onClick={() => setViewMode((v) => (v === 'grid' ? 'list' : 'grid'))}
+          title="toggle grid / details view" className={`shrink-0 p-1.5 border transition-colors ${viewMode === 'list' ? 'border-teal-ice/40 text-teal-ice bg-teal-ice/10' : 'border-line/60 text-slate-dim hover:text-teal-ice'}`}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        <button onClick={() => { setSplitView((v) => !v); setBCwdId(bCwdId); }}
+          title="dual pane" className={`shrink-0 p-1.5 border transition-colors ${splitView ? 'border-teal-ice/40 text-teal-ice bg-teal-ice/10' : 'border-line/60 text-slate-dim hover:text-teal-ice'}`}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M12 4v16" /></svg>
+        </button>
         <button onClick={() => setTreeOpen((v) => !v)}
           title={treeOpen ? 'hide locations' : 'show locations'}
           className={`shrink-0 p-1.5 border transition-colors ${treeOpen ? 'border-teal-ice/40 text-teal-ice bg-teal-ice/10' : 'border-line/60 text-slate-dim hover:text-teal-ice hover:border-teal-ice/40'}`}>
@@ -768,6 +933,46 @@ export function FileManager({ onOpen, onImport, onLock }: {
         <button onClick={() => setShowInspector((v) => !v)} className={`font-mono text-[9px] px-2 py-1.5 border transition-colors ${showInspector ? 'border-teal-ice/40 text-teal-ice' : 'border-line/60 text-slate-dim'}`}>inspector</button>
       </div>
 
+      {/* THE TAB STRIP (Files/Sigma pattern) — each tab owns its cwd + history */}
+      <div className="flex items-stretch gap-1 px-3 pt-1.5 pb-0 border-b border-line/50 shrink-0 overflow-x-auto thin-scroll">
+        {tabs.map((t, i) => {
+          const name = t.cwd === EFS_ROOT ? 'vault' : vfs.nodes[t.cwd]?.name ?? 'lost';
+          return (
+            <div
+              key={t.id}
+              onClick={() => { setActiveTab(i); setBrowse({ kind: 'dir' }); setSel(new Set()); setAnchorId(null); }}
+              className={`group flex items-center gap-2 px-3 py-1.5 rounded-t-lg border border-b-0 cursor-pointer font-mono text-[9.5px] tracking-[0.14em] uppercase transition-colors max-w-44 ${
+                i === activeTab && browse.kind === 'dir'
+                  ? 'border-teal-ice/40 bg-teal-ice/10 text-teal-ice'
+                  : 'border-transparent text-slate-dim hover:text-paper'
+              }`}
+            >
+              <IcFolder size={10} />
+              <span className="truncate">{name}</span>
+              {tabs.length > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTabs((prev) => prev.filter((_, j) => j !== i));
+                    setActiveTab((a) => (a >= i && a > 0 ? a - 1 : a));
+                  }}
+                  className="opacity-0 group-hover:opacity-100 text-slate-dim hover:text-red-300 transition-all"
+                  title="close tab"
+                >✕</button>
+              )}
+            </div>
+          );
+        })}
+        <button
+          onClick={() => {
+            setTabs((prev) => [...prev, { id: `t${Date.now()}`, cwd: tabs[activeTab].cwd, history: [tabs[activeTab].cwd], hIndex: 0 }]);
+            setActiveTab(tabs.length);
+          }}
+          title="new tab (Ctrl+T)"
+          className="px-2.5 mb-1 self-center text-slate-dim hover:text-teal-ice transition-colors"
+        ><IcPlus size={11} /></button>
+      </div>
+
       <div className="flex-1 min-h-0 flex relative">
         {/* locations rail — collapsible from the toolbar & its own caption */}
         <div className="relative shrink-0 overflow-hidden" style={{ width: treeOpen ? 216 : 0, transition: 'width 0.4s cubic-bezier(0.22,1,0.36,1)' }}>
@@ -784,6 +989,34 @@ export function FileManager({ onOpen, onImport, onLock }: {
               {rootDirs.filter((d) => d.pinned && !expanded.has(EFS_ROOT)).map((d) => (
                 <TreeRow key={d.id} node={d} depth={1} />
               ))}
+
+              {/* SMART COLLECTIONS (Spacedrive) — recents + browse-by-tag */}
+              <div className="mt-2 pt-2 border-t border-line/30">
+                <p className="font-mono text-[7px] tracking-[0.34em] uppercase text-slate-dim px-4 pb-1">collections</p>
+                <button
+                  onClick={() => { setBrowse({ kind: 'recents' }); setSel(new Set()); setTrashOpen(false); }}
+                  className={`w-full flex items-center gap-2.5 px-4 py-1.5 font-mono text-[9.5px] tracking-[0.12em] uppercase transition-colors ${
+                    browse.kind === 'recents' ? 'text-teal-ice bg-teal-ice/10' : 'text-slate-dim hover:text-paper'
+                  }`}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+                  recents
+                </button>
+                {allTags.length > 0 && (
+                  <p className="font-mono text-[7px] tracking-[0.34em] uppercase text-slate-dim px-4 pt-2 pb-1">tags</p>
+                )}
+                {allTags.map(([tag, count]) => (
+                  <button
+                    key={tag}
+                    onClick={() => { setBrowse({ kind: 'tag', tag }); setSel(new Set()); setTrashOpen(false); }}
+                    className={`w-full flex items-center gap-2.5 px-4 py-1.5 font-mono text-[9.5px] tracking-[0.12em] transition-colors ${
+                      browse.kind === 'tag' && browse.tag === tag ? 'text-teal-ice bg-teal-ice/10' : 'text-slate-dim hover:text-paper'
+                    }`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-ice/60 shrink-0" />
+                    <span className="truncate flex-1 text-left">{tag}</span>
+                    <span className="tabular-nums text-[8.5px] text-slate-dim">{count}</span>
+                  </button>
+                ))}
+              </div>
             </div>
             <button onClick={() => setTrashOpen((v) => !v)}
               className={`flex items-center gap-2 px-4 h-9 border-t border-line/40 font-mono text-[9px] tracking-[0.2em] uppercase transition-colors ${trashOpen ? 'text-solar bg-solar/10' : 'text-slate-dim hover:text-paper'}`}>
@@ -793,7 +1026,123 @@ export function FileManager({ onOpen, onImport, onLock }: {
           </div>
         </div>
 
-        {trashOpen ? trashView : listing}
+        {trashOpen ? trashView : browse.kind === 'tag' ? (
+          /* THE TAG COLLECTION (Spacedrive) — every node carrying this tag */
+          <div className="flex-1 min-h-0 overflow-y-auto thin-scroll p-3" data-mq="1">
+            <div className="flex items-center gap-2 mb-3">
+              <p className="font-mono text-[9px] tracking-[0.28em] uppercase text-paper/75">tagged · {browse.tag}</p>
+              <span className="font-mono text-[9px] text-slate-dim">{tagFiles?.length ?? 0} objects</span>
+            </div>
+            {(tagFiles ?? []).map(({ node, file }) => (
+              <div key={node.id} data-node-id={node.id}
+                onClick={(e) => select(node.id, e)}
+                onDoubleClick={() => { if (node.type === 'dir') enter(node.id); else if (file) (file.lock ? onLock(file) : onOpen(file)); }}
+                onDragStart={(e) => onRowDragStart(e, node.id)}
+                draggable
+                className="flex items-center gap-3 px-3 py-2 border-b border-line/30 cursor-pointer hover:bg-teal-ice/5">
+                <span className="text-slate-soft">{node.type === 'dir' ? <IcFolder size={13} /> : file ? <KindGlyph kind={file.kind} size={14} /> : null}</span>
+                <span className="text-[11.5px] text-paper truncate flex-1">{node.name}</span>
+                <span className="font-mono text-[9px] text-slate-dim">{efsPathString(vfs, node.parentId ?? EFS_ROOT)}</span>
+                {file && <span className="font-mono text-[9px] text-slate-dim tabular-nums">{fmtBytes(file.size)}</span>}
+              </div>
+            ))}
+            {(tagFiles?.length ?? 0) === 0 && <p className="font-mono text-[10px] text-slate-dim py-8 text-center">no objects carry this tag yet</p>}
+          </div>
+        ) : browse.kind === 'recents' ? (
+          /* RECENTS — the 40 newest objects vault-wide */
+          <div className="flex-1 min-h-0 overflow-y-auto thin-scroll p-3" data-mq="1">
+            <p className="font-mono text-[9px] tracking-[0.28em] uppercase text-paper/75 mb-3">recently sealed · {recentFiles?.length ?? 0}</p>
+            {(recentFiles ?? []).map((f) => {
+              const node = fileNodeById.get(f.id);
+              return (
+                <div key={f.id} data-node-id={node?.id ?? 'vnode-' + f.id}
+                  onClick={(e) => node && select(node.id, e)}
+                  onDoubleClick={() => (f.lock ? onLock(f) : onOpen(f))}
+                  className="flex items-center gap-3 px-3 py-2 border-b border-line/30 cursor-pointer hover:bg-teal-ice/5">
+                  <span className="text-slate-soft"><KindGlyph kind={f.kind} size={14} /></span>
+                  <span className="text-[11.5px] text-paper truncate flex-1">{f.name}</span>
+                  <span className="font-mono text-[9px] text-slate-dim tabular-nums">{fmtBytes(f.size)}</span>
+                  <span className="font-mono text-[9px] text-slate-dim">{fmtDate(f.addedAt)}</span>
+                </div>
+              );
+            })}
+            {(recentFiles?.length ?? 0) === 0 && <p className="font-mono text-[10px] text-slate-dim py-8 text-center">nothing sealed yet</p>}
+          </div>
+        ) : splitView ? (
+          /* DUAL PANE (Double Commander) — two independent explorers; the
+             focused pane drives keyboard + inspector, drag crosses panes */
+          <div className="flex-1 min-h-0 flex">
+            <div
+              onMouseDown={() => setFocusPane('a')}
+              className={`flex-1 min-w-0 flex flex-col border-r border-line/40 ${focusPane === 'a' ? 'bg-white/[0.02]' : 'opacity-80'}`}
+            >
+              <div className="flex items-center gap-2 px-3 h-7 border-b border-line/30 font-mono text-[8.5px] tracking-[0.2em] uppercase">
+                <span className={focusPane === 'a' ? 'text-teal-ice' : 'text-slate-dim'}>■ pane a</span>
+                <span className="text-slate-dim">· {cwd.name}</span>
+              </div>
+              {listing}
+            </div>
+            <div
+              onMouseDown={() => setFocusPane('b')}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { if (e.dataTransfer.files?.length) acceptDrop(bCwdId)(e); else forkAToB(); }}
+              className={`flex-1 min-w-0 flex flex-col ${focusPane === 'b' ? 'bg-white/[0.02]' : 'opacity-80'}`}
+            >
+              <div className="flex items-center gap-2 px-3 h-7 border-b border-line/30 font-mono text-[8.5px] tracking-[0.2em] uppercase">
+                <span className={focusPane === 'b' ? 'text-teal-ice' : 'text-slate-dim'}>■ pane b</span>
+                <span className="text-slate-dim">· {bCwd.name}</span>
+              </div>
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-line/30 flex-wrap">
+                  {bBreadcrumb.map((b, i) => (
+                    <span key={b.id} className="flex items-center gap-1 min-w-0">
+                      {i > 0 && <span className="text-slate-dim">/</span>}
+                      <button onClick={() => setBCwdId(b.id)} className={`font-mono text-[9.5px] truncate transition-colors ${i === bBreadcrumb.length - 1 ? 'text-paper font-semibold' : 'text-slate-soft hover:text-paper'}`}>
+                        {b.id === EFS_ROOT ? 'vault' : b.name}
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto thin-scroll p-3" data-mq="1"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { if (e.dataTransfer.files?.length) acceptDrop(bCwdId)(e); }}>
+                  {bDirs.map((d) => (
+                    <div key={d.id} data-node-id={d.id} draggable
+                      onDragStart={(e) => { const ids = selB.has(d.id) ? [...selB] : [d.id]; e.dataTransfer.setData('text/efs', JSON.stringify({ nodeIds: ids })); }}
+                      onDragOver={(e) => { e.preventDefault(); setDropTarget(d.id); }}
+                      onDragLeave={() => setDropTarget((t) => (t === d.id ? null : t))}
+                      onDrop={acceptDrop(d.id)}
+                      onClick={(e) => { setSelB(new Set([d.id])); if (e.detail === 2) setBCwdId(d.id); }}
+                      onDoubleClick={() => setBCwdId(d.id)}
+                      className={`flex items-center gap-3 px-3 py-1.5 border-b border-line/25 cursor-pointer hover:bg-teal-ice/5 ${selB.has(d.id) ? 'sel bg-teal-ice/10' : ''} ${dropTarget === d.id ? 'drop' : ''}`}>
+                      <span className="shrink-0" style={{ color: d.color || 'rgba(111,194,180,0.85)' }}><IcFolder size={13} /></span>
+                      <span className="flex-1 text-[11.5px] text-paper truncate">{d.name}</span>
+                      <span className="w-16 font-mono text-[9px] text-slate-dim">dir</span>
+                    </div>
+                  ))}
+                  {bFiles.map((f) => {
+                    const node = fileNodeById.get(f.id);
+                    return (
+                      <div key={f.id} data-node-id={node?.id ?? 'vnode-' + f.id} draggable
+                        onDragStart={(e) => { if (node) { const ids = selB.has(node.id) ? [...selB] : [node.id]; e.dataTransfer.setData('text/efs', JSON.stringify({ nodeIds: ids })); } }}
+                        onClick={(e) => node && setSelB(new Set([node.id]))}
+                        onDoubleClick={() => (f.lock ? onLock(f) : onOpen(f))}
+                        className={`flex items-center gap-3 px-3 py-1.5 border-b border-line/25 cursor-pointer hover:bg-teal-ice/5 ${node && selB.has(node.id) ? 'sel bg-teal-ice/10' : ''}`}>
+                        <span className="shrink-0 text-slate-soft"><KindGlyph kind={f.kind} size={13} /></span>
+                        <span className="flex-1 text-[11.5px] text-paper truncate">{f.name}</span>
+                        <span className="w-16 font-mono text-[9px] text-slate-dim">{f.kind}</span>
+                        <span className="w-16 font-mono text-[9px] text-slate-dim text-right tabular-nums">{fmtBytes(f.size)}</span>
+                      </div>
+                    );
+                  })}
+                  {bDirs.length === 0 && bFiles.length === 0 && (
+                    <p className="font-mono text-[10px] text-slate-dim py-8 text-center">pane b is empty — drop here to fork across</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : listing}
 
         {/* inspector */}
         {showInspector && (

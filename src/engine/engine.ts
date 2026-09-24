@@ -26,6 +26,7 @@ import { REALITIES, RealityConfig, GalaxyClusterData, GalaxyData } from '../real
 import { HIERARCHY_DIALS } from '../realities/hierarchyStages';
 import { generateStellarSystemForGalaxy } from '../realities/galaxyGenerator';
 import { calculateKeplerPosition, calculatePhysics } from '../physics/physicsEngine';
+import { LivingGravityField, lensStrengthFor, dynamicMassKg, gravityTelemetry, SCENE_UNITS_PER_AU } from '../physics/nbody';
 import { cosmosBridge } from '../native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../performance';
 import { isDesktop } from '../desktop/adapter';
@@ -132,6 +133,9 @@ interface RuntimeBody {
   fadeTarget: number;
   hoverT: number;
   baseScale: number;
+  /* Round 14 — this body's gravitational-lens strength (uv pull at the lens
+     core, log-compressed from its REAL mass) */
+  lensStrength?: number;
 }
 
 /* one Kepler world of a galaxy's REAL isolated inner system — the same
@@ -309,6 +313,21 @@ export class UniverseEngine {
   /* Point clouds captured when the portal arms; the field pulls their points
      toward the core (visual-only suction, transforms untouched). */
   private portalPointSets: { points: THREE.Points; mat: THREE.ShaderMaterial }[] = [];
+
+  /* -------------- Round 14 — gravitational lensing + living gravity -------------- */
+  /* The masses bend ONLY the universe surface (celestial dome + background
+     star shells) — the observable signature of Einstein's curvature. The
+     bodies themselves never bend (the first post-pass attempt was removed
+     after owner review: it warped the planets' own edges). */
+  private lensCur = 1;                /* damped toggle — lensing is born ON */
+  private lensTarget = 1;
+  private lensVecs: THREE.Vector4[] = Array.from({ length: 16 }, () => new THREE.Vector4());
+  private _lensDir = new THREE.Vector3();
+  private _lensFwd = new THREE.Vector3();
+  /* Living Gravity: first-order N-body coupling in osculating elements (nbody.ts). */
+  private livingField = new LivingGravityField();
+  private livingGravityOn = true;     /* real mutual gravity — ON by default */
+  private lastSimDelta = 0;           /* sim-days advanced last frame (element-rate dt) */
   /* The traveler's exact camera + framing at the moment a portal opened.
      leavePortal() cuts straight back to this — closing a diary or the vault
      must never slam the camera to the anchor or sweep it sideways. */
@@ -1415,6 +1434,89 @@ export class UniverseEngine {
     u.uAuroraIntensity.value = cur.intensity;
     u.uAuroraStorm.value = cur.storm;
     u.uEchoBloom.value = cur.echo;
+  }
+
+  /* --------------- Round 14 — Gravitational Lensing & Living Gravity --------------- */
+
+  /** Spacetime lensing visibility — whether light visibly bends around the
+      masses (Einstein's observable curvature). */
+  setSpacetimeLens(on: boolean): void {
+    this.lensTarget = on ? 1 : 0;
+  }
+
+  /** Living Gravity — first-order N-body coupling in osculating elements.
+      Turning it off performs a canonical heal: the divine ephemeris is
+      restored exactly, because the orbital elements were never touched. */
+  setLivingGravity(on: boolean): void {
+    this.livingGravityOn = on;
+    if (!on) this.livingField.heal();
+  }
+
+  /** CANONICAL HEAL — restore the exact canonical paths in one stroke. */
+  healLivingGravity(): void {
+    this.livingField.heal();
+  }
+
+  /** Per-frame lensing driver — each massive body's direction from the
+      camera becomes a lens ON THE UNIVERSE SURFACE: the celestial dome and
+      the background star shells bend around it with the true thin-lens law
+      (α = θ_E²/θ). The bodies themselves are never touched. θ_E comes from
+      the body's REAL mass (lensStrengthFor, log-compressed). */
+  private updateSpacetimeLens(dt: number) {
+    this.lensCur += (this.lensTarget - this.lensCur) * Math.min(1, dt * 4);
+    this.camera.getWorldDirection(this._lensFwd);
+    let n = 0;
+    for (const b of this.bodies) {
+      if (n >= this.lensVecs.length) break;
+      const thetaE = b.lensStrength ?? 0;
+      if (thetaE <= 0) continue;
+      this._lensDir.setFromMatrixPosition(b.group.matrixWorld).sub(this.camera.position);
+      const dist = this._lensDir.length();
+      if (dist < 1e-3) continue;
+      this._lensDir.divideScalar(dist);
+      if (this._lensDir.dot(this._lensFwd) < 0.05) continue; /* behind the view */
+      this.lensVecs[n++].set(this._lensDir.x, this._lensDir.y, this._lensDir.z, thetaE);
+    }
+    this.surfaceManager.setLenses(this.lensVecs, n, this.lensCur);
+  }
+
+  /** Living Gravity — first-order N-body coupling in osculating elements
+      (Gauss's planetary equations, see nbody.ts). Runs AFTER updateBodies:
+      the exact Kepler state feeds the field, the element perturbations
+      advance, and every world is re-positioned from the exact Kepler solver
+      run on its osculating elements. The canonical elements are never
+      written — a heal is always one zeroing pass away. */
+  private updateLivingGravity() {
+    const field = this.livingField;
+    if (field.nodes.length === 0) return;
+    if (this.bootIntro && this.birthK < 1) return; /* the Birth is pure ejection — gravity joins after */
+    const active = this.livingGravityOn && this.lastSimDelta > 0;
+
+    for (const b of this.bodies) {
+      const node = field.nodes.find((nd) => nd.id === b.data.id);
+      if (!node || node.isStar) continue;
+      const phys = calculatePhysics(b.data);
+      const o = b.data.orbit;
+      node.a = o.a;
+      node.e0 = phys.eccentricity;
+      node.phase = o.phase;
+      node.incl = o.incl;
+      node.speed = o.speed || 0.01;
+      const kp = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01);
+      node.cx = kp.x; node.cy = kp.y; node.cz = kp.z;
+      node.trueAnomaly = kp.trueAnomaly;
+    }
+    if (active) field.step(this.lastSimDelta, this.simDays);
+
+    for (const b of this.bodies) {
+      const node = field.nodes.find((nd) => nd.id === b.data.id);
+      if (!node || node.isStar) continue;
+      const pert = field.perturbedPosition(node, this.simDays);
+      b.group.position.set(pert.x, pert.y, pert.z);
+      node.deviationAU = pert.deviation / SCENE_UNITS_PER_AU;
+      const tel = gravityTelemetry.get(node.id);
+      if (tel) tel.deviationAU = node.deviationAU;
+    }
   }
 
   /** Memory Constellation Search: pulse the given worlds' atmospheres gold
@@ -4425,6 +4527,26 @@ void main(){
     list.forEach((data) => {
       if (!existing.has(data.id)) this.buildBody(data);
     });
+
+    /* Round 14 — Living Gravity re-syncs: new worlds are born healed on
+       their canonical path, removed worlds leave the field. Each body also
+       receives its lens strength (log-compressed real mass). */
+    for (const rb of this.bodies) {
+      rb.lensStrength = lensStrengthFor(calculatePhysics(rb.data).massKg, rb.data.kind);
+    }
+    this.livingField.sync(list.map((b) => {
+      const phys = calculatePhysics(b);
+      return {
+        id: b.id,
+        massKg: dynamicMassKg(phys.massKg, b.kind),
+        isStar: b.kind === 'star',
+        a: b.orbit?.a ?? 0,
+        e0: phys.eccentricity,
+        phase: b.orbit?.phase ?? 0,
+        incl: b.orbit?.incl ?? 0,
+        speed: b.orbit?.speed ?? 0.01,
+      };
+    }));
   }
 
   /** Dimensional Barrier — strictly isolates state, star spectrum, corona, and local universe to active reality */
@@ -4878,6 +5000,7 @@ void main(){
     /* time */
     const rate = this.paused ? 0 : 6 * this.timeScale * (this.coreActive ? 0.35 : 1);
     this.simDays += dt * rate;
+    this.lastSimDelta = dt * rate;
     if (this.clockT - this.lastDateSent > 0.25) {
       this.lastDateSent = this.clockT;
       this.cb.onSimDate(new Date(this.epoch + this.simDays * DAY).toISOString());
@@ -5357,6 +5480,8 @@ void main(){
       focusMax,
     });
     this.updateBodies(dt);
+    this.updateLivingGravity();
+    this.updateSpacetimeLens(dt);
     this.updateMeteors(dt);
     this.updateAurora(dt);
     this.updatePulses(performance.now());
@@ -6354,6 +6479,7 @@ void main(){
       this.clickTimer = null;
     }
     this.renderer.setAnimationLoop(null);
+    gravityTelemetry.clear();
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
     this.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.canvas.removeEventListener('pointerup', this.onPointerUp);

@@ -43,7 +43,9 @@ import {
   createVfs, efsAddFileNode, efsBump, efsChildren, efsCreateShadow, efsDedup,
   efsDeleteShadow, efsMkdir, efsMove, efsNodeOf, efsPathString, efsRename,
   efsScrub, efsSubtreeIds, efsHeal, efsUniqueName, EFS_ROOT, migrateLegacyVault,
+  seedVfs,
 } from './backend';
+import { VAULT_HOME_FOLDERS } from './backend/storage/seeds';
 import { recordPersistence } from './performance';
 import { desktopStore, realityApi, syncedRealityApi } from './desktop/adapter';
 import { toast } from './ui/toast';
@@ -114,13 +116,18 @@ function ensureBucket(realityId: string): RealityBucket {
   if (!state.realities) state.realities = {};
   if (!state.realities[id]) {
     const cfg = REALITIES.find((r) => r.id === id) ?? state.customRealities?.find((r: any) => r.id === id);
+    const efs = createVfs();
+    /* every reality is born with the home folders of a fresh OS —
+       a File Manager is a window onto storage, and storage should
+       never open as an empty void */
+    seedVfs(efs, VAULT_HOME_FOLDERS);
     state.realities[id] = {
       bodies: cfg ? cfg.bodies.map((b: CosmicBody) => ({ ...b })) : [],
       entries: cfg ? (cfg.entries ?? []).map((e: DiaryEntry) => ({ ...e })) : [],
       connections: [],
       vault: [],
       vaultTrash: [],
-      efs: createVfs(),
+      efs,
     };
   }
   return state.realities[id];
@@ -674,6 +681,22 @@ export const actions = {
     notify();
   },
 
+  /* ------------------- Round 14 — Physics Visualization ------------------- */
+  /* Both toggles persist with the universe; an absent flag reads as ON, so
+     existing saved universes gain Einstein's bent starlight with no migration. */
+
+  setSpacetimeLensing(on: boolean) {
+    state.spacetimeLensing = on;
+    audit(`[General Relativity] Spacetime lensing ${on ? 'bending the starlight' : 'released'} — ${on ? 'light curves around every mass' : 'light runs straight'}`);
+    notify();
+  },
+
+  setLivingGravity(on: boolean) {
+    state.livingGravity = on;
+    audit(`[Universal Gravitation] Living Gravity ${on ? 'awakened' : 'rested — canonical ephemeris healed'}`);
+    notify();
+  },
+
   resetRealityDescription(realityId: string) {
     if (state.customRealityDescriptions) {
       delete state.customRealityDescriptions[realityId];
@@ -731,16 +754,19 @@ export const actions = {
     }
     recomputeRealities();
     /* seed the reality's world container from its forged config — the worlds
-       are real and clickable from the first visit; the black hole vault
-       starts fresh and empty (total isolation) */
+       are real and clickable from the first visit; the black hole vault starts
+       fresh (total isolation) but WITH the home folders of a fresh OS, so its
+       File Manager opens as a real file system, never a void */
     state.realities = state.realities ?? {};
+    const newEfs = createVfs();
+    seedVfs(newEfs, VAULT_HOME_FOLDERS);
     state.realities[newReality.id] = {
       bodies: newReality.bodies.map((b) => ({ ...b })),
       entries: (newReality.entries ?? []).map((e) => ({ ...e })),
       connections: [],
       vault: [],
       vaultTrash: [],
-      efs: createVfs(),
+      efs: newEfs,
     };
     audit(`[Multiverse Nexus] Manifested new parallel reality: ${newReality.name}`);
     notify();
@@ -1299,6 +1325,22 @@ export const actions = {
   },
 
   efsHealVault(): number {
+    /* HOME-FOLDER GUARANTEE — vaults born before the fresh-OS seeding (or
+       whose user deleted a home folder) get the structure back. Only fires
+       when a home folder is genuinely absent, so user deletions of their own
+       non-home folders are never undone. */
+    const efs = bucket().efs;
+    const missing = VAULT_HOME_FOLDERS.filter((p) => {
+      const name = p.split('/').filter(Boolean)[0];
+      /* case-insensitive: the user's own 'Images' IS the home folder —
+         never spawn a duplicate 'images (2)' beside it */
+      return !Object.values(efs.nodes).some((n) => n.type === 'dir' && n.parentId === EFS_ROOT && n.name.toLowerCase() === name.toLowerCase());
+    });
+    if (missing.length) {
+      seedVfs(efs, missing);
+      audit(`[EFS] home folders restored: ${missing.map((m) => m.replace('/', '')).join(', ')}`);
+      notify();
+    }
     const healed = efsHeal(bucket().efs, bucket().vault);
     if (healed) {
       audit(`[EFS] healed ${healed} detached node(s)`);

@@ -374,6 +374,20 @@ export function seedEntries(
   ];
 }
 
+/* THE VAULT HOME FOLDERS — every reality's black-hole vault is born with the
+   home structure of a fresh OS (like Documents/Downloads/Pictures on a new
+   user account). Empty is honest for files, but the *structure* of storage
+   is part of the machine, not the user's burden. */
+export const VAULT_HOME_FOLDERS = [
+  '/documents',
+  '/images',
+  '/videos',
+  '/audio',
+  '/downloads',
+  '/projects',
+  '/archives',
+];
+
 export const SEED_FOLDERS = [
   '/documents',
   '/documents/research',

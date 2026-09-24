@@ -1,5 +1,53 @@
 import { NOISE } from '../shaders';
 
+/* ------------------- gravitational lensing of the surface ------------------- */
+
+/* Round 14 — masses bend the UNIVERSE SURFACE (the celestial canvas), never
+   the bodies themselves. Each lens arrives as vec4(xyz = unit world direction
+   to the mass as seen by the camera, w = Einstein-ring angle θ_E in radians).
+   The sampled direction is pulled toward the mass with the true thin-lens
+   law: deflection α = θ_E²/θ — background features appear displaced AWAY
+   from the mass, which is why starlight arcs around it. This is the only
+   place curvature is drawn: a diagram is not the sky, a body is never bent. */
+export const LENS_UNIFORMS_GLSL = /* glsl */ `
+uniform vec4 uLenses[16];
+uniform int uLensCount;
+uniform float uLensBend;
+`;
+
+export const LENS_WARP_GLSL = /* glsl */ `
+vec3 applyLensBend(vec3 d){
+  for (int i = 0; i < 16; i++) {
+    if (i >= uLensCount) break;
+    vec3 L = uLenses[i].xyz;
+    float thetaE = uLenses[i].w;
+    float cosA = clamp(dot(d, L), -1.0, 1.0);
+    float ang = acos(cosA);
+    float pull = min((thetaE * thetaE) / max(ang, 0.02), 0.3) * uLensBend;
+    vec3 perp = d - L * cosA;
+    float perpLen = length(perp);
+    if (perpLen < 1e-5) continue; /* looking straight into the mass */
+    vec3 perpDir = perp / perpLen;
+    float ang2 = max(ang - pull, 0.0);
+    d = normalize(L * cos(ang2) + perpDir * sin(ang2));
+  }
+  return d;
+}
+`;
+
+/* For vertex stages (star shells, nebula points): uniforms + warp + a helper
+   that bends a point's direction on the celestial sphere and restores its
+   original radius, so background stars migrate around masses. */
+export const LENS_VERT_GLSL = /* glsl */ `
+${LENS_UNIFORMS_GLSL}
+${LENS_WARP_GLSL}
+vec3 lensBentPosition(vec3 position){
+  float r = length(position);
+  if (r < 1e-4) return position;
+  return applyLensBend(position / r) * r;
+}
+`;
+
 /**
  * Universe Surface Vertex Shader.
  * Projects positions of the inverted celestial sky sphere into directional vectors.
@@ -27,6 +75,7 @@ export const universeSurfaceFrag = /* glsl */ `
 uniform float uTime;
 uniform float uKamuiErase;
 uniform vec3 uVortexDir;
+${LENS_UNIFORMS_GLSL}
 
 // Reality-specific custom surface uniforms
 uniform vec3 uColorA;
@@ -41,6 +90,8 @@ uniform float uStarDensity;
 varying vec3 vDir;
 
 ${NOISE}
+
+${LENS_WARP_GLSL}
 
 float starHash(vec3 p){
   p = fract(p * 0.3183099 + 0.1);
@@ -103,7 +154,11 @@ void main(){
     float distToHorizon = spiralHorizon - r;
     edgeAlpha = r > spiralHorizon ? smoothstep(0.12, 0.0, r - spiralHorizon) : smoothstep(-0.07, 0.0, distToHorizon);
   }
-  
+
+  /* GRAVITATIONAL LENSING — the masses bend this canvas and nothing else.
+     Applied after the Kamui transcendence warp, before any layer is sampled. */
+  d = applyLensBend(d);
+
   // Abyssal deep universe background base, modulated by reality deepColor
   vec3 col = max(vec3(0.001, 0.0015, 0.003), uDeepColor);
   

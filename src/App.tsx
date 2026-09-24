@@ -33,7 +33,7 @@ interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean
 const MAX_RECT = (): WinRect => ({ x: 12, y: 12, w: window.innerWidth - 24, h: window.innerHeight - 24 });
 
 /* bump on every shipped build — lets you confirm the running bundle is current */
-export const BUILD = 'R38';
+export const BUILD = 'R39';
 
 /* THE ECHO SHOWER TOAST — one glass banner the day a memory returns.
    Auto-fades; re-keyed only when the shower's membership changes. */
@@ -545,6 +545,18 @@ export default function App() {
     eng.setReality(r, state.bodies, state.entries);
   }, [state.activeRealityId, state.customRealityDescriptions]);
 
+  /* Round 14 — physics toggles ride store state into the engine. engineReady
+     re-fires this after the async boot so the engine's first state is the
+     persisted one, not its default. */
+  const spacetimeLensOn = state.spacetimeLensing !== false;
+  const livingGravityOn = state.livingGravity !== false;
+  useEffect(() => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    eng.setSpacetimeLens(spacetimeLensOn);
+    eng.setLivingGravity(livingGravityOn);
+  }, [spacetimeLensOn, livingGravityOn, engineReady]);
+
   /* EXISTENCE SYNC — the 3D multiverse is rebuilt from the live reality list
      whenever a reality or galaxy is created/edited/deleted, so the scene is
      always literal: a bubble exists iff the reality exists, an ellipse exists
@@ -752,7 +764,7 @@ export default function App() {
 
             {showPhysics && (
               <div className="mt-3 pointer-events-auto">
-                <PhysicsHUD body={selectBody} onClose={() => setShowPhysics(false)} />
+                <PhysicsHUD body={selectBody} livingGravity={livingGravityOn} onClose={() => setShowPhysics(false)} />
               </div>
             )}
           </div>
@@ -778,7 +790,7 @@ export default function App() {
             <p className="font-body text-[11px] text-slate-soft leading-relaxed mt-1">{innerWorld.body.note}</p>
             {showPhysics && (
               <div className="mt-3 pointer-events-auto">
-                <PhysicsHUD body={innerWorld.body} onClose={() => setShowPhysics(false)} />
+                <PhysicsHUD body={innerWorld.body} livingGravity={livingGravityOn} onClose={() => setShowPhysics(false)} />
               </div>
             )}
           </div>
@@ -1249,6 +1261,15 @@ export default function App() {
         <Suspense fallback={<AsyncOverlay label="OPENING CORE CONSOLE" />}>
           <CoreConsole
             onClose={() => setCoreConsoleOpen(false)}
+            lensOn={spacetimeLensOn}
+            livingOn={livingGravityOn}
+            onToggleLens={(on) => actions.setSpacetimeLensing(on)}
+            onToggleLiving={(on) => actions.setLivingGravity(on)}
+            onRestoreEphemeris={() => {
+              engineRef.current?.healLivingGravity();
+              toast('✦ Ephemeris restored — every world back on its divine path');
+              chime(600);
+            }}
             onWarpReality={(id) => {
             actions.switchReality(id);
             const r = getReality(id, state.customRealityDescriptions);

@@ -67,6 +67,10 @@ export interface BodyPhysicsData {
   iscoKm?: number;                /* Innermost Stable Circular Orbit (3 R_s) */
   timeDilationFactor?: number;    /* Gravitational time dilation factor at 2 R_s */
 
+  /* General Relativity — EVERY mass bends spacetime (Einstein, 1915) */
+  spacetimeCurvatureSurface: number; /* 2GM/(Rc²) — dimensionless surface compactness */
+  timeDilationAtSurface: number;     /* dτ/dt at the surface: √(1 − 2GM/Rc²) */
+
   /* Solar/Stellar Axial Spin & Galactic Orbit Telemetry */
   axialRotationPeriodDays: number;  /* Sidereal axial spin period (25.05 Earth Days at equator) */
   axialSpinVelocityKms: number;     /* Surface spin velocity at equator (1.997 km/s) */
@@ -281,6 +285,19 @@ function computePhysicsFresh(body: CosmicBody, simTimeSec: number): BodyPhysicsD
     timeDilationFactor = Math.sqrt(1 - 1 / 2.0);
   }
 
+  /* 7b. UNIVERSAL SPACETIME CURVATURE — Einstein's field equations tell us
+     every mass bends spacetime, not only black holes. 2GM/Rc² is the
+     dimensionless compactness (how deep the surface sits in its own well
+     relative to the speed of light) and the surface clock rate follows
+     dτ/dt = √(1 − 2GM/Rc²). Earth's value is ~7×10⁻¹⁰ — the fabric is real
+     but nearly flat, which is exactly why Newton's laws serve so well at
+     human scales. For relativistic bodies the "surface" IS the event
+     horizon, where 2GM/Rc² = 1 by definition and clocks freeze. */
+  const spacetimeCurvatureSurface = isRelativistic
+    ? 1
+    : (radiusM > 0 ? (2 * CONSTANTS.G * massKg) / (radiusM * Math.pow(CONSTANTS.c, 2)) : 0);
+  const timeDilationAtSurface = Math.sqrt(Math.max(0, 1 - spacetimeCurvatureSurface));
+
   /* 8. AXIAL ROTATION & GALACTIC ORBIT (Milky Way / Galactic Core dynamics) */
   /* Anchor Star / Sun axial rotation period: 25.05 Earth days at equator */
   const axialRotationPeriodDays = body.kind === 'star' ? 25.05 : 1.0 + (radiusKm / 6371) * 0.5;
@@ -334,6 +351,8 @@ function computePhysicsFresh(body: CosmicBody, simTimeSec: number): BodyPhysicsD
     photonSphereKm,
     iscoKm,
     timeDilationFactor,
+    spacetimeCurvatureSurface,
+    timeDilationAtSurface,
     axialRotationPeriodDays,
     axialSpinVelocityKms,
     axialTiltDeg,

@@ -27,6 +27,12 @@ interface Props {
   onTriggerKamui: () => void;
   onEnterGalaxy: (realityId: string, galaxyId: string) => void;
   onShowToolbar?: () => void;
+  /* Round 14 — physics laws (spacetime lensing + living gravity) */
+  lensOn: boolean;
+  livingOn: boolean;
+  onToggleLens: (on: boolean) => void;
+  onToggleLiving: (on: boolean) => void;
+  onRestoreEphemeris: () => void;
 }
 
 type Tab = 'dashboard' | 'realities' | 'hierarchy' | 'bin';
@@ -1036,6 +1042,11 @@ export const CoreConsole: React.FC<Props> = ({
   onTriggerKamui,
   onEnterGalaxy,
   onShowToolbar,
+  lensOn,
+  livingOn,
+  onToggleLens,
+  onToggleLiving,
+  onRestoreEphemeris,
 }) => {
   const state = useUniverse();
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -1321,6 +1332,58 @@ export const CoreConsole: React.FC<Props> = ({
                 </div>
                 <SimClockTile />
                 <DiskSyncStatusTile diskSync={state.diskSync} />
+              </motion.div>
+
+              {/* ROUND 14 — PHYSICS LAWS: Einstein's lensing + Newton's living
+                  gravity. 8-col beside the radar (under Vitals) so the bento
+                  rows stay packed. */}
+              <motion.div variants={rise} className="lg:col-span-8 cc-panel p-4 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="cc-panel-title">
+                    <Orbit className="w-3.5 h-3.5" />
+                    Physics Laws — Relativity &amp; Gravitation
+                  </span>
+                  <span className="cc-label text-cyan-300/80">Einstein · Newton · Live</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <TiltButton
+                    onClick={() => onToggleLens(!lensOn)}
+                    maxTilt={11}
+                    lift={16}
+                    style={{ ['--btn' as string]: lensOn ? '34 211 238' : '100 116 139' }}
+                    className={`cc-btn-glass p-2.5 rounded-xl text-[10px] font-mono uppercase tracking-wider cursor-pointer ${lensOn ? 'text-cyan-100' : 'text-slate-400'}`}
+                    title="Einstein lensing — every mass bends the light passing it. The real universe has no grid; curvature shows in the light."
+                  >
+                    <Orbit className="w-3.5 h-3.5" /> Lens · {lensOn ? 'Bent' : 'Clear'}
+                  </TiltButton>
+                  <TiltButton
+                    onClick={() => onToggleLiving(!livingOn)}
+                    maxTilt={11}
+                    lift={16}
+                    style={{ ['--btn' as string]: livingOn ? '167 139 250' : '100 116 139' }}
+                    className={`cc-btn-glass p-2.5 rounded-xl text-[10px] font-mono uppercase tracking-wider cursor-pointer ${livingOn ? 'text-violet-200' : 'text-slate-400'}`}
+                    title="True mutual N-body coupling in osculating elements (Gauss's planetary equations) — bounded forever"
+                  >
+                    <Zap className="w-3.5 h-3.5" /> Gravity · {livingOn ? 'Awake' : 'Rested'}
+                  </TiltButton>
+                  <TiltButton
+                    onClick={onRestoreEphemeris}
+                    maxTilt={11}
+                    lift={16}
+                    style={{ ['--btn' as string]: '251 191 36' }}
+                    className="cc-btn-glass p-2.5 rounded-xl text-amber-100 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
+                    title="Canonical heal — restore every world's exact divine path in one stroke"
+                  >
+                    <Compass className="w-3.5 h-3.5" /> Restore Ephemeris
+                  </TiltButton>
+                </div>
+                <p className="text-[10px] font-mono leading-relaxed text-slate-400/90">
+                  The real universe has no grid — so curvature is shown the only way it can be seen:
+                  light bending. Every mass lenses the starlight passing it (strongest around the star,
+                  a deep ring around the Vault), and Living Gravity lets worlds tug each other through
+                  Gauss's planetary equations in osculating elements — orbits breathe and precess, never
+                  wander. Restore Ephemeris heals every path instantly; the divine plan is never lost.
+                </p>
               </motion.div>
 
               {/* ACTIVE REALITIES MATRIX — 8-col beside the radar */}

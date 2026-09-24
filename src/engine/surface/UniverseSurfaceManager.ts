@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { RealityConfig } from '../../realities/types';
-import { universeSurfaceVert, universeSurfaceFrag } from './surfaceShaders';
+import { universeSurfaceVert, universeSurfaceFrag, LENS_VERT_GLSL } from './surfaceShaders';
 import { getSurfaceConfigForReality } from './surfacePresets';
 import { makeGlowTexture } from '../math';
 import { PhotoDome } from './photoDome';
@@ -31,6 +31,15 @@ export class UniverseSurfaceManager {
   /* the Sky Studio's photo layer — sits between the procedural cosmos and
      the far stars, owned per reality */
   private photoDome = new PhotoDome();
+  /* Round 14 — GRAVITATIONAL LENSING of the universe surface. One shared set
+     of uniform objects referenced by every background material (celestial
+     dome + star shells + nebula points): the masses bend THIS canvas and
+     nothing else — the bodies themselves never bend. */
+  private lensUniforms = {
+    uLenses: { value: Array.from({ length: 16 }, () => new THREE.Vector4(0, 0, 1, 0)) },
+    uLensCount: { value: 0 },
+    uLensBend: { value: 1 },
+  };
 
   constructor(scene: THREE.Scene, initialReality?: RealityConfig | string | null) {
     this.scene = scene;
@@ -65,6 +74,7 @@ export class UniverseSurfaceManager {
         uNebulaIntensity: { value: this.currentConfig.nebulaIntensity },
         uDustLaneIntensity: { value: this.currentConfig.dustLaneIntensity },
         uStarDensity: { value: this.currentConfig.starDensity },
+        ...this.lensUniforms,
       },
       vertexShader: universeSurfaceVert,
       fragmentShader: universeSurfaceFrag,
@@ -118,8 +128,10 @@ export class UniverseSurfaceManager {
           uTime: { value: 0 },
           uTwinkle: { value: 1.0 },
           uOpacity: { value: 1.0 },
+          ...this.lensUniforms,
         },
         vertexShader: /* glsl */ `
+          ${LENS_VERT_GLSL}
           attribute float aSize; attribute vec3 aColor; attribute float aAlpha;
           uniform float uScale; uniform float uTime; uniform float uTwinkle;
           varying vec3 vColor; varying float vAlpha;
@@ -127,7 +139,7 @@ export class UniverseSurfaceManager {
             vColor = aColor;
             float tw = uTwinkle > 0.5 ? (0.8 + 0.2 * sin(uTime * 1.5 + position.x * 0.001)) : 1.0;
             vAlpha = aAlpha * tw;
-            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            vec4 mv = modelViewMatrix * vec4(lensBentPosition(position), 1.0);
             gl_PointSize = clamp(aSize * uScale * (260.0 / max(-mv.z, 0.001)), 2.0, 48.0);
             gl_Position = projectionMatrix * mv;
           }
@@ -198,15 +210,17 @@ export class UniverseSurfaceManager {
         uTime: { value: 0 },
         uTwinkle: { value: 0 },
         uOpacity: { value: 1 },
+        ...this.lensUniforms,
       },
       vertexShader: /* glsl */ `
+        ${LENS_VERT_GLSL}
         attribute float aSize; attribute vec3 aColor; attribute float aAlpha;
         uniform float uScale;
         varying vec3 vColor; varying float vAlpha;
         void main(){
           vColor = aColor;
           vAlpha = aAlpha;
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vec4 mv = modelViewMatrix * vec4(lensBentPosition(position), 1.0);
           gl_PointSize = clamp(aSize * uScale * (260.0 / max(-mv.z, 0.001)), 1.5, 36.0);
           gl_Position = projectionMatrix * mv;
         }
@@ -276,8 +290,10 @@ export class UniverseSurfaceManager {
         uTime: { value: 0 },
         uTwinkle: { value: 1 },
         uOpacity: { value: 1 },
+        ...this.lensUniforms,
       },
       vertexShader: /* glsl */ `
+        ${LENS_VERT_GLSL}
         attribute float aSize; attribute vec3 aColor; attribute float aAlpha;
         uniform float uScale; uniform float uTime; uniform float uTwinkle;
         varying vec3 vColor; varying float vAlpha;
@@ -285,7 +301,7 @@ export class UniverseSurfaceManager {
           vColor = aColor;
           float tw = uTwinkle > 0.5 ? (0.76 + 0.24 * sin(uTime * 2.6 + position.x * 17.3 + position.y * 11.1 + position.z * 7.7)) : 1.0;
           vAlpha = aAlpha * tw;
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vec4 mv = modelViewMatrix * vec4(lensBentPosition(position), 1.0);
           gl_PointSize = clamp(aSize * uScale * (260.0 / max(-mv.z, 0.001)), 1.5, 36.0);
           gl_Position = projectionMatrix * mv;
         }
@@ -406,6 +422,18 @@ export class UniverseSurfaceManager {
 
   public getBackdropMaterial(): THREE.ShaderMaterial {
     return this.backdropMat;
+  }
+
+  /** Round 14 — feed the masses that bend the universe surface (gravitational
+      lensing of the celestial canvas and the background star shells; the
+      bodies themselves never bend). lens direction = unit world vector from
+      the camera toward the mass; thetaE = Einstein-ring angle in radians;
+      bend = damped global strength (0 when the toggle is off). */
+  public setLenses(lenses: THREE.Vector4[], count: number, bend: number): void {
+    const arr = this.lensUniforms.uLenses.value as THREE.Vector4[];
+    for (let i = 0; i < count && i < arr.length; i++) arr[i].copy(lenses[i]);
+    this.lensUniforms.uLensCount.value = count;
+    this.lensUniforms.uLensBend.value = bend;
   }
 
   /** The Sky Studio layer — apply/refresh this reality's photo sky. */

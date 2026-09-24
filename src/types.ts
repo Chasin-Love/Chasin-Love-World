@@ -305,6 +305,9 @@ export interface RealityBucket {
 
 export interface UniverseState {
   activeRealityId?: string;
+  /* Round 14 — physics toggles (persisted; absent flag = ON, no migration) */
+  spacetimeLensing?: boolean;  /* Einstein lensing — masses bend the light passing them */
+  livingGravity?: boolean;     /* true mutual N-body coupling (osculating elements) */
   customRealityDescriptions?: Record<string, string>;
   customRealities?: any[];
   deletedRealityIds?: string[];
