@@ -552,7 +552,7 @@ function DiskSyncStatusTile({ diskSync }: { diskSync?: DiskSyncState }) {  const
   const pending = diskSync?.pendingOps ?? 0;
   return (
     <div
-      className={`p-2.5 rounded-xl border flex items-center gap-2.5 ${
+      className={`p-2.5 rounded-xl border backdrop-blur-md flex items-center gap-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] ${
         connected
           ? 'bg-emerald-500/8 border-emerald-400/30'
           : 'bg-rose-500/10 border-rose-400/40'
@@ -649,8 +649,8 @@ function BentoRealityCard({
       whileHover={{ y: -3 }}
       className={`group relative rounded-2xl border transition-[border-color,box-shadow] duration-300 flex flex-col justify-between overflow-hidden ${
         active
-          ? 'bg-linear-to-b from-cyan-500/14 via-[rgba(11,19,34,0.78)] to-[rgba(8,14,27,0.82)] border-cyan-400/55 shadow-[0_16px_40px_rgba(0,0,0,0.55),0_0_26px_rgba(6,182,212,0.2)] cc-sheen'
-          : 'bg-[rgba(13,21,38,0.66)] border-white/8 hover:border-cyan-400/35 hover:shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_16px_rgba(6,182,212,0.1)]'
+          ? 'cc-glass-card border-cyan-400/55 shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_30px_rgba(6,182,212,0.25)] cc-sheen'
+          : 'cc-glass-card hover:border-cyan-400/35 hover:shadow-[0_16px_40px_rgba(0,0,0,0.45),0_0_18px_rgba(6,182,212,0.12)]'
       }`}
     >
       {/* Top Accent Line — the anchored reality's line carries a travelling spark */}
@@ -678,7 +678,7 @@ function BentoRealityCard({
               title="Click to recolor this reality"
             >
               <Sparkles className="w-4 h-4 text-white/90 drop-shadow" />
-              <span className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-slate-950 border border-white/20">
+              <span className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-abyss/85 backdrop-blur-md border border-white/20">
                 <Palette className="w-2.5 h-2.5 text-cyan-300" />
               </span>
             </div>
@@ -695,7 +695,7 @@ function BentoRealityCard({
                       if (e.key === 'Escape') setIsEditingName(false);
                     }}
                     autoFocus
-                    className="px-2 py-0.5 rounded bg-slate-900 border border-cyan-400 text-xs text-white font-semibold focus:outline-none"
+                    className="px-2 py-0.5 rounded bg-white/10 backdrop-blur-md border border-cyan-400 text-xs text-white font-semibold focus:outline-none"
                   />
                   <button
                     onClick={handleSaveName}
@@ -735,7 +735,7 @@ function BentoRealityCard({
 
         {/* Color Palette Popover */}
         {showColorPicker && (
-          <div className="p-2.5 rounded-xl bg-slate-950 border border-cyan-500/30 flex flex-wrap gap-1.5 shadow-xl">
+          <div className="p-2.5 rounded-xl bg-abyss/70 backdrop-blur-xl border border-cyan-500/30 flex flex-wrap gap-1.5 shadow-xl">
             {[
               { label: 'Cyan / Violet', a: '#00f5d4', b: '#8b5cf6' },
               { label: 'Solar Gold', a: '#f59e0b', b: '#fbbf24' },
@@ -769,7 +769,7 @@ function BentoRealityCard({
             { icon: <Disc className="w-3 h-3" />, n: diaryCount, label: 'Pages', color: '#f472b6' },
             { icon: <Database className="w-3 h-3" />, n: vaultCount, label: 'Vault', color: '#34d399' },
           ].map((p) => (
-            <div key={p.label} className="p-1.5 rounded-lg bg-white/4 border border-white/6 flex flex-col items-center gap-0.5">
+            <div key={p.label} className="p-1.5 rounded-lg bg-white/7 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] flex flex-col items-center gap-0.5">
               <div className="flex items-center gap-0.5 text-[10.5px] font-bold tabular-nums" style={{ color: p.color }}>
                 {p.icon}
                 <AnimatedNumber value={p.n} />
@@ -796,7 +796,7 @@ function BentoRealityCard({
             {galaxies.slice(0, isExpanded ? 99 : 3).map((g) => (
               <div
                 key={g.id}
-                className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-lg bg-black/30 border border-white/5 text-[10px] font-mono text-slate-300"
+                className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-lg bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] text-[10px] font-mono text-slate-300"
               >
                 <div className="flex items-center gap-1.5 truncate">
                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: g.color || '#00f5d4' }} />
@@ -816,7 +816,7 @@ function BentoRealityCard({
       </div>
 
       {/* Card Action Footer Bar */}
-      <div className="px-4 py-3 bg-black/30 border-t border-white/8 flex items-center justify-between gap-2">
+      <div className="px-4 py-3 bg-white/4 backdrop-blur-md border-t border-white/10 flex items-center justify-between gap-2">
         <button
           onClick={onWarp}
           disabled={active}
@@ -860,7 +860,7 @@ function BentoRealityCard({
 
       {/* Expanded Deep Advanced Reality Workbench */}
       {isExpanded && (
-        <div className="p-4 bg-slate-950/80 border-t border-cyan-500/30">
+        <div className="p-4 bg-abyss/55 backdrop-blur-2xl border-t border-cyan-500/30">
           <RealityAdvancedPanel realityId={reality.id} onEnterGalaxy={onEnterGalaxy} />
         </div>
       )}
@@ -886,7 +886,7 @@ function DeepHierarchyExplorer({
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
       {/* Left: Reality Branch Selection Column */}
-      <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/10 flex flex-col gap-2 overflow-y-auto custom-scroll max-h-[560px]">
+      <div className="cc-glass-card p-3 rounded-2xl flex flex-col gap-2 overflow-y-auto custom-scroll max-h-[560px]">
         <span className="font-mono text-[10px] uppercase tracking-wider text-cyan-300 mb-1 flex items-center gap-1.5">
           <Globe className="w-3.5 h-3.5" /> Reality Branches ({realities.length})
         </span>
@@ -922,7 +922,7 @@ function DeepHierarchyExplorer({
       </div>
 
       {/* Right: Deep Galaxy & Stellar System Deck */}
-      <div className="md:col-span-2 p-4 rounded-2xl bg-slate-900/60 border border-white/10 flex flex-col gap-3 overflow-y-auto custom-scroll max-h-[560px]">
+      <div className="cc-glass-card md:col-span-2 p-4 rounded-2xl flex flex-col gap-3 overflow-y-auto custom-scroll max-h-[560px]">
         {selectedReality && (
           <>
             <div className="flex items-center justify-between pb-3 border-b border-white/10 flex-wrap gap-2">
@@ -955,7 +955,7 @@ function DeepHierarchyExplorer({
                 {(selectedReality.galaxies || []).map((g) => (
                   <div
                     key={g.id}
-                    className="p-3 rounded-xl bg-black/40 border border-white/10 hover:border-cyan-400/40 transition-all flex flex-col justify-between gap-2"
+                    className="p-3 rounded-xl bg-white/6 border border-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] hover:border-cyan-400/40 transition-all flex flex-col justify-between gap-2"
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
@@ -1086,7 +1086,7 @@ export const CoreConsole: React.FC<Props> = ({
         <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-300/90 to-transparent pointer-events-none" />
 
         {/* TOP COMMAND HEADER BAR */}
-        <div className="shrink-0 flex items-center justify-between gap-4 px-5 sm:px-7 py-3.5 border-b border-cyan-500/20 bg-linear-to-r from-slate-950/80 via-slate-900/60 to-slate-950/80">
+        <div className="shrink-0 flex items-center justify-between gap-4 px-5 sm:px-7 py-3.5 border-b border-cyan-500/20 bg-white/4">
           <div className="flex items-center gap-3.5 min-w-0">
             {/* Pulsing Core Gyro Sigil */}
             <div className="relative w-11 h-11 shrink-0">
@@ -1155,7 +1155,7 @@ export const CoreConsole: React.FC<Props> = ({
         </div>
 
         {/* TAB CONTROLS & SEARCH BAR */}
-        <div className="shrink-0 flex items-center justify-between gap-3 px-5 sm:px-7 py-2.5 border-b border-white/10 bg-slate-900/40 flex-wrap">
+        <div className="shrink-0 flex items-center justify-between gap-3 px-5 sm:px-7 py-2.5 border-b border-white/10 bg-white/4 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             {([
               { id: 'dashboard' as Tab, label: 'Command Matrix', icon: <Cpu className="w-3.5 h-3.5" /> },

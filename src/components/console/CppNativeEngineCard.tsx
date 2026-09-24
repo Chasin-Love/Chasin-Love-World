@@ -153,21 +153,21 @@ export const CppNativeEngineCard: React.FC = () => {
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 font-mono text-xs">
-        <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
           <span className="cc-label block">Active Backend</span>
           <span className="text-sm font-bold text-white tabular-nums">{status.backend}</span>
         </div>
-        <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
           <span className="cc-label block">Core Version</span>
           <span className="text-sm font-bold text-cyan-300 tabular-nums">{status.version}</span>
         </div>
-        <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
           <span className="cc-label block">N-Body Throughput</span>
           <span className="text-sm font-bold text-emerald-300 tabular-nums">
             {opsPerSec === null ? '—' : `${(opsPerSec / 1_000_000).toFixed(2)} Mops/s`}
           </span>
         </div>
-        <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
           <span className="cc-label block">Step Latency</span>
           <span className="text-sm font-bold text-amber-300 tabular-nums">
             {latencyMs === null ? '—' : `${latencyMs.toFixed(1)} ms`}
@@ -178,7 +178,7 @@ export const CppNativeEngineCard: React.FC = () => {
       {/* Parity receipt — same criterion as the toast: the TS reference tier
           trivially matches itself, so it always reads as verified */}
       {parity !== null && (
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950/70 border border-white/10 font-mono text-[11px]">
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-abyss/45 backdrop-blur-md border border-white/10 font-mono text-[11px]">
           {(parity < 1e-9 || parityBackend === 'typescript')
             ? <BadgeCheck className="w-4 h-4 text-emerald-400" />
             : <BadgeX className="w-4 h-4 text-amber-400" />}
@@ -230,7 +230,7 @@ export const CppNativeEngineCard: React.FC = () => {
             ['linux', 'Standalone C++ Core (Linux .so)', commands.linux, 'text-cyan-400'],
             ['win', 'Standalone C++ Core (Windows .dll)', commands.windows, 'text-amber-400'],
           ] as const).map(([key, label, cmd, color]) => (
-            <div key={key} className="flex items-center justify-between p-2 rounded-xl bg-slate-950/70 border border-white/5 gap-2">
+            <div key={key} className="flex items-center justify-between p-2 rounded-xl bg-abyss/45 backdrop-blur-md border border-white/10 gap-2">
               <div className="truncate">
                 <span className={`${color} font-bold mr-2`}>[{label}]:</span>
                 <code className="text-slate-300">{cmd}</code>

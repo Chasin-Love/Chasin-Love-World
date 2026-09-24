@@ -136,19 +136,19 @@ export const QuantumBinTab: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs mb-3">
-          <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+          <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
             <span className="cc-label block">Total Scans Executed</span>
             <span className="text-sm font-bold text-white tabular-nums">{diskSync?.scanCount ?? 0}</span>
           </div>
-          <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+          <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
             <span className="cc-label block">Active Disk Folders</span>
             <span className="text-sm font-bold text-cyan-300 tabular-nums">{diskSync?.activeFolders?.length ?? 0}</span>
           </div>
-          <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+          <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
             <span className="cc-label block">Bin Folders On Disk</span>
             <span className="text-sm font-bold text-rose-300 tabular-nums">{diskSync?.binDetails?.length ?? 0}</span>
           </div>
-          <div className="p-2.5 rounded-xl bg-black/30 border border-white/6">
+          <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
             <span className="cc-label block">Daemon Health</span>
             <span
               className={`text-sm font-bold flex items-center gap-1 ${
@@ -183,7 +183,7 @@ export const QuantumBinTab: React.FC = () => {
 
         {/* Operations Activity Log */}
         {connected && diskSync?.operationsLog && diskSync.operationsLog.length > 0 && (
-          <div className="mt-1 p-2.5 rounded-xl bg-slate-950/60 border border-white/5 font-mono text-[10px] text-slate-400 max-h-24 overflow-y-auto custom-scroll">
+          <div className="mt-1 p-2.5 rounded-xl bg-abyss/45 backdrop-blur-md border border-white/10 font-mono text-[10px] text-slate-400 max-h-24 overflow-y-auto custom-scroll">
             <div className="text-[9px] uppercase tracking-wider text-cyan-400/80 mb-1">Daemon Audit Stream:</div>
             {diskSync.operationsLog.map((log, idx) => (
               <div key={`${log.timestamp}-${idx}`} className="flex items-center gap-2 truncate py-0.5">
@@ -218,7 +218,7 @@ export const QuantumBinTab: React.FC = () => {
             {binRealities.map((item) => (
               <div
                 key={item.id}
-                className="p-4 rounded-2xl bg-[rgba(19,16,25,0.66)] border border-rose-500/25 hover:border-rose-400/45 flex flex-col justify-between gap-3 transition-all hover:shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_16px_rgba(251,113,133,0.1)]"
+                className="cc-glass-card p-4 rounded-2xl border-rose-500/25 hover:border-rose-400/45 flex flex-col justify-between gap-3 transition-all hover:shadow-[0_16px_40px_rgba(0,0,0,0.45),0_0_18px_rgba(251,113,133,0.14)]"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -244,7 +244,7 @@ export const QuantumBinTab: React.FC = () => {
                     {item.description || 'Parallel universe archived in stasis.'}
                   </p>
 
-                  <div className="p-2 rounded-xl bg-black/40 border border-white/6 font-mono text-[9px] text-slate-400 flex items-center justify-between">
+                  <div className="p-2 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] font-mono text-[9px] text-slate-400 flex items-center justify-between">
                     <span className="truncate">
                       📁 src/realities/bin/{item.folderName ?? item.name.replace(/[^a-zA-Z0-9]/g, '')}/
                     </span>
@@ -310,7 +310,7 @@ export const QuantumBinTab: React.FC = () => {
               {orphanFolders.map((f) => (
                 <div
                   key={f.folderName}
-                  className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-black/30 border border-white/5 font-mono text-[10px]"
+                  className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] font-mono text-[10px]"
                 >
                   <span className="text-slate-300 truncate">
                     📁 src/realities/bin/{f.folderName}/

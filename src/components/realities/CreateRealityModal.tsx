@@ -102,7 +102,7 @@ export const CreateRealityModal: React.FC<CreateRealityModalProps> = ({
       }}
     >
       <div
-        className="relative w-full max-w-xl rounded-3xl border border-cyan-400/30 bg-[#0a101d] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.12)] text-slate-100 flex flex-col gap-4 max-h-[90vh] overflow-y-auto custom-scroll select-none relative overflow-hidden"
+        className="relative w-full max-w-xl rounded-3xl border border-white/16 bg-[rgba(10,16,29,0.55)] backdrop-blur-3xl saturate-150 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.65),0_0_50px_rgba(6,182,212,0.12),inset_0_1px_1px_rgba(255,255,255,0.2),inset_0_-1px_0_rgba(0,0,0,0.25)] text-slate-100 flex flex-col gap-4 max-h-[90vh] overflow-y-auto custom-scroll select-none relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Specular glass reflection */}

@@ -2118,16 +2118,19 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   box-shadow: 0 0 15px rgb(var(--btn, var(--cc)) / 0.3);
 }
 
-/* radar frame — glowing grid beneath the holographic radar */
+/* radar frame — glowing grid over frosted glass (no extra backdrop blur —
+   it nests inside an already-blurred panel; keep the GPU budget for the deck) */
 .cc-radar-frame {
   background:
-    linear-gradient(rgba(103, 232, 249, 0.045) 1px, transparent 1px) 0 0 / 100% 25%,
-    linear-gradient(90deg, rgba(103, 232, 249, 0.045) 1px, transparent 1px) 0 0 / 25% 100%,
-    radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.09), transparent 72%);
-  border: 1px solid rgba(103, 232, 249, 0.16);
+    linear-gradient(rgba(103, 232, 249, 0.04) 1px, transparent 1px) 0 0 / 100% 25%,
+    linear-gradient(90deg, rgba(103, 232, 249, 0.04) 1px, transparent 1px) 0 0 / 25% 100%,
+    radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.07), transparent 72%),
+    rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(103, 232, 249, 0.18);
   box-shadow:
-    inset 0 0 34px rgba(6, 182, 212, 0.08),
-    0 0 22px rgba(6, 182, 212, 0.07);
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 34px rgba(6, 182, 212, 0.07),
+    0 0 22px rgba(6, 182, 212, 0.06);
 }
 
 /* sheen sweep — the anchored focal card's travelling highlight */
@@ -2171,18 +2174,21 @@ input[type='range'].pw-range::-webkit-slider-thumb {
    here OVERRIDES the Quantum Glass pass above — keep both, this wins. */
 
 .core-plate {
-  /* aurora under-glow: two slow ambient light pools baked into the plate's
-     own background — no extra DOM, no extra blur planes */
+  /* TRUE GLASS — the living cosmos (3D universe + animated starfield backdrop)
+     shows through the plate; frost and saturation do the luxury work now,
+     opacity no longer hides it. Aurora pools remain as tint, not paint. */
   background:
-    radial-gradient(58% 42% at 18% -6%, rgb(var(--cc) / 0.14), transparent 70%),
-    radial-gradient(50% 40% at 88% 108%, rgb(var(--cc) / 0.10), transparent 72%),
-    linear-gradient(165deg, rgba(12, 17, 31, 0.68) 0%, rgba(5, 8, 15, 0.78) 55%, rgba(3, 5, 10, 0.84) 100%);
+    radial-gradient(58% 42% at 18% -6%, rgb(var(--cc) / 0.10), transparent 70%),
+    radial-gradient(50% 40% at 88% 108%, rgb(var(--cc) / 0.07), transparent 72%),
+    linear-gradient(165deg, rgba(10, 14, 26, 0.40) 0%, rgba(6, 9, 18, 0.50) 55%, rgba(4, 6, 12, 0.56) 100%);
+  backdrop-filter: blur(22px) saturate(1.35);
+  -webkit-backdrop-filter: blur(22px) saturate(1.35);
   box-shadow:
-    0 45px 120px rgba(0, 0, 0, 0.85),
-    0 0 90px rgb(var(--cc) / 0.12),
-    0 2px 3px rgba(0, 0, 0, 0.6),
-    inset 0 1px 1px rgba(255, 255, 255, 0.26),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+    0 45px 120px rgba(0, 0, 0, 0.72),
+    0 0 110px rgb(var(--cc) / 0.13),
+    0 2px 3px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.30),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   transition: border-color 0.6s ease, box-shadow 0.6s ease;
 }
 .core-plate:hover {
@@ -2209,23 +2215,41 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   opacity: 0.9;
 }
 
-/* glass panes: calmer at rest, warmer on approach */
+/* glass panes: TRUE GLASS — translucent white frost, not navy paint.
+   The blur bends whatever glows behind it; hairlines catch the light. */
 .cc-panel {
   background: linear-gradient(
     160deg,
-    rgba(17, 26, 47, 0.38) 0%,
-    rgba(10, 17, 32, 0.48) 55%,
-    rgba(7, 11, 22, 0.55) 100%
+    rgba(255, 255, 255, 0.075) 0%,
+    rgba(255, 255, 255, 0.03) 45%,
+    rgba(255, 255, 255, 0.055) 100%
   );
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 18px;
+  box-shadow:
+    var(--elev-1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22);
+}
+.cc-panel::before {
+  /* frost sheen narrows to the top rim — light catching the glass edge */
+  height: 26%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 100%);
 }
 .cc-panel:hover {
-  box-shadow: var(--elev-2), 0 0 30px rgb(var(--cc) / 0.14);
+  border-color: rgb(var(--cc) / 0.45);
+  box-shadow: var(--elev-2), 0 0 34px rgb(var(--cc) / 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26);
 }
 
-/* vital tiles: premium approach lift with a soft accent breath */
+/* vital tiles: frosted metric panes with the neon category line on top */
 .cc-vital {
-  background: linear-gradient(165deg, rgba(15, 24, 44, 0.5), rgba(6, 10, 20, 0.62));
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
+  backdrop-filter: blur(12px) saturate(1.35);
+  -webkit-backdrop-filter: blur(12px) saturate(1.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
 }
 .cc-vital:hover {
   transform: translateY(-3px);
@@ -2234,9 +2258,14 @@ input[type='range'].pw-range::-webkit-slider-thumb {
     0 0 20px color-mix(in srgb, var(--tile, #67e8f9) 24%, transparent);
 }
 
-/* action buttons: gold-white signature on hover — the luxury tell */
+/* action buttons: frosted glass pills; gold-white signature on hover */
 .cc-btn-glass {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.03));
+  backdrop-filter: blur(10px) saturate(1.3);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 .cc-btn-glass:hover {
   border-color: rgb(var(--btn, var(--cc)) / 0.6);
@@ -2268,6 +2297,20 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 }
 
 /* slim scrollbars for console panels (previously referenced but undefined) */
+
+/* THE GLASS CARD — the shared frosted pane for console sub-surfaces (reality
+   cards, hierarchy columns). White frost + hairline + light-caught top edge:
+   premium because the cosmos bends through it, never opaque navy. */
+.cc-glass-card {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.028));
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 12px 32px rgba(0, 0, 0, 0.32);
+}
 .custom-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--cc, 34 211 238) / 0.35) transparent; }
 .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
 .custom-scroll::-webkit-scrollbar-thumb {
