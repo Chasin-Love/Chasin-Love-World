@@ -13,6 +13,7 @@ import { toast } from '../../ui/toast';
 import { prettyPrint } from '../../ui/format';
 import { CreateRealityModal } from '../realities/CreateRealityModal';
 import { CoreSigil } from './CoreSigil';
+import { TiltButton } from './TiltButton';
 import { RealityAdvancedPanel } from '../realities/RealityAdvancedPanel';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
 import { QuantumBinTab } from './QuantumBinTab';
@@ -88,6 +89,32 @@ const matrixRise: Variants = {
     transition: { type: 'spring', stiffness: 130, damping: 19, staggerChildren: 0.05, delayChildren: 0.08 },
   },
 };
+
+/* STAT SEAL — one unique symbol per feature (never shared: a reality is a
+   globe, a cluster is strata, a galaxy is an orbit, a world is a sun) with
+   the count beside it; the full name rises in a glass chip on hover. */
+function StatSeal({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+  return (
+    <span className="relative inline-flex group/stat">
+      <TiltButton
+        maxTilt={9}
+        lift={10}
+        aria-label={`${value} ${label}`}
+        className="px-2 py-1 rounded-lg bg-white/5 border border-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] flex items-center gap-1.5 cursor-default"
+      >
+        <span className="text-cyan-300/95">{icon}</span>
+        <AnimatedNumber className="text-[11px] font-bold text-white tabular-nums" value={value} />
+      </TiltButton>
+      {/* the full name — rises above the seal on hover */}
+      <span
+        className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 rounded-lg bg-abyss/80 backdrop-blur-xl border border-cyan-300/40 shadow-[0_8px_22px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.18)] whitespace-nowrap opacity-0 translate-y-1 group-hover/stat:opacity-100 group-hover/stat:translate-y-0 transition-all duration-200 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100 z-50"
+      >
+        {value} {label}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-cyan-300/40" />
+      </span>
+    </span>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* 1. Live 3D Holographic Backdrop — perspective starfield + rotating  */
@@ -1121,14 +1148,12 @@ export const CoreConsole: React.FC<Props> = ({
                   <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
                   Sovereign Continuum Active
                 </span>
-                {[
-                  `${realities.length} Realities`,
-                  `${totalClusters} Clusters`,
-                  `${totalGalaxies} Galaxies`,
-                  `${totalWorlds} Worlds`,
-                ].map((s) => (
-                  <span key={s} className="cc-badge cc-badge-dim">{s}</span>
-                ))}
+                {/* STAT SEALS — icon-only, each feature its own unique symbol;
+                    the full name pops up on hover (no symbol ever shared) */}
+                <StatSeal icon={<Globe className="w-3.5 h-3.5" />} value={realities.length} label="Realities" />
+                <StatSeal icon={<Layers className="w-3.5 h-3.5" />} value={totalClusters} label="Clusters" />
+                <StatSeal icon={<Orbit className="w-3.5 h-3.5" />} value={totalGalaxies} label="Galaxies" />
+                <StatSeal icon={<Sun className="w-3.5 h-3.5" />} value={totalWorlds} label="Worlds" />
               </div>
             </div>
           </div>
@@ -1145,13 +1170,15 @@ export const CoreConsole: React.FC<Props> = ({
               iconType="forge"
               id="core-forge-reality-btn"
             />
-            <button
+            <TiltButton
               onClick={onClose}
-              className="w-9 h-9 rounded-xl bg-white/6 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-all shrink-0 cursor-pointer"
+              maxTilt={12}
+              lift={18}
+              className="w-9 h-9 rounded-xl bg-white/6 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white flex items-center justify-center shrink-0 cursor-pointer"
               title="Close Console (Esc)"
             >
               <X className="w-4 h-4" />
-            </button>
+            </TiltButton>
           </div>
         </div>
 
@@ -1169,10 +1196,11 @@ export const CoreConsole: React.FC<Props> = ({
                 badge: (state.binRealities || []).length > 0 ? (state.binRealities || []).length : undefined,
               },
             ]).map((t) => (
-              <button
+              <TiltButton
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`cc-tab flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-mono uppercase tracking-wider border transition-all cursor-pointer ${
+                maxTilt={7}
+                className={`cc-tab px-3.5 py-1.5 rounded-xl text-xs font-mono uppercase tracking-wider border cursor-pointer ${
                   tab === t.id ? 'cc-tab-active text-white' : 'bg-white/4 text-slate-300 border-white/10 hover:text-white'
                 }`}
                 style={tab === t.id ? { ['--cc' as string]: TAB_ACCENTS[t.id] } : undefined}
@@ -1183,7 +1211,7 @@ export const CoreConsole: React.FC<Props> = ({
                     {t.badge}
                   </span>
                 )}
-              </button>
+              </TiltButton>
             ))}
           </div>
 
@@ -1215,17 +1243,19 @@ export const CoreConsole: React.FC<Props> = ({
                 { id: 'custom', label: 'Custom' },
                 { id: 'dense', label: 'Dense' },
               ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setFilterType(f.id as typeof filterType)}
-                  className={`px-2 py-1 rounded-lg border transition-all ${
-                    filterType === f.id
-                      ? 'bg-cyan-500/20 text-cyan-200 border-cyan-400/50'
-                      : 'bg-white/4 text-slate-400 border-white/10 hover:text-white'
-                  }`}
-                >
-                  {f.label}
-                </button>
+              <TiltButton
+                key={f.id}
+                onClick={() => setFilterType(f.id as typeof filterType)}
+                maxTilt={10}
+                lift={10}
+                className={`px-2 py-1 rounded-lg border ${
+                  filterType === f.id
+                    ? 'bg-cyan-500/20 text-cyan-200 border-cyan-400/50'
+                    : 'bg-white/4 text-slate-400 border-white/10 hover:text-white'
+                }`}
+              >
+                {f.label}
+              </TiltButton>
               ))}
             </div>
           </div>
@@ -1333,35 +1363,43 @@ export const CoreConsole: React.FC<Props> = ({
               <motion.div variants={rise} className="lg:col-span-4 cc-panel p-4">
                 <span className="cc-panel-title block mb-2">Singularity Quick Pods</span>
                 <div className="grid grid-cols-2 gap-2">
-                  <button
+                  <TiltButton
                     onClick={() => { onClose(); onZoomToCore(); }}
+                    maxTilt={11}
+                    lift={16}
                     style={{ ['--btn' as string]: '34 211 238' }}
-                    className="cc-btn-glass p-2.5 rounded-xl text-cyan-100 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="cc-btn-glass p-2.5 rounded-xl text-cyan-100 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
                   >
                     <Crosshair className="w-3.5 h-3.5" /> Frame Core
-                  </button>
-                  <button
+                  </TiltButton>
+                  <TiltButton
                     onClick={() => { onClose(); onTriggerKamui(); }}
+                    maxTilt={11}
+                    lift={16}
                     style={{ ['--btn' as string]: '251 113 133' }}
-                    className="cc-btn-glass p-2.5 rounded-xl text-rose-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="cc-btn-glass p-2.5 rounded-xl text-rose-200 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
                   >
                     <Zap className="w-3.5 h-3.5" /> Kamui Warp
-                  </button>
+                  </TiltButton>
                   {onShowToolbar && (
-                    <button
+                    <TiltButton
                       onClick={onShowToolbar}
+                      maxTilt={11}
+                      lift={16}
                       style={{ ['--btn' as string]: '167 139 250' }}
-                      className="cc-btn-glass p-2.5 rounded-xl text-violet-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="cc-btn-glass p-2.5 rounded-xl text-violet-200 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
                     >
                       <Compass className="w-3.5 h-3.5" /> Toolbar
-                    </button>
+                    </TiltButton>
                   )}
-                  <button
+                  <TiltButton
                     onClick={() => setShowCreate(true)}
-                    className="cc-btn-glass p-2.5 rounded-xl text-slate-200 text-[10px] font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                    maxTilt={11}
+                    lift={16}
+                    className="cc-btn-glass p-2.5 rounded-xl text-slate-200 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" /> New Reality
-                  </button>
+                  </TiltButton>
                 </div>
               </motion.div>
 

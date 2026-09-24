@@ -1,5 +1,8 @@
 import React, { useCallback, useRef } from 'react';
 
+/* browsers coalesce mousemove to frame rate anyway, so the transform is
+   written directly in the handler — no rAF indirection, works everywhere */
+
 type TiltButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   /** max tilt in degrees — small is premium, large is toy-like */
   maxTilt?: number;
@@ -26,7 +29,6 @@ export const TiltButton: React.FC<TiltButtonProps> = ({
   ...rest
 }) => {
   const ref = useRef<HTMLButtonElement>(null);
-  const rafRef = useRef(0);
 
   const handleMove = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -40,13 +42,10 @@ export const TiltButton: React.FC<TiltButtonProps> = ({
       const py = (e.clientY - r.top) / r.height;
       const rx = (0.5 - py) * maxTilt * 2;         /* tilt toward pointer */
       const ry = (px - 0.5) * maxTilt * 2;
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() => {
-        el.style.transform = `perspective(520px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateZ(2px)`;
-        el.style.setProperty('--gx', `${(px * 100).toFixed(1)}%`);
-        el.style.setProperty('--gy', `${(py * 100).toFixed(1)}%`);
-        el.style.setProperty('--glare', '1');
-      });
+      el.style.transform = `perspective(520px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateZ(2px)`;
+      el.style.setProperty('--gx', `${(px * 100).toFixed(1)}%`);
+      el.style.setProperty('--gy', `${(py * 100).toFixed(1)}%`);
+      el.style.setProperty('--glare', '1');
     },
     [maxTilt, onMouseMove],
   );
@@ -56,7 +55,6 @@ export const TiltButton: React.FC<TiltButtonProps> = ({
       onMouseLeave?.(e);
       const el = ref.current;
       if (!el) return;
-      cancelAnimationFrame(rafRef.current);
       /* spring back — CSS transition does the settle */
       el.style.transform = 'perspective(520px) rotateX(0deg) rotateY(0deg) translateZ(0)';
       el.style.setProperty('--glare', '0');

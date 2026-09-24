@@ -175,44 +175,49 @@ export const ThinkingCloudTooltip: React.FC<ThinkingCloudTooltipProps> = ({
         )}
       </button>
 
-      {/* THE THINKING CLOUD / THOUGHT BUBBLE ANIMATION */}
+      {/* THE THOUGHT CARD — a clean rectangular glass pane that rises under
+          the seal; a chain of thinking-dots pulses between them. */}
       {isHovered && (
         <div
-          className={`absolute ${posClasses} z-50 pointer-events-none select-none animate-in fade-in zoom-in-90`}
+          className={`absolute ${posClasses} z-50 pointer-events-none select-none`}
           style={{
             transformOrigin: position === 'top' ? 'bottom center' : 'top center',
-            ...(flipX === 'right' ? { left: 'auto', right: '-6px', transform: 'none' } : {}),
-            ...(flipX === 'left' ? { right: 'auto', left: '-6px', transform: 'none' } : {}),
+            ...(flipX === 'right' ? { left: 'auto', right: '-6px' } : {}),
+            ...(flipX === 'left' ? { right: 'auto', left: '-6px' } : {}),
           }}
-        >
-          {/* Puff 1: Smallest thought puff */}
+        >          {/* the thinking chain — three dots pulsing from the trigger;
+              always on the trigger's side of the card */}
+          {position === 'bottom' && (
+            <div className="relative h-5" aria-hidden="true">
+              {[
+                { cls: 'cc-thought-dot w-1.5 h-1.5', x: flipX === 'right' ? 'right-6' : flipX === 'left' ? 'left-6' : 'left-1/2 -translate-x-1/2' },
+                { cls: 'cc-thought-dot cc-thought-dot-2 w-2 h-2', x: flipX === 'right' ? 'right-8' : flipX === 'left' ? 'left-8' : 'left-1/2 -translate-x-1/2' },
+                { cls: 'cc-thought-dot w-2.5 h-2.5', x: flipX === 'right' ? 'right-10' : flipX === 'left' ? 'left-10' : 'left-1/2 -translate-x-1/2', style: { animationDelay: '0.56s' } },
+              ].map((d, i) => (
+                <span
+                  key={i}
+                  className={`absolute bottom-0 rounded-full bg-cyan-200 border border-cyan-300/70 shadow-[0_0_8px_rgba(103,232,249,0.6)] ${d.cls} ${d.x}`}
+                  style={d.style}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* THE CARD — pure rectangular glass; precision corner accents */}
           <div
-            className={`absolute ${
-              position === 'bottom' ? '-top-2.5' : 'bottom-0'
-            } ${puffAnchor} w-2.5 h-2.5 rounded-full bg-abyss/85 backdrop-blur-md border border-cyan-300/60 shadow-[0_0_8px_rgba(6,182,212,0.4)] animate-bounce`}
-            style={{ animationDuration: '2s' }}
-          />
+            className={`cc-cloud-rise relative min-w-[250px] max-w-[320px] rounded-2xl bg-abyss/65 backdrop-blur-2xl saturate-150 border border-cyan-300/45 shadow-[0_18px_44px_rgba(0,0,0,0.55),0_0_34px_rgba(6,182,212,0.2),inset_0_1px_0_rgba(255,255,255,0.28)] text-left ${
+              flipX === 'right' ? 'ml-auto' : flipX === 'left' ? 'mr-auto' : ''
+            }`}
+          >
+            {/* corner brackets — machined, not bubbly */}
+            <span className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-t border-l border-cyan-300/70 rounded-tl-sm" aria-hidden="true" />
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-t border-r border-cyan-300/70 rounded-tr-sm" aria-hidden="true" />
+            <span className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 border-b border-l border-cyan-300/70 rounded-bl-sm" aria-hidden="true" />
+            <span className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 border-b border-r border-cyan-300/70 rounded-br-sm" aria-hidden="true" />
 
-          {/* Puff 2: Medium thought puff */}
-          <div
-            className={`absolute ${
-              position === 'bottom' ? '-top-1' : 'bottom-2'
-            } ${puffAnchor2} w-4 h-4 rounded-full bg-abyss/85 backdrop-blur-md border border-cyan-300/70 shadow-[0_0_12px_rgba(6,182,212,0.5)]`}
-          />
-
-          {/* Puff 3: Large billowed cloud container — true glass now */}
-          <div className="relative min-w-[250px] max-w-[320px] px-4 py-3 rounded-[24px] bg-abyss/60 backdrop-blur-2xl saturate-150 border border-cyan-300/50 shadow-[0_15px_35px_rgba(0,0,0,0.6),0_0_30px_rgba(6,182,212,0.25),inset_0_1px_0_rgba(255,255,255,0.25)] text-left">
-            {/* Cloud Billow Decorative Puffs along perimeter */}
-            <div className="absolute -top-2 left-4 w-6 h-6 rounded-full bg-abyss/60 border-t-2 border-l-2 border-cyan-300/50 -z-10" />
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-abyss/60 border-t-2 border-cyan-300/60 -z-10 shadow-[0_-4px_10px_rgba(6,182,212,0.2)]" />
-            <div className="absolute -top-2 right-4 w-6 h-6 rounded-full bg-abyss/60 border-t-2 border-r-2 border-cyan-300/50 -z-10" />
-
-            <div className="absolute -bottom-2 left-6 w-6 h-6 rounded-full bg-abyss/60 border-b-2 border-l-2 border-cyan-300/50 -z-10" />
-            <div className="absolute -bottom-2 right-6 w-6 h-6 rounded-full bg-abyss/60 border-b-2 border-r-2 border-cyan-300/50 -z-10" />
-
-            {/* Content inside cloud */}
-            <div className="relative z-10 flex items-start gap-2.5">
-              <div className="p-1.5 rounded-xl bg-cyan-400/15 border border-cyan-300/50 text-cyan-200 shrink-0 mt-0.5 shadow-[0_0_10px_rgba(6,182,212,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]">
+            {/* Content */}
+            <div className="relative z-10 flex items-start gap-2.5 px-4 py-3">
+              <div className="p-1.5 rounded-lg bg-cyan-400/15 border border-cyan-300/45 text-cyan-200 shrink-0 mt-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]">
                 <Sparkles className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '6s' }} />
               </div>
 

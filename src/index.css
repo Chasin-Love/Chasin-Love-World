@@ -2292,6 +2292,8 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   .forge-ring-inner {
     animation: none;
   }
+  .tilt-btn { transform: none !important; }
+  .cc-cloud-rise, .cc-thought-dot { animation: none; }
   .cc-vital,
   .cc-btn-glass {
     transition: none;
@@ -2299,6 +2301,53 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 }
 
 /* slim scrollbars for console panels (previously referenced but undefined) */
+
+/* THE 3D TILT CONTROL — physical key-cap buttons. The JS sets rotateX/Y per
+   pointer; this CSS supplies the glass face, the floating glyph layer and the
+   pointer-tracked specular glare. */
+.tilt-btn {
+  position: relative;
+  transform-style: preserve-3d;
+  overflow: hidden;
+}
+.tilt-face {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  transform: translateZ(var(--lift, 14px));
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+.tilt-glare {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--glare, 0);
+  transition: opacity 0.3s ease;
+  background: radial-gradient(
+    140px circle at var(--gx, 50%) var(--gy, 50%),
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0.05) 45%,
+    transparent 70%
+  );
+}
+
+/* THE THOUGHT CLOUD — clean rectangular glass card rising beneath the seal,
+   with a chain of thinking-dots pulsing upward from the trigger. No billow
+   bumps glued to the edges (the old 'hot-iron' look). */
+@keyframes ccCloudRise {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.cc-cloud-rise { animation: ccCloudRise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes ccThoughtPuff {
+  0%, 100% { transform: translateY(1px); opacity: 0.7; }
+  50% { transform: translateY(-3px); opacity: 1; }
+}
+.cc-thought-dot { animation: ccThoughtPuff 1.6s ease-in-out infinite; }
+.cc-thought-dot-2 { animation-delay: 0.28s; }
 
 /* THE FORGE SEAL — machined ring rotation for the ThinkingCloudTooltip's
    precision SVG instrument. Inner reticle counter-rotates; hover accelerates
