@@ -49,6 +49,35 @@ const rise: Variants = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 130, damping: 19 } },
 };
+/* Round-8 motion core: a soft spring preset and a count-up number that
+   springs between values - live counters feel alive instead of snapping. */
+const softSpring = { type: 'spring' as const, stiffness: 170, damping: 22 };
+
+function AnimatedNumber({ value, className, style }: {
+  value: number; className?: string; style?: React.CSSProperties;
+}) {
+  const [display, setDisplay] = useState(value);
+  const prev = useRef(value);
+  useEffect(() => {
+    const from = prev.current;
+    const to = value;
+    prev.current = value;
+    if (from === to) return;
+    let raf = 0;
+    const start = performance.now();
+    const dur = 650;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(from + (to - from) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <span className={className} style={style}>{display}</span>;
+}
+
 /* the realities-matrix panel rises AND orchestrates its own cards */
 const matrixRise: Variants = {
   hidden: { opacity: 0, y: 16 },
@@ -499,9 +528,11 @@ function VitalTile({
 }) {
   return (
     <div className="cc-vital p-2.5 flex flex-col items-center gap-1" style={{ ['--tile' as string]: color }}>
-      <span className="cc-num text-lg leading-none" style={{ color }}>
-        {value}
-      </span>
+      {typeof value === 'number' ? (
+        <AnimatedNumber className="cc-num text-lg leading-none" style={{ color }} value={value} />
+      ) : (
+        <span className="cc-num text-lg leading-none" style={{ color }}>{value}</span>
+      )}
       <span className="cc-label">{label}</span>
     </div>
   );
@@ -561,12 +592,16 @@ function DiskSyncStatusTile({ diskSync }: { diskSync?: DiskSyncState }) {  const
 function BentoRealityCard({
   reality,
   active,
+  diaryCount,
+  vaultCount,
   onWarp,
   onDelete,
   onEnterGalaxy,
 }: {
   reality: RealityConfig;
   active: boolean;
+  diaryCount: number;
+  vaultCount: number;
   onWarp: () => void;
   onDelete: () => void;
   onEnterGalaxy: (rid: string, gid: string) => void;
@@ -724,31 +759,24 @@ function BentoRealityCard({
           </div>
         )}
 
-        {/* Telemetry Metrics Pods */}
-        <div className="grid grid-cols-3 gap-2 text-center font-mono">
-          <div className="p-2 rounded-xl bg-white/4 border border-white/6 flex flex-col items-center">
-            <div className="flex items-center gap-1 text-cyan-300 text-xs font-bold tabular-nums">
-              <Orbit className="w-3 h-3" />
-              <span>{galaxies.length}</span>
+        {/* Live Telemetry Pods - roster plus the real diary pages and vault */}
+        {/*   seals of this reality (read from its own isolated container) */}
+        <div className="grid grid-cols-5 gap-1.5 text-center font-mono">
+          {[
+            { icon: <Orbit className="w-3 h-3" />, n: galaxies.length, label: 'Gal', color: '#67e8f9' },
+            { icon: <Layers className="w-3 h-3" />, n: clusters.length, label: 'Clstr', color: '#a78bfa' },
+            { icon: <Sun className="w-3 h-3" />, n: worldsCount, label: 'Worlds', color: '#fbbf24' },
+            { icon: <Disc className="w-3 h-3" />, n: diaryCount, label: 'Pages', color: '#f472b6' },
+            { icon: <Database className="w-3 h-3" />, n: vaultCount, label: 'Vault', color: '#34d399' },
+          ].map((p) => (
+            <div key={p.label} className="p-1.5 rounded-lg bg-white/4 border border-white/6 flex flex-col items-center gap-0.5">
+              <div className="flex items-center gap-0.5 text-[10.5px] font-bold tabular-nums" style={{ color: p.color }}>
+                {p.icon}
+                <AnimatedNumber value={p.n} />
+              </div>
+              <span className="cc-label text-[7.5px]">{p.label}</span>
             </div>
-            <span className="cc-label mt-0.5">Galaxies</span>
-          </div>
-
-          <div className="p-2 rounded-xl bg-white/4 border border-white/6 flex flex-col items-center">
-            <div className="flex items-center gap-1 text-violet-300 text-xs font-bold tabular-nums">
-              <Layers className="w-3 h-3" />
-              <span>{clusters.length}</span>
-            </div>
-            <span className="cc-label mt-0.5">Clusters</span>
-          </div>
-
-          <div className="p-2 rounded-xl bg-white/4 border border-white/6 flex flex-col items-center">
-            <div className="flex items-center gap-1 text-amber-300 text-xs font-bold tabular-nums">
-              <Sun className="w-3 h-3" />
-              <span>{worldsCount}</span>
-            </div>
-            <span className="cc-label mt-0.5">Worlds</span>
-          </div>
+          ))}
         </div>
 
         {/* Orbiting Galaxies Preview Chips */}
@@ -1281,6 +1309,8 @@ export const CoreConsole: React.FC<Props> = ({
                       key={r.id}
                       reality={r}
                       active={r.id === activeRealityId}
+                      diaryCount={state.realities?.[r.id]?.entries?.length ?? 0}
+                      vaultCount={state.realities?.[r.id]?.vault?.length ?? 0}
                       onWarp={() => onWarpReality(r.id)}
                       onDelete={() => {
                         if (r.id === 'sol-prime') {
@@ -1349,14 +1379,26 @@ export const CoreConsole: React.FC<Props> = ({
                   <span className="cc-badge cc-badge-dim">{state.audit.length} events</span>
                 </div>
                 <div className="flex flex-col gap-1 max-h-24 overflow-y-auto custom-scroll">
-                  {[...state.audit].reverse().slice(0, 8).map((a, i) => (
-                    <div key={`${a.t}-${i}`} className="flex items-baseline gap-2 font-mono text-[9px]">
-                      <span className="text-slate-500 tabular-nums shrink-0">
-                        {new Date(a.t).toLocaleTimeString(undefined, { hour12: false })}
-                      </span>
-                      <span className="text-slate-300 truncate">{a.msg}</span>
-                    </div>
-                  ))}
+                  {[...state.audit].reverse().slice(0, 8).map((a, i) => {
+                    const hue = a.msg.includes('\u26a0') ? 'text-amber-300'
+                      : a.msg.includes('Quantum Bin') || a.msg.includes('purged') ? 'text-rose-300'
+                      : a.msg.toLowerCase().includes('reality') ? 'text-cyan-200'
+                      : 'text-slate-300';
+                    return (
+                      <motion.div
+                        key={`${a.t}-${i}`}
+                        initial={{ opacity: 0, x: -6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ ...softSpring, delay: Math.min(i * 0.03, 0.2) }}
+                        className="flex items-baseline gap-2 font-mono text-[9px]"
+                      >
+                        <span className="text-slate-500 tabular-nums shrink-0">
+                          {new Date(a.t).toLocaleTimeString(undefined, { hour12: false })}
+                        </span>
+                        <span className={`${hue} truncate`}>{a.msg}</span>
+                      </motion.div>
+                    );
+                  })}
                   {state.audit.length === 0 && (
                     <p className="text-[10px] text-slate-500">No multiverse events recorded yet.</p>
                   )}
@@ -1397,6 +1439,8 @@ export const CoreConsole: React.FC<Props> = ({
                     key={r.id}
                     reality={r}
                     active={r.id === activeRealityId}
+                      diaryCount={state.realities?.[r.id]?.entries?.length ?? 0}
+                      vaultCount={state.realities?.[r.id]?.vault?.length ?? 0}
                     onWarp={() => onWarpReality(r.id)}
                     onDelete={() => {
                       if (r.id === 'sol-prime') {
