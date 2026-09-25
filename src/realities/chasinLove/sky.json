@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "activeId": "sky-mufzz2xl-kboy9",
+  "photos": [
+    {
+      "id": "sky-mufzz2xl-kboy9",
+      "file": "assets/sky-mufzz2xl-kboy9.jpg",
+      "name": "hinata.png",
+      "mime": "image/jpeg",
+      "size": 166898,
+      "addedAt": 1790282496191
+    }
+  ],
+  "settings": {
+    "blend": 0.85,
+    "dim": 0.45,
+    "blur": 0.12,
+    "vignette": 0.55,
+    "drift": 0.3
+  }
+}

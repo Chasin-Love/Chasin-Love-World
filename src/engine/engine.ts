@@ -26,7 +26,7 @@ import { REALITIES, RealityConfig, GalaxyClusterData, GalaxyData } from '../real
 import { HIERARCHY_DIALS } from '../realities/hierarchyStages';
 import { generateStellarSystemForGalaxy } from '../realities/galaxyGenerator';
 import { calculateKeplerPosition, calculatePhysics } from '../physics/physicsEngine';
-import { LivingGravityField, lensStrengthFor, dynamicMassKg, gravityTelemetry, SCENE_UNITS_PER_AU } from '../physics/nbody';
+import { LivingGravityField, lensHaloFor, dynamicMassKg, gravityTelemetry, SCENE_UNITS_PER_AU } from '../physics/nbody';
 import { cosmosBridge } from '../native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../performance';
 import { isDesktop } from '../desktop/adapter';
@@ -133,9 +133,9 @@ interface RuntimeBody {
   fadeTarget: number;
   hoverT: number;
   baseScale: number;
-  /* Round 14 — this body's gravitational-lens strength (uv pull at the lens
-     core, log-compressed from its REAL mass) */
-  lensStrength?: number;
+  /* Round 14 — this body's lens-halo multiplier on the universe surface
+     (halo radius = multiplier × the body's own apparent silhouette angle) */
+  lensHalo?: number;
 }
 
 /* one Kepler world of a galaxy's REAL isolated inner system — the same
@@ -322,6 +322,9 @@ export class UniverseEngine {
   private lensCur = 1;                /* damped toggle — lensing is born ON */
   private lensTarget = 1;
   private lensVecs: THREE.Vector4[] = Array.from({ length: 16 }, () => new THREE.Vector4());
+  private lensRims: number[] = new Array(16).fill(0);
+  /* Round 16 — 1.0 = black hole (exact Schwarzschild optics + capture shadow) */
+  private lensStrong: number[] = new Array(16).fill(0);
   private _lensDir = new THREE.Vector3();
   private _lensFwd = new THREE.Vector3();
   /* Living Gravity: first-order N-body coupling in osculating elements (nbody.ts). */
@@ -1049,27 +1052,20 @@ export class UniverseEngine {
       );
       g.add(dustCloud3D);
     } else if (data.kind === 'hole') {
-      const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.15, 48, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-      g.add(sphere);
-      const discM = new THREE.ShaderMaterial({
-        uniforms: {
-          uTime: { value: 0 }, uInner: { value: 1.5 }, uOuter: { value: 6.2 },
-          uColor: { value: new THREE.Color('#fa8c2e') }, uColor2: { value: new THREE.Color('#ffe6b8') },
-        },
-        vertexShader: ringVert, fragmentShader: discFrag,
-        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-      });
-      const disc = new THREE.Mesh(new THREE.RingGeometry(1.5, 6.2, 96, 1), discM);
-      disc.rotation.x = -Math.PI / 2 + 0.5;
-      disc.renderOrder = 4;
-      g.add(disc);
-      rb.mat = discM;
-      const photon = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: makeGlowTexture(128, [[0, 'rgba(0,0,0,0)'], [0.3, 'rgba(255,190,110,0.7)'], [0.42, 'rgba(255,170,90,0.18)'], [1, 'rgba(255,150,70,0)']]),
-        blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
-      }));
-      photon.scale.setScalar(6.5);
-      g.add(photon);
+      /* Round 16 — a black hole IS a black hole: the legacy primitive
+         (black sphere + flat gradient disc) is retired. Any hole anywhere is
+         now the same Gargantua-class composite the vault uses — true shadow,
+         Shakura–Sunyaev disk with Doppler beaming, photon ring, lensed arcs,
+         Einstein-ring star streams — plus the cinematic raymarched tier
+         where the GPU allows, and the exact Schwarzschild bend on the
+         universe surface (lensStrong is set for kind 'hole' too). */
+      const R = data.radius;
+      const bh = createBlackHole(R);
+      g.add(bh.group);
+      const rm = this.attachRaymarchHole(R, g);
+      if (rm) g.userData.bhRaymarch = rm;
+      rb.mat = undefined;
+      g.userData.bh = bh;
     } else if (data.kind === 'vault') {
       /* the Universal Vault — Gargantua: composite black hole (baked
          blackbody disk, photon ring, lensed arcs) built from driver-proof
@@ -1459,25 +1455,32 @@ export class UniverseEngine {
 
   /** Per-frame lensing driver — each massive body's direction from the
       camera becomes a lens ON THE UNIVERSE SURFACE: the celestial dome and
-      the background star shells bend around it with the true thin-lens law
-      (α = θ_E²/θ). The bodies themselves are never touched. θ_E comes from
-      the body's REAL mass (lensStrengthFor, log-compressed). */
+      the background star shells bend around it. The halo is always THE SIZE
+      OF THE BODY'S OWN SILHOUETTE (θ_f = halo multiplier × asin(R/d)) — a
+      black hole's disc is a hollow in the surface of reality, and only the
+      surface in contact with it bends — so nothing can ever dwarf the
+      universe at one distance and vanish at another. The bodies themselves
+      are never touched. */
   private updateSpacetimeLens(dt: number) {
     this.lensCur += (this.lensTarget - this.lensCur) * Math.min(1, dt * 4);
     this.camera.getWorldDirection(this._lensFwd);
     let n = 0;
     for (const b of this.bodies) {
       if (n >= this.lensVecs.length) break;
-      const thetaE = b.lensStrength ?? 0;
-      if (thetaE <= 0) continue;
-      this._lensDir.setFromMatrixPosition(b.group.matrixWorld).sub(this.camera.position);
+      const halo = b.lensHalo ?? 0;
+      if (halo <= 0) continue;
+      this._lensDir.copy(b.group.position).sub(this.camera.position);
       const dist = this._lensDir.length();
       if (dist < 1e-3) continue;
       this._lensDir.divideScalar(dist);
       if (this._lensDir.dot(this._lensFwd) < 0.05) continue; /* behind the view */
-      this.lensVecs[n++].set(this._lensDir.x, this._lensDir.y, this._lensDir.z, thetaE);
+      /* apparent silhouette half-angle from the body's real radius */
+      const rim = Math.asin(Math.min(1, b.data.radius / dist));
+      this.lensRims[n] = rim;
+      this.lensStrong[n] = (b.data.kind === 'hole' || b.data.kind === 'vault') ? 1 : 0;
+      this.lensVecs[n++].set(this._lensDir.x, this._lensDir.y, this._lensDir.z, halo * rim);
     }
-    this.surfaceManager.setLenses(this.lensVecs, n, this.lensCur);
+    this.surfaceManager.setLenses(this.lensVecs, this.lensRims, this.lensStrong, n, this.lensCur);
   }
 
   /** Living Gravity — first-order N-body coupling in osculating elements
@@ -4530,9 +4533,10 @@ void main(){
 
     /* Round 14 — Living Gravity re-syncs: new worlds are born healed on
        their canonical path, removed worlds leave the field. Each body also
-       receives its lens strength (log-compressed real mass). */
+       receives its lens-halo multiplier (the bend is always the size of the
+       body's own silhouette). */
     for (const rb of this.bodies) {
-      rb.lensStrength = lensStrengthFor(calculatePhysics(rb.data).massKg, rb.data.kind);
+      rb.lensHalo = lensHaloFor(rb.data.kind);
     }
     this.livingField.sync(list.map((b) => {
       const phys = calculatePhysics(b);

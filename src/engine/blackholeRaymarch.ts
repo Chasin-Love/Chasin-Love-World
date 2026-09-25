@@ -46,6 +46,20 @@ uniform int uSteps;
 uniform vec3 uDiskHot;
 uniform vec3 uDiskCool;
 
+/* Round 16 — relativistic spectral physics: disk temperature T ∝ r^(−3/4)
+   (Shakura–Sunyaev), color from an approximate Planck/Wien law, dimming and
+   reddening by the integrated gravitational redshift 1/√(1−rs/r). */
+/* Round 16 — approximate Wien peak→RGB (redshifts read as physical dim/redden) */
+vec3 blackbody(float kelvin) {
+  float t = clamp(kelvin, 1000.0, 12000.0) / 100.0;
+  vec3 c;
+  c.r = t <= 66.0 ? 1.0 : clamp(1.292936 * pow(t - 60.0, -0.1332047), 0.0, 1.0);
+  c.g = t <= 66.0 ? clamp(0.3900816 * log(max(t, 1.0)) - 0.6318414, 0.0, 1.0)
+                  : clamp(1.1298909 * pow(t - 60.0, -0.0755148), 0.0, 1.0);
+  c.b = t >= 66.0 ? 1.0 : (t <= 19.0 ? 0.0 : clamp(0.5432068 * log(t - 10.0) - 1.1962541, 0.0, 1.0));
+  return c;
+}
+
 #define PI 3.141592653589793
 
 /* --- procedural starfield (hash grid on the ray's escape direction) --- */
@@ -106,11 +120,13 @@ void main() {
   vec3 emission = vec3(0.0);
   bool captured = false;
   float prevY = p.y;
+  float minR = 1e9;   /* Round 16 — TRUE per-step closest approach (photon ring) */
 
   for (int i = 0; i < 96; i++) {
     if (i >= uSteps) break;
     float r2 = dot(p, p);
     float r = sqrt(r2);
+    minR = min(minR, r);
     if (r < 1.0) { captured = true; break; }        /* event horizon */
     if (r > 42.0 && dot(p, v) > 0.0) break;          /* escaped */
 
@@ -130,8 +146,15 @@ void main() {
         float beta = clamp(0.55 / sqrt(max(hr, 1.0)), 0.0, 0.6);
         float cosA = dot(tangent, -vNext);
         float doppler = pow(clamp(1.0 + beta * cosA, 0.05, 2.0), 3.0);
+        /* Round 16 — GRAVITATIONAL REDSHIFT: the integrated (1+z) = 1/√(1−rs/r)
+           multiplies Doppler's thermal factor — the innermost gas physically
+           dims and reddens. Disk temperature: T ∝ r^(−3/4) (Shakura–Sunyaev),
+           6500 K at the ISCO. Color follows Planck's law, not art. */
+        float gFactor = sqrt(max(1.0 - 1.0 / max(hr, 1.05), 0.02));
+        float tKelvin = 6500.0 * pow(max(hr, 1.0) / 3.0, -0.75);
+        vec3 planckCol = blackbody(clamp(tKelvin * doppler * gFactor, 1200.0, 12000.0));
         float thin = 0.55 + 0.45 * sin(uTime * 0.8 + hr * 2.0);
-        emission += diskEmission(hit, doppler) * 0.11 * thin * uIntensity;
+        emission += diskEmission(hit, doppler) * 0.11 * thin * uIntensity * gFactor * (0.55 + 0.45 * planckCol);
       }
     }
 
@@ -146,10 +169,9 @@ void main() {
     stars = starfield(normalize(v)) * uIntensity;
   }
 
-  /* photon ring shimmer: intensity spikes for rays that skim r ≈ 1.5 rs */
-  float minR = 1e9;
-  /* recompute cheaply: approximate with closest approach of the straight leg */
-  minR = length(cross(ro, normalize(v)));
+  /* Round 16 — PHOTON RING: the shimmer spikes exactly where the integrated
+     geodesic skimmed the photon sphere (r = 1.5 rs) — measured along the true
+     path, not the straight-leg approximation. */
   float ring = exp(-pow((minR - 1.5) * 6.0, 2.0)) * 0.9 * uIntensity;
   emission += uDiskHot * ring * (0.75 + 0.25 * sin(uTime * 2.2));
 

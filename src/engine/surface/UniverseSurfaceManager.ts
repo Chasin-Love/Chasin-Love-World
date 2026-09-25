@@ -34,9 +34,16 @@ export class UniverseSurfaceManager {
   /* Round 14 — GRAVITATIONAL LENSING of the universe surface. One shared set
      of uniform objects referenced by every background material (celestial
      dome + star shells + nebula points): the masses bend THIS canvas and
-     nothing else — the bodies themselves never bend. */
+     nothing else — the bodies themselves never bend. Each lens carries its
+     halo angle (uLenses.w) AND its silhouette angle (uLensRim): the bend is
+     always the size of the body's own hole in the surface, never fixed. */
   private lensUniforms = {
     uLenses: { value: Array.from({ length: 16 }, () => new THREE.Vector4(0, 0, 1, 0)) },
+    uLensRim: { value: new Array(16).fill(0) },
+    /* Round 16 — 1.0 marks a black hole: it lenses with the EXACT
+       Schwarzschild optics (image equation + capture shadow) instead of the
+       weak-field law the stars and worlds use. */
+    uLensStrong: { value: new Array(16).fill(0) },
     uLensCount: { value: 0 },
     uLensBend: { value: 1 },
   };
@@ -426,12 +433,19 @@ export class UniverseSurfaceManager {
 
   /** Round 14 — feed the masses that bend the universe surface (gravitational
       lensing of the celestial canvas and the background star shells; the
-      bodies themselves never bend). lens direction = unit world vector from
-      the camera toward the mass; thetaE = Einstein-ring angle in radians;
-      bend = damped global strength (0 when the toggle is off). */
-  public setLenses(lenses: THREE.Vector4[], count: number, bend: number): void {
+      bodies themselves never bend). Per lens: halo angle (vec4.w), the
+      body's own silhouette angle (rims) and — Round 16 — whether it is a
+      BLACK HOLE (strong = exact Schwarzschild optics with a capture shadow).
+      bend = damped global strength (0 when off). */
+  public setLenses(lenses: THREE.Vector4[], rims: number[], strong: number[], count: number, bend: number): void {
     const arr = this.lensUniforms.uLenses.value as THREE.Vector4[];
-    for (let i = 0; i < count && i < arr.length; i++) arr[i].copy(lenses[i]);
+    const rimArr = this.lensUniforms.uLensRim.value as number[];
+    const strongArr = this.lensUniforms.uLensStrong.value as number[];
+    for (let i = 0; i < count && i < arr.length; i++) {
+      arr[i].copy(lenses[i]);
+      rimArr[i] = rims[i];
+      strongArr[i] = strong[i];
+    }
     this.lensUniforms.uLensCount.value = count;
     this.lensUniforms.uLensBend.value = bend;
   }

@@ -302,19 +302,17 @@ export class LivingGravityField {
   }
 }
 
-/* --------------------- lens strength (universe surface) --------------------- */
+/* --------------------- lens halo (universe surface) --------------------- */
 
-/** Einstein-ring angle θ_E (radians) a body casts on the UNIVERSE SURFACE —
-    the celestial dome and background star shells bend around it with the
-    true thin-lens law α = θ_E²/θ (surfaceShaders' applyLensBend). The
-    honest range problem again: the anchor star is 1.99e30 kg, a world
-    ~6e24 kg — 10⁶:1 — so θ_E is log-compressed from the real mass while
-    keeping the ORDERING exact (star ≫ worlds, the Vault strongest). The
-    bodies themselves never bend — only the background does. */
-export function lensStrengthFor(massKg: number, kind: BodyKind): number {
-  const m = Math.max(1e18, massKg);
-  const depth = Math.max(0, (Math.log10(m) - 21) / 10.2);
-  if (kind === 'hole' || kind === 'vault') return 0.115;
-  if (kind === 'star') return 0.05;
-  return 0.014 + 0.022 * Math.min(1, depth);
+/** Halo multiplier for a body's lens on the UNIVERSE SURFACE: the halo's
+    angular radius is this × the body's own apparent silhouette angle
+    (asin(R/d), computed per frame by the engine). The bend is therefore
+    always THE SIZE OF THE HOLE ITSELF — a black hole's disc is a hollow in
+    the surface of reality, and only the surface in contact with it bends —
+    never a fixed angle that could dwarf the universe at one distance and
+    vanish at another. The Vault's halo rides slightly wider than the rest. */
+export function lensHaloFor(kind: BodyKind): number {
+  if (kind === 'hole' || kind === 'vault') return 3.2;
+  if (kind === 'star') return 2.6;
+  return 2.2;
 }

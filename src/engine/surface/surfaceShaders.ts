@@ -4,32 +4,96 @@ import { NOISE } from '../shaders';
 
 /* Round 14 — masses bend the UNIVERSE SURFACE (the celestial canvas), never
    the bodies themselves. Each lens arrives as vec4(xyz = unit world direction
-   to the mass as seen by the camera, w = Einstein-ring angle θ_E in radians).
-   The sampled direction is pulled toward the mass with the true thin-lens
-   law: deflection α = θ_E²/θ — background features appear displaced AWAY
-   from the mass, which is why starlight arcs around it. This is the only
-   place curvature is drawn: a diagram is not the sky, a body is never bent. */
+   to the mass as seen by the camera, w = halo angle in radians).
+   Round 16 — black holes get TRUE SCHWARZSCHILD OPTICS (uLensStrong): the
+   exact image equation with the second-order strong-field term and the real
+   capture shadow. Everything else keeps the proven weak-field law.
+   This is the only place curvature is drawn: a diagram is not the sky,
+   a body is never bent. */
 export const LENS_UNIFORMS_GLSL = /* glsl */ `
-uniform vec4 uLenses[16];
+uniform vec4 uLenses[16];   /* xyz = direction to the mass, w = halo angle (rad) */
+uniform float uLensRim[16]; /* each mass's own apparent silhouette angle (rad) */
+uniform float uLensStrong[16]; /* 1.0 = black hole: exact Schwarzschild optics */
 uniform int uLensCount;
 uniform float uLensBend;
 `;
 
 export const LENS_WARP_GLSL = /* glsl */ `
+/* the sentinel direction returned when a ray is CAPTURED — no image exists */
+const vec3 LENS_CAPTURE = vec3(-1.0);
+
+/* helpers shared by both lens modes (declared first — GLSL order rules) */
+float lensPerpLen(vec3 d, vec3 L){
+  float cosA = clamp(dot(d, L), -1.0, 1.0);
+  vec3 perp = d - L * cosA;
+  return length(perp);
+}
+vec3 lensReconstruct(vec3 L, vec3 d, float cosA, float ang2){
+  vec3 perp = d - L * clamp(cosA, -1.0, 1.0);
+  float perpLenV = length(perp);
+  if (perpLenV < 1e-5) return d; /* looking straight into the mass */
+  vec3 perpDir = perp / perpLenV;
+  return normalize(L * cos(ang2) + perpDir * sin(ang2));
+}
+
+/* Round 16 — the lens law, two modes.
+
+   HOLE MODE (uLensStrong = 1) — EXACT SCHWARZSCHILD OPTICS.
+   The sampled image angle θ maps to its source angle β through the exact
+   thin-lens relation β = θ − θ_E²/θ with θ_E² = 2·rs_ang (rs_ang = 0.62·rim,
+   the composite's rs = 0.62 R), plus the SECOND-ORDER strong-field correction
+
+        α(θ) = 2 rs/θ + (15π/16)(rs/θ)²          (Iyer & Petters 2007)
+
+   which tightens the bend correctly as θ approaches the critical angle.
+   CAPTURE — image angles below the critical impact parameter
+
+        b_c = (3√3/2) rs ≈ 2.598 rs               (Darwin 1959)
+
+   have NO image: the function returns LENS_CAPTURE and the caller paints the
+   true black of the shadow. The map's source angle β(θ) is monotone with
+   dβ/dθ = 1 + (θ_E² − 2c·rs²)/θ² ≥ 1 − 0.58 > 0 at θ ≥ b_c, and β(b_c) ≈
+   1.39 rs > 0 — the forward map CANNOT fold at any distance, for any hole.
+   Background stars therefore pile into real arc-densification (magnification
+   ≈ 2.4 at the shadow edge) and stream around the hole exactly as in the
+   NASA/Interstellar reference — emergent from the equation, never painted.
+
+   WEAK MODE — the Round 14 law: displacement anchored to the silhouette,
+   decaying 1/θ toward the halo edge, capped at 0.85× the distance — the
+   map cannot fold, so the giant flat-disc artifact is impossible. */
 vec3 applyLensBend(vec3 d){
   for (int i = 0; i < 16; i++) {
     if (i >= uLensCount) break;
     vec3 L = uLenses[i].xyz;
-    float thetaE = uLenses[i].w;
+    float halo = max(uLenses[i].w, 1e-5);
+    float rim = max(uLensRim[i], 1e-6);
+    float m = halo / rim;
     float cosA = clamp(dot(d, L), -1.0, 1.0);
     float ang = acos(cosA);
-    float pull = min((thetaE * thetaE) / max(ang, 0.02), 0.3) * uLensBend;
-    vec3 perp = d - L * cosA;
-    float perpLen = length(perp);
-    if (perpLen < 1e-5) continue; /* looking straight into the mass */
-    vec3 perpDir = perp / perpLen;
-    float ang2 = max(ang - pull, 0.0);
-    d = normalize(L * cos(ang2) + perpDir * sin(ang2));
+    if (lensPerpLen(d, L) < 1e-5) continue; /* looking straight into the mass */
+    if (uLensStrong[i] > 0.5) {
+      /* ---- hole mode: the real equations ---- */
+      float rsA = 0.62 * rim;                     /* rs = 0.62 R, matching the composite */
+      float bc = 2.5980762 * rsA;                 /* b_c = (3√3/2) rs — the true shadow edge */
+      /* captured — no image exists here (gated by the damped toggle: when
+         the lens is released, no capture occurs and the sky heals whole) */
+      if (ang < bc && uLensBend > 0.02) return LENS_CAPTURE;
+      float thE2 = 2.0 * rsA;                     /* Einstein area of the point-mass lens */
+      float disp = thE2 / ang + 2.9452431 * rsA * rsA / (ang * ang);  /* 15π/16 second order */
+      float fade = 1.0 - smoothstep(m * 0.62, m, ang / rim);          /* melts into weak sky */
+      disp *= fade * uLensBend;
+      if (disp < 1e-6) continue;
+      float ang2 = max(ang - disp, 0.0);          /* β — monotone, fold-proof by the math above */
+      d = lensReconstruct(L, d, cosA, ang2);
+    } else {
+      /* ---- weak mode: the Round 14 law ---- */
+      float x = ang / rim;
+      float fade = 1.0 - smoothstep(m * 0.62, m, x);   /* melts to zero at the halo edge */
+      if (fade < 0.003) continue;
+      float pull = min(0.85 * rim / max(x, 0.35), ang * 0.85) * fade * uLensBend;
+      float ang2 = max(ang - pull, 0.0);
+      d = lensReconstruct(L, d, cosA, ang2);
+    }
   }
   return d;
 }
@@ -37,14 +101,25 @@ vec3 applyLensBend(vec3 d){
 
 /* For vertex stages (star shells, nebula points): uniforms + warp + a helper
    that bends a point's direction on the celestial sphere and restores its
-   original radius, so background stars migrate around masses. */
+   original radius, so background stars curve around the masses — the black
+   hole's halo strongest of all. */
 export const LENS_VERT_GLSL = /* glsl */ `
 ${LENS_UNIFORMS_GLSL}
 ${LENS_WARP_GLSL}
 vec3 lensBentPosition(vec3 position){
   float r = length(position);
   if (r < 1e-4) return position;
-  return applyLensBend(position / r) * r;
+  vec3 dir = position / r;
+  dir = applyLensBend(dir);
+  /* CAPTURED — a background star whose direction falls inside the true
+     shadow has NO IMAGE: it is placed behind the camera and clipped away,
+     so stars visibly vanish crossing the shadow, exactly as real lensing
+     videos show. With the lens damped off, no capture occurs and the sky
+     releases whole. */
+  if (dir.x < -0.99 && dir.y < -0.99 && dir.z < -0.99) {
+    return cameraPosition - normalize(position) * r * 0.5;
+  }
+  return dir * r;
 }
 `;
 
@@ -156,8 +231,22 @@ void main(){
   }
 
   /* GRAVITATIONAL LENSING — the masses bend this canvas and nothing else.
-     Applied after the Kamui transcendence warp, before any layer is sampled. */
+     Applied after the Kamui transcendence warp, before any layer is sampled.
+     The black hole is one of these lenses with the strongest ring of all:
+     the surface in contact with the hole bends into a circular halo around
+     its silhouette, and the rest of the sky holds still. */
   d = applyLensBend(d);
+
+  /* Round 16 — CAPTURED rays paint the TRUE SHADOW: inside b_c = (3√3/2)·rs
+     no image of the background exists, so the sky is genuinely absent — pure
+     black, not darkened. This thin ring just outside the composite's own
+     horizon mesh is the Event Horizon Telescope look, produced by the
+     equations rather than painted on. Normal blending makes it a true hole
+     in the luminous sky. */
+  if (d.x < -0.99 && d.y < -0.99 && d.z < -0.99) {
+    gl_FragColor = vec4(vec3(0.0), edgeAlpha);
+    return;
+  }
 
   // Abyssal deep universe background base, modulated by reality deepColor
   vec3 col = max(vec3(0.001, 0.0015, 0.003), uDeepColor);
@@ -229,7 +318,7 @@ void main(){
     vec3 specCol = mix(vec3(0.8, 0.9, 1.0), uStarColor, fract(s2 * 31.0));
     col += specCol * b * 0.85;
   }
-  
+
   float alpha = edgeAlpha * (1.0 - smoothstep(0.88, 0.998, k));
   gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
 }

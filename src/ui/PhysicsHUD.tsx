@@ -366,6 +366,17 @@ export const PhysicsHUD: React.FC<PhysicsHUDProps> = ({ body, livingGravity, onC
                 <span className="text-paper/40 text-[9px] block">Clocks run 29.3% slower</span>
               </div>
             </div>
+
+            {/* Round 16 — the shadow: the hole's one true measurement */}
+            <div className="bg-slate-900/60 p-2 rounded border border-paper/10">
+              <span className="text-paper/50 font-mono text-[9px] uppercase block">Shadow Diameter — the EHT measure</span>
+              <span className="font-mono text-sm text-paper font-semibold">
+                ⌀ = 3√3·GM/c² ≈ {fmtNum((phys.schwarzschildRadiusKm ?? 29.5) * 2.598, 1)} km
+              </span>
+              <span className="text-paper/40 text-[9px] block">
+                b_c = (3√3/2)·R_s — light below this impact parameter never escapes. This is the silhouette EHT photographed around M87*.
+              </span>
+            </div>
           </div>
         )}
 
