@@ -134,3 +134,81 @@ Note: during the live dive test the vault UI itself did not mount (the Key Ring 
 in-progress work); the black-hole side of the dive is verified independent of it.
 
 **Gauntlet:** new checks — basis frame (+Y), no portal fade, guard portal exemption. GREEN.
+
+---
+
+## §7 ADDENDUM — Round 20.2 (the glow upgrade — match the demo's bloom look)
+
+User comparison: our hole read hard-edged next to the demo's soft blaze. Three causes, three fixes:
+
+1. **Local warm glow halo.** The demo's soft blaze is its bloom (strength 0.68 / threshold 0.4) —
+   far hotter than the project-wide UnrealBloom (0.12 / 0.90) the planets depend on. Instead of
+   re-lighting the universe, the geodesic hole now carries its own additive radial-gradient halo
+   (`buildGlowTexture`, warm white → amber → transparent), scale 44 rs, opacity 0.38, renderOrder
+   below the quad (which stays `children[0]`). Depth-tested, so planets still occlude it.
+2. **Hotter core.** Default intensity 1.0 → **1.35** — the white-hot band now crosses the project
+   bloom threshold (0.90) and visibly blazes, as in the demo.
+3. **Cinematic focus framing.** The demo is shot from ≈13° above the disk plane; whatever angle the
+   previous view left made the band read fat or vanish edge-on. `focusOn` on a geodesic hole now
+   frames the reference composition (tPhi 1.36, zoom 0.235 ≈ band-width fill); orbiting away stays free.
+
+Verified live at the focused framing: thin band + over-wrap + under-crescent + white-hot core +
+Doppler shading + soft halo — the reference signature. Gauntlet: glow halo, hot intensity, cinematic
+framing checks. GREEN.
+
+---
+
+## §8 ADDENDUM — Round 20.3 (smaller shadow, grander disk — the sizing request)
+
+User: "reduce the radius of the black sphere… increase the radius of the disk." Both asks are one
+knob: the mass-equivalent. The shadow's apparent size is physics (2.6 rs) and the disk radii were
+fixed numbers — lowering **RS 0.8 → 0.66** (mass-equiv 0.4 → 0.33) keeps the wrap/shadow physics
+identical in rs-units while the fixed disk numbers (4.1–14.5 u) grow from 5.1–18.1 rs to
+**6.2–22 rs** relative to it. Every other panel number from the demo (4.1 / 14.5 / 5.0 / 50 kK /
+5.22 / 0.18 / 0.5 / 1.81 / 0.75 / 7.4 / −8.7 / 5) is untouched. Support changes: `uScale =
+rs/0.66`, quad 48 → 60 rs, glow halo 44 → 56 rs @ 0.45.
+
+Diagnostic note: the user reported "nothing changed" — probing their live tab showed the opposite
+(latest build, glow present, tuned uniforms, raymarch attached). The earlier changes were real but
+subtle at their viewing angle; R20.3's proportion change is unmistakable. Verified live: RS 0.66
+in the running shader, focus framing intact.
+
+**Gauntlet:** RS 0.66 / 60 rs quad check. GREEN.
+
+---
+
+## §9 ADDENDUM — Round 20.4 (reference restore — the real bug was the lensing invariant)
+
+User comparison, reference demo screenshot vs our render: ours read as a fat donut with a bloated
+shadow; his had the classic thin photon ring + over-wrap. The panel numbers were NOT the problem —
+auditing against his actual source (`blackhole-shader.js`, `main.js` defaults) showed every value
+already ported verbatim, including Peak Temp: his panel formats 49.78 with `toFixed(0)`, so his
+"50k K" IS our 49.78. Two real divergences:
+
+1. **THE LENSING INVARIANT (the donut).** His per-step bend is
+   `(rs/r²) · stepSize · gravitationalLensing` — the SAME form as ours — so bend **per unit of
+   path** = rs × lensing and the step size cancels. R20's derivation ("0.3 × 8.0 = 1.0 × 2.4")
+   equated per-STEP products while our step is 3.33× finer, so we bent light 2.75× too hard
+   (0.66 × 8.0 = 5.28 vs his 0.8 × 2.4 = 1.92). Over-bending bloats the capture cross-section and
+   wraps the disk into the donut. Fix: **uLensing = 2.4 verbatim** — his slider value, no
+   step compensation, and mass changes now scale bending exactly like his demo.
+2. **MASS.** §8's R20.3 shrink (RS 0.66) moved away from the reference composition. Restored:
+   rs = mass × 2 with the reference **mass 0.4 → rs 0.8**.
+
+Implementation: `#define RS`/`CAPTURE_R` are gone — rs is the live uniform **uRs** (capture
+`r < uRs · 1.01`), and `uScale = rs_world / (mass · 2)` tracks it so `uScale · uRs = rs_world`
+always — the shader shadow never drifts off the composite's baked sphere beneath, at any mass.
+Below mass ≈ 0.28 the fixed 29 u disk diameter would outgrow the quad's 60·uRs-u span, so the
+quad mesh rescales up (`max(1, 34/(60·uRs))`).
+
+**The Black Hole Studio panel.** New `blackholeParams.ts` store (quality-tier pattern:
+localStorage `my-universe:blackhole:v1` + window CustomEvent) and `BlackHoleTuningCard.tsx`
+mounted full-width after the engine card in the Core Console. Seven live sliders with his ui.js
+ranges verbatim — Mass 0.4, Grav. Lensing 2.4, Doppler 1.0, Inner 4.1, Outer 14.5, Brightness 5.0,
+Rotation −8.7 — plus Reset-to-Reference. Non-panel numbers (49.78 kK, falloff 5.22, turbulence
+1.81/0.75/7.4, softness 0.18/0.5) stay baked at the reference values. `createRaymarchBlackHole`
+seeds from the store and subscribes; dispose unsubscribes.
+
+**Gauntlet:** SIN 3 rewritten for the corrected invariant (bend/unit = uRs × uLensing), config
+checks moved to the store defaults, uRs/uScale convention + live-apply + dispose checks. GREEN.
+

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { BlackHoleVisual } from './blackhole';
+import { BLACKHOLE_CHANGE_EVENT, getBlackHoleParams, type BlackHoleParams } from './blackholeParams';
 
 /**
  * Geodesic black hole renderer — the cinematic tier.
@@ -13,12 +14,17 @@ import type { BlackHoleVisual } from './blackhole';
  *   • HIS EXACT UNIT CONVENTION: the march runs in units where rs = 0.8
  *     (his mass 0.4 × 2). One uScale uniform converts world → shader units,
  *     so every constant below transfers from his config VERBATIM — zero
- *     rescaling drift, and the renderer stays scale-invariant at any hole size.
- *   • HIS TUNED PAIR (step 1.0, lensing 2.4) reproduced at our finer 0.3 step:
- *     bending per unit distance is what shapes the trajectory, so the port's
- *     step·lensing product must equal his (0.3 × 8.0 = 1.0 × 2.4). Round 19
- *     paired his fallback step with his fallback lensing → 5.3× too little
- *     bending → no wrap, a flat translucent band.
+ *     rescaling drift, and the renderer stays scale-invariant at any hole
+ *     size. R20.4: rs is the live uniform uRs (R20.3's baked 0.66 shrank the
+ *     shadow and grandified the disk — away from the reference look).
+ *   • HIS LENSING, VERBATIM: his bend per step is (rs/r²)·stepSize·lensing —
+ *     the SAME form as ours — so bend per unit path = rs × lensing and the
+ *     step size CANCELS. uLensing is therefore his gravitationalLensing
+ *     (2.4) directly, not a step-compensated derivative: R20's 8.0 ("0.3 ×
+ *     8.0 = 1.0 × 2.4") compared per-step products, forgot his step is 3.33×
+ *     longer, and bent light 2.75× too hard — a bloated shadow wrapping the
+ *     disk into a donut. (Round 19 paired his fallback step with his
+ *     fallback lensing → far too little bending → no wrap, a flat band.)
  *   • THE QUAD BILLBOARDS EVERY FRAME (updateRaymarchUniforms copies the
  *     camera rotation). Round 19 left it facing world +Z — a sheared window
  *     that clipped the photon ring and vanished edge-on.
@@ -40,8 +46,11 @@ import type { BlackHoleVisual } from './blackhole';
  * Captured rays stay opaque (his contract): the shader owns the black shadow,
  * disk light crossing in front of it survives.
  *
- * Units: 1 shader unit = rs_world × 1.25. The march sphere (r ≤ 16), capture
- * (r < 0.808) and escape (r > 100) all live in that space.
+ * Units: 1 shader unit = rs_world / uRs (rs = mass × 2; ÷0.8 at the default
+ * mass 0.4 — uScale·uRs always equals rs_world, so the shader shadow stays
+ * aligned with the composite's baked sphere beneath at any mass). The march
+ * sphere (r ≤ 16), capture (r < 1.01·uRs) and escape (r > 100) all live in
+ * that space.
  *
  * SAFETY CONTRACT (preserved): this is an overlay on the infallible
  * composite. If its shader fails, the eventide-shader-error hook hides it,
@@ -75,7 +84,9 @@ uniform int uSteps;
 uniform mat3 uDiskBasis;   /* world → disk-local rotation */
 uniform sampler2D uBlackbody;
 
-/* ---- dgreenheck's RUNTIME config, verbatim (shader units, rs = 0.8) ---- */
+/* ---- dgreenheck's RUNTIME config, verbatim (shader units, rs = uRs) ---- */
+uniform float uRs;           /* Schwarzschild radius in shader units = mass × 2
+                                (his blackHoleMass; 0.8 at the default mass) */
 uniform float uDiskInner;    /* 4.1 */
 uniform float uDiskOuter;    /* 14.5 */
 uniform float uDiskTemp;     /* 49.78  (thousands of K) */
@@ -91,10 +102,9 @@ uniform float uTurbLac;      /* 3.0 */
 uniform float uTurbPers;     /* 0.8 */
 uniform float uSoftInner;    /* 0.18 */
 uniform float uSoftOuter;    /* 0.5 */
-uniform float uLensing;      /* 8.0 = his (step 1.0 × 2.4) at our 0.3 step */
+uniform float uLensing;      /* his gravitationalLensing — bend per unit path
+                                = uRs × uLensing, step-size independent */
 
-#define RS 0.8            /* his Schwarzschild radius in shader units */
-#define CAPTURE_R (RS * 1.01)
 #define MARCH_STEP 0.3
 
 /* ---- Mitchell Charity blackbody colors (CIE 1931), via dgreenheck's LUT ----
@@ -212,8 +222,9 @@ void main() {
     }
   }
 
-  /* HIS MARCH — bending = rs/r² per unit × his tuned pair (see uLensing),
-     capture 1.01·rs, escape 100. EVERY disk-plane crossing along the BENT
+  /* HIS MARCH — bending = uRs/r² per unit × uLensing (his invariant: bend
+     per unit path = uRs × uLensing, step-size independent), capture
+     1.01·uRs, escape 100. EVERY disk-plane crossing along the BENT
      ray paints — that is what builds the continuous lensed halo over and
      under the shadow, by construction.
      ADAPTIVE STEP (Round 20, iGPU lifeline): the per-unit bending of his
@@ -225,7 +236,7 @@ void main() {
     if (i >= uSteps) break;
     if (alpha > 0.99) break;
     float r = length(p);
-    if (r < CAPTURE_R) { captured = true; break; }
+    if (r < uRs * 1.01) { captured = true; break; }
     if (r > 100.0) break;
     /* fully clear of the disk and receding — no further crossing can occur
        and the residual bending only affects the (transparent) background */
@@ -234,7 +245,7 @@ void main() {
     float stepLen = MARCH_STEP * clamp(r * 0.125, 1.0, 4.0);
     /* gravitational light bending: a = −rs/r² toward the center */
     vec3 toCenter = -p / r;
-    v = normalize(v + toCenter * (RS / (r * r)) * stepLen * uLensing);
+    v = normalize(v + toCenter * (uRs / (r * r)) * stepLen * uLensing);
     vec3 pPrev = p;
     p += v * stepLen;
 
@@ -367,6 +378,26 @@ export interface RaymarchBlackHoleOptions {
   steps?: number;
 }
 
+/** Soft radial glow texture — the local stand-in for the demo's bloom
+    (strength 0.68 / threshold 0.4, far hotter than the project-wide bloom
+    the planets depend on). Warm white core → amber → transparent. */
+function buildGlowTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  g.addColorStop(0.00, 'rgba(255, 244, 224, 0.85)');
+  g.addColorStop(0.22, 'rgba(255, 214, 150, 0.42)');
+  g.addColorStop(0.45, 'rgba(255, 166, 87, 0.16)');
+  g.addColorStop(0.72, 'rgba(120, 60, 24, 0.05)');
+  g.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 256, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
+}
+
 /**
  * Builds the geodesic renderer. Returns null when the caller should use the
  * composite alone (unsupported tier). Same contract as ever: parent the
@@ -374,8 +405,16 @@ export interface RaymarchBlackHoleOptions {
  */
 export function createRaymarchBlackHole(R: number, opts: RaymarchBlackHoleOptions = {}): BlackHoleVisual {
   const rs = R * 0.62;
+  /* Round 20.2 — 1.35 pushes the white-hot band past the project bloom
+     threshold (0.90) so it visibly blazes, as in the demo */
+  const intensity = opts.intensity ?? 1.35;
+  /* R20.4 — start from the persisted tuning panel (defaults = the reference
+     config). Mass sets the shader-space rs = mass × 2; uScale tracks it so
+     uScale·uRs stays = rs_world — the shader shadow never drifts off the
+     composite's baked sphere beneath, at any mass. */
+  const params = getBlackHoleParams();
   const group = new THREE.Group();
-  group.userData.baseIntensity = opts.intensity ?? 1.0;
+  group.userData.baseIntensity = intensity;
 
   const material = new THREE.ShaderMaterial({
     vertexShader: VERT,
@@ -392,20 +431,21 @@ export function createRaymarchBlackHole(R: number, opts: RaymarchBlackHoleOption
     uniforms: {
       uCamPos: { value: new THREE.Vector3() },
       uCenter: { value: new THREE.Vector3() },
-      uScale: { value: rs * 1.25 },  /* shader unit = rs × 1.25 → rs = 0.8 units, his convention */
+      uScale: { value: rs / (params.mass * 2) },  /* world per shader unit */
       uTime: { value: 0 },
-      uIntensity: { value: opts.intensity ?? 1.0 },
+      uIntensity: { value: intensity },
       uSteps: { value: Math.max(48, Math.min(96, opts.steps ?? 96)) },
       uDiskBasis: { value: buildDiskBasis() },
       uBlackbody: { value: buildBlackbodyLut() },
-      /* dgreenheck's runtime config, verbatim */
-      uDiskInner: { value: 4.1 },
-      uDiskOuter: { value: 14.5 },
+      /* dgreenheck's runtime config — panel-tunable via blackholeParams (R20.4) */
+      uRs: { value: params.mass * 2 },
+      uDiskInner: { value: params.diskInner },
+      uDiskOuter: { value: params.diskOuter },
       uDiskTemp: { value: 49.78 },
       uTempFalloff: { value: 5.22 },
-      uDiskBright: { value: 5.0 },
-      uDoppler: { value: 1.0 },
-      uRotSpeed: { value: -8.7 },
+      uDiskBright: { value: params.brightness },
+      uDoppler: { value: params.doppler },
+      uRotSpeed: { value: params.rotSpeed },
       uCycleTime: { value: 5.0 },
       uTurbScale: { value: 1.81 },
       uTurbStretch: { value: 0.75 },
@@ -414,16 +454,56 @@ export function createRaymarchBlackHole(R: number, opts: RaymarchBlackHoleOption
       uTurbPers: { value: 0.8 },
       uSoftInner: { value: 0.18 },
       uSoftOuter: { value: 0.5 },
-      uLensing: { value: 8.0 },  /* his (step 1.0 × 2.4) reproduced at our 0.3 step */
+      uLensing: { value: params.lensing },
     },
   });
 
-  /* quad frames the disk (14.5 units ≈ 18 rs) plus the full lensed wrap */
-  const quadSize = rs * 48;
+  /* quad frames the disk (14.5 u ≈ 18 rs at the default mass) plus the
+     lensed wrap */
+  const quadSize = rs * 60;
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(quadSize, quadSize), material);
   quad.renderOrder = 12; /* after the composite's transparent layers */
   quad.frustumCulled = false;
   group.add(quad);
+
+  /* Round 20.2 — the local bloom stand-in. The demo's glow comes from its
+     hot bloom (0.68 / 0.4); the project-wide bloom is deliberately gentle
+     (0.12 / 0.90) to protect the planets. A warm additive halo sized just
+     past the disk recreates that soft blaze locally — the side character
+     glows without re-lighting the whole universe. Must stay children[1]:
+     updateRaymarchUniforms addresses the quad as children[0]. */
+  const glowTex = buildGlowTexture();
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    opacity: 0.45,
+  }));
+  glow.scale.setScalar(rs * 56);
+  glow.renderOrder = 11;
+  glow.frustumCulled = false;
+  group.add(glow);
+
+  /* R20.4 — live tuning: panel changes land on this material immediately.
+     Mass below ~0.28 would let the fixed 29 u disk diameter outgrow the
+     quad's 60·uRs-u span, so the quad mesh rescales up to keep the disk
+     framed (the glow halo stays hole-sized by design). */
+  const applyParams = (p: BlackHoleParams) => {
+    const shaderRs = p.mass * 2;
+    material.uniforms.uRs.value = shaderRs;
+    material.uniforms.uScale.value = rs / shaderRs;
+    material.uniforms.uDiskInner.value = p.diskInner;
+    material.uniforms.uDiskOuter.value = p.diskOuter;
+    material.uniforms.uDiskBright.value = p.brightness;
+    material.uniforms.uDoppler.value = p.doppler;
+    material.uniforms.uRotSpeed.value = p.rotSpeed;
+    material.uniforms.uLensing.value = p.lensing;
+    quad.scale.setScalar(Math.max(1, 34 / (60 * shaderRs)));
+  };
+  const onParams = (e: Event) => applyParams((e as CustomEvent<BlackHoleParams>).detail);
+  window.addEventListener(BLACKHOLE_CHANGE_EVENT, onParams);
+  applyParams(params);
 
   return {
     group,
@@ -435,12 +515,15 @@ export function createRaymarchBlackHole(R: number, opts: RaymarchBlackHoleOption
          hole, and fading it during a dive left the bare black sphere. Full
          glory, always (the baked composite carries portal tear effects when
          it is the active look in fallback mode). */
-      material.uniforms.uIntensity.value = opts.intensity ?? 1.0;
+      material.uniforms.uIntensity.value = intensity;
     },
     dispose() {
+      window.removeEventListener(BLACKHOLE_CHANGE_EVENT, onParams);
       quad.geometry.dispose();
       const lut = material.uniforms.uBlackbody.value as THREE.DataTexture;
       lut.dispose();
+      glow.material.map?.dispose();
+      glow.material.dispose();
       material.dispose();
     },
   };

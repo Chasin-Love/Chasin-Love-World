@@ -18,6 +18,7 @@ import { RealityAdvancedPanel } from '../realities/RealityAdvancedPanel';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
 import { QuantumBinTab } from './QuantumBinTab';
 import { CppNativeEngineCard } from './CppNativeEngineCard';
+import { BlackHoleTuningCard } from './BlackHoleTuningCard';
 import { getSimDate, subscribeSimDate } from '../../simClock';
 
 interface Props {
@@ -1469,6 +1470,11 @@ export const CoreConsole: React.FC<Props> = ({
               {/* C++ NATIVE ENGINE — 8-col */}
               <motion.div variants={rise} className="lg:col-span-8">
                 <CppNativeEngineCard />
+              </motion.div>
+
+              {/* BLACK HOLE STUDIO — R20.4 live geodesic tuning rail */}
+              <motion.div variants={rise} className="lg:col-span-12">
+                <BlackHoleTuningCard />
               </motion.div>
 
               {/* CORE LIVE CHRONICLE — full-width bottom rail */}

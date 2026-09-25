@@ -4246,6 +4246,18 @@ void main(){
     this.realityFocused = false;
     if (this.cosmicStage === 'multiverse') { this.beginKamui('toWeb', 0.16); return; }
     this.rig.clearPan();
+    /* Round 20.2 — cinematic hole framing: focusing a geodesic hole lands
+       the camera at the reference composition — ≈13° above the disk plane,
+       the band filling the frame — instead of whatever angle the previous
+       view happened to leave. Orbiting away is still free after the focus. */
+    const target = this.bodies.find((x) => x.data.id === id);
+    const geodesicHole = !!target && (target.data.kind === 'hole' || target.data.kind === 'vault') && !!target.group.userData.bhRaymarch;
+    if (geodesicHole) {
+      this.rig.tPhi = 1.36;
+      this.rig.setZoomTarget(0.235);
+      this.prevDialTarget = this.rig.tZoomT;
+      return;
+    }
     this.rig.setZoomTarget(Math.min(this.rig.tZoomT, 0.16));
     this.prevDialTarget = this.rig.tZoomT;
   }

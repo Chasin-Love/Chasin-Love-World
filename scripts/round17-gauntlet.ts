@@ -189,7 +189,7 @@ function inv(d: [number, number, number]): [number, number] {
   /* the shader must carry his exact physics and the multi-crossing halo */
   const rmSrc = readFileSync(new URL('../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
   const multiCrossing = /EVERY disk-plane crossing/.test(rmSrc) && /remaining = 1\.0 - alpha/.test(rmSrc);
-  const hisConstants = /CAPTURE_R \(RS \* 1\.01\)/.test(rmSrc) && /r > 100\.0/.test(rmSrc)
+  const hisConstants = /r < uRs \* 1\.01\)/.test(rmSrc) && /r > 100\.0/.test(rmSrc)
     && /pow\(uDiskInner \/ hitR, uTempFalloff\)/.test(rmSrc)
     && /0\.3 \/ sqrt\(hitR \/ uDiskInner\)/.test(rmSrc)
     && /pow\(1\.0 \/ \(1\.0 - beta \* cosA\), 3\.0 \* uDoppler\)/.test(rmSrc);
@@ -207,6 +207,7 @@ function inv(d: [number, number, number]): [number, number] {
   const bhSrc = readFileSync(new URL('../src/engine/blackhole.ts', import.meta.url), 'utf8');
   const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
   const capSrc = readFileSync(new URL('../src/engine/capability.ts', import.meta.url), 'utf8');
+  const bpSrc = readFileSync(new URL('../src/engine/blackholeParams.ts', import.meta.url), 'utf8');
 
   /* SIN 1 — the quad must billboard EVERY frame, inside the per-frame
      uniform updater the engine already calls (R19 never copied the camera
@@ -219,33 +220,48 @@ function inv(d: [number, number, number]): [number, number] {
   const coreHides = /setCinematic\(on\) \{[\s\S]*?core\.visible = !on;[\s\S]*?funnel\.group\.visible = !on;[\s\S]*?\},/.test(bhSrc);
   check('R20: cinematic hides core sphere + funnel (no depth punch-out)', coreHides, `${coreHides}`);
 
-  /* SIN 3 — his TUNED bending pair: per-unit bend = step × lensing must equal
-     his runtime 1.0 × 2.4. Our 0.3 step demands 8.0 (R19 paired fallbacks:
-     0.3 × 1.5 → 5.3× too weak → flat band, no wrap). */
-  const lensing = /uLensing: \{ value: 8\.0 \}/.test(rmSrc) && /stepLen \* uLensing/.test(rmSrc)
-    && /clamp\(r \* 0\.125, 1\.0, 4\.0\)/.test(rmSrc);
-  check('R20: his tuned bending pair reproduced (0.3 × 8.0 = 1.0 × 2.4)', lensing, `${lensing}`);
+  /* SIN 3 — his TUNED bending, VERBATIM: his per-step bend is
+     (rs/r²)·stepSize·lensing — the SAME form as ours — so bend per unit
+     path = rs × lensing and the step size CANCELS. uLensing is therefore
+     his gravitationalLensing (2.4) directly, and capture rides uRs too.
+     (R20's 8.0 equated per-step products, forgot his step is 3.33× longer
+     and bent light 2.75× too hard — bloated shadow, donut disk. R19 paired
+     fallbacks → far too weak → flat band, no wrap.) */
+  const lensing = /uLensing: \{ value: params\.lensing \}/.test(rmSrc) && /stepLen \* uLensing/.test(rmSrc)
+    && /clamp\(r \* 0\.125, 1\.0, 4\.0\)/.test(rmSrc)
+    && /uRs \/ \(r \* r\)\) \* stepLen \* uLensing/.test(rmSrc) && /r < uRs \* 1\.01\)/.test(rmSrc);
+  check('R20.4: his lensing verbatim — bend/unit = uRs × uLensing, capture 1.01·uRs', lensing, `${lensing}`);
 
   /* SIN 4 — his gamma step STAYS: his material encodes pow(1/2.2) BEFORE the
      renderer's ACES + sRGB output — exactly our composer's structure. */
   const hisGamma = /pow\(max\(color, vec3\(0\.0\)\), vec3\(1\.0 \/ 2\.2\)\)/.test(rmSrc);
   check('R20: his pipeline gamma step kept (material → bloom → OutputPass)', hisGamma, `${hisGamma}`);
 
-  /* SIN 5 — his RUNTIME config verbatim (the demo reference look), plus his
-     full LUT range (R19 truncated at 10,000 K; his peak runs 49,780 K). */
-  const tuned = /uDiskInner: \{ value: 4\.1 \}/.test(rmSrc) && /uDiskOuter: \{ value: 14\.5 \}/.test(rmSrc)
+  /* SIN 5 — his RUNTIME config (the demo reference look) now lives in the
+     blackholeParams store (defaults = his panel values) and feeds the
+     uniforms; the non-panel numbers stay baked. Plus his full LUT range
+     (R19 truncated at 10,000 K; his peak runs 49,780 K). */
+  const tuned = /uDiskInner: \{ value: params\.diskInner \}/.test(rmSrc) && /uDiskOuter: \{ value: params\.diskOuter \}/.test(rmSrc)
     && /uDiskTemp: \{ value: 49\.78 \}/.test(rmSrc) && /uTempFalloff: \{ value: 5\.22 \}/.test(rmSrc)
-    && /uDiskBright: \{ value: 5\.0 \}/.test(rmSrc) && /uRotSpeed: \{ value: -8\.7 \}/.test(rmSrc)
-    && /uTurbSharp: \{ value: 7\.4 \}/.test(rmSrc) && /uLensing: \{ value: 8\.0 \}/.test(rmSrc);
+    && /uDiskBright: \{ value: params\.brightness \}/.test(rmSrc) && /uRotSpeed: \{ value: params\.rotSpeed \}/.test(rmSrc)
+    && /uTurbSharp: \{ value: 7\.4 \}/.test(rmSrc) && /uDoppler: \{ value: params\.doppler \}/.test(rmSrc);
+  const referenceDefaults = /mass: 0\.4,/.test(bpSrc) && /lensing: 2\.4,/.test(bpSrc)
+    && /doppler: 1\.0,/.test(bpSrc) && /diskInner: 4\.1,/.test(bpSrc) && /diskOuter: 14\.5,/.test(bpSrc)
+    && /brightness: 5\.0,/.test(bpSrc) && /rotSpeed: -8\.7,/.test(bpSrc);
   const fullLut = /clamp\(tempK, 1000\.0, 40000\.0\)/.test(rmSrc) && /90\.0 \+ \(t - 10000\.0\) \* 0\.001/.test(rmSrc);
   const rotSign = /sign\(uRotSpeed\)/.test(rmSrc);
-  check('R20: his tuned runtime config verbatim (4.1/14.5/49.78/5.22/5/−8.7/7.4)', tuned, `${tuned}`);
+  check('R20.4: runtime config from the panel store (49.78/5.22/7.4 baked)', tuned, `${tuned}`);
+  check('R20.4: store defaults = the reference config (0.4/2.4/1.0/4.1/14.5/5/−8.7)', referenceDefaults, `${referenceDefaults}`);
   check('R20: LUT reaches 40,000 K (his two-segment table)', fullLut, `${fullLut}`);
   check('R20: Doppler rotation-sign flip present (his disk spins negatively)', rotSign, `${rotSign}`);
 
-  /* unit convention — march in HIS units (rs = 0.8) via one scale uniform */
-  const hisUnits = /uScale: \{ value: rs \* 1\.25 \}/.test(rmSrc) && /\(uCamPos - uCenter\) \/ uScale/.test(rmSrc);
-  check('R20: his unit convention (rs = 0.8 shader units, uScale bridge)', hisUnits, `${hisUnits}`);
+  /* unit convention — march in his convention via one scale uniform; R20.4
+     restored his mass 0.4 (rs 0.8) as the live uRs default, and uScale
+     tracks it so uScale·uRs = rs_world (shadow aligned with the baked
+     sphere beneath at every mass) */
+  const hisUnits = /uScale: \{ value: rs \/ \(params\.mass \* 2\) \}/.test(rmSrc) && /\(uCamPos - uCenter\) \/ uScale/.test(rmSrc)
+    && /uRs: \{ value: params\.mass \* 2 \}/.test(rmSrc);
+  check('R20.4: unit convention uScale·uRs = rs_world (his mass 0.4 default)', hisUnits, `${hisUnits}`);
 
   /* SIN 6 — a disarmed tier must restore the WHOLE composite + torii. */
   const failureRestore = /disableAllRaymarchHoles\(\): void \{[\s\S]*?setCinematicHole\(b\.group, false\)/.test(engSrc);
@@ -277,6 +293,30 @@ function inv(d: [number, number, number]): [number, number] {
   const noPortalFade = /mat\.uniforms\.uIntensity\.value = base;/.test(rmSrc)
     && !/Math\.abs\(portal\) \* 1\.2/.test(rmSrc);
   check('R20.1: raymarch keeps full glory through portals (no fade)', noPortalFade, `${noPortalFade}`);
+
+  /* ==== ROUND 20.2 — the glow upgrade (match the demo's bloom look) ==== */
+  /* The demo's soft blaze comes from its hot bloom (0.68/0.4); the project
+     bloom (0.12/0.90) must stay gentle for the planets, so the hole carries
+     its own warm additive halo + a hotter default intensity. */
+  const glowHalo = /buildGlowTexture\(\)/.test(rmSrc) && /blending: THREE\.AdditiveBlending/.test(rmSrc)
+    && /glow\.scale\.setScalar\(rs \* 56\)/.test(rmSrc) && /opacity: 0\.45/.test(rmSrc);
+  const hotIntensity = /opts\.intensity \?\? 1\.35/.test(rmSrc);
+  const cinematicFrame = /geodesicHole/.test(engSrc) && /this\.rig\.tPhi = 1\.36;/.test(engSrc)
+    && /this\.rig\.setZoomTarget\(0\.235\)/.test(engSrc);
+  check('R20.2: local warm glow halo on the geodesic hole (56 rs @ 0.45)', glowHalo, `${glowHalo}`);
+  check('R20.2: default intensity 1.35 (band feeds the bloom threshold)', hotIntensity, `${hotIntensity}`);
+  check('R20.2: focusing a hole frames the reference composition (13° / band-width)', cinematicFrame, `${cinematicFrame}`);
+
+  /* ==== ROUND 20.4 — reference restore + live tuning panel ==== */
+  /* R20.3's baked 0.66 shrank the shadow away from the reference look; the
+     mass now rides the live uRs uniform (default 0.8 = his mass 0.4) and
+     the panel applies through a CustomEvent subscription. */
+  const proportions = /uRs: \{ value: params\.mass \* 2 \}/.test(rmSrc) && /const quadSize = rs \* 60;/.test(rmSrc);
+  check('R20.4: live uRs (mass × 2) + 60 rs quad (disk stays framed)', proportions, `${proportions}`);
+  const liveTuning = /window\.addEventListener\(BLACKHOLE_CHANGE_EVENT, onParams\)/.test(rmSrc)
+    && /quad\.scale\.setScalar\(Math\.max\(1, 34 \/ \(60 \* shaderRs\)\)\)/.test(rmSrc)
+    && /window\.removeEventListener\(BLACKHOLE_CHANGE_EVENT, onParams\)/.test(rmSrc);
+  check('R20.4: panel events apply live (uniforms + quad rescale, dispose-safe)', liveTuning, `${liveTuning}`);
 }
 
 /* ================================ verdict ================================ */
