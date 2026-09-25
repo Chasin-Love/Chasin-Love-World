@@ -40,6 +40,14 @@ export class PhotoDome {
   /* apply sequencing — a superseded texture load (two reality switches in a
      row) must never win: last-CHOSEN sky renders, not last-finished load */
   private applySeq = 0;
+  /* Round 18.2 — REALITY-ISOLATION FIX: an in-flight texture load holds the
+     crossfade (the old sky keeps the view while the new one loads), but a
+     slow, failed, or ABSENT photo must never freeze the old sky on screen
+     forever — that was the stuck-background-after-reality-switch bug. The
+     hold clears the moment the load lands or fails, and expires after ~4s
+     no matter what. */
+  private pendingLoad = false;
+  private pendingSince = 0;
 
   /* Round 17.1 — the photo sky bends with the universe, and it bends ONCE:
      the vertex stage passes the RAW dome direction (a bent direction per
@@ -236,10 +244,16 @@ export class PhotoDome {
     this.drift = spec?.drift ?? this.drift;
     (this.mat.uniforms.uGlowColor.value as THREE.Color).set(glowColor);
 
-    const tex = spec ? await this.loadTexture(spec.url) : null;
+    let tex: THREE.Texture | null = null;
+    if (spec) {
+      this.pendingLoad = true;
+      this.pendingSince = performance.now();
+      tex = await this.loadTexture(spec.url);
+    }
     /* a newer apply superseded this one while the texture was loading —
-       abandon silently; the newer apply owns the dome */
+       abandon silently; the newer apply owns the dome (and its pending flag) */
     if (seq !== this.applySeq) return;
+    this.pendingLoad = false; /* landed or failed — the fade may proceed */
     const u = this.mat.uniforms;
     u.uMap.value = tex;
     u.uHasMap.value = tex ? 1 : 0;
@@ -263,8 +277,11 @@ export class PhotoDome {
 
     /* advance the crossfade — full blend in ~1.2s at 60fps. While a previous
        sky is on screen and the new texture is still loading, hold the fade
-       so the old sky keeps the view instead of flashing the raw cosmos. */
-    if (this.fadeK < 1 && (hasMap || this.mat.uniforms.uHasPrev.value < 0.5)) {
+       so the old sky keeps the view instead of flashing the raw cosmos —
+       but only while the load is genuinely alive (≤4s): a slow, failed, or
+       absent photo must always release the old sky. */
+    const holdForLoad = this.pendingLoad && performance.now() - this.pendingSince < 4000;
+    if (this.fadeK < 1 && (hasMap || !holdForLoad || this.mat.uniforms.uHasPrev.value < 0.5)) {
       this.fadeK = Math.min(1, this.fadeK + 0.022);
       if (this.fadeK >= 1 && this.prevTexture) {
         this.prevTexture = null;

@@ -43,10 +43,14 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /* ------------------------------ textures -------------------------------- */
 
-/** Full-square top view of the disk for RingGeometry's planar UVs:
- *  blackbody radial ramp, Keplerian-sheared streaks, Doppler asymmetry. */
+/** Full-square top view of the disk for RingGeometry's planar UVs.
+ *  Round 18 — the INTERSTELLAR look, matched to the user's reference stills:
+ *  thousands of fine filament streaks sheared ALONG the flow, cream-white
+ *  → gold → soft amber palette (never cartoon orange), strong Doppler
+ *  beaming (the approaching side blazes near-white), and a cloudy, ragged,
+ *  feathered outer melt — no plates, no hard rims. */
 function makeDiskTexture(rs: number): THREE.CanvasTexture {
-  const size = 1024;
+  const size = 2048; /* 2048² — the filaments must read as thousands of streaks */
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const g = c.getContext('2d')!;
@@ -68,43 +72,74 @@ function makeDiskTexture(rs: number): THREE.CanvasTexture {
       const t = (r - rIn) / (1 - rIn);          /* 0 at ISCO → 1 at edge */
       const th = Math.atan2(dy, dx);
 
-      /* Shakura–Sunyaev temperature + hot inner rim */
-      let bright = Math.pow(1 - t, 1.25) * 0.85 + 0.38 * Math.exp(-t * 9);
+      /* Shakura–Sunyaev temperature, tuned to the references: a broad,
+         luminous field that stays BRIGHT far out — a dim outer disk reads
+         as a red-brown donut face-on (the R47 bug); the references' sea is
+         creamy to the last wisp */
+      let bright = Math.pow(1 - t, 0.6) * 1.05 + 0.62 * Math.exp(-t * 1.8);
 
-      /* Keplerian-sheared turbulence: long streaks stretched ALONG the
-         orbit (low radial frequency, higher angular frequency) */
-      const sx = Math.cos(th - r * 3.2) * 5.5;
-      const sy = Math.sin(th - r * 3.2) * 5.5;
+      /* Round 18 — FILAMENT SHEAR: three octaves of noise sampled in a
+         spiral-sheared frame, sharpened into thousands of fine streaks
+         flowing ALONG the orbit — the reference stills' signature */
+      /* integer multiples of th only — a fractional multiple would leave a
+         visible seam at θ=±π in the sheared sampling */
+      const s1 = th + r * 3.5, s2 = th * 2.0 + r * 2.4, s3 = th * 3.0 + r * 1.6;
       const n =
-        noise(sx + r * 9, sy + r * 5.5) * 0.55 +
-        noise(sx * 2.1 + r * 16, sy * 2.1 + r * 9) * 0.45;
-      const streak = 0.35 + 0.85 * clamp01((n - 0.2) / 0.62);
-      bright *= streak;
+        noise(Math.cos(s1) * 6 + r * 10, Math.sin(s1) * 6 + r * 5) * 0.5 +
+        noise(Math.cos(s2) * 13 + r * 22, Math.sin(s2) * 13 + r * 11) * 0.3 +
+        noise(Math.cos(s3) * 26 + r * 44, Math.sin(s3) * 26 + r * 22) * 0.2;
+      /* Round 18.5 — ENERGY, not mud: the filaments are strong bright/dark
+         banding (the references' flow lines). Floors guard against
+         VANISHING, never against variation — R48's uniform beige was the
+         over-correction. */
+      const streakN = clamp01((n - 0.26) / 0.5);
+      /* the fast filaments ADD light — compressed, hotter gas (×0.42–1.0
+         plus a square-law boost) — so bright streaks blaze even on the
+         Doppler-dim side, exactly like the references' white rivers */
+      bright = bright * (0.42 + 0.58 * streakN) + 0.35 * streakN * streakN;
 
       /* Doppler beaming, baked: material orbiting counter-clockwise seen
-         from +Y — the +x side approaches and flares white-hot */
-      const doppler = 1 + 0.85 * Math.cos(th);
-      bright *= 0.42 + 0.58 * doppler;
+         from +Y — the +x side approaches and BLAZES (≈2.6× the receding
+         side, matching the stills' asymmetric flare) */
+      const doppler = 1 + 1.1 * Math.cos(th);
+      bright *= 0.60 + 0.55 * (doppler / 2.1);
 
-      /* edge fades — the outer melt is long and soft so the disk dissolves
-         into the background instead of ending like a plate */
-      bright *= (1 - smoothstepJs(0.74, 1.0, r)) * smoothstepJs(rIn, rIn + 0.05, r);
+      /* Round 18 — CLOUDY FEATHERED RIM: the outer melt is modulated by
+         low-frequency noise so the edge dissolves in ragged wisps — the
+         disk never ends like a machined plate */
+      const cloud = noise(Math.cos(th) * 3 + 9, Math.sin(th) * 3 + r * 6);
+      const rimR = r * (0.92 + 0.16 * cloud);
+      bright *= (1 - smoothstepJs(0.86, 1.0, rimR)) * smoothstepJs(rIn, rIn + 0.04, r);
+      /* Round 18.3 — CONTINUITY: the disk is ONE unbroken structure. Density
+         varies with the clouds — no sector ever vanishes (the references'
+         blade never breaks). Streaks modulate brightness, never existence. */
+      const body = smoothstepJs(rIn, rIn + 0.06, r) * (1 - smoothstepJs(0.82, 0.98, rimR));
+      bright = Math.max(bright, 0.20 * body);
       bright = Math.min(bright, 3.6);
 
-      /* color: blackbody ramp — white-hot inner, gold mid, deep orange outer;
-         the approaching side shifts whiter */
+      /* color: the CREAM-CHAMPAGNE ramp of image 2 — white at the blazing
+         limb, champagne gold mid, warm taupe-cream outer. NEVER saturated
+         red-brown: the sea stays creamy to the last wisp. */
       let cr: number, cg: number, cb: number;
-      if (t < 0.35) { cr = 1; cg = mix(0.88, 0.62, t / 0.35); cb = mix(0.6, 0.28, t / 0.35); }
-      else if (t < 0.75) { const u = (t - 0.35) / 0.4; cr = 1; cg = mix(0.62, 0.4, u); cb = mix(0.28, 0.1, u); }
-      else { const u = (t - 0.75) / 0.25; cr = 0.95; cg = mix(0.4, 0.24, u); cb = mix(0.1, 0.04, u); }
-      const white = clamp01((doppler - 1.15) * 0.6) * (1 - t) * 0.55;
-      cr = mix(cr, 0.95, white); cg = mix(cg, 0.96, white); cb = mix(cb, 1.0, white);
+      if (t < 0.30) { cr = 1; cg = mix(0.965, 0.93, t / 0.30); cb = mix(0.90, 0.80, t / 0.30); }
+      else if (t < 0.70) { const u = (t - 0.30) / 0.40; cr = 1; cg = mix(0.93, 0.86, u); cb = mix(0.80, 0.68, u); }
+      else { const u = (t - 0.70) / 0.30; cr = 0.97; cg = mix(0.86, 0.79, u); cb = mix(0.68, 0.58, u); }
+      /* the approaching side whitens HARD — that blaze is the look */
+      const white = clamp01((doppler - 1.35) * 0.75) * (1 - t) * 0.85;
+      cr = mix(cr, 1.0, white); cg = mix(cg, 0.985, white); cb = mix(cb, 0.97, white);
+      /* Round 18.5 — the FIRE: bright fast streaks blaze toward white,
+         deep gaps sink toward burning gold — luminance breathes as color,
+         so the sea reads as energy, never flat mud */
+      const fire = clamp01((bright - 0.75) * 1.1);
+      cr = mix(cr, 1.0, fire); cg = mix(cg, 0.99, fire); cb = mix(cb, 0.96, fire);
+      const gap = clamp01((0.72 - bright) * 1.4);
+      cr = mix(cr, 0.70, gap * 0.55); cg = mix(cg, 0.52, gap * 0.55); cb = mix(cb, 0.28, gap * 0.55);
 
-      const b8 = Math.min(255, bright * 205);
+      const b8 = Math.min(255, bright * 235);
       data[i] = Math.min(255, cr * b8 * 1.4);
       data[i + 1] = Math.min(255, cg * b8 * 1.4);
       data[i + 2] = Math.min(255, cb * b8 * 1.4);
-      data[i + 3] = Math.min(255, clamp01(bright * 0.75) * 255);
+      data[i + 3] = Math.min(255, clamp01(bright * 1.05) * 255);
     }
   }
   g.putImageData(img, 0, 0);
@@ -140,7 +175,10 @@ function makeRingTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-/** Lensed-arc band: white-hot at the inner edge, streaky falloff outward. */
+/** Round 18 — the LENSED HALO: the far side of the disk, lifted by gravity
+ *  into a full circular wrap AROUND the shadow (not two half-arc stickers).
+ *  White-hot at the inner edge; fine tangent filaments streak outward; the
+ *  band breathes with noise; alpha reaches exactly 0 at r=1. */
 function makeArcTexture(seed: number): THREE.CanvasTexture {
   const size = 512;
   const c = document.createElement('canvas');
@@ -153,20 +191,31 @@ function makeArcTexture(seed: number): THREE.CanvasTexture {
       const dx = (x - 256) / 256, dy = (y - 256) / 256;
       const r = Math.sqrt(dx * dx + dy * dy);
       const th = Math.atan2(dy, dx);
-      /* band occupies r ∈ [0.52, 1.0] — RingGeometry crops to the arc;
-         alpha reaches exactly 0 at r=1 so the outer edge is invisible */
-      const inner = smoothstepJs(0.5, 0.56, r);
-      const fall = 1 - smoothstepJs(0.56, 1.0, r);
-      /* fade the arc's cut ENDS (the horizontal diameter) so it dissolves
-         into the flat disk instead of stopping like a plate */
-      const endFade = smoothstepJs(0.015, 0.16, Math.abs(dy));
-      const streak = 0.7 + 0.3 * noise(Math.cos(th) * 5 + 9, Math.sin(th) * 5 + r * 22);
-      let a = inner * fall * streak * 0.95 * endFade;
-      /* white-hot line at the very inner edge */
-      const hot = smoothstepJs(0.5, 0.53, r) * (1 - smoothstepJs(0.53, 0.62, r)) * endFade;
+      /* the wrap occupies r ∈ [0.5, 1.0] — hugging the shadow, breathing
+         outward into fine filaments; alpha is exactly 0 at r=1 */
+      const filament = 0.62 + 0.38 * noise(Math.cos(th) * 7 + 9, Math.sin(th) * 7 + r * 26);
+      const glow = 0.45 + 0.55 * filament;
+      /* Round 18.3 — the wrap is CONTINUOUS: it starts tight against the
+         shadow's limb (the mesh's inner edge maps to r=0.432) and NEVER
+         breaks — the sides narrow and dim exactly like the references,
+         but no arc of the circle ever vanishes. */
+      const inner = smoothstepJs(0.425, 0.475, r);
+      /* the wrap blazes AND REACHES top and bottom — the far-side disk seen
+         above and below the shadow (canvas y+ is down, ±π/2 are the poles) */
+      const sin2 = Math.sin(th) * Math.sin(th);
+      const tilt = 0.46 + 0.54 * sin2;
+      const reach = 1 - smoothstepJs(0.56 + 0.26 * sin2, 1.0, r);
+      let a = inner * reach * glow * 0.95 * tilt;
+      const bodyW = inner * (1 - smoothstepJs(0.86, 1.0, r));
+      a = Math.max(a, 0.30 * bodyW);
+      /* the WHITE-HOT inner edge — the lensed disk seen edge-on; a razor
+         band that saturates to true 255 immediately */
+      const hot = smoothstepJs(0.43, 0.45, r) * (1 - smoothstepJs(0.465, 0.56, r));
       const i = (y * size + x) * 4;
-      const cr = mix(255, 255, hot), cg = mix(190 * fall + 40, 245, hot), cb = mix(120 * fall + 20, 255, hot);
-      a = clamp01(a + hot * 0.8);
+      /* cream body around the white-hot edge — the wrap is the same
+         champagne sea as the disk, never orange-red */
+      const cr = mix(255, 255, hot), cg = mix(228 * glow * reach + 45, 250, hot), cb = mix(198 * glow * reach + 30, 255, hot);
+      a = clamp01(a + hot * 0.9);
       data255(img.data, i, cr * a, cg * a, cb * a, a * 255);
     }
   }
@@ -249,9 +298,10 @@ function makeHazeTexture(): THREE.CanvasTexture {
       const r = Math.sqrt((x - 128) ** 2 + (y - 128) ** 2) / 128;
       /* RingGeometry maps inner 10rs → 0.606; glow peaks just outside the
          disk edge and fades to nothing at the outer rim */
-      const a = smoothstepJs(0.6, 0.72, r) * (1 - smoothstepJs(0.74, 0.99, r)) * 0.5;
+      const a = smoothstepJs(0.6, 0.72, r) * (1 - smoothstepJs(0.74, 0.99, r)) * 0.42;
       const i = (y * 256 + x) * 4;
-      data255(img.data, i, 255 * a, 175 * a, 95 * a, a * 255);
+      /* Round 18 — cream haze to match the references' palette */
+      data255(img.data, i, 255 * a, 218 * a, 172 * a, a * 255);
     }
   }
   g.putImageData(img, 0, 0);
@@ -526,12 +576,15 @@ export function createBlackHole(R: number, colorA = '#38bdf8', colorB = '#7c3aed
   /* 2. the accretion disk — world-oriented, slowly shearing */
   const normal = new THREE.Vector3(0.055, 1.0, 0.04).normalize();
   const diskTex = makeDiskTexture(rs);
+  /* Round 18.1 — NORMAL blending: the disk is DENSE matter — it OCCLUDES
+     the sky behind it (like every reference still). Additive was invisible
+     over the user's bright photo sky: gold light added onto white is white. */
   const diskMat = new THREE.MeshBasicMaterial({
     map: diskTex,
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
   });
   const disk = new THREE.Mesh(new THREE.RingGeometry(rs * 3, rs * 12, 160, 1), diskMat);
   const diskTilt = new THREE.Group();
@@ -544,37 +597,43 @@ export function createBlackHole(R: number, colorA = '#38bdf8', colorB = '#7c3aed
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending, /* Round 18.1 — a warm veil, not added light */
     opacity: 0.55,
   });
   const haze = new THREE.Mesh(new THREE.RingGeometry(rs * 10, rs * 16.5, 96, 1), hazeMat);
   diskTilt.add(haze);
   group.add(diskTilt);
 
-  /* 3–5. billboarded: photon ring + the lensed arcs over/under the shadow */
+  /* 3–5. billboarded: the photon ring and the LENSED HALO — the far side
+        of the disk wrapped in a full circle AROUND the shadow (the actual
+        lensing look), with its secondary image beneath (smaller, dimmer) */
   const billboard = new THREE.Group();
 
   const ringMat = new THREE.MeshBasicMaterial({
     map: makeRingTexture(),
     transparent: true,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending, /* Round 18.1 — reads over bright skies */
     side: THREE.DoubleSide,
   });
-  const photonRing = new THREE.Mesh(new THREE.RingGeometry(rs * 2.42, rs * 2.62, 96, 1), ringMat);
+  const photonRing = new THREE.Mesh(new THREE.RingGeometry(rs * 2.44, rs * 2.58, 128, 1), ringMat);
   billboard.add(photonRing);
 
-  const arcTexTop = makeArcTexture(4242);
-  const arcTexBottom = makeArcTexture(909);
-  const topArc = new THREE.Mesh(
-    new THREE.RingGeometry(rs * 2.7, rs * 5.4, 96, 1, 0, Math.PI),
-    new THREE.MeshBasicMaterial({ map: arcTexTop, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+  const haloTex = makeArcTexture(4242);
+  /* Round 18.1 — the lensed wrap is a solid luminous structure: normal
+     blending so it reads over bright photo skies too */
+  const primaryHalo = new THREE.Mesh(
+    /* inner edge = 0.432 × outer — exactly where the texture's band begins,
+       so the wrap paints from the very first row: no gap at the limb */
+    new THREE.RingGeometry(rs * 2.42, rs * 5.6, 160, 1),
+    new THREE.MeshBasicMaterial({ map: haloTex, transparent: true, depthWrite: false, blending: THREE.NormalBlending, side: THREE.DoubleSide }),
   );
-  const bottomArc = new THREE.Mesh(
-    new THREE.RingGeometry(rs * 2.8, rs * 4.6, 96, 1, Math.PI, Math.PI),
-    new THREE.MeshBasicMaterial({ map: arcTexBottom, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, opacity: 0.7 }),
+  const secondaryHalo = new THREE.Mesh(
+    new THREE.RingGeometry(rs * 2.30, rs * 4.0, 128, 1),
+    new THREE.MeshBasicMaterial({ map: makeArcTexture(909), transparent: true, depthWrite: false, blending: THREE.NormalBlending, side: THREE.DoubleSide, opacity: 0.35 }),
   );
-  billboard.add(topArc, bottomArc);
+  secondaryHalo.scale.setScalar(0.72);
+  billboard.add(primaryHalo, secondaryHalo);
 
   /* Einstein-ring star streams — the continuous smeared band just outside
      the shadow; it slowly rotates so the lensed starlight visibly orbits */
@@ -585,7 +644,7 @@ export function createBlackHole(R: number, colorA = '#38bdf8', colorB = '#7c3aed
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-    opacity: 0.34, /* Round 17 — tamed: the funnel owns the surface look now */
+    opacity: 0.22, /* Round 18 — demoted: the lensed halo owns the wrap now */
   });
   const lensRing = new THREE.Mesh(new THREE.RingGeometry(rs * 2.55, rs * 4.7, 128, 1), lensMat);
   lensRing.renderOrder = 2;
@@ -612,7 +671,8 @@ export function createBlackHole(R: number, colorA = '#38bdf8', colorB = '#7c3aed
       const warp = clamp01(portal);
       /* majestic Keplerian-flavored shear; portal energy accelerates and
          stretches the actual disk instead of placing a screen ring over it */
-      disk.rotation.z = -time * 0.055 - warp * (0.55 + 0.12 * Math.sin(time * 6.0));
+      /* Round 18.5 — the sea VISIBLY FLOWS: ~2.5× the old drift rate */
+      disk.rotation.z = -time * 0.14 - warp * (0.55 + 0.12 * Math.sin(time * 6.0));
       disk.scale.setScalar(1 + warp * 0.16);
       diskTilt.scale.setScalar(1 + warp * 0.10);
       /* the lensed starlight continuously orbits the shadow */

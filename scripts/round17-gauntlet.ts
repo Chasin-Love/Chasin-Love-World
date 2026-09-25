@@ -162,6 +162,14 @@ function inv(d: [number, number, number]): [number, number] {
   const blast = /blast \*= 0\.35 \+ 0\.65 \* \(yAxis \* yAxis\);/.test(funnelFrag)
     && /vec3\(1\.05, 1\.0, 0\.92\) \* blast/.test(funnelFrag);
   check('light-speed lip: white ±Y energy blast at the rim', blast, `present=${blast}`);
+
+  /* ROUND 18.1 — the disk and halo are DENSE matter: normal blending, so
+     they occlude the sky and read over bright photo backgrounds too. (The
+     additive era was invisible over the user's white photo sky.) */
+  const diskNormal = /const diskMat = new THREE\.MeshBasicMaterial\(\{[\s\S]*?NormalBlending[\s\S]*?\}\);/.test(bhSrc);
+  const haloNormal = /const primaryHalo = new THREE\.Mesh\([\s\S]*?NormalBlending[\s\S]*?\);/.test(bhSrc);
+  check('dense-matter blending: disk + lensed halo occlude the sky', diskNormal && haloNormal,
+    `disk=${diskNormal} halo=${haloNormal}`);
 }
 
 /* ================================ verdict ================================ */
