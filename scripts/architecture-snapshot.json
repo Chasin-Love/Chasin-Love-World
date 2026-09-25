@@ -1,0 +1,959 @@
+{
+  "generatedAt": "2026-09-25T19:18:24.693Z",
+  "fileCount": 108,
+  "deadExports": [
+    {
+      "symbol": "realityVarNameOf",
+      "file": "server/realityTemplates.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "surfaceVarNameOf",
+      "file": "server/realityTemplates.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "$",
+      "file": "server/realityTemplates.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "DEFAULT_SKY_SETTINGS",
+      "file": "server/skyStore.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "readSkyManifest",
+      "file": "server/skyStore.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "BUILD",
+      "file": "src/App.tsx",
+      "action": "delete"
+    },
+    {
+      "symbol": "getBackendStatus",
+      "file": "src/backend/index.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "KDF_LEGACY_RECORD_ROUNDS",
+      "file": "src/backend/storage/crypto.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "KDF_PBKDF2_FLOOR",
+      "file": "src/backend/storage/crypto.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "ARGON2ID_SPEC",
+      "file": "src/backend/storage/crypto.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "deriveKey",
+      "file": "src/backend/storage/crypto.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "efsId",
+      "file": "src/backend/storage/efs.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "efsIsDescendant",
+      "file": "src/backend/storage/efs.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "efsPayloadShared",
+      "file": "src/backend/storage/efs.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "parseCsv",
+      "file": "src/backend/storage/importers.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "openDb",
+      "file": "src/backend/storage/indexedDB.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "snapshotAt",
+      "file": "src/backend/storage/metrics.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "computeStats",
+      "file": "src/backend/storage/metrics.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "writingDays",
+      "file": "src/backend/storage/metrics.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "hslToHex",
+      "file": "src/backend/storage/procedural.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "ATLAS_HTML",
+      "file": "src/backend/storage/seeds.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "SCOPE_HTML",
+      "file": "src/backend/storage/seeds.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "THEME_CSS",
+      "file": "src/backend/storage/seeds.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "synthWavDataUrl",
+      "file": "src/backend/storage/seeds.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "synthCsv",
+      "file": "src/backend/storage/seeds.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "seedEntries",
+      "file": "src/backend/storage/seeds.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "SEED_FOLDERS",
+      "file": "src/backend/storage/seeds.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "seedVault",
+      "file": "src/backend/storage/seeds.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "base32Decode",
+      "file": "src/backend/storage/totp.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "BLACKHOLE_DEFAULTS",
+      "file": "src/engine/blackholeParams.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "DIST_BASE",
+      "file": "src/engine/cameraRig.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "DIST_SPAN",
+      "file": "src/engine/cameraRig.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "SURFACE_PRESETS",
+      "file": "src/engine/surface/surfacePresets.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "WEB_LADDER_MIN_D",
+      "file": "src/engine/systems/levelSystem.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "GALAXY_NAME_BAND_MAX",
+      "file": "src/engine/systems/levelSystem.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "PORTAL_CHAIN",
+      "file": "src/engine/systems/portalPhases.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "COSMOS_KIND",
+      "file": "src/native/cpp_bridge.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "CosmosBridge",
+      "file": "src/native/cpp_bridge.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "getPerformanceSnapshot",
+      "file": "src/performance.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "NBODY_G",
+      "file": "src/physics/nbody.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "gravityFieldStats",
+      "file": "src/physics/nbody.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "buildCosmicAddress",
+      "file": "src/realities/clusterGenerator.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "slugify",
+      "file": "src/realities/galaxyGenerator.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "buildGalaxyLineage",
+      "file": "src/realities/galaxyGenerator.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "solPrimeSurface",
+      "file": "src/realities/solPrime/surface.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "MOOD_AURORA",
+      "file": "src/sentiment/sentiment.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "hasEchoToday",
+      "file": "src/sentiment/sentiment.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "skyFolderForReality",
+      "file": "src/sky/skyRegistry.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "cachedSky",
+      "file": "src/sky/skyRegistry.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "fetchSky",
+      "file": "src/sky/skyRegistry.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "mimeFromName",
+      "file": "src/ui/MediaPlates.tsx",
+      "action": "delete"
+    },
+    {
+      "symbol": "MissingPayloadNotice",
+      "file": "src/ui/MediaPlates.tsx",
+      "action": "delete"
+    },
+    {
+      "symbol": "IcGrid",
+      "file": "src/ui/bits.tsx",
+      "action": "delete"
+    },
+    {
+      "symbol": "IcRows",
+      "file": "src/ui/bits.tsx",
+      "action": "delete"
+    },
+    {
+      "symbol": "IcPulse",
+      "file": "src/ui/bits.tsx",
+      "action": "delete"
+    },
+    {
+      "symbol": "WaveStrip",
+      "file": "src/ui/bits.tsx",
+      "action": "delete"
+    },
+    {
+      "symbol": "SYNTAX_COLORS",
+      "file": "src/ui/syntax.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "defineEventideTheme",
+      "file": "src/ui/vault/monacoSetup.ts",
+      "action": "delete"
+    }
+  ],
+  "deadTypes": [
+    {
+      "name": "SurfaceTemplateInput",
+      "file": "server/realityTemplates.ts"
+    },
+    {
+      "name": "RealityTemplateInput",
+      "file": "server/realityTemplates.ts"
+    },
+    {
+      "name": "JsRunHandle",
+      "file": "src/backend/executors/index.ts"
+    },
+    {
+      "name": "LogSink",
+      "file": "src/backend/executors/index.ts"
+    },
+    {
+      "name": "PythonRunHandle",
+      "file": "src/backend/executors/index.ts"
+    },
+    {
+      "name": "NovaVerdict",
+      "file": "src/backend/storage/breaches.ts"
+    },
+    {
+      "name": "NovaScanResult",
+      "file": "src/backend/storage/breaches.ts"
+    },
+    {
+      "name": "CometOpenResult",
+      "file": "src/backend/storage/courier.ts"
+    },
+    {
+      "name": "KdfSpec",
+      "file": "src/backend/storage/crypto.ts"
+    },
+    {
+      "name": "BuildRingOptions",
+      "file": "src/backend/storage/crypto.ts"
+    },
+    {
+      "name": "DedupReport",
+      "file": "src/backend/storage/efs.ts"
+    },
+    {
+      "name": "ScrubProgress",
+      "file": "src/backend/storage/efs.ts"
+    },
+    {
+      "name": "ImportResult",
+      "file": "src/backend/storage/importers.ts"
+    },
+    {
+      "name": "TotpParams",
+      "file": "src/backend/storage/totp.ts"
+    },
+    {
+      "name": "ExtractedFile",
+      "file": "src/backend/storage/zip.ts"
+    },
+    {
+      "name": "ExecutionContext",
+      "file": "src/backend/types.ts"
+    },
+    {
+      "name": "ExecutionResult",
+      "file": "src/backend/types.ts"
+    },
+    {
+      "name": "PaletteApi",
+      "file": "src/components/console/CommandPalette.tsx"
+    },
+    {
+      "name": "SpacetimeFunnel",
+      "file": "src/engine/blackhole.ts"
+    },
+    {
+      "name": "RaymarchBlackHoleOptions",
+      "file": "src/engine/blackholeRaymarch.ts"
+    },
+    {
+      "name": "RigFrame",
+      "file": "src/engine/cameraRig.ts"
+    },
+    {
+      "name": "RigSnapshot",
+      "file": "src/engine/cameraRig.ts"
+    },
+    {
+      "name": "GpuCapability",
+      "file": "src/engine/capability.ts"
+    },
+    {
+      "name": "EngineCallbacks",
+      "file": "src/engine/engine.ts"
+    },
+    {
+      "name": "SharedLensUniforms",
+      "file": "src/engine/surface/photoDome.ts"
+    },
+    {
+      "name": "PortalTransition",
+      "file": "src/engine/systems/portalPhases.ts"
+    },
+    {
+      "name": "CosmosBackend",
+      "file": "src/native/cpp_bridge.ts"
+    },
+    {
+      "name": "KeplerBatchInput",
+      "file": "src/native/cpp_bridge.ts"
+    },
+    {
+      "name": "KeplerBatchResult",
+      "file": "src/native/cpp_bridge.ts"
+    },
+    {
+      "name": "PhysicsBatchInput",
+      "file": "src/native/cpp_bridge.ts"
+    },
+    {
+      "name": "UniversePerformanceSnapshot",
+      "file": "src/performance.ts"
+    },
+    {
+      "name": "GravityNode",
+      "file": "src/physics/nbody.ts"
+    },
+    {
+      "name": "GravityTelemetry",
+      "file": "src/physics/nbody.ts"
+    },
+    {
+      "name": "HierarchyStage",
+      "file": "src/realities/hierarchyStages.ts"
+    },
+    {
+      "name": "Connection",
+      "file": "src/types.ts"
+    },
+    {
+      "name": "VfsNodeType",
+      "file": "src/types.ts"
+    },
+    {
+      "name": "EfsSuperblock",
+      "file": "src/types.ts"
+    },
+    {
+      "name": "VaultLock",
+      "file": "src/types.ts"
+    },
+    {
+      "name": "PasswordHistoryEntry",
+      "file": "src/types.ts"
+    },
+    {
+      "name": "RealityMetaPatch",
+      "file": "src/types.ts"
+    },
+    {
+      "name": "ExportFormat",
+      "file": "src/ui/exportDiary.ts"
+    },
+    {
+      "name": "Tok",
+      "file": "src/ui/syntax.ts"
+    },
+    {
+      "name": "ToastTone",
+      "file": "src/ui/toast.ts"
+    },
+    {
+      "name": "ToastHandler",
+      "file": "src/ui/toast.ts"
+    }
+  ],
+  "deadCss": [
+    "att-rename-input",
+    "av-viewport",
+    "book-scene",
+    "climate-bar",
+    "code-scroll",
+    "copy-flash",
+    "core-num",
+    "core-sigil",
+    "cosmos-hit",
+    "cosmos-results",
+    "crumb",
+    "crumb-sep",
+    "crumbs",
+    "drag-float",
+    "drop-marker",
+    "exec-scan",
+    "fm-actions",
+    "fm-btn",
+    "fm-check",
+    "fm-grid",
+    "fm-head",
+    "fm-marquee",
+    "fm-meta",
+    "fm-row",
+    "fm-th",
+    "fs-actions",
+    "fs-meta",
+    "fs-name",
+    "fs-row",
+    "fs-tree-item",
+    "fx-grid-bg",
+    "fx-pulse-dot",
+    "glue-audio-inner",
+    "glue-cap",
+    "glue-grip",
+    "glue-plate",
+    "glue-seal",
+    "hint-line",
+    "hud-chamfer",
+    "hud-pill-pod",
+    "jump-sel",
+    "kamui-disappear",
+    "leaf-shadow",
+    "leaf-shadow-left",
+    "obj-row",
+    "page-content",
+    "page-corner",
+    "page-counter",
+    "plate-audio",
+    "plate-audio-slot",
+    "plate-cap",
+    "plate-dur",
+    "plate-grip",
+    "plate-image",
+    "plate-play",
+    "plate-presets",
+    "plate-tools",
+    "plate-video",
+    "plate-wave",
+    "row-action",
+    "sifi-card",
+    "sifi-glass",
+    "sifi-glass-gold",
+    "sifi-grid-bg",
+    "sifi-scanlines",
+    "tele-sub",
+    "tilt-glyph",
+    "tl-slider",
+    "tone-swatch",
+    "tree-resize",
+    "turning-under"
+  ],
+  "importers": {
+    "server/paths.ts": 3,
+    "server/realityDaemon.ts": 1,
+    "server/realityTemplates.ts": 2,
+    "server/skyStore.ts": 1,
+    "src/App.tsx": 1,
+    "src/audio.ts": 4,
+    "src/backend/executors/index.ts": 1,
+    "src/backend/executors/isoExecutor.ts": 2,
+    "src/backend/index.ts": 7,
+    "src/backend/storage/breaches.ts": 1,
+    "src/backend/storage/courier.ts": 1,
+    "src/backend/storage/crypto.ts": 4,
+    "src/backend/storage/efs.ts": 2,
+    "src/backend/storage/formatters.ts": 1,
+    "src/backend/storage/importers.ts": 1,
+    "src/backend/storage/indexedDB.ts": 2,
+    "src/backend/storage/metrics.ts": 1,
+    "src/backend/storage/procedural.ts": 1,
+    "src/backend/storage/sanitizeHtml.ts": 1,
+    "src/backend/storage/seeds.ts": 2,
+    "src/backend/storage/totp.ts": 2,
+    "src/backend/storage/zip.ts": 2,
+    "src/backend/types.ts": 11,
+    "src/components/console/BlackHoleTuningCard.tsx": 1,
+    "src/components/console/CommandPalette.tsx": 1,
+    "src/components/console/CoreConsole.tsx": 1,
+    "src/components/console/CoreSigil.tsx": 1,
+    "src/components/console/CppNativeEngineCard.tsx": 1,
+    "src/components/console/QuantumBinTab.tsx": 1,
+    "src/components/console/TiltButton.tsx": 1,
+    "src/components/hud/ClusterHoverCard.tsx": 1,
+    "src/components/hud/CosmicWebHUD.tsx": 1,
+    "src/components/hud/GalaxyHoverCard.tsx": 1,
+    "src/components/hud/GalaxyRoster.tsx": 1,
+    "src/components/hud/MultiverseBar.tsx": 1,
+    "src/components/hud/RealityHoverCard.tsx": 1,
+    "src/components/lineage/CosmicLineageModal.tsx": 1,
+    "src/components/lineage/ThinkingCloudTooltip.tsx": 2,
+    "src/components/realities/CreateRealityModal.tsx": 2,
+    "src/components/realities/RealityAdvancedModal.tsx": 1,
+    "src/components/realities/RealityAdvancedPanel.tsx": 2,
+    "src/desktop/adapter.ts": 5,
+    "src/engine/blackhole.ts": 3,
+    "src/engine/blackholeParams.ts": 2,
+    "src/engine/blackholeRaymarch.ts": 2,
+    "src/engine/cameraRig.ts": 1,
+    "src/engine/capability.ts": 2,
+    "src/engine/engine.ts": 1,
+    "src/engine/math.ts": 4,
+    "src/engine/shaders.ts": 2,
+    "src/engine/surface/UniverseSurfaceManager.ts": 1,
+    "src/engine/surface/index.ts": 1,
+    "src/engine/surface/photoDome.ts": 1,
+    "src/engine/surface/surfacePresets.ts": 2,
+    "src/engine/surface/surfaceShaders.ts": 4,
+    "src/engine/surface/types.ts": 8,
+    "src/engine/systems/levelSystem.ts": 1,
+    "src/engine/systems/portalPhases.ts": 1,
+    "src/engine/systems/stageThresholds.ts": 1,
+    "src/native/cpp_bridge.ts": 2,
+    "src/performance.ts": 4,
+    "src/physics/nbody.ts": 2,
+    "src/physics/physicsEngine.ts": 4,
+    "src/realities/auroraTest/surface.ts": 1,
+    "src/realities/chasinLove/surface.ts": 1,
+    "src/realities/clusterGenerator.ts": 1,
+    "src/realities/galaxyGenerator.ts": 2,
+    "src/realities/hierarchyStages.ts": 4,
+    "src/realities/hierarchyTypes.ts": 6,
+    "src/realities/index.ts": 16,
+    "src/realities/solPrime/index.ts": 1,
+    "src/realities/testOne/surface.ts": 1,
+    "src/realities/testWorld/surface.ts": 1,
+    "src/realities/types.ts": 9,
+    "src/sentiment/sentiment.ts": 2,
+    "src/simClock.ts": 2,
+    "src/sky/skyRegistry.ts": 3,
+    "src/state.ts": 16,
+    "src/sync/realitySync.ts": 2,
+    "src/types.ts": 22,
+    "src/ui/AttachmentEditor.tsx": 1,
+    "src/ui/Book.tsx": 1,
+    "src/ui/CoreMode.tsx": 1,
+    "src/ui/DiaryWindow.tsx": 1,
+    "src/ui/FileManager.tsx": 1,
+    "src/ui/MediaPlates.tsx": 1,
+    "src/ui/PhysicsHUD.tsx": 1,
+    "src/ui/VaultBits.tsx": 2,
+    "src/ui/VaultUI.tsx": 1,
+    "src/ui/bits.tsx": 6,
+    "src/ui/exportDiary.ts": 1,
+    "src/ui/format.ts": 4,
+    "src/ui/lib.ts": 3,
+    "src/ui/syntax.ts": 2,
+    "src/ui/toast.ts": 19,
+    "src/ui/vault/MonacoCodeEditor.tsx": 1,
+    "src/ui/vault/monacoSetup.ts": 1
+  },
+  "loc": {
+    "scripts/audit-architecture.ts": 271,
+    "scripts/make-icons.mjs": 101,
+    "scripts/round16-gauntlet.ts": 103,
+    "scripts/round17-gauntlet.ts": 325,
+    "server/index.ts": 447,
+    "server/paths.ts": 35,
+    "server/realityDaemon.ts": 459,
+    "server/realityTemplates.ts": 153,
+    "server/skyStore.ts": 251,
+    "src/App.tsx": 1353,
+    "src/audio.ts": 194,
+    "src/backend/executors/index.ts": 355,
+    "src/backend/executors/isoExecutor.ts": 257,
+    "src/backend/index.ts": 50,
+    "src/backend/storage/breaches.ts": 133,
+    "src/backend/storage/courier.ts": 126,
+    "src/backend/storage/crypto.ts": 437,
+    "src/backend/storage/efs.ts": 488,
+    "src/backend/storage/formatters.ts": 32,
+    "src/backend/storage/importers.ts": 271,
+    "src/backend/storage/indexedDB.ts": 187,
+    "src/backend/storage/metrics.ts": 100,
+    "src/backend/storage/procedural.ts": 60,
+    "src/backend/storage/sanitizeHtml.ts": 122,
+    "src/backend/storage/seeds.ts": 541,
+    "src/backend/storage/totp.ts": 106,
+    "src/backend/storage/zip.ts": 108,
+    "src/backend/types.ts": 68,
+    "src/components/console/BlackHoleTuningCard.tsx": 111,
+    "src/components/console/CommandPalette.tsx": 334,
+    "src/components/console/CoreConsole.tsx": 1619,
+    "src/components/console/CoreSigil.tsx": 226,
+    "src/components/console/CppNativeEngineCard.tsx": 257,
+    "src/components/console/QuantumBinTab.tsx": 342,
+    "src/components/console/TiltButton.tsx": 83,
+    "src/components/hud/ClusterHoverCard.tsx": 171,
+    "src/components/hud/CosmicWebHUD.tsx": 213,
+    "src/components/hud/GalaxyHoverCard.tsx": 127,
+    "src/components/hud/GalaxyRoster.tsx": 277,
+    "src/components/hud/MultiverseBar.tsx": 613,
+    "src/components/hud/RealityHoverCard.tsx": 161,
+    "src/components/lineage/CosmicLineageModal.tsx": 579,
+    "src/components/lineage/ThinkingCloudTooltip.tsx": 247,
+    "src/components/realities/CreateRealityModal.tsx": 308,
+    "src/components/realities/RealityAdvancedModal.tsx": 80,
+    "src/components/realities/RealityAdvancedPanel.tsx": 521,
+    "src/desktop/adapter.ts": 248,
+    "src/engine/blackhole.ts": 717,
+    "src/engine/blackholeParams.ts": 104,
+    "src/engine/blackholeRaymarch.ts": 558,
+    "src/engine/cameraRig.ts": 422,
+    "src/engine/capability.ts": 128,
+    "src/engine/engine.ts": 6667,
+    "src/engine/math.ts": 42,
+    "src/engine/shaders.ts": 1431,
+    "src/engine/surface/UniverseSurfaceManager.ts": 498,
+    "src/engine/surface/index.ts": 13,
+    "src/engine/surface/photoDome.ts": 307,
+    "src/engine/surface/surfacePresets.ts": 56,
+    "src/engine/surface/surfaceShaders.ts": 362,
+    "src/engine/surface/types.ts": 34,
+    "src/engine/systems/levelSystem.ts": 42,
+    "src/engine/systems/portalPhases.ts": 52,
+    "src/engine/systems/stageThresholds.ts": 50,
+    "src/main.tsx": 10,
+    "src/native/cpp_bridge.ts": 456,
+    "src/performance.ts": 117,
+    "src/physics/nbody.ts": 319,
+    "src/physics/physicsEngine.ts": 407,
+    "src/realities/auroraTest/index.ts": 142,
+    "src/realities/auroraTest/surface.ts": 15,
+    "src/realities/chasinLove/index.ts": 94,
+    "src/realities/chasinLove/surface.ts": 15,
+    "src/realities/clusterGenerator.ts": 358,
+    "src/realities/galaxyGenerator.ts": 420,
+    "src/realities/hierarchyStages.ts": 43,
+    "src/realities/hierarchyTypes.ts": 132,
+    "src/realities/index.ts": 362,
+    "src/realities/solPrime/index.ts": 51,
+    "src/realities/solPrime/surface.ts": 15,
+    "src/realities/testOne/index.ts": 142,
+    "src/realities/testOne/surface.ts": 15,
+    "src/realities/testWorld/index.ts": 94,
+    "src/realities/testWorld/surface.ts": 15,
+    "src/realities/types.ts": 39,
+    "src/sentiment/sentiment.ts": 119,
+    "src/simClock.ts": 27,
+    "src/sky/skyRegistry.ts": 230,
+    "src/state.ts": 1786,
+    "src/sync/realitySync.ts": 145,
+    "src/types.ts": 401,
+    "src/ui/AttachmentEditor.tsx": 495,
+    "src/ui/Book.tsx": 163,
+    "src/ui/CoreMode.tsx": 920,
+    "src/ui/DiaryWindow.tsx": 1655,
+    "src/ui/FileManager.tsx": 1280,
+    "src/ui/MediaPlates.tsx": 1271,
+    "src/ui/PhysicsHUD.tsx": 485,
+    "src/ui/VaultBits.tsx": 133,
+    "src/ui/VaultUI.tsx": 5566,
+    "src/ui/bits.tsx": 153,
+    "src/ui/exportDiary.ts": 372,
+    "src/ui/format.ts": 128,
+    "src/ui/lib.ts": 31,
+    "src/ui/syntax.ts": 195,
+    "src/ui/toast.ts": 16,
+    "src/ui/vault/MonacoCodeEditor.tsx": 152,
+    "src/ui/vault/monacoSetup.ts": 98
+  },
+  "locLeaders": [
+    [
+      "src/engine/engine.ts",
+      6667
+    ],
+    [
+      "src/ui/VaultUI.tsx",
+      5566
+    ],
+    [
+      "src/state.ts",
+      1786
+    ],
+    [
+      "src/ui/DiaryWindow.tsx",
+      1655
+    ],
+    [
+      "src/components/console/CoreConsole.tsx",
+      1619
+    ],
+    [
+      "src/engine/shaders.ts",
+      1431
+    ],
+    [
+      "src/App.tsx",
+      1353
+    ],
+    [
+      "src/ui/FileManager.tsx",
+      1280
+    ],
+    [
+      "src/ui/MediaPlates.tsx",
+      1271
+    ],
+    [
+      "src/ui/CoreMode.tsx",
+      920
+    ],
+    [
+      "src/engine/blackhole.ts",
+      717
+    ],
+    [
+      "src/components/hud/MultiverseBar.tsx",
+      613
+    ],
+    [
+      "src/components/lineage/CosmicLineageModal.tsx",
+      579
+    ],
+    [
+      "src/engine/blackholeRaymarch.ts",
+      558
+    ],
+    [
+      "src/backend/storage/seeds.ts",
+      541
+    ]
+  ],
+  "pathEncode": {
+    "realities-path lock": [
+      "vite.config.js:29",
+      "vite.config.js:34",
+      "tsconfig.json:24",
+      "server/index.ts:7",
+      "server/index.ts:13",
+      "server/index.ts:48",
+      "server/index.ts:61",
+      "server/index.ts:75",
+      "server/index.ts:87",
+      "server/index.ts:184",
+      "server/index.ts:198",
+      "server/index.ts:231",
+      "server/index.ts:235",
+      "server/index.ts:237",
+      "server/index.ts:247",
+      "server/index.ts:266",
+      "server/index.ts:290",
+      "server/index.ts:328",
+      "server/index.ts:335",
+      "server/index.ts:387",
+      "server/realityDaemon.ts:2",
+      "server/realityDaemon.ts:37",
+      "server/realityDaemon.ts:38",
+      "server/realityDaemon.ts:136",
+      "server/realityDaemon.ts:150",
+      "server/realityDaemon.ts:217",
+      "server/realityDaemon.ts:265",
+      "server/realityDaemon.ts:307",
+      "server/realityDaemon.ts:415",
+      "server/skyStore.ts:6",
+      "server/skyStore.ts:7",
+      "server/skyStore.ts:64",
+      "src-tauri/src/realities.rs:3"
+    ],
+    "generated-code imports": [
+      "server/realityTemplates.ts:44",
+      "server/realityTemplates.ts:81",
+      "src-tauri/src/realities.rs:390",
+      "src-tauri/src/realities.rs:401"
+    ],
+    "disk surface.ts imports": [
+      "src/realities/auroraTest/surface.ts:1 — import { UniverseSurfaceConfig } from '../../engine/surface/types';",
+      "src/realities/chasinLove/surface.ts:1 — import { UniverseSurfaceConfig } from '../../engine/surface/types';",
+      "src/realities/solPrime/surface.ts:1 — import { UniverseSurfaceConfig } from '../../engine/surface/types';",
+      "src/realities/testOne/surface.ts:1 — import { UniverseSurfaceConfig } from '../../engine/surface/types';",
+      "src/realities/testWorld/surface.ts:1 — import { UniverseSurfaceConfig } from '../../engine/surface/types';"
+    ],
+    "native build path": [
+      "src-tauri/build.rs:19",
+      "src-tauri/build.rs:24",
+      "src-tauri/build.rs:25",
+      "src/native/cpp_bridge.ts:74"
+    ],
+    "gauntlet readFileSync targets": [
+      "scripts/round17-gauntlet.ts:132",
+      "scripts/round17-gauntlet.ts:190",
+      "scripts/round17-gauntlet.ts:206",
+      "scripts/round17-gauntlet.ts:207",
+      "scripts/round17-gauntlet.ts:208",
+      "scripts/round17-gauntlet.ts:209",
+      "scripts/round17-gauntlet.ts:210"
+    ],
+    "public roots": [
+      "index.html:11",
+      "src/backend/executors/index.ts:319"
+    ],
+    "route↔command strings": [
+      "server/index.ts:41",
+      "server/index.ts:46",
+      "server/index.ts:73",
+      "server/index.ts:98",
+      "server/index.ts:108",
+      "server/index.ts:118",
+      "server/index.ts:128",
+      "server/index.ts:134",
+      "server/index.ts:147",
+      "server/index.ts:248",
+      "server/index.ts:284",
+      "server/index.ts:340",
+      "server/index.ts:348",
+      "server/index.ts:357",
+      "server/index.ts:366",
+      "server/index.ts:375",
+      "server/index.ts:384",
+      "server/index.ts:406",
+      "server/realityTemplates.ts:4",
+      "src/components/realities/CreateRealityModal.tsx:70",
+      "src/desktop/adapter.ts:123",
+      "src/desktop/adapter.ts:125",
+      "src/desktop/adapter.ts:127",
+      "src/desktop/adapter.ts:129",
+      "src/desktop/adapter.ts:131",
+      "src/desktop/adapter.ts:133",
+      "src/desktop/adapter.ts:135",
+      "src/desktop/adapter.ts:137",
+      "src/desktop/adapter.ts:139",
+      "src/sky/skyRegistry.ts:5",
+      "src/sky/skyRegistry.ts:6",
+      "src/sky/skyRegistry.ts:7",
+      "src/sky/skyRegistry.ts:8",
+      "src/sky/skyRegistry.ts:9",
+      "src/sky/skyRegistry.ts:10",
+      "src/sky/skyRegistry.ts:70",
+      "src/sky/skyRegistry.ts:128",
+      "src/sky/skyRegistry.ts:168",
+      "src/sky/skyRegistry.ts:206",
+      "src/sky/skyRegistry.ts:215",
+      "src/sky/skyRegistry.ts:224",
+      "src/state.ts:733",
+      "src/state.ts:740",
+      "src/state.ts:778",
+      "src/state.ts:786",
+      "src/state.ts:853",
+      "src/state.ts:883",
+      "src/state.ts:906",
+      "src/state.ts:928",
+      "src/state.ts:961",
+      "src/state.ts:1009",
+      "src/sync/realitySync.ts:65",
+      "src/sync/realitySync.ts:66",
+      "src/sync/realitySync.ts:120"
+    ],
+    "localStorage keys": [
+      "src/audio.ts:4",
+      "src/audio.ts:40",
+      "src/backend/storage/courier.ts:75",
+      "src/engine/blackholeParams.ts:56",
+      "src/engine/capability.ts:24",
+      "src/engine/capability.ts:25",
+      "src/state.ts:55",
+      "src/state.ts:421",
+      "src/ui/VaultUI.tsx:3631",
+      "src/ui/VaultUI.tsx:4121"
+    ],
+    "window seams": [
+      "src/desktop/adapter.ts:5",
+      "src/performance.ts:72"
+    ]
+  }
+}
