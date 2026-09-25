@@ -22,6 +22,13 @@ export const LENS_WARP_GLSL = /* glsl */ `
 /* the sentinel direction returned when a ray is CAPTURED — no image exists */
 const vec3 LENS_CAPTURE = vec3(-1.0);
 
+/* the capture test shared by every stage: the sentinel is the one direction
+   that cannot be a unit vector (x²+y²+z² = 1 can't have all three components
+   below −0.99), so the test is exact and collision-free */
+bool lensCaptured(vec3 d){
+  return d.x < -0.99 && d.y < -0.99 && d.z < -0.99;
+}
+
 /* helpers shared by both lens modes (declared first — GLSL order rules) */
 float lensPerpLen(vec3 d, vec3 L){
   float cosA = clamp(dot(d, L), -1.0, 1.0);

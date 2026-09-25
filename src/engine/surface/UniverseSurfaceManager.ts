@@ -55,7 +55,10 @@ export class UniverseSurfaceManager {
     this.buildDeepNebulae();
     this.buildFarStars();
     this.buildNeighborhood();
-    this.photoDome.build(scene);
+    /* Round 17 — the photo sky joins the shared lens system: one set of
+       uniform objects bends the procedural cosmos, the star shells and the
+       uploaded photo alike, so every sky agrees around the hole */
+    this.photoDome.build(scene, this.lensUniforms);
   }
 
   /**

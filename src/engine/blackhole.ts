@@ -260,11 +260,240 @@ function makeHazeTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+/* ------------------------- Round 17 — the spacetime funnel -------------------------
+ *
+ * THE CONCEPT (the user's ice-cream cone): a black hole is not an object
+ * floating ON the universe — it is a HOLE IN THE SURFACE of the universe.
+ * Place an ice-cream cone mouth-down in water: the mouth circle sits on the
+ * surface, the cone plunges beneath, and the water bends inward around it.
+ *
+ * THE USER'S TWO LAWS (Round 17.1 corrections — both absolute):
+ *  1. THE CONE PLUNGES ALONG −Z, THE VIEW AXIS. The viewer never sees the
+ *     cone's geometry — only the void: black, emptiness, nothingness. The
+ *     funnel is therefore billboarded face-on to the camera, rings in the
+ *     screen plane, throat sinking along the view axis into the shadow.
+ *  2. THE POUR IS ALWAYS CIRCULAR. However the surface distorts, the mouth
+ *     touches every tangential point equally — rings, never spokes, never
+ *     polygons. Water around a cone pours in circles; so does spacetime.
+ *
+ * THE REAL EQUATION: the membrane's depth profile is the FLAMM PARABOLOID
+ * (Flamm 1916) — the EXACT spatial embedding of the Schwarzschild metric:
+ *
+ *        z(r) = 2·√(rs·(r − rs))
+ *
+ * The membrane emerges from inside the composite's own black horizon sphere
+ * (which occludes it), so funnel and shadow read as ONE object — the
+ * surface pouring into the hole — with no seam.
+ *
+ * SAFETY: pure visuals. It adds no forces, touches no orbits, and its
+ * strength rides the damped spacetime-lens toggle (Lens · Clear flattens
+ * it away). The Dimensional Anchor and Living Gravity are untouched.
+ */
+
+/** The Flamm paraboloid depth (in rs units) at radius r (in rs units). */
+export function flammDepth(rRs: number): number {
+  return 2 * Math.sqrt(Math.max(rRs - 1, 0));
+}
+
+export interface SpacetimeFunnel {
+  group: THREE.Group;
+  /** strength 0..1 — rides the damped spacetime-lens toggle */
+  update(time: number, strength: number, camQuat?: THREE.Quaternion, camDist?: number): void;
+  /** the active reality's palette, so the funnel grid is native to its universe */
+  setTint(colorA: THREE.Color, colorB: THREE.Color): void;
+  dispose(): void;
+}
+
+/**
+ * Builds the funnel membrane around a hole of nominal radius R.
+ * Rings lie in the LOCAL XY plane; the Flamm depth sinks along −Z (law 1).
+ * The mesh is billboarded to the camera every frame, so the viewer always
+ * looks straight into the mouth: perfect circles around pure void (law 2).
+ * Depth from the exact Flamm equation; circles drift inward (the pour);
+ * tinted by the reality's own two surface colors.
+ */
+function createSpacetimeFunnel(R: number, colorA: THREE.Color, colorB: THREE.Color): SpacetimeFunnel {
+  const rs = R * 0.62;
+  /* Round 17.2 — the mouth is COMPACT and hugs the shadow (the Interstellar
+     references): outer rim 7 rs. The pour is the hole's own crown, never a
+     room around the camera — the R41 wall/floor bug was the 30 rs scale.
+     The throat still plunges along −Z by the exact Flamm law. */
+  const R_IN = 1.0;    /* inner ring radius (rs units) — hidden inside the horizon sphere */
+  const R_OUT = 7;     /* outer rim (rs units) — melts into the bent sky */
+  const RINGS = 44;
+  const SEGS = 72;
+
+  const ringCount = RINGS + 1;
+  const vertsPerRing = SEGS + 1;
+  const pos = new Float32Array(ringCount * vertsPerRing * 3);
+  const uvs = new Float32Array(ringCount * vertsPerRing * 2);
+  const indices: number[] = [];
+
+  for (let ri = 0; ri < ringCount; ri++) {
+    const t = ri / RINGS;
+    /* log-spaced rings: uniform in log(r) so the grid densifies toward the
+       throat exactly like the classic embedding diagram, and a uniform
+       inward drift in v reads as accelerating infall in linear space */
+    const rRs = R_IN * Math.pow(R_OUT / R_IN, t);
+    const z = flammDepth(rRs);
+    for (let a = 0; a <= SEGS; a++) {
+      const th = (a / SEGS) * Math.PI * 2;
+      const k = (ri * vertsPerRing + a) * 3;
+      /* law 1: rings in XY (the screen plane once billboarded), the cone's
+         depth sinks along −Z — toward the viewer's axis, into the void */
+      pos[k] = Math.cos(th) * rRs * rs;
+      pos[k + 1] = Math.sin(th) * rRs * rs;
+      pos[k + 2] = -z * rs;
+      const u = (ri * vertsPerRing + a) * 2;
+      uvs[u] = a / SEGS;
+      uvs[u + 1] = t;
+    }
+    if (ri < RINGS) {
+      for (let a = 0; a < SEGS; a++) {
+        const i0 = ri * vertsPerRing + a;
+        const i1 = i0 + 1;
+        const j0 = (ri + 1) * vertsPerRing + a;
+        const j1 = j0 + 1;
+        indices.push(i0, j0, i1, i1, j0, j1);
+      }
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uStrength: { value: 1 },
+      uRs: { value: rs },
+      uCamDist: { value: 1e9 },
+      uColorA: { value: colorA.clone() },
+      uColorB: { value: colorB.clone() },
+    },
+    vertexShader: /* glsl */ `
+      varying vec3 vPosRs;
+      varying vec2 vUvF;
+      uniform float uRs;   /* declared also on the material — kept local for clarity */
+      void main() {
+        vPosRs = position / uRs;   /* geometry in rs units, pre-displaced */
+        vUvF = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      varying vec3 vPosRs;
+      varying vec2 vUvF;
+      uniform float uTime;
+      uniform float uStrength;
+      uniform float uRs;       /* world-units per rs — scales the camera melt */
+      uniform float uCamDist;  /* camera distance to the hole's center (world) */
+      uniform vec3 uColorA;
+      uniform vec3 uColorB;
+
+      void main() {
+        /* law 2 — THE POUR IS ALWAYS CIRCULAR: only concentric rings exist
+           here. The pattern is a function of radius alone — every tangential
+           point of the mouth behaves identically. Circle in, circle out. */
+        float r = length(vPosRs.xy);            /* radius in rs units */
+
+        /* the pour — circles marching inward, accelerating near the throat:
+           one shared phase per ring (a ring is a single thing), spacing
+           uniform in log(r) like the embedding */
+        float v = vUvF.y * 15.0;
+        float flow = uTime * 0.05;
+        float ring = abs(fract(v - flow) - 0.5) / 15.0 * 30.0 * r;
+        float aa = max(fwidth(r) * 1.2, 1e-4);
+        float ringLine = 1.0 - smoothstep(0.0, aa * 1.6, ring * 0.3183099);
+
+        /* membrane sheen — the surface itself, strongest where curvature
+           is brutal (near the throat) */
+        float deep = 1.0 - smoothstep(1.6, 5.0, r);
+        float sheen = deep * 0.16 + 0.02;
+
+        /* Round 17.2 — THE LIGHT-SPEED LIP: at the mouth's rim the bending
+           surface moves so fast it rivals light — the user's white energy
+           blast in ±Y. A blazing white band hugs the shadow exactly like
+           the Interstellar stills: brightest at 12 and 6 o'clock, thinning
+           to the sides, flickering, fine circular striations dragged with
+           the pour. */
+        float lip = smoothstep(3.4, 4.35, r) * (1.0 - smoothstep(4.35, 6.1, r));
+        float flut = 0.9 + 0.1 * sin(uTime * 9.0 + r * 14.0);
+        float blast = lip * lip * flut;
+        float yAxis = abs(vPosRs.y / max(r, 1e-4));
+        blast *= 0.35 + 0.65 * (yAxis * yAxis);        /* ±Y emphasis */
+        float stria = 0.55 + 0.45 * sin(r * 42.0 - uTime * 2.6);
+        blast *= 0.55 + 0.45 * stria;                  /* surface filaments */
+
+        /* color: reality palette through the body; the lip is WHITE HOT —
+           it outruns the palette, that is the point */
+        float mixK = smoothstep(1.8, 6.4, r);
+        vec3 tint = mix(uColorA, uColorB, mixK);
+        vec3 col = tint * (0.85 + 0.6 * deep) * (ringLine * 0.9 + sheen)
+                 + vec3(1.05, 1.0, 0.92) * blast * 1.9;
+
+        /* outer melt — no edge, only curvature dissolving into the bent sky */
+        float rimFade = 1.0 - smoothstep(4.6, 7.0, r);
+        /* inner fade — the true black owns everything under the limb */
+        float innerFade = smoothstep(1.0, 1.9, r);
+
+        /* CAMERA DISTANCE — the mouth dissolves as the viewer nears it, so
+           no camera can ever fly INTO the pour (the R41 wall/floor bug).
+           Up close it reads as the solid angle closing around you, never as
+           geometry. */
+        float near = 1.0 - smoothstep(4.0 * uRs, 12.0 * uRs, uCamDist);
+
+        float alpha = (ringLine * 0.9 + sheen) * rimFade * innerFade * uStrength;
+        alpha = max(alpha, blast * rimFade * innerFade * 0.95) * near * uStrength;
+        if (alpha < 0.004) discard;
+        gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.NormalBlending,
+  });
+  mat.userData.immuneToVortex = true;
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 1; /* above the sky (≤0), under the disk (5) and billboard (6) */
+  mesh.frustumCulled = false;
+  const group = new THREE.Group();
+  group.add(mesh);
+
+  return {
+    group,
+    update(time, strength, camQuat, camDist) {
+      mat.uniforms.uTime.value = time;
+      mat.uniforms.uStrength.value = Math.max(0, Math.min(1, strength));
+      /* law 1 — the cone plunges along the VIEW axis: the funnel's rings
+         always face the camera dead-on, so the viewer sees only circles
+         sinking into the void along −Z — never the cone's geometry */
+      if (camQuat) group.quaternion.copy(camQuat);
+      if (camDist !== undefined) mat.uniforms.uCamDist.value = camDist;
+      group.visible = strength > 0.01;
+    },
+    setTint(colorA2, colorB2) {
+      (mat.uniforms.uColorA.value as THREE.Color).copy(colorA2);
+      (mat.uniforms.uColorB.value as THREE.Color).copy(colorB2);
+    },
+    dispose() {
+      geo.dispose();
+      mat.dispose();
+    },
+  };
+}
+
 /* ------------------------------ assembly -------------------------------- */
 
 export interface BlackHoleVisual {
   group: THREE.Group;
-  update(time: number, camQuat?: THREE.Quaternion, portal?: number): void;
+  update(time: number, camQuat?: THREE.Quaternion, portal?: number, funnelStrength?: number, camDist?: number): void;
+  /** Round 17 — retint the spacetime funnel to a new reality's palette. */
+  setTint?(colorA: THREE.Color, colorB: THREE.Color): void;
   dispose(): void;
 }
 
@@ -277,10 +506,15 @@ export interface BlackHoleVisual {
  * position — it inherits the body's transform. (Copying a world position
  * into a local one double-transforms the hole to 2× its orbit position.)
  */
-export function createBlackHole(R: number): BlackHoleVisual {
+export function createBlackHole(R: number, colorA = '#38bdf8', colorB = '#7c3aed'): BlackHoleVisual {
   const rs = R * 0.62;
 
   const group = new THREE.Group();
+
+  /* 0. Round 17 — the SPACETIME FUNNEL: the universe surface itself, bending
+        into the hole. One object with the shadow — no sticker on the sky. */
+  const funnel = createSpacetimeFunnel(R, new THREE.Color(colorA), new THREE.Color(colorB));
+  group.add(funnel.group);
 
   /* 1. the horizon — pure black, occludes properly in the opaque pass */
   const core = new THREE.Mesh(
@@ -351,6 +585,7 @@ export function createBlackHole(R: number): BlackHoleVisual {
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
+    opacity: 0.34, /* Round 17 — tamed: the funnel owns the surface look now */
   });
   const lensRing = new THREE.Mesh(new THREE.RingGeometry(rs * 2.55, rs * 4.7, 128, 1), lensMat);
   lensRing.renderOrder = 2;
@@ -361,7 +596,7 @@ export function createBlackHole(R: number): BlackHoleVisual {
     transparent: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
-    opacity: 0.5,
+    opacity: 0.26, /* Round 17 — tamed: the surface (not a glow blob) owns the look */
   }));
   halo.scale.setScalar(rs * 9);
   billboard.add(halo);
@@ -372,7 +607,7 @@ export function createBlackHole(R: number): BlackHoleVisual {
 
   return {
     group,
-    update(time, camQuat, portal = 0) {
+    update(time, camQuat, portal = 0, funnelStrength = 1, camDist?: number) {
       if (camQuat) billboard.quaternion.copy(camQuat);
       const warp = clamp01(portal);
       /* majestic Keplerian-flavored shear; portal energy accelerates and
@@ -383,6 +618,12 @@ export function createBlackHole(R: number): BlackHoleVisual {
       /* the lensed starlight continuously orbits the shadow */
       lensRing.rotation.z = time * 0.12 + warp * (0.85 + 0.18 * Math.sin(time * 5.0));
       billboard.scale.setScalar(1 + warp * (0.14 + 0.035 * Math.sin(time * 7.0)));
+      /* Round 17 — the surface pours into the hole with the damped lens
+         toggle; inside the composite, so Lens · Clear flattens it away */
+      funnel.update(time, funnelStrength, camQuat, camDist);
+    },
+    setTint(colorA2, colorB2) {
+      funnel.setTint(colorA2, colorB2);
     },
     dispose() {
       group.traverse((o) => {

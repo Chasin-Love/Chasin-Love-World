@@ -33,7 +33,7 @@ interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean
 const MAX_RECT = (): WinRect => ({ x: 12, y: 12, w: window.innerWidth - 24, h: window.innerHeight - 24 });
 
 /* bump on every shipped build — lets you confirm the running bundle is current */
-export const BUILD = 'R40';
+export const BUILD = 'R43';
 
 /* THE ECHO SHOWER TOAST — one glass banner the day a memory returns.
    Auto-fades; re-keyed only when the shower's membership changes. */

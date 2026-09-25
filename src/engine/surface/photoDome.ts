@@ -1,4 +1,11 @@
 import * as THREE from 'three';
+import { LENS_UNIFORMS_GLSL, LENS_WARP_GLSL } from './surfaceShaders';
+
+/** Uniform-object shape shared by every lens-bending material (assigned by
+ *  UniverseSurfaceManager, which owns the one true set). */
+export interface SharedLensUniforms {
+  [key: string]: { value: unknown };
+}
 
 /**
  * PhotoDome — the Sky Studio's canvas inside the 3D universe.
@@ -34,6 +41,12 @@ export class PhotoDome {
      row) must never win: last-CHOSEN sky renders, not last-finished load */
   private applySeq = 0;
 
+  /* Round 17.1 — the photo sky bends with the universe, and it bends ONCE:
+     the vertex stage passes the RAW dome direction (a bent direction per
+     coarse vertex then interpolated again per pixel double-bends the image
+     — the angular facet artifact the user caught). The fragment stage runs
+     the shared Schwarzschild law per-pixel: crisp capture shadow, perfectly
+     circular distortion, zero facets, on every GPU. One lens, one bend. */
   private vert = /* glsl */ `
     varying vec2 vUv;
     varying vec3 vDir;
@@ -57,6 +70,8 @@ export class PhotoDome {
     uniform float uDrift;
     uniform float uTime;
     uniform vec3 uGlowColor;
+    ${LENS_UNIFORMS_GLSL}
+    ${LENS_WARP_GLSL}
     varying vec2 vUv;
     varying vec3 vDir;
 
@@ -76,9 +91,27 @@ export class PhotoDome {
     }
 
     void main() {
+      /* Round 17 — the lens bends the sampled direction BEFORE it drives the
+         UV mapping: the photo itself stretches and pours around the hole
+         exactly like the procedural sky underneath it. Inside b_c the
+         capture sentinel means NO image exists — the photo is painted as a
+         true hole in the sky, matching the procedural dome's shadow. */
+      vec3 d = applyLensBend(normalize(vDir));
+      if (lensCaptured(d)) {
+        gl_FragColor = vec4(vec3(0.0), 0.0);
+        return;
+      }
+      /* EXACT SphereGeometry inverse (three.js: x = −cosφ·sinθ, z = sinφ·sinθ,
+         uv = (φ/2π, 1 − θ/π) — note NO +0.5 offset; a hand-rolled convention
+         here would rotate and mirror every photo sky under the lens) */
+      vec2 lensUv = vec2(
+        atan(d.z, -d.x) / 6.2831853,
+        1.0 - acos(clamp(d.y, -1.0, 1.0)) / 3.14159265
+      );
+
       /* slow parallax breathing — the sky is alive but never seasick */
       float drift = uDrift * 0.006;
-      vec2 uv = vUv + vec2(
+      vec2 uv = lensUv + vec2(
         sin(uTime * 0.05) * drift,
         cos(uTime * 0.037) * drift * 0.6
       );
@@ -93,15 +126,16 @@ export class PhotoDome {
       vec3 color = mix(photoDark, photoDark + cosmos * 0.5, cosmosMask * 0.45);
 
       /* vignette — the edges fall into real space so the dome never shows
-         a hard seam at the horizon */
-      float r = length(vUv - 0.5) * 1.414;
+         a hard seam at the horizon (lens-space coords keep the vignette
+         centered where the lens actually samples) */
+      float r = length(lensUv - 0.5) * 1.414;
       float vig = 1.0 - uVignette * smoothstep(0.42, 1.05, r);
       color *= vig;
 
       /* crossfade from the previous reality's sky while entering */
       float alpha = uHasMap * uBlend * uFade;
       if (uHasPrev > 0.5 && uFade < 0.999) {
-        vec3 prev = sampleSoft(uPrevMap, vUv, uBlur * 0.02) * (1.0 - uDim * 0.75) * vig;
+        vec3 prev = sampleSoft(uPrevMap, lensUv, uBlur * 0.02) * (1.0 - uDim * 0.75) * vig;
         float prevAlpha = uFade < 0.35 ? (0.35 - uFade) / 0.35 : 0.0;
         color = mix(color, prev, clamp(prevAlpha * 1.6, 0.0, 1.0));
         alpha = max(alpha, prevAlpha * 0.9);
@@ -113,8 +147,11 @@ export class PhotoDome {
     }
   `;
 
-  /** Build once — hidden until a reality with a sky becomes active. */
-  build(scene: THREE.Scene): void {
+  /** Build once — hidden until a reality with a sky becomes active.
+   *  `sharedLens` (Round 17) is UniverseSurfaceManager's one true lens uniform
+   *  set: referencing its objects (not copies) keeps the photo sky bent in
+   *  perfect sync with the procedural cosmos at zero per-frame cost. */
+  build(scene: THREE.Scene, sharedLens?: SharedLensUniforms): void {
     if (this.group) return;
     const group = new THREE.Group();
     this.mat = new THREE.ShaderMaterial({
@@ -131,6 +168,7 @@ export class PhotoDome {
         uDrift: { value: this.drift },
         uTime: { value: 0 },
         uGlowColor: { value: new THREE.Color('#38bdf8') },
+        ...(sharedLens ?? {}),
       },
       vertexShader: this.vert,
       fragmentShader: this.frag,

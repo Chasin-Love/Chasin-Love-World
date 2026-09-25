@@ -1060,7 +1060,9 @@ export class UniverseEngine {
          where the GPU allows, and the exact Schwarzschild bend on the
          universe surface (lensStrong is set for kind 'hole' too). */
       const R = data.radius;
-      const bh = createBlackHole(R);
+      /* Round 17 — the composite is born with its reality's palette, so the
+         spacetime funnel's grid is native to this universe from frame one */
+      const bh = createBlackHole(R, this.activeReality?.colorA ?? '#38bdf8', this.activeReality?.colorB ?? '#7c3aed');
       g.add(bh.group);
       const rm = this.attachRaymarchHole(R, g);
       if (rm) g.userData.bhRaymarch = rm;
@@ -1071,7 +1073,7 @@ export class UniverseEngine {
          blackbody disk, photon ring, lensed arcs) built from driver-proof
          primitives; the ray-march shader variant is retired */
       const R = data.radius;
-      const bh = createBlackHole(R);
+      const bh = createBlackHole(R, this.activeReality?.colorA ?? '#38bdf8', this.activeReality?.colorB ?? '#7c3aed');
       g.add(bh.group);
       /* cinematic overlay: true geodesic lensing above the composite (safe by
          construction — composite stays underneath and owns the shadow) */
@@ -2889,7 +2891,7 @@ void main(){
              lensed arcs and the activity lattice. It must not fall through the
              ordinary planet builder just because it lives in another galaxy. */
       if (data.kind === 'vault') {
-        const bh = createBlackHole(data.radius);
+        const bh = createBlackHole(data.radius, this.activeReality?.colorA ?? '#38bdf8', this.activeReality?.colorB ?? '#7c3aed');
         g.add(bh.group);
         const rm = this.attachRaymarchHole(data.radius, g);
         if (rm) ipRaymarch = rm;
@@ -3242,7 +3244,9 @@ void main(){
            quaternion into this vault's local frame so the lensed arcs remain
            true billboards instead of inheriting that tilt. */
         p.group.getWorldQuaternion(this._qScratch2).invert().multiply(this.camera.quaternion);
-        p.blackHole.update(this.clockT, this._qScratch2, portalTear);
+        p.group.getWorldPosition(this._vScratch1);
+        this._vScratch1.sub(this.camera.position);
+        p.blackHole.update(this.clockT, this._qScratch2, portalTear, this.lensCur, this._vScratch1.length());
         if (p.blackHoleRaymarch && p.blackHoleRaymarch.group.visible) {
           updateRaymarchUniforms(p.blackHoleRaymarch, this.camera, this.clockT, portalTear);
         }
@@ -4567,6 +4571,20 @@ void main(){
     // the photo dome crossfades while the rest of the reality builds)
     void this.applyActiveSky();
 
+    /* Round 17 — every composite hole's spacetime funnel re-tints to the
+       active reality's palette, so the membrane stays native to its universe */
+    const funnelA = new THREE.Color(reality.colorA);
+    const funnelB = new THREE.Color(reality.colorB);
+    for (const b of this.bodies) {
+      if (b.data.kind !== 'hole' && b.data.kind !== 'vault') continue;
+      (b.group.userData.bh as { setTint?: (a: THREE.Color, c: THREE.Color) => void } | undefined)?.setTint?.(funnelA, funnelB);
+    }
+    for (const sys of this.galaxyStageNodes) {
+      for (const p of sys.innerSys?.planets ?? []) {
+        (p.group.userData.bh as { setTint?: (a: THREE.Color, c: THREE.Color) => void } | undefined)?.setTint?.(funnelA, funnelB);
+      }
+    }
+
     // 1. Update Anchor Star shader uniforms & corona palette
     const colA = new THREE.Color(reality.colorA);
     const colB = new THREE.Color(reality.colorB);
@@ -5763,23 +5781,29 @@ void main(){
         b.streakRing.visible = mat.opacity > 0.02 && b.fade * sysW > 0.03;
       }
 
-      if (b.data.kind === 'vault' && b.group.userData.spin) {
-        const s = b.group.userData.spin as { r1: THREE.Mesh; r2: THREE.Mesh };
-        s.r1.rotation.z += dt * 0.3; s.r2.rotation.x += dt * 0.22;
-
-        /* the black hole: feed time + the camera orientation (the
-           billboarded rings/arcs always face the viewer). The composite
-           group is parented to the body group and inherits its transform. */
+      /* Round 17 — EVERY composite black hole (vault + kind 'hole') gets its
+         per-frame update: the billboarded rings/arcs face the viewer and the
+         spacetime funnel pours with the damped lens toggle. (The kind-'hole'
+         composites were silently never updated before — fixed here.) */
+      if (b.data.kind === 'vault' || b.data.kind === 'hole') {
         const bh = b.group.userData.bh as {
-          update(t: number, camQuat?: THREE.Quaternion, portal?: number): void;
+          update(t: number, camQuat?: THREE.Quaternion, portal?: number, funnelStrength?: number, camDist?: number): void;
         } | undefined;
         if (bh) {
-          bh.update(this.clockT, this.camera.quaternion, portalTear);
+          /* camera distance feeds the funnel's proximity melt — the mouth
+             dissolves as the viewer nears, so no camera ever flies into it */
+          this._vScratch1.copy(b.group.position).sub(this.camera.position);
+          bh.update(this.clockT, this.camera.quaternion, portalTear, this.lensCur, this._vScratch1.length());
         }
         const rm = b.group.userData.bhRaymarch as BlackHoleVisual | undefined;
         if (rm && rm.group.visible) {
           updateRaymarchUniforms(rm, this.camera, this.clockT, portalTear);
         }
+      }
+
+      if (b.data.kind === 'vault' && b.group.userData.spin) {
+        const s = b.group.userData.spin as { r1: THREE.Mesh; r2: THREE.Mesh };
+        s.r1.rotation.z += dt * 0.3; s.r2.rotation.x += dt * 0.22;
 
         /* feed the void — recent Vault activity (store/extract/run) brightens
            and shudders the lattice rings, then relaxes back to baseline */
