@@ -256,11 +256,27 @@ function inv(d: [number, number, number]): [number, number] {
 
   /* the on-by-default policy + its runtime safety nets */
   const policy = /cap\.tier === 'low'/ .test(capSrc) && !/cap\.tier !== 'cinematic'/.test(capSrc);
-  const frameGuard = /guardRaymarch\(dt\);/.test(engSrc) && /avg > 0\.055/.test(engSrc);
+  const frameGuard = /guardRaymarch\(dt\);/.test(engSrc) && /avg > 0\.055/.test(engSrc)
+    && /this\.portal\.phase !== 'idle'/ .test(engSrc);
   const focusClamp = /activeFb\.data\.radius \* 0\.62 \* 7/.test(engSrc);
   check('R20: raymarch on by default (medium+ tier, software excluded)', policy, `${policy}`);
-  check('R20: frame-budget circuit breaker wired into tick', frameGuard, `${frameGuard}`);
+  check('R20: frame-budget circuit breaker wired into tick (portal frames exempt)', frameGuard, `${frameGuard}`);
   check('R20: focus clamp keeps the camera outside the disk inner edge', focusClamp, `${focusClamp}`);
+
+  /* ==== ROUND 20.1 — the disk lies flat (X-axis base) + dive keeps glory ==== */
+  /* THE FRAME FIX: the shader tests the plane on local Y, so the basis must
+     map local +Y → the disk normal. R19/R20 built it from (0,0,1)→normal and
+     the disk stood VERTICAL in the world XY plane (measured normal ≈ −Z). */
+  const basisFrame = /setFromUnitVectors\(new THREE\.Vector3\(0, 1, 0\), DISK_NORMAL\)/.test(rmSrc)
+    && !/setFromUnitVectors\(new THREE\.Vector3\(0, 0, 1\), DISK_NORMAL\)/.test(rmSrc);
+  check('R20.1: disk basis maps local +Y to the normal (disk lies flat, X base)', basisFrame, `${basisFrame}`);
+
+  /* THE GLORY FIX: no portal fade on the geodesic renderer — in cinematic
+     mode it IS the hole; fading it during the vault dive left the bare
+     black sphere. */
+  const noPortalFade = /mat\.uniforms\.uIntensity\.value = base;/.test(rmSrc)
+    && !/Math\.abs\(portal\) \* 1\.2/.test(rmSrc);
+  check('R20.1: raymarch keeps full glory through portals (no fade)', noPortalFade, `${noPortalFade}`);
 }
 
 /* ================================ verdict ================================ */

@@ -3,6 +3,10 @@
 **Build:** R50 → R51 · **Cinematic tier:** the geodesic renderer, corrected · **Status:** SHIPPED & VISUALLY VERIFIED
 *(Doc named `ROUND-20-BLACKHOLE` because `ROUND-20` is taken by the Key Ring wave.)*
 
+> **20.1 ADDENDUM (same day, user-caught):** two live bugs fixed after user testing —
+> see §6. The disk now lies FLAT on the world XZ ground plane (base along X), and the
+> vault dive keeps the hole at full glory instead of collapsing to the bare sphere.
+
 Round 19 transliterated [dgreenheck/webgpu-black-hole](https://github.com/dgreenheck/webgpu-black-hole)
 (MIT, © 2025 Daniel Greenheck) correctly at the physics level and shipped it broken at the
 presentation level. This round names the five presentation sins, reverses every one, adopts his
@@ -100,3 +104,33 @@ The gauntlet-mirrored LUT comes from the same source (ultimately Mitchell Charit
 Two syntax errors from parallel in-progress work broke the vite overlay mid-verification and were
 minimally repaired (semantics preserved): `src/backend/storage/totp.ts:59` (`??`/`||` needs
 parentheses) and `src/ui/VaultUI.tsx:3491` (one extra closing paren in the `health` formula).
+
+---
+
+## §6 ADDENDUM — Round 20.1 (user-caught live bugs)
+
+**20.1.a — The disk stood VERTICAL ("x axis as base" fix).**
+Probed the live material: the shader's disk normal measured **(−0.053, 0.043, −0.998) ≈ world −Z**
+— the accretion disk was standing upright in the world XY plane like a wheel. Root cause: the
+shader tests the disk plane on its local **Y** axis (`lPrev.y · lCur.y < 0`, `hitR = length(hit.xz)`),
+but `buildDiskBasis()` built the rotation with `setFromUnitVectors((0,0,1), DISK_NORMAL)` — mapping
+local **Z** to the normal, so local **Y** landed on an in-plane world direction. The R19 frame
+mismatch survived every screenshot review because a lensed ring reads similarly from any
+orientation without ground context. Fix: `setFromUnitVectors((0, 1, 0), DISK_NORMAL)`. Verified
+live: disk normal now **(0.055, 0.998, 0.040) ≈ +Y** — the disk lies flat on the XZ ground plane,
+base along X, its band parallel to the system's ecliptic (the reference composition).
+
+**20.1.b — The vault dive kept collapsing the hole to the bare black sphere.**
+The engine feeds the portal-target body a `portalTear` value; the port scaled the raymarch's
+intensity by it — and in cinematic mode there is NO baked composite underneath, so the dive faded
+the hole into nothing. Two fixes: (1) `updateRaymarchUniforms` (and the visual's `update`) no
+longer apply any portal fade — the geodesic hole keeps full glory through the whole dive (verified
+live: `uIntensity = 1` through arming → vortex at visualT 0.67); (2) `guardRaymarch` resets and
+skips while `portal.phase !== 'idle'` — a dive's frame cost can never permanently stand the tier
+down. Verified end-to-end: `portalTo('eventide')` → dive holds glory → `leavePortal()` → hole
+intact, tier alive (`disabled: false`, `uIntensity: 1`).
+
+Note: during the live dive test the vault UI itself did not mount (the Key Ring wave's
+in-progress work); the black-hole side of the dive is verified independent of it.
+
+**Gauntlet:** new checks — basis frame (+Y), no portal fade, guard portal exemption. GREEN.

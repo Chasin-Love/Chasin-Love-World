@@ -454,6 +454,10 @@ export class UniverseEngine {
 
   private guardRaymarch(dt: number): void {
     if (this.raymarchDisabled || this.raymarchHoles.length === 0) return;
+    /* Round 20.1 — portal dives (vault entry, reality work) have their own
+       heavy frame moments; they must never be blamed on the geodesic tier
+       and stand it down permanently */
+    if (this.portal.phase !== 'idle') { this._rmGuardFrames = 0; this._rmGuardAccum = 0; return; }
     if (!this.raymarchOnStage()) { this._rmGuardFrames = 0; this._rmGuardAccum = 0; return; }
     this._rmGuardAccum += dt;
     this._rmGuardFrames++;

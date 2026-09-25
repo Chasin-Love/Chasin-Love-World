@@ -346,11 +346,16 @@ function buildBlackbodyLut(): THREE.DataTexture {
 }
 
 /* the composite's disk plane (must match blackhole.ts) — its inverse rotation
-   maps world offsets into the disk-local frame for the plane-crossing test */
+   maps world offsets into the disk-local frame for the plane-crossing test.
+   Round 20.1 — THE FRAME FIX: the shader tests the plane on local **Y**
+   (lPrev.y · lCur.y, hitR = length(hit.xz)), so the basis must map local +Y
+   → the disk normal. R19/R20 built it from (0,0,1)→normal, silently mapping
+   local +Y → an in-plane world direction — the disk rendered STANDING
+   VERTICAL in the world XY plane instead of lying flat on the XZ ground. */
 const DISK_NORMAL = new THREE.Vector3(0.055, 1.0, 0.04).normalize();
 
 function buildDiskBasis(): THREE.Matrix3 {
-  const localToWorld = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), DISK_NORMAL);
+  const localToWorld = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), DISK_NORMAL);
   const worldToLocal = localToWorld.clone().invert();
   return new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(worldToLocal));
 }
@@ -426,8 +431,11 @@ export function createRaymarchBlackHole(R: number, opts: RaymarchBlackHoleOption
       material.uniforms.uTime.value = time;
       /* billboard: copy the camera's world orientation so the quad faces it */
       if (camQuat) quad.quaternion.copy(camQuat);
-      const fade = portal === undefined ? 1 : 1 - Math.min(1, Math.abs(portal) * 1.2);
-      material.uniforms.uIntensity.value = (opts.intensity ?? 1.0) * Math.max(0.0, fade);
+      /* Round 20.1 — NO portal fade: in cinematic mode this renderer IS the
+         hole, and fading it during a dive left the bare black sphere. Full
+         glory, always (the baked composite carries portal tear effects when
+         it is the active look in fallback mode). */
+      material.uniforms.uIntensity.value = opts.intensity ?? 1.0;
     },
     dispose() {
       quad.geometry.dispose();
@@ -442,13 +450,15 @@ export function createRaymarchBlackHole(R: number, opts: RaymarchBlackHoleOption
  * Convenience wrapper the engine calls per frame with the live camera. Sets
  * EVERYTHING the shader needs: the billboard orientation (Round 20 — the R19
  * sheared-window bug), the true camera position for the geodesic integration,
- * the hole's world center, time, and the portal-faded intensity.
+ * the hole's world center, time, and the intensity. The portal argument is
+ * accepted for interface compatibility but deliberately IGNORED since
+ * Round 20.1 — fading this renderer during a dive left the bare black sphere.
  */
 export function updateRaymarchUniforms(
   visual: BlackHoleVisual,
   camera: THREE.Camera,
   time: number,
-  portal?: number,
+  _portal?: number,
 ): void {
   const quad = visual.group.children[0] as THREE.Mesh | undefined;
   const mat = quad?.material as THREE.ShaderMaterial | undefined;
@@ -460,6 +470,5 @@ export function updateRaymarchUniforms(
   mat.uniforms.uCamPos.value.setFromMatrixPosition(camera.matrixWorld);
   mat.uniforms.uTime.value = time;
   const base = (visual.group.userData.baseIntensity as number | undefined) ?? 1.0;
-  const fade = portal === undefined ? 1 : 1 - Math.min(1, Math.abs(portal) * 1.2);
-  mat.uniforms.uIntensity.value = base * Math.max(0, fade);
+  mat.uniforms.uIntensity.value = base;
 }
