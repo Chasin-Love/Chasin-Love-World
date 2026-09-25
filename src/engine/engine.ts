@@ -408,6 +408,64 @@ export class UniverseEngine {
     for (const overlay of this.raymarchHoles) {
       overlay.group.visible = false;
     }
+    /* Round 20 — a disarmed geodesic tier must restore the WHOLE composite:
+       setCinematic(true) hid the baked disk, core shadow and funnel, and the
+       vault's lattice torii. Without this restore a shader failure left a
+       half-dressed hole (the R19 latent bug). */
+    for (const b of this.bodies) {
+      if (b.group.userData.bhRaymarch) this.setCinematicHole(b.group, false);
+    }
+  }
+
+  /** Round 20 — one switch for the hole's full presentation: the composite
+   *  steps aside for the geodesic renderer (and its lattice torii with it),
+   *  or everything comes back for the fallback. */
+  private setCinematicHole(g: THREE.Object3D, on: boolean): void {
+    const bh = g.userData.bh as { setCinematic?(on: boolean): void } | undefined;
+    bh?.setCinematic?.(on);
+    const spin = g.userData.spin as { r1?: THREE.Mesh; r2?: THREE.Mesh } | undefined;
+    if (spin?.r1) spin.r1.visible = !on;
+    if (spin?.r2) spin.r2.visible = !on;
+  }
+
+  /* Round 20 — frame-budget guard for the geodesic tier. On by default now,
+     so instead of a quality toggle the safety net is automatic: if the march
+     drags the average frame past ~55 ms (an 18 fps floor, measured ~47 ms on
+     Intel UHD at close focus) for ~3 s while a hole is actually on stage, it
+     stands down for the session (one-way — no flapping). */
+  private _rmGuardFrames = 0;
+  private _rmGuardAccum = 0;
+
+  /** True when a raymarched hole is near enough for its march to plausibly
+   *  drive frame cost (within ~120 rs — beyond that the quad is tiny). */
+  private raymarchOnStage(): boolean {
+    for (const b of this.bodies) {
+      if (b.data.kind !== 'hole' && b.data.kind !== 'vault') continue;
+      const rm = b.group.userData.bhRaymarch as BlackHoleVisual | undefined;
+      if (!rm || !rm.group.visible) continue;
+      /* world position — body groups ride inside orbit pivots, so .position
+         alone is local (and reads as origin) */
+      b.group.getWorldPosition(this._vScratch1);
+      this._vScratch1.sub(this.camera.position);
+      if (this._vScratch1.length() < b.data.radius * 0.62 * 120) return true;
+    }
+    return false;
+  }
+
+  private guardRaymarch(dt: number): void {
+    if (this.raymarchDisabled || this.raymarchHoles.length === 0) return;
+    if (!this.raymarchOnStage()) { this._rmGuardFrames = 0; this._rmGuardAccum = 0; return; }
+    this._rmGuardAccum += dt;
+    this._rmGuardFrames++;
+    if (this._rmGuardFrames < 180) return;
+    const avg = this._rmGuardAccum / this._rmGuardFrames;
+    this._rmGuardFrames = 0;
+    this._rmGuardAccum = 0;
+    if (avg > 0.055) {
+      console.warn('[universe] geodesic black hole exceeded the frame budget — the composite takes over for this session');
+      this.raymarchDisabled = true;
+      this.disableAllRaymarchHoles();
+    }
   }
   /* Pocket Cosmos Marbles — every reality bubble is a glass universe */
   private realityMarbles: { spiral: THREE.Points; glassMat: THREE.ShaderMaterial; speed: number }[] = [];
@@ -1065,7 +1123,11 @@ export class UniverseEngine {
       const bh = createBlackHole(R, this.activeReality?.colorA ?? '#38bdf8', this.activeReality?.colorB ?? '#7c3aed');
       g.add(bh.group);
       const rm = this.attachRaymarchHole(R, g);
-      if (rm) g.userData.bhRaymarch = rm;
+      if (rm) {
+        g.userData.bhRaymarch = rm;
+        /* Round 19 — the geodesic renderer owns the disk now */
+        bh.setCinematic?.(true);
+      }
       rb.mat = undefined;
       g.userData.bh = bh;
     } else if (data.kind === 'vault') {
@@ -1078,7 +1140,10 @@ export class UniverseEngine {
       /* cinematic overlay: true geodesic lensing above the composite (safe by
          construction — composite stays underneath and owns the shadow) */
       const rm = this.attachRaymarchHole(R, g);
-      if (rm) g.userData.bhRaymarch = rm;
+      if (rm) {
+        g.userData.bhRaymarch = rm;
+        bh.setCinematic?.(true);
+      }
 
       /* slim lattice torii kept as the Vault activity pulse feedback */
       const latticeMat = new THREE.MeshStandardMaterial({ color: 0x0c1418, emissive: new THREE.Color('#6fc2b4'), emissiveIntensity: 1.8, metalness: 0.7, roughness: 0.35 });
@@ -1088,6 +1153,9 @@ export class UniverseEngine {
       g.add(r1, r2);
 
       g.userData.spin = { r1, r2 };
+      /* Round 20 — while the geodesic tier owns the hole, the lattice steps
+         aside too (it would cut dark torii silhouettes through the disk glow) */
+      if (rm) { r1.visible = false; r2.visible = false; }
       g.userData.bh = bh;
     }
 
@@ -2894,7 +2962,10 @@ void main(){
         const bh = createBlackHole(data.radius, this.activeReality?.colorA ?? '#38bdf8', this.activeReality?.colorB ?? '#7c3aed');
         g.add(bh.group);
         const rm = this.attachRaymarchHole(data.radius, g);
-        if (rm) ipRaymarch = rm;
+        if (rm) {
+          ipRaymarch = rm;
+          bh.setCinematic?.(true);
+        }
         const latticeMat = new THREE.MeshStandardMaterial({
           color: 0x0c1418,
           emissive: new THREE.Color('#6fc2b4'),
@@ -2909,6 +2980,8 @@ void main(){
         r2.rotation.y = 0.6;
         g.add(r1, r2);
         g.userData.spin = { r1, r2 };
+        /* Round 20 — cinematic vault: the lattice steps aside with the composite */
+        if (ipRaymarch) { r1.visible = false; r2.visible = false; }
         const ip: InnerPlanet = { data, group: g, blackHole: bh, blackHoleRaymarch: ipRaymarch ?? undefined, moons: [], hoverT: 0 };
         this.addInnerColliderAndOrbit(ip, root, rnd);
         root.add(g);
@@ -5019,6 +5092,11 @@ void main(){
     const dt = Math.min(0.05, this.clock.getDelta());
     this.clockT += dt;
 
+    /* Round 20 — the geodesic tier's one-way circuit breaker: while a
+       raymarched hole is actually on stage, sustained frame overruns stand
+       it down for the session and the proven composite returns. */
+    this.guardRaymarch(dt);
+
     /* time */
     const rate = this.paused ? 0 : 6 * this.timeScale * (this.coreActive ? 0.35 : 1);
     this.simDays += dt * rate;
@@ -5449,6 +5527,15 @@ void main(){
       focusMax = 520000;                               /* release point on zoom-out */
     } else if (activeFb) {
       activeFb.group.getWorldPosition(this._vFocusScratch);
+      /* Round 20 — with the geodesic tier live, never let the camera dive
+         inside the disk's inner edge (~5.1 rs): clamp the orbit to his own
+         demo's minimum approach (~6 rs, here 7 rs for framing headroom) */
+      if (activeFb.data.kind === 'hole' || activeFb.data.kind === 'vault') {
+        const rm = activeFb.group.userData.bhRaymarch as BlackHoleVisual | undefined;
+        if (rm && rm.group.visible) {
+          focusMin = Math.max(activeFb.data.radius * 1.35, activeFb.data.radius * 0.62 * 7);
+        }
+      }
     } else if (this.galaxyFocusId) {
       /* orbit the entered galaxy — deep inside its own stellar system
          (galaxyInnerFocus) or framed on its disc from outside */

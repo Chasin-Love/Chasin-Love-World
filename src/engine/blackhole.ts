@@ -544,6 +544,9 @@ export interface BlackHoleVisual {
   update(time: number, camQuat?: THREE.Quaternion, portal?: number, funnelStrength?: number, camDist?: number): void;
   /** Round 17 — retint the spacetime funnel to a new reality's palette. */
   setTint?(colorA: THREE.Color, colorB: THREE.Color): void;
+  /** Round 20 — the geodesic tier owns the whole hole; every baked part
+   *  (disk, arcs, core shadow, funnel) steps aside and restores on false. */
+  setCinematic?(on: boolean): void;
   dispose(): void;
 }
 
@@ -684,6 +687,17 @@ export function createBlackHole(R: number, colorA = '#38bdf8', colorB = '#7c3aed
     },
     setTint(colorA2, colorB2) {
       funnel.setTint(colorA2, colorB2);
+    },
+    /* Round 20 — the geodesic renderer owns the ENTIRE hole now: disk, arcs,
+       shadow AND funnel step aside. The baked core sphere in particular MUST
+       hide — it writes depth, and with depthTest on the raymarch quad it
+       punched a circular clip through the lensed image (the R19 "disk stops
+       at the hole" artifact). The raymarch paints its own black shadow. */
+    setCinematic(on) {
+      diskTilt.visible = !on;
+      billboard.visible = !on;
+      core.visible = !on;
+      funnel.group.visible = !on;
     },
     dispose() {
       group.traverse((o) => {

@@ -3,6 +3,7 @@
 
 import { readFileSync } from 'fs';
 import { flammDepth } from '../src/engine/blackhole';
+import { blackbodyColorOf } from '../src/engine/blackholeRaymarch';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: string): void {
@@ -170,6 +171,96 @@ function inv(d: [number, number, number]): [number, number] {
   const haloNormal = /const primaryHalo = new THREE\.Mesh\([\s\S]*?NormalBlending[\s\S]*?\);/.test(bhSrc);
   check('dense-matter blending: disk + lensed halo occlude the sky', diskNormal && haloNormal,
     `disk=${diskNormal} halo=${haloNormal}`);
+}
+
+/* ==== 5. ROUND 19/20 — the ported geodesic engine (dgreenheck, MIT) ==== */
+{
+  /* Mitchell–Charity LUT spot values: 6600K ≈ white (CIE 1931), 3000K warm,
+     1000K deep red — the ported table must agree with the source table. */
+  const w = blackbodyColorOf(6600);
+  const warm = blackbodyColorOf(3000);
+  const red = blackbodyColorOf(1000);
+  check('blackbody LUT: 6600K ≈ white', w[0] > 0.94 && w[1] > 0.94 && w[2] > 0.94,
+    `rgb(${w.map(v => v.toFixed(3)).join(',')})`);
+  check('blackbody LUT: 3000K warm, 1000K deep red',
+    warm[0] === 1 && warm[1] > 0.45 && warm[1] < 0.53 && warm[2] < 0.16 && red[1] < 0.05,
+    `3000K rgb(${warm.map(v => v.toFixed(2)).join(',')}), 1000K rgb(${red.map(v => v.toFixed(2)).join(',')})`);
+
+  /* the shader must carry his exact physics and the multi-crossing halo */
+  const rmSrc = readFileSync(new URL('../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
+  const multiCrossing = /EVERY disk-plane crossing/.test(rmSrc) && /remaining = 1\.0 - alpha/.test(rmSrc);
+  const hisConstants = /CAPTURE_R \(RS \* 1\.01\)/.test(rmSrc) && /r > 100\.0/.test(rmSrc)
+    && /pow\(uDiskInner \/ hitR, uTempFalloff\)/.test(rmSrc)
+    && /0\.3 \/ sqrt\(hitR \/ uDiskInner\)/.test(rmSrc)
+    && /pow\(1\.0 \/ \(1\.0 - beta \* cosA\), 3\.0 \* uDoppler\)/.test(rmSrc);
+  const localFrame = /uDiskBasis \* pPrev/.test(rmSrc) && /uDiskBasis \* p;/.test(rmSrc);
+  const ourSky = !/starfield/.test(rmSrc);
+  check('geodesic: multi-crossing halo + front-to-back compositing', multiCrossing, `${multiCrossing}`);
+  check('geodesic: his exact constants (1.01·rs capture, 100 escape, T∝(rin/r)^α, β=0.3/√(r/rin), D³)', hisConstants, `${hisConstants}`);
+  check('geodesic: disk crossings in the disk-LOCAL frame (uDiskBasis)', localFrame, `${localFrame}`);
+  check('geodesic: OUR universe is the background (no procedural starfield)', ourSky, `${ourSky}`);
+}
+
+/* ==== 6. ROUND 20 — the presentation fixes (the R19 five sins, reversed) ==== */
+{
+  const rmSrc = readFileSync(new URL('../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
+  const bhSrc = readFileSync(new URL('../src/engine/blackhole.ts', import.meta.url), 'utf8');
+  const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
+  const capSrc = readFileSync(new URL('../src/engine/capability.ts', import.meta.url), 'utf8');
+
+  /* SIN 1 — the quad must billboard EVERY frame, inside the per-frame
+     uniform updater the engine already calls (R19 never copied the camera
+     rotation → sheared window, straight-edge clipping, edge-on vanishing). */
+  const billboard = /updateRaymarchUniforms[\s\S]*?quad\.quaternion\.copy\(camera\.quaternion\)/.test(rmSrc);
+  check('R20: quad billboards every frame (updateRaymarchUniforms)', billboard, `${billboard}`);
+
+  /* SIN 2 — the baked core sphere (depth writer) must hide in cinematic mode
+     or it punches a circular clip through the lensed image. */
+  const coreHides = /setCinematic\(on\) \{[\s\S]*?core\.visible = !on;[\s\S]*?funnel\.group\.visible = !on;[\s\S]*?\},/.test(bhSrc);
+  check('R20: cinematic hides core sphere + funnel (no depth punch-out)', coreHides, `${coreHides}`);
+
+  /* SIN 3 — his TUNED bending pair: per-unit bend = step × lensing must equal
+     his runtime 1.0 × 2.4. Our 0.3 step demands 8.0 (R19 paired fallbacks:
+     0.3 × 1.5 → 5.3× too weak → flat band, no wrap). */
+  const lensing = /uLensing: \{ value: 8\.0 \}/.test(rmSrc) && /stepLen \* uLensing/.test(rmSrc)
+    && /clamp\(r \* 0\.125, 1\.0, 4\.0\)/.test(rmSrc);
+  check('R20: his tuned bending pair reproduced (0.3 × 8.0 = 1.0 × 2.4)', lensing, `${lensing}`);
+
+  /* SIN 4 — his gamma step STAYS: his material encodes pow(1/2.2) BEFORE the
+     renderer's ACES + sRGB output — exactly our composer's structure. */
+  const hisGamma = /pow\(max\(color, vec3\(0\.0\)\), vec3\(1\.0 \/ 2\.2\)\)/.test(rmSrc);
+  check('R20: his pipeline gamma step kept (material → bloom → OutputPass)', hisGamma, `${hisGamma}`);
+
+  /* SIN 5 — his RUNTIME config verbatim (the demo reference look), plus his
+     full LUT range (R19 truncated at 10,000 K; his peak runs 49,780 K). */
+  const tuned = /uDiskInner: \{ value: 4\.1 \}/.test(rmSrc) && /uDiskOuter: \{ value: 14\.5 \}/.test(rmSrc)
+    && /uDiskTemp: \{ value: 49\.78 \}/.test(rmSrc) && /uTempFalloff: \{ value: 5\.22 \}/.test(rmSrc)
+    && /uDiskBright: \{ value: 5\.0 \}/.test(rmSrc) && /uRotSpeed: \{ value: -8\.7 \}/.test(rmSrc)
+    && /uTurbSharp: \{ value: 7\.4 \}/.test(rmSrc) && /uLensing: \{ value: 8\.0 \}/.test(rmSrc);
+  const fullLut = /clamp\(tempK, 1000\.0, 40000\.0\)/.test(rmSrc) && /90\.0 \+ \(t - 10000\.0\) \* 0\.001/.test(rmSrc);
+  const rotSign = /sign\(uRotSpeed\)/.test(rmSrc);
+  check('R20: his tuned runtime config verbatim (4.1/14.5/49.78/5.22/5/−8.7/7.4)', tuned, `${tuned}`);
+  check('R20: LUT reaches 40,000 K (his two-segment table)', fullLut, `${fullLut}`);
+  check('R20: Doppler rotation-sign flip present (his disk spins negatively)', rotSign, `${rotSign}`);
+
+  /* unit convention — march in HIS units (rs = 0.8) via one scale uniform */
+  const hisUnits = /uScale: \{ value: rs \* 1\.25 \}/.test(rmSrc) && /\(uCamPos - uCenter\) \/ uScale/.test(rmSrc);
+  check('R20: his unit convention (rs = 0.8 shader units, uScale bridge)', hisUnits, `${hisUnits}`);
+
+  /* SIN 6 — a disarmed tier must restore the WHOLE composite + torii. */
+  const failureRestore = /disableAllRaymarchHoles\(\): void \{[\s\S]*?setCinematicHole\(b\.group, false\)/.test(engSrc);
+  const toriiHide = /if \(rm\) \{ r1\.visible = false; r2\.visible = false; \}/.test(engSrc)
+    && /if \(ipRaymarch\) \{ r1\.visible = false; r2\.visible = false; \}/.test(engSrc);
+  check('R20: shader failure restores composite + torii (both vault sites)', failureRestore && toriiHide,
+    `restore=${failureRestore} torii=${toriiHide}`);
+
+  /* the on-by-default policy + its runtime safety nets */
+  const policy = /cap\.tier === 'low'/ .test(capSrc) && !/cap\.tier !== 'cinematic'/.test(capSrc);
+  const frameGuard = /guardRaymarch\(dt\);/.test(engSrc) && /avg > 0\.055/.test(engSrc);
+  const focusClamp = /activeFb\.data\.radius \* 0\.62 \* 7/.test(engSrc);
+  check('R20: raymarch on by default (medium+ tier, software excluded)', policy, `${policy}`);
+  check('R20: frame-budget circuit breaker wired into tick', frameGuard, `${frameGuard}`);
+  check('R20: focus clamp keeps the camera outside the disk inner edge', focusClamp, `${focusClamp}`);
 }
 
 /* ================================ verdict ================================ */

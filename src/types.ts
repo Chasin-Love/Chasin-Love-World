@@ -226,6 +226,10 @@ export interface VaultUser {
   kdfRounds?: number;
 }
 
+export interface PasswordField { k: string; v: string; }
+
+export interface PasswordHistoryEntry { secret: string; changedAt: number; }
+
 export interface PasswordRecord {
   id: string;
   label: string;
@@ -234,9 +238,63 @@ export interface PasswordRecord {
   category?: string;
   notes?: string;
   updatedAt: number;
+  /** TOTP seed as an otpauth:// URI — grants the record a pulsar code */
+  otpauth?: string;
+  /** Associated login addresses (one per line in editors) */
+  urls?: string[];
+  /** Custom key/value payload — card numbers, recovery codes, SSH hosts… */
+  fields?: PasswordField[];
+  /** Prior secrets, newest last, capped — one-click revert on edit */
+  history?: PasswordHistoryEntry[];
+  /** Soft-delete marker — the record falls into ring trash until purged */
+  deletedAt?: number;
+  /** Set by nova scan when the secret matches a known-compromised corpus */
+  breachedAt?: number;
 }
 
-export interface VaultSecrets { salt: string; iv: string; data: string; rounds?: number; }
+/**
+ * One way to unwrap the ring key. The record payload is sealed under a random
+ * 256-bit ring key; envelopes are the doors to it — master passphrase (+optional
+ * keyfile), a WebAuthn PRF credential, or the stellar-will custodian key.
+ */
+export interface RingEnvelope {
+  salt: string;
+  iv: string;
+  /** the wrapped ring key, AES-GCM under the KDF-derived envelope key */
+  data: string;
+  kdf?: 'argon2id' | 'pbkdf2';
+  rounds?: number;
+  mem?: number;
+  iters?: number;
+  kind?: 'master' | 'prf' | 'custodian';
+  /** keyfile fingerprint (first 16 hex of sha256(kfHash)) — present means a keyfile is required */
+  fp?: string;
+  /** WebAuthn credential id (b64url) for prf envelopes */
+  credId?: string;
+  /** PRF eval salt (b64) for prf envelopes */
+  prfSalt?: string;
+  /** when the custodian envelope was armed */
+  armedAt?: number;
+  /** stellar-will darkness threshold in months */
+  months?: number;
+  createdAt?: number;
+}
+
+export interface VaultSecrets {
+  /** v2 envelope sealing — record payload is raw AES-GCM under the ring key */
+  version?: 2;
+  iv: string;
+  data: string;
+  envelopes?: RingEnvelope[];
+  /** last successful open — drives the stellar will's darkness check */
+  lastOpenedAt?: number;
+  /* ---- legacy v1 fields (payload sealed under a passphrase-derived key) ---- */
+  salt?: string;
+  rounds?: number;
+  kdf?: 'argon2id' | 'pbkdf2';
+  mem?: number;
+  iters?: number;
+}
 
 export interface AuditEntry { t: number; msg: string; }
 
