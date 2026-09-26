@@ -13,7 +13,7 @@
  * onSkyChanged so the engine's photo dome updates live. Total isolation:
  * a reality's sky is addressed by that reality's OWN disk folder.
  */
-import { realityApi } from '../desktop/adapter';
+import { realityApi, isDesktop } from '../desktop/adapter';
 import { folderNameForReality, deriveFolderName, getReality } from '../../realities';
 import { getState } from '../../state';
 
@@ -67,6 +67,14 @@ function skyFolderForReality(realityId: string): string {
 }
 
 export function skyAssetUrl(realityId: string, file: string): string {
+  /* Desktop: sky assets never cross HTTP — the Tauri webview has no route
+     into the realities tree. Rust returns raw bytes; they are wrapped in a
+     blob URL here and cached (warmSkyAsset below keeps it fresh). Web: the
+     express route serves the bytes as before. */
+  if (isDesktop()) {
+    const folder = skyFolderForReality(realityId);
+    return blobUrlCache.get(`${folder}/${file}`) ?? '';
+  }
   return `/api/realities/sky/asset/${encodeURIComponent(skyFolderForReality(realityId))}/${file}`;
 }
 
@@ -120,6 +128,38 @@ const EMPTY_SKY: SkyManifest = {
   settings: { blend: 0.85, dim: 0.45, blur: 0.12, vignette: 0.55, drift: 0.3 },
 };
 
+/* ----------------------- desktop blob-URL bridge ------------------------
+   On desktop every photo's bytes come from Rust (sky_asset command) and are
+   wrapped in an object URL keyed by `<folder>/<file>`. `warmSkyAssets`
+   fills the cache BEFORE a manifest is adopted, so skyAssetUrl() never
+   returns an empty string for a photo the manifest knows about. URLs are
+   revoked when a photo is deleted or its folder changes. */
+const blobUrlCache = new Map<string, string>();
+
+async function warmSkyAssets(realityId: string, manifest: SkyManifest): Promise<void> {
+  if (!isDesktop()) return;
+  const folder = skyFolderForReality(realityId);
+  const wanted = new Set(manifest.photos.map((p) => `${folder}/${p.file}`));
+  for (const [key, url] of blobUrlCache) {
+    if (!wanted.has(key)) {
+      URL.revokeObjectURL(url);
+      blobUrlCache.delete(key);
+    }
+  }
+  await Promise.all(
+    manifest.photos.map(async (p) => {
+      const key = `${folder}/${p.file}`;
+      if (blobUrlCache.has(key)) return;
+      try {
+        const bytes = await realityApi<number[]>('/api/realities/sky/asset-bytes', { folder, file: p.file });
+        if (Array.isArray(bytes) && bytes.length) {
+          blobUrlCache.set(key, URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: p.mime || 'image/jpeg' })));
+        }
+      } catch { /* leave the cache without it — the <img> just stays empty */ }
+    }),
+  );
+}
+
 async function fetchSky(realityId: string): Promise<SkyManifest> {
   try {
     const res = await realityApi<{ success?: boolean; manifest?: SkyManifest }>(
@@ -127,7 +167,10 @@ async function fetchSky(realityId: string): Promise<SkyManifest> {
       undefined,
       'GET',
     );
-    if (res?.manifest) return adopt(realityId, res.manifest, true);
+    if (res?.manifest) {
+      await warmSkyAssets(realityId, res.manifest);
+      return adopt(realityId, res.manifest, true);
+    }
   } catch { /* fall through to the cache-preservation path */ }
   /* No answer (desktop-native or server hiccup): keep any healthy cached
      manifest — a transient network blip must never wipe a real sky. Only
@@ -167,6 +210,7 @@ export async function uploadSkyPhoto(realityId: string, file: File): Promise<Sky
     { folder: skyFolderForReality(realityId), name: file.name, mime: 'image/jpeg', dataBase64, ensure: true },
   );
   if (!res?.success || !res.manifest) throw new Error(res?.error ?? 'the sky rejected the upload');
+  await warmSkyAssets(realityId, res.manifest);
   return adopt(realityId, res.manifest);
 }
 
@@ -205,6 +249,7 @@ export async function activateSkyPhoto(realityId: string, photoId: string | null
     { folder: skyFolderForReality(realityId), photoId },
   );
   if (!res?.success || !res.manifest) throw new Error(res?.error ?? 'activation failed');
+  await warmSkyAssets(realityId, res.manifest);
   return adopt(realityId, res.manifest);
 }
 
@@ -214,6 +259,7 @@ export async function deleteSkyPhoto(realityId: string, photoId: string): Promis
     { folder: skyFolderForReality(realityId), photoId },
   );
   if (!res?.success || !res.manifest) throw new Error(res?.error ?? 'delete failed');
+  await warmSkyAssets(realityId, res.manifest);
   return adopt(realityId, res.manifest);
 }
 

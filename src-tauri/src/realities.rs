@@ -8,7 +8,7 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-fn sanitize_folder_name(raw: &str) -> String {
+pub(crate) fn sanitize_folder_name(raw: &str) -> String {
     let segment: String = raw.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
     if segment.is_empty() || segment == "." || segment == ".." {
         String::new()
@@ -17,14 +17,14 @@ fn sanitize_folder_name(raw: &str) -> String {
     }
 }
 
-fn is_inside(parent: &Path, child: &Path) -> bool {
+pub(crate) fn is_inside(parent: &Path, child: &Path) -> bool {
     match (parent.canonicalize(), child.canonicalize()) {
         (Ok(p), Ok(c)) => c.starts_with(&p) && c != p,
         _ => false,
     }
 }
 
-fn realities_dir() -> Result<PathBuf, String> {
+pub(crate) fn realities_dir() -> Result<PathBuf, String> {
     // 1. Explicit override (dev convenience / CI).
     if let Ok(dir) = std::env::var("MYU_REALITIES_DIR") {
         let p = PathBuf::from(dir);
@@ -303,9 +303,15 @@ pub fn rename_folder(reality_id: String, new_name: String) -> Result<String, Str
                 let q1 = start + q1;
                 let quote = content.as_bytes()[q1] as char;
                 if let Some(len) = content[q1 + 1..].find(quote) {
-                    let mut patched = String::from(&content[..q1 + 1]);
-                    patched.push_str(&new_name.replace('\'', "\\'"));
-                    patched.push_str(&content[q1 + 1 + len..]);
+                /* JSON.stringify the name (function replacement like the
+                   Node daemon): a trailing backslash in the old naive
+                   \' splice escaped the closing quote and corrupted the
+                   module — eager glob then white-screened the app. The
+                   literal replaces the ENTIRE quoted span, quotes included. */
+                let name_literal = serde_json::to_string(&new_name).unwrap_or_else(|_| "\"\"".into());
+                let mut patched = String::from(&content[..q1]);
+                patched.push_str(&name_literal);
+                patched.push_str(&content[q1 + 1 + len..]);
                     fs::write(&index_path, patched).map_err(|e| e.to_string())?;
                 }
             }
@@ -386,29 +392,33 @@ pub fn create_folder(
     let surface_var = format!("{}Surface", folder);
     let esc = |s: &str| -> String { serde_json::to_string(s).unwrap_or_else(|_| "\"\"".into()) };
 
+    /* Every user-controlled value crosses as a JSON string literal (JSON is a
+       subset of TS expression syntax for strings). Raw single-quote splices
+       here were the desktop twin of the Round-1 injection fix — a crafted
+       color like x',evil(),y executed inside the generated module. */
     let surface = format!(
-        "import {{ UniverseSurfaceConfig }} from '../types';\n\nexport const {sv}: UniverseSurfaceConfig = {{\n  realityId: '{cid}',\n  name: {name},\n  colorA: '{ca}',\n  colorB: '{cb}',\n  deepColor: '#030108',\n  starColor: '{sc}',\n  webFilaments: '{ca}',\n  nebulaIntensity: 1.0,\n  dustLaneIntensity: 0.8,\n  starDensity: 0.85,\n}};\n",
+        "import {{ UniverseSurfaceConfig }} from '../types';\n\nexport const {sv}: UniverseSurfaceConfig = {{\n  realityId: {cid},\n  name: {name},\n  colorA: {ca},\n  colorB: {cb},\n  deepColor: '#030108',\n  starColor: {sc},\n  webFilaments: {ca},\n  nebulaIntensity: 1.0,\n  dustLaneIntensity: 0.8,\n  starDensity: 0.85,\n}};\n",
         sv = surface_var,
-        cid = clean_id,
+        cid = esc(&clean_id),
         name = esc(&name),
-        ca = color_a,
-        cb = color_b,
-        sc = star_color,
+        ca = esc(color_a),
+        cb = esc(color_b),
+        sc = esc(star_color),
     );
     fs::write(target.join("surface.ts"), surface).map_err(|e| e.to_string())?;
 
     let index = format!(
-        "import {{ RealityConfig }} from '../types';\nimport {{ {sv} }} from './surface';\n\nconst day = 86400000;\nconst now = Date.now();\nconst TAU = Math.PI * 2;\n\nexport const {v}: RealityConfig = {{\n  id: '{cid}',\n  name: {name},\n  codeName: {cn},\n  spectral: {sp},\n  description: {desc},\n  bubblePos: [0, 0, 0],\n  bubbleSize: 7500,\n  colorA: '{ca}',\n  colorB: '{cb}',\n  starColor: '{sc}',\n  bodies: {bodies},\n  entries: {entries},{hint}\n}};\n\nexport * from './surface';\n",
+        "import {{ RealityConfig }} from '../types';\nimport {{ {sv} }} from './surface';\n\nconst day = 86400000;\nconst now = Date.now();\nconst TAU = Math.PI * 2;\n\nexport const {v}: RealityConfig = {{\n  id: {cid},\n  name: {name},\n  codeName: {cn},\n  spectral: {sp},\n  description: {desc},\n  bubblePos: [0, 0, 0],\n  bubbleSize: 7500,\n  colorA: {ca},\n  colorB: {cb},\n  starColor: {sc},\n  bodies: {bodies},\n  entries: {entries},{hint}\n}};\n\nexport * from './surface';\n",
         sv = surface_var,
         v = var_name,
-        cid = clean_id,
+        cid = esc(&clean_id),
         name = esc(&name),
         cn = esc(code_name.as_deref().unwrap_or(&format!("REALITY-{}", folder.to_uppercase()))),
         sp = esc(spectral.as_deref().unwrap_or("Quantum Singularity")),
         desc = esc(description.as_deref().unwrap_or(&format!("The {} continuum realm.", name))),
-        ca = color_a,
-        cb = color_b,
-        sc = star_color,
+        ca = esc(color_a),
+        cb = esc(color_b),
+        sc = esc(star_color),
         bodies = if bodies_json.trim().is_empty() || bodies_json == "[]" {
             default_bodies_json(&clean_id, &name, &color_a, &color_b)
         } else {
@@ -428,12 +438,28 @@ fn default_bodies_json(clean_id: &str, name: &str, color_a: &str, color_b: &str)
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
+    /* Same rule as the module templates: interpolated text crosses as JSON
+       literals, never raw quote-splices. The palette colors are string
+       literals inside the bodies array; the id is sanitized but escaped
+       anyway so the invariant holds unconditionally. */
+    let ca = serde_json::to_string(color_a).unwrap_or_else(|_| "\"\"".into());
+    let cb = serde_json::to_string(color_b).unwrap_or_else(|_| "\"\"".into());
+    let core_name = serde_json::to_string(&format!("{name} Core Star")).unwrap_or_else(|_| "\"\"".into());
+    let prime_name = serde_json::to_string(&format!("{name} Prime")).unwrap_or_else(|_| "\"\"".into());
+    let core_note = serde_json::to_string(&format!("The stellar anchor of {name}."))
+        .unwrap_or_else(|_| "\"\"".into());
+    let prime_note = serde_json::to_string(&format!("The primordial terrestrial world of {name}."))
+        .unwrap_or_else(|_| "\"\"".into());
     format!(
-        "[\n    {{\n      id: \"{cid}-core\",\n      name: \"{n} Core Star\",\n      kind: 'star',\n      meaning: null,\n      note: \"The stellar anchor of {n}.\",\n      createdAt: {now},\n      radius: 6.5,\n      palette: {{ deep: '#1c0e35', base: '{ca}', high: '#ffffff', atmo: '{cb}', ice: '#ffffff' }},\n      orbit: {{ a: 0, speed: 0, phase: 0, incl: 0 }},\n    }},\n    {{\n      id: \"{cid}-prime\",\n      name: \"{n} Prime\",\n      kind: 'planet',\n      meaning: 'moment',\n      note: \"The primordial terrestrial world of {n}.\",\n      createdAt: {now},\n      radius: 2.2,\n      clouds: true,\n      nightside: true,\n      palette: {{ deep: '#0c1b33', base: '#10b981', high: '#6ee7b7', atmo: '{ca}', ice: '#e0f2fe' }},\n      orbit: {{ a: 45, speed: Math.PI * 2 / 365, phase: 1.2, incl: 0.04 }},\n    }}\n  ]",
-        cid = clean_id,
-        n = name,
-        ca = color_a,
-        cb = color_b,
+        "[\n    {{\n      id: {cid},\n      name: {core_name},\n      kind: 'star',\n      meaning: null,\n      note: {core_note},\n      createdAt: {now},\n      radius: 6.5,\n      palette: {{ deep: '#1c0e35', base: {ca}, high: '#ffffff', atmo: {cb}, ice: '#ffffff' }},\n      orbit: {{ a: 0, speed: 0, phase: 0, incl: 0 }},\n    }},\n    {{\n      id: {cid2},\n      name: {prime_name},\n      kind: 'planet',\n      meaning: 'moment',\n      note: {prime_note},\n      createdAt: {now},\n      radius: 2.2,\n      clouds: true,\n      nightside: true,\n      palette: {{ deep: '#0c1b33', base: '#10b981', high: '#6ee7b7', atmo: {ca}, ice: '#e0f2fe' }},\n      orbit: {{ a: 45, speed: Math.PI * 2 / 365, phase: 1.2, incl: 0.04 }},\n    }}\n  ]",
+        cid = serde_json::to_string(&format!("{clean_id}-core")).unwrap_or_else(|_| "\"\"".into()),
+        cid2 = serde_json::to_string(&format!("{clean_id}-prime")).unwrap_or_else(|_| "\"\"".into()),
+        core_name = core_name,
+        prime_name = prime_name,
+        core_note = core_note,
+        prime_note = prime_note,
+        ca = ca,
+        cb = cb,
         now = now
     )
 }

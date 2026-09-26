@@ -24,7 +24,7 @@ pub const PHYSICS_FIELD_COUNT: usize = 41;
 
 #[cfg(cosmos_cpp)]
 mod ffi {
-    use std::ffi::{c_char, c_double, c_int};
+    use std::ffi::{c_char, c_double, c_int, c_void};
 
     extern "C" {
         pub fn cosmos_version() -> *const c_char;
@@ -63,12 +63,33 @@ mod ffi {
         );
         pub fn cosmos_terrain_fbm(x: c_double, y: c_double) -> c_double;
         pub fn cosmos_benchmark_rk4(n_bodies: c_int, iterations: c_int) -> c_double;
+        /* the handle-based N-body simulator + single-orbit helpers (v1 FFI,
+           exported from cosmos_engine.cpp; stubs mirror them for type-check
+           hosts without a C++ toolchain) */
+        pub fn cosmos_create_simulator() -> *mut c_void;
+        pub fn cosmos_destroy_simulator(handle: *mut c_void);
+        pub fn cosmos_add_body(
+            handle: *mut c_void,
+            id: u32,
+            mass: c_double,
+            radius: c_double,
+            px: c_double, py: c_double, pz: c_double,
+            vx: c_double, vy: c_double, vz: c_double,
+        );
+        pub fn cosmos_step_simulation(handle: *mut c_void, dt: c_double, iterations: c_int);
+        pub fn cosmos_get_body_state(
+            handle: *mut c_void,
+            index: u32,
+            out_pos: *mut c_double,
+            out_vel: *mut c_double,
+        );
+        pub fn cosmos_time_dilation(radius: c_double, mass: c_double) -> c_double;
     }
 }
 
 #[cfg(cosmos_stub)]
 mod ffi {
-    use std::ffi::{c_char, c_double, c_int};
+    use std::ffi::{c_char, c_double, c_int, c_void};
 
     pub unsafe fn cosmos_version() -> *const c_char {
         b"stub\0".as_ptr() as *const c_char
@@ -103,6 +124,30 @@ mod ffi {
     }
     pub unsafe fn cosmos_terrain_fbm(_x: c_double, _y: c_double) -> c_double { 0.0 }
     pub unsafe fn cosmos_benchmark_rk4(_n: c_int, _i: c_int) -> c_double { 0.0 }
+    pub unsafe fn cosmos_orbit_position(
+        _a: c_double, _e: c_double, _phase: c_double, _incl: c_double,
+        _days: c_double, _speed: c_double, out: *mut c_double,
+    ) {
+        if !out.is_null() {
+            *out.add(0) = 0.0; *out.add(1) = 0.0; *out.add(2) = 0.0;
+            *out.add(3) = 0.0; *out.add(4) = 0.0;
+        }
+    }
+    pub unsafe fn cosmos_create_simulator() -> *mut c_void { std::ptr::null_mut() }
+    pub unsafe fn cosmos_destroy_simulator(_h: *mut c_void) {}
+    pub unsafe fn cosmos_add_body(
+        _h: *mut c_void, _id: u32, _mass: c_double, _radius: c_double,
+        _px: c_double, _py: c_double, _pz: c_double,
+        _vx: c_double, _vy: c_double, _vz: c_double,
+    ) {}
+    pub unsafe fn cosmos_step_simulation(_h: *mut c_void, _dt: c_double, _iters: c_int) {}
+    pub unsafe fn cosmos_get_body_state(
+        _h: *mut c_void, _index: u32, out_pos: *mut c_double, out_vel: *mut c_double,
+    ) {
+        if !out_pos.is_null() { std::slice::from_raw_parts_mut(out_pos, 3).fill(0.0); }
+        if !out_vel.is_null() { std::slice::from_raw_parts_mut(out_vel, 3).fill(0.0); }
+    }
+    pub unsafe fn cosmos_time_dilation(_radius: c_double, _mass: c_double) -> c_double { 0.0 }
 }
 
 pub fn version_string() -> String {

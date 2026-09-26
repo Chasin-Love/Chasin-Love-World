@@ -11,6 +11,7 @@
 
 mod cosmos;
 mod realities;
+mod sky;
 mod store;
 
 use serde::Deserialize;
@@ -271,6 +272,142 @@ fn reality_create_folder(
     Ok(serde_json::json!({ "success": true, "folderName": folder }))
 }
 
+/* ------------------------------- sky studio ------------------------------ */
+
+#[tauri::command]
+fn sky_status(folder: Option<String>) -> Result<serde_json::Value, String> {
+    Ok(serde_json::json!({ "success": true, "manifest": sky::get_sky_status(folder)? }))
+}
+
+#[tauri::command]
+fn sky_upload(folder: Option<String>, name: Option<String>, mime: Option<String>, dataBase64: Option<String>, ensure: Option<bool>) -> Result<serde_json::Value, String> {
+    sky::add_sky_photo(folder, name, mime, dataBase64, ensure.unwrap_or(true))
+}
+
+#[tauri::command]
+fn sky_activate(folder: Option<String>, photoId: Option<String>) -> Result<serde_json::Value, String> {
+    sky::set_active_sky_photo(folder, photoId)
+}
+
+#[tauri::command]
+fn sky_delete(folder: Option<String>, photoId: String) -> Result<serde_json::Value, String> {
+    sky::remove_sky_photo(folder, photoId)
+}
+
+#[tauri::command]
+fn sky_settings(folder: Option<String>, settings: Option<sky::SkySettings>) -> Result<serde_json::Value, String> {
+    sky::update_sky_settings(folder, settings)
+}
+
+#[tauri::command]
+fn sky_asset(folder: String, file: String) -> Result<Vec<u8>, String> {
+    sky::sky_asset(folder, file)
+}
+
+/* --------------------- native N-body simulator (v1 FFI) ------------------
+   The C++ handle API (cosmos_create_simulator / cosmos_add_body /
+   cosmos_step_simulation / cosmos_get_body_state) becomes a session: one
+   live simulator owned by the shell, reset on every configure call. The
+   renderer's TS physics stay the reference + fallback (per the C++ header's
+   contract); this session exists for parity testing and future drivers. */
+use std::sync::Mutex;
+
+struct SimSession {
+    handle: *mut std::ffi::c_void,
+    bodies: u32,
+}
+unsafe impl Send for SimSession {}
+
+static SIM: Mutex<Option<SimSession>> = Mutex::new(None);
+
+fn with_sim<T>(f: impl FnOnce(*mut std::ffi::c_void) -> T) -> Result<T, String> {
+    let mut guard = SIM.lock().map_err(|_| "sim session poisoned".to_string())?;
+    if guard.is_none() {
+        let h = unsafe { cosmos::ffi::cosmos_create_simulator() };
+        if h.is_null() {
+            return Err("simulator unavailable in this build".into());
+        }
+        *guard = Some(SimSession { handle: h, bodies: 0 });
+    }
+    Ok(f(guard.as_ref().unwrap().handle))
+}
+
+#[tauri::command]
+fn cosmos_sim_configure(bodies: Vec<serde_json::Value>) -> Result<serde_json::Value, String> {
+    let mut guard = SIM.lock().map_err(|_| "sim session poisoned".to_string())?;
+    /* reset: destroy + recreate for a clean deterministic run */
+    if let Some(s) = guard.take() {
+        unsafe { cosmos::ffi::cosmos_destroy_simulator(s.handle) };
+    }
+    let h = unsafe { cosmos::ffi::cosmos_create_simulator() };
+    if h.is_null() {
+        return Err("simulator unavailable in this build".into());
+    }
+    let mut count = 0u32;
+    for (i, b) in bodies.iter().enumerate() {
+        if count >= 4096 {
+        break;
+    }
+        let get = |k: &str| -> f64 {
+            b.get(k).and_then(|v| v.as_f64()).unwrap_or(0.0)
+        };
+        unsafe {
+            cosmos::ffi::cosmos_add_body(
+                h,
+                b.get("id").and_then(|v| v.as_u64()).unwrap_or(i as u64) as u32,
+                get("mass"), get("radius"),
+                get("px"), get("py"), get("pz"),
+                get("vx"), get("vy"), get("vz"),
+            );
+        }
+        count += 1;
+    }
+    *guard = Some(SimSession { handle: h, bodies: count });
+    Ok(serde_json::json!({ "configured": count }))
+}
+
+#[tauri::command]
+fn cosmos_sim_step(dt: f64, iterations: i32) -> Result<serde_json::Value, String> {
+    let bodies = {
+        let guard = SIM.lock().map_err(|_| "sim session poisoned".to_string())?;
+        guard.as_ref().map(|s| s.bodies).unwrap_or(0)
+    };
+    if bodies == 0 {
+        return Err("no simulator session — call cosmos_sim_configure first".into());
+    }
+    let iters = iterations.clamp(1, 1000);
+    with_sim(|h| unsafe { cosmos::ffi::cosmos_step_simulation(h, dt, iters) })?;
+    Ok(serde_json::json!({ "stepped": iters, "dt": dt }))
+}
+
+#[tauri::command]
+fn cosmos_sim_body(index: i32) -> Result<serde_json::Value, String> {
+    if index < 0 {
+        return Err("body index must be >= 0".into());
+    }
+    let mut pos = [0f64; 3];
+    let mut vel = [0f64; 3];
+    let idx = index as u32;
+    with_sim(|h| unsafe {
+        cosmos::ffi::cosmos_get_body_state(h, idx, pos.as_mut_ptr(), vel.as_mut_ptr());
+    })?;
+    Ok(serde_json::json!({ "pos": pos, "vel": vel }))
+}
+
+#[tauri::command]
+fn cosmos_orbit_position(a: f64, eccentricity: f64, phase: f64, inclination: f64, simDays: f64, speed: f64) -> Result<serde_json::Value, String> {
+    let mut out = [0f64; 5];
+    unsafe {
+        cosmos::ffi::cosmos_orbit_position(a, eccentricity, phase, inclination, simDays, speed, out.as_mut_ptr());
+    }
+    Ok(serde_json::json!({ "x": out[0], "y": out[1], "z": out[2], "radius": out[3], "trueAnomaly": out[4] }))
+}
+
+#[tauri::command]
+fn cosmos_time_dilation(radius: f64, mass: f64) -> Result<f64, String> {
+    Ok(unsafe { cosmos::ffi::cosmos_time_dilation(radius, mass) })
+}
+
 /// Daemon status shape compatible with realityDaemon.getStatus() consumers.
 #[tauri::command]
 fn reality_daemon_status() -> Result<serde_json::Value, String> {
@@ -301,6 +438,11 @@ pub fn run() {
             cosmos_physics_batch,
             cosmos_benchmark,
             cosmos_terrain_fbm,
+            cosmos_sim_configure,
+            cosmos_sim_step,
+            cosmos_sim_body,
+            cosmos_orbit_position,
+            cosmos_time_dilation,
             store_state_read,
             store_state_write,
             store_payload_put,
@@ -317,6 +459,12 @@ pub fn run() {
             reality_rename,
             reality_create_folder,
             reality_daemon_status,
+            sky_status,
+            sky_upload,
+            sky_activate,
+            sky_delete,
+            sky_settings,
+            sky_asset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -10,6 +10,10 @@ const BACKEND_LABEL: Record<string, { text: string; cls: string }> = {
   typescript: { text: 'TS REFERENCE FALLBACK', cls: 'bg-amber-500/20 text-amber-300 border-amber-400/30' },
 };
 
+/* The compiled C++ core can only run inside the Tauri desktop binary — a
+   browser tab physically cannot load it. Same probe the bridge uses. */
+const isDesktopShell = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
 export const CppNativeEngineCard: React.FC = () => {
   const [status, setStatus] = useState<CosmosStatus>(() => cosmosBridge.getStatus());
   const [opsPerSec, setOpsPerSec] = useState<number | null>(null);
@@ -128,6 +132,13 @@ export const CppNativeEngineCard: React.FC = () => {
             <p className="font-mono text-[9px] text-slate-400">
               core v{status.version} · {status.physicsFieldCount}-field telemetry · RK4 integrator
             </p>
+            {!isDesktopShell && (
+              <p className="font-mono text-[9px] text-cyan-300/80 max-w-[340px]">
+                Browser preview — the compiled C++ core ships inside the desktop app only.
+                This tab runs the TypeScript reference engine; Verify Parity &amp; the benchmark
+                are self-tests, not features.
+              </p>
+            )}
           </div>
         </div>
 
@@ -213,8 +224,9 @@ export const CppNativeEngineCard: React.FC = () => {
           ))}
         </div>
         <p className="text-[10px] text-slate-500">
-          CINEMATIC unlocks the raymarched black hole (true gravitational lensing)
-          and 2× pixel ratio — desktop-class GPUs only; the composite hole always remains as fallback.
+          The raymarched black hole (true gravitational lensing) is already on at MEDIUM and above.
+          CINEMATIC adds richer particles and exoplanet horizon plates; sharpness scales with your
+          display's density — on a 125% screen MEDIUM and CINEMATIC render at the same resolution.
         </p>
       </div>
 

@@ -136,6 +136,25 @@ function mapRealityEndpoint<T = unknown>(path: string, body: unknown): { cmd: st
       return { cmd: 'reality_bin_list', args: {} };
     case '/api/realities/folders':
       return { cmd: 'reality_list', args: {} };
+    /* Sky Studio — the desktop twin of server/routes/sky.ts. Status keeps
+       the query-param shape of its HTTP twin; mutations keep the body shape.
+       The asset route returns RAW BYTES (the webview has no HTTP route into
+       the realities tree) — skyRegistry wraps them in a blob URL. */
+    case '/api/realities/sky/status': {
+      const q = path.split('?')[1] ?? '';
+      const folder = new URLSearchParams(q).get('folder');
+      return { cmd: 'sky_status', args: { folder } };
+    }
+    case '/api/realities/sky/upload':
+      return { cmd: 'sky_upload', args: { folder: b.folder, name: b.name, mime: b.mime, dataBase64: b.dataBase64, ensure: b.ensure } };
+    case '/api/realities/sky/activate':
+      return { cmd: 'sky_activate', args: { folder: b.folder, photoId: b.photoId } };
+    case '/api/realities/sky/delete':
+      return { cmd: 'sky_delete', args: { folder: b.folder, photoId: b.photoId } };
+    case '/api/realities/sky/settings':
+      return { cmd: 'sky_settings', args: { folder: b.folder, settings: b.settings } };
+    case '/api/realities/sky/asset-bytes':
+      return { cmd: 'sky_asset', args: { folder: b.folder, file: b.file } };
     case '/api/realities/create-folder': {
       const cfg = b as Record<string, unknown>;
       return {

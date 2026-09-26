@@ -50,7 +50,7 @@ export const ${surfaceVarNameOf(input.folderName)}: UniverseSurfaceConfig = {
   colorB: ${esc(input.colorB)},
   deepColor: '#030108',
   starColor: ${esc(input.starColor)},
-  webFilaments: '${input.colorA}',
+  webFilaments: ${esc(input.colorA)},
   nebulaIntensity: 1.0,
   dustLaneIntensity: 0.8,
   starDensity: 0.85,

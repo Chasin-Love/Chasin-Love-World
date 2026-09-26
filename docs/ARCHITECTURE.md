@@ -85,7 +85,7 @@ DESKTOP (tauri)      src-tauri/  (mirrors the server API in Rust; C++ core via F
 | `src/ui/` | Feature UI: VaultUI (5.5k lines — R52 register: split), DiaryWindow, FileManager, MediaPlates, CoreMode, toast bus |
 | `src/ui/console/`, `src/ui/hud/`, `src/ui/lineage/`, `src/ui/reality/` | Console dashboard, HUD overlays, lineage modal, reality editors |
 | `server/` | Express: realities CRUD + bin + sky API; `realityDaemon` (3s scan/repair); `realityTemplates` (codegen) |
-| `src-tauri/` | Rust shell: `realities.rs` (API mirror), `store.rs` (files), `cosmos.rs` (C++ FFI) |
+| `src-tauri/` | Rust shell: `realities.rs` (API mirror), `store.rs` (files), `cosmos.rs` (C++ FFI), `sky.rs` (desktop Sky Studio) |
 | `scripts/` | `round16/17-gauntlet.ts` (verification), `audit-architecture.ts` (R52), `smoke.ts` (R52), toolchain helpers |
 | `docs/verify/` | Smoke reference frame + bundle baseline |
 
