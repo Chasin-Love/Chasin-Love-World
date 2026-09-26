@@ -319,6 +319,44 @@ function inv(d: [number, number, number]): [number, number] {
   check('R20.4: panel events apply live (uniforms + quad rescale, dispose-safe)', liveTuning, `${liveTuning}`);
 }
 
+/* ==== 7. ROUND 52 — spacetime bending of the BACKGROUND (the star clouds) ==== */
+{
+  const shSrc = readFileSync(new URL('../src/engine/shaders.ts', import.meta.url), 'utf8');
+  const ssSrc = readFileSync(new URL('../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
+  const enSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
+  const mgrSrc = readFileSync(new URL('../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
+
+  /* The sky's discrete stars are point clouds. Until R52 their materials
+     carried no lens uniforms at all, so only the procedural canvas and the
+     sky shells bent while the stars the eye actually tracks stayed rigid —
+     the sky read flat around a black hole. The helper bends the vertex's
+     direction AS SEEN FROM THE CAMERA and preserves its distance (a cloud
+     inside an offset group bends wrongly if measured from the origin), and a
+     captured direction is mirrored behind the camera so it clips away. */
+  const helper = ssSrc.includes('export const LENS_POINT_GLSL')
+    && ssSrc.includes('vec3 lensBendWorld(vec3 worldPos)')
+    && ssSrc.includes('vec3 delta = worldPos - cameraPosition;')
+    && ssSrc.includes('return cameraPosition + bent * dist;')
+    && ssSrc.includes('if (lensCaptured(bent)) return cameraPosition - delta;');
+  check('R52: star lensing helper bends from the camera, preserves distance, clips capture', helper, String(helper));
+
+  const starBend = shSrc.includes('vec4 wp = modelMatrix * vec4(vp, 1.0);')
+    && shSrc.includes('if (uLensCount > 0) wp.xyz = lensBendWorld(wp.xyz);')
+    && shSrc.includes('vec4 mv = viewMatrix * wp;');
+  check('R52: every star cloud bends in world space (identity when no lens)', starBend, String(starBend));
+
+  const wired = enSrc.includes('const POINTS_VERT_LENSED')
+    && enSrc.includes('LENS_POINT_GLSL')
+    && enSrc.includes('this.surfaceManager.lensUniforms')
+    && enSrc.includes('vertexShader: POINTS_VERT_LENSED, fragmentShader: pointsFrag,');
+  check('R52: pointsMaterial receives the shared lens uniforms', wired, String(wired));
+
+  const sharedLens = mgrSrc.includes('public lensUniforms')
+    && mgrSrc.includes('uLensCount')
+    && mgrSrc.includes('public setLenses');
+  check('R52: the lens uniform set is shared across every sky layer', sharedLens, String(sharedLens));
+}
+
 /* ================================ verdict ================================ */
 console.log(failures === 0 ? '\n● GAUNTLET GREEN — Round 17 math verified' : `\n● ${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

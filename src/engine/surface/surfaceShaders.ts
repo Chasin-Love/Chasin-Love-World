@@ -130,6 +130,35 @@ vec3 lensBentPosition(vec3 position){
 }
 `;
 
+/* Round 52 — WORLD-SPACE STAR LENSING for object-space point clouds.
+
+   lensBentPosition() above bends a vertex's direction from the ORIGIN, which
+   is exact for a sky shell centred on the camera — but wrong for the star
+   clouds that live inside offset groups (a galaxy's dense starfield, a
+   cluster's halo, a level's dust). Those must bend as seen from the CAMERA:
+
+     worldPos → direction from the camera → applyLensBend → back out at the
+     SAME distance, so size, depth and parallax are untouched and only the
+     direction moves — which is precisely what curvature does to a background
+     star, and why the sky now arcs around a mass instead of sliding under it.
+
+   A captured direction has no image at all: it is mirrored to the far side of
+   the camera, where the frustum clips it, so the shadow holds no star.
+
+   Compose this AFTER LENS_UNIFORMS_GLSL and LENS_WARP_GLSL (it calls
+   applyLensBend and lensCaptured), and BEFORE the point vertex shader that
+   uses lensBendWorld — see POINTS_VERT_LENSED in engine.ts. */
+export const LENS_POINT_GLSL = /* glsl */ `
+vec3 lensBendWorld(vec3 worldPos){
+  vec3 delta = worldPos - cameraPosition;
+  float dist = length(delta);
+  if (dist < 1e-4) return worldPos;
+  vec3 bent = applyLensBend(delta / dist);
+  if (lensCaptured(bent)) return cameraPosition - delta;
+  return cameraPosition + bent * dist;
+}
+`;
+
 /**
  * Universe Surface Vertex Shader.
  * Projects positions of the inverted celestial sky sphere into directional vectors.

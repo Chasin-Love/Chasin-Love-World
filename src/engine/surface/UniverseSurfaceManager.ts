@@ -36,8 +36,14 @@ export class UniverseSurfaceManager {
      dome + star shells + nebula points): the masses bend THIS canvas and
      nothing else — the bodies themselves never bend. Each lens carries its
      halo angle (uLenses.w) AND its silhouette angle (uLensRim): the bend is
-     always the size of the body's own hole in the surface, never fixed. */
-  private lensUniforms = {
+     always the size of the body's own hole in the surface, never fixed.
+
+     Round 52 — PUBLIC because the engine now spreads these exact objects into
+     every point-cloud material too (see POINTS_VERT_LENSED): the sky's
+     discrete stars are part of the same canvas, so they must bend with it.
+     Sharing the wrapper objects is what makes one setLenses() call drive the
+     dome, the shells, the photo layer and every star cloud at once. */
+  public lensUniforms = {
     uLenses: { value: Array.from({ length: 16 }, () => new THREE.Vector4(0, 0, 1, 0)) },
     uLensRim: { value: new Array(16).fill(0) },
     /* Round 16 — 1.0 marks a black hole: it lenses with the EXACT

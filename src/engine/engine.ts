@@ -17,18 +17,19 @@ import {
 } from './shaders';
 import { smoothstep, makeGlowTexture } from './math';
 import { UniverseSurfaceManager } from './surface';
+import { LENS_UNIFORMS_GLSL, LENS_WARP_GLSL, LENS_POINT_GLSL } from './surface/surfaceShaders';
 import { createBlackHole, type BlackHoleVisual } from './blackhole';
 import { createRaymarchBlackHole, updateRaymarchUniforms } from './blackholeRaymarch';
 import { canUseRaymarchBlackHole, probeCapability, pixelRatioFor, getQualityTier, QUALITY_CHANGE_EVENT } from './capability';
 import { CameraRig } from './cameraRig';
-import type { CosmicBody, DiaryEntry } from '../types';
+import type { CosmicBody, DiaryEntry } from '../domain/universe';
 import { REALITIES, RealityConfig, GalaxyClusterData, GalaxyData } from '../realities';
 import { HIERARCHY_DIALS } from '../realities/hierarchyStages';
 import { generateStellarSystemForGalaxy } from '../realities/galaxyGenerator';
 import { calculateKeplerPosition, calculatePhysics } from '../physics/physicsEngine';
 import { LivingGravityField, lensHaloFor, dynamicMassKg, gravityTelemetry, SCENE_UNITS_PER_AU } from '../physics/nbody';
 import { cosmosBridge } from '../native/cpp_bridge';
-import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../performance';
+import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../platform/performance';
 import { isDesktop } from '../desktop/adapter';
 import { ensureSkyFor, getActiveSkySpec, type ActiveSkySpec } from '../sky/skyRegistry';
 import { MOOD_HEX, type AuroraSignal, type EchoEntry } from '../sentiment/sentiment';
@@ -40,6 +41,23 @@ import {
 } from './systems/stageThresholds';
 import { SCALE_BANDS, highScaleLabel } from './systems/levelSystem';
 import { PORTAL_PHASE_WEIGHTS, portalTransitionFor, type PortalPhase } from './systems/portalPhases';
+
+/* Round 52 — SPACETIME BENDING OF THE BACKGROUND, composed once.
+
+   The universe-surface canvas and the sky shells have been lensed since
+   Round 14/16, but every DISCRETE star in the sky is a point cloud built by
+   makePoints()/pointsMaterial() — and those materials carried no lens uniforms
+   at all, so the bright stars the eye actually tracks stayed rigid while the
+   faint procedural canvas bent underneath them. The sky therefore read as
+   flat around a black hole, which is the one thing Einstein's field equations
+   make impossible.
+
+   pointsVert now lifts each vertex to world space and bends its direction
+   from the camera (lensBendWorld), so stars arc, pile up at the shadow edge
+   and vanish into the capture region exactly as the surface does. It needs
+   the lens header ahead of it, so the three chunks are composed here once and
+   every point material reuses the identical string (one program, not N). */
+const POINTS_VERT_LENSED = `${LENS_UNIFORMS_GLSL}\n${LENS_WARP_GLSL}\n${LENS_POINT_GLSL}\n${pointsVert}`;
 
 interface ShootingMeteor {
   pos: THREE.Vector3;
@@ -783,8 +801,12 @@ export class UniverseEngine {
         uScale: { value: 1 }, uTime: { value: 0 }, uTwinkle: { value: twinkle ? 1 : 0 }, uOpacity: { value: 1 },
         uVortexC: { value: new THREE.Vector3() }, uVortexR: { value: 0 }, uVortexS: { value: 0 }, uVortexT: { value: 0 }, uVortexPull: { value: 0 },
         uVortexRev: { value: 1 },
+        /* Round 52 — the SAME uniform objects the sky dome and the star shells
+           use, so one setLenses() per frame bends the canvas, the shells and
+           every discrete star cloud together. Nothing else has to be synced. */
+        ...this.surfaceManager.lensUniforms,
       },
-      vertexShader: pointsVert, fragmentShader: pointsFrag,
+      vertexShader: POINTS_VERT_LENSED, fragmentShader: pointsFrag,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     });
     this.clouds.push({ mat, px });

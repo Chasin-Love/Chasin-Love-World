@@ -687,7 +687,19 @@ void main(){
       vAlpha *= (1.0 - infl * (0.6 + pullAmt * 0.3));
     }
   }
-  vec4 mv = modelViewMatrix * vec4(vp, 1.0);
+  /* Round 52 — SPACETIME BENDING OF THE BACKGROUND. Every cloud built here is
+     part of the sky (stars, dust, gas, distant galaxies), so the masses'
+     curvature has to move IT — that is the observable signature of Einstein's
+     field equations, and until now only the procedural canvas and the sky
+     shells bent while these discrete stars stayed rigid, which is exactly why
+     the sky read as flat around the hole.
+     vp is still object space: lift to world, bend the direction from the
+     camera, then take the ordinary view transform. With no lens on stage
+     (uLensCount == 0) this is byte-identical to the previous path, because
+     viewMatrix · modelMatrix is what modelViewMatrix already was. */
+  vec4 wp = modelMatrix * vec4(vp, 1.0);
+  if (uLensCount > 0) wp.xyz = lensBendWorld(wp.xyz);
+  vec4 mv = viewMatrix * wp;
   float pSize = aSize * uScale * (260.0 / max(-mv.z, 0.001));
   gl_PointSize = clamp(pSize, 1.5, 36.0);
   vSize = gl_PointSize;
