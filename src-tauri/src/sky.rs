@@ -31,6 +31,7 @@ const EXT_BY_MIME: &[(&str, &str)] = &[
     ("image/avif", "avif"),
 ];
 
+#[allow(dead_code)]
 const MIME_BY_EXT: &[(&str, &str)] = &[
     ("png", "image/png"),
     ("jpg", "image/jpeg"),
@@ -379,6 +380,7 @@ fn decode_base64(input: &str) -> Option<Vec<u8>> {
 }
 
 /// Extension → mime for the renderer's blob typing (kept for parity).
+#[allow(dead_code)]
 pub fn mime_for_ext(ext: &str) -> Option<&'static str> {
     MIME_BY_EXT.iter().find(|(e, _)| *e == ext).map(|(_, m)| *m)
 }

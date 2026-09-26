@@ -141,7 +141,7 @@ fn store_state_read() -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({
         "json": snap.json,
         "path": snap.path,
-        "migratedFromWebview": snap.migratedFromWebview,
+        "migratedFromWebview": snap.migrated_from_webview,
     }))
 }
 
@@ -191,7 +191,7 @@ fn store_payload_list() -> Result<Vec<String>, String> {
 #[tauri::command]
 fn store_payload_stats() -> Result<serde_json::Value, String> {
     let s = store::payload_stats()?;
-    Ok(serde_json::json!({ "count": s.count, "totalBytes": s.totalBytes, "dir": s.dir }))
+    Ok(serde_json::json!({ "count": s.count, "totalBytes": s.total_bytes, "dir": s.dir }))
 }
 
 /* ---------------------------- realities (daemon) -------------------------- */
@@ -279,18 +279,18 @@ fn sky_status(folder: Option<String>) -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-fn sky_upload(folder: Option<String>, name: Option<String>, mime: Option<String>, dataBase64: Option<String>, ensure: Option<bool>) -> Result<serde_json::Value, String> {
-    sky::add_sky_photo(folder, name, mime, dataBase64, ensure.unwrap_or(true))
+fn sky_upload(folder: Option<String>, name: Option<String>, mime: Option<String>, data_base64: Option<String>, ensure: Option<bool>) -> Result<serde_json::Value, String> {
+    sky::add_sky_photo(folder, name, mime, data_base64, ensure.unwrap_or(true))
 }
 
 #[tauri::command]
-fn sky_activate(folder: Option<String>, photoId: Option<String>) -> Result<serde_json::Value, String> {
-    sky::set_active_sky_photo(folder, photoId)
+fn sky_activate(folder: Option<String>, photo_id: Option<String>) -> Result<serde_json::Value, String> {
+    sky::set_active_sky_photo(folder, photo_id)
 }
 
 #[tauri::command]
-fn sky_delete(folder: Option<String>, photoId: String) -> Result<serde_json::Value, String> {
-    sky::remove_sky_photo(folder, photoId)
+fn sky_delete(folder: Option<String>, photo_id: String) -> Result<serde_json::Value, String> {
+    sky::remove_sky_photo(folder, photo_id)
 }
 
 #[tauri::command]
@@ -394,10 +394,10 @@ fn cosmos_sim_body(index: i32) -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-fn cosmos_orbit_position(a: f64, eccentricity: f64, phase: f64, inclination: f64, simDays: f64, speed: f64) -> Result<serde_json::Value, String> {
+fn cosmos_orbit_position(a: f64, eccentricity: f64, phase: f64, inclination: f64, sim_days: f64, speed: f64) -> Result<serde_json::Value, String> {
     let mut out = [0f64; 5];
     unsafe {
-        cosmos::ffi::cosmos_orbit_position(a, eccentricity, phase, inclination, simDays, speed, out.as_mut_ptr());
+        cosmos::ffi::cosmos_orbit_position(a, eccentricity, phase, inclination, sim_days, speed, out.as_mut_ptr());
     }
     Ok(serde_json::json!({ "x": out[0], "y": out[1], "z": out[2], "radius": out[3], "trueAnomaly": out[4] }))
 }
