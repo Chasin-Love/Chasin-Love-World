@@ -16,13 +16,13 @@ fn has_cpp_compiler() -> bool {
 
 fn main() {
     if has_cpp_compiler() {
-        // The C++ simulation core (src/native/cosmos_engine.cpp) is compiled
+        // The C++ simulation core (src/platform/native/cosmos_engine.cpp) is compiled
         // and linked directly into the Tauri binary. The renderer reaches it
         // through the invoke commands in src/lib.rs — no dlopen/LoadLibrary.
         cc::Build::new()
             .cpp(true)
             .file("../../src/platform/native/cosmos_engine.cpp")
-            .include("../../src/native")
+            .include("../../src/platform/native")
             .std("c++20")
             .flag_if_supported("/O2")
             .flag_if_supported("/arch:AVX2")

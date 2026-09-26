@@ -87,16 +87,6 @@ function AnimatedNumber({ value, className, style }: {
   return <span className={className} style={style}>{display}</span>;
 }
 
-/* the realities-matrix panel rises AND orchestrates its own cards */
-const matrixRise: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { type: 'spring', stiffness: 130, damping: 19, staggerChildren: 0.05, delayChildren: 0.08 },
-  },
-};
-
 /* STAT SEAL — one unique symbol per feature (never shared: a reality is a
    globe, a cluster is strata, a galaxy is an orbit, a world is a sun) with
    the count beside it; the full name rises in a glass chip on hover. */
@@ -1277,9 +1267,10 @@ export const CoreConsole: React.FC<Props> = ({
         <div className="flex-1 min-h-0 overflow-y-auto custom-scroll px-5 sm:px-7 py-4">
           <AnimatePresence mode="wait">
           {tab === 'dashboard' && (
-            /* 12-col bento: radar(4×2 rows) · vitals(8) · realities(8) ·
-               pods(4) · engine(8) · chronicle(12) — auto-placement puts pods
-               directly under the radar */
+            /* 12-col bento: radar(4×2 rows) · vitals(8) · physics(8) ·
+               pods(4) · engine(8) · studio(12) · chronicle(12) — realities
+               live only in the Realities Grid tab, so auto-placement puts
+               pods directly under the radar */
             <motion.div
               key="dashboard"
               initial={{ opacity: 0, y: 10 }}
@@ -1387,41 +1378,9 @@ export const CoreConsole: React.FC<Props> = ({
                 </p>
               </motion.div>
 
-              {/* ACTIVE REALITIES MATRIX — 8-col beside the radar */}
-              <motion.div variants={matrixRise} className="lg:col-span-8 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="cc-panel-title">
-                    <Globe className="w-4 h-4" />
-                    Active Realities Matrix ({filteredRealities.length})
-                  </span>
-                  <span className="cc-label">
-                    Showing {filteredRealities.length} of {realities.length} branches
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {filteredRealities.map((r) => (
-                    <BentoRealityCard
-                      key={r.id}
-                      reality={r}
-                      active={r.id === activeRealityId}
-                      diaryCount={state.realities?.[r.id]?.entries?.length ?? 0}
-                      vaultCount={state.realities?.[r.id]?.vault?.length ?? 0}
-                      onWarp={() => onWarpReality(r.id)}
-                      onDelete={() => {
-                        if (r.id === 'sol-prime') {
-                          toast('Sol Prime is the primordial anchor — it cannot be erased', 'warn');
-                          return;
-                        }
-                        actions.deleteReality(r.id);
-                        toast(`${r.name} collapsed out of existence`);
-                      }}
-                      onEnterGalaxy={onEnterGalaxy}
-                    />
-                  ))}
-                </div>
-              </motion.div>
-
               {/* QUICK PODS — 4-col, lands directly under the radar.
+                  Reality cards live ONLY in the Realities Grid tab — the
+                  Command Matrix stays a control deck, not a second list.
                   Camera + Kamui pods dismiss the deck FIRST — their 3D effects
                   play on the universe and must not fire behind the glass. */}
               <motion.div variants={rise} className="lg:col-span-4 cc-panel p-4">

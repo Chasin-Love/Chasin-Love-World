@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-26T08:28:09.226Z",
+  "generatedAt": "2026-09-26T10:30:52.754Z",
   "fileCount": 125,
   "deadExports": [
     {
@@ -774,7 +774,7 @@
     "src/physics/physicsEngine.ts": 407,
     "src/platform/audio.ts": 195,
     "src/platform/desktop/adapter.ts": 248,
-    "src/platform/native/cpp_bridge.ts": 456,
+    "src/platform/native/cpp_bridge.ts": 461,
     "src/platform/performance.ts": 115,
     "src/platform/sentiment/sentiment.ts": 117,
     "src/platform/simClock.ts": 27,
@@ -833,7 +833,7 @@
     "src/ui/reality/RealityAdvancedPanel.tsx": 521,
     "src/ui/syntax.ts": 195,
     "src/ui/toast.ts": 16,
-    "src/ui/vault/MonacoCodeEditor.tsx": 152,
+    "src/ui/vault/MonacoCodeEditor.tsx": 156,
     "src/ui/vault/atmosphere.tsx": 128,
     "src/ui/vault/avatars.tsx": 401,
     "src/ui/vault/gate.tsx": 416,
@@ -853,7 +853,7 @@
     "src/vault/storage/efs.ts": 481,
     "src/vault/storage/formatters.ts": 32,
     "src/vault/storage/importers.ts": 271,
-    "src/vault/storage/indexedDB.ts": 187,
+    "src/vault/storage/indexedDB.ts": 195,
     "src/vault/storage/metrics.ts": 77,
     "src/vault/storage/procedural.ts": 60,
     "src/vault/storage/sanitizeHtml.ts": 122,
@@ -957,10 +957,7 @@
       "src/realities/testOne/surface.ts:1 — import { UniverseSurfaceConfig } from '../types';",
       "src/realities/testWorld/surface.ts:1 — import { UniverseSurfaceConfig } from '../types';"
     ],
-    "native build path": [
-      "src-tauri/build.rs:19",
-      "src-tauri/build.rs:25"
-    ],
+    "native build path": [],
     "gauntlet readFileSync targets": [
       "scripts/round17-gauntlet.ts:132",
       "scripts/round17-gauntlet.ts:190",
@@ -975,7 +972,8 @@
       "scripts/round17-gauntlet.ts:327"
     ],
     "public roots": [
-      "index.html:11"
+      "index.html:11",
+      "src/vault/executors/index.ts:319"
     ],
     "route↔command strings": [
       "server/realityTemplates.ts:4",

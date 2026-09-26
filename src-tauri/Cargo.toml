@@ -11,7 +11,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-# Compiles src/native/cosmos_engine.cpp directly into the binary — the C++
+# Compiles src/platform/native/cosmos_engine.cpp directly into the binary — the C++
 # core ships inside the app with no DLL loading step at all.
 cc = "1"
 

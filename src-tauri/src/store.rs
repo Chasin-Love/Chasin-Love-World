@@ -1,6 +1,6 @@
 //! Desktop persistence: universe state JSON + binary payload store, both in
 //! the OS app-data directory. The webview frontend reaches these through the
-//! `store_*` commands; the semantics mirror src/backend/storage/indexedDB.ts
+//! `store_*` commands; the semantics mirror src/vault/storage/indexedDB.ts
 //! so the adapter swap is invisible to the rest of the app.
 
 use serde::Serialize;

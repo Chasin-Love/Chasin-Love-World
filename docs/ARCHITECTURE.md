@@ -50,24 +50,15 @@ DESKTOP (tauri)      src-tauri/  (mirrors the server API in Rust; C++ core via F
 ```
 
 ```
-UI (react)           src/ui/*  src/components/*  src/App.tsx
-  │  useUniverse() · callbacks · lazy chunks
-STATE                src/state.ts  (observable store + ~60 actions)
-  │
-DOMAIN               src/types.ts  src/realities/*  src/backend/*
-  │
-PLATFORM             src/engine/*  src/physics/*  src/desktop/*  src/native/*
-  │                  src/sky · src/sync · src/sentiment · src/audio · src/simClock · src/performance
-SERVER (node)        server/*  (Express + reality daemon; dev host on :3000)
-DESKTOP (tauri)      src-tauri/*  (mirrors the server API in Rust; C++ core via FFI)
+
 ```
 
 **Dependency rules (enforced by review, machine-listed by the auditor):**
-- `types.ts` and `realities/*` never import UI or engine internals (the one
-  historical cycle — engine ⇄ realities via surface types — is on the R52
-  register to be cut).
+- `src/domain/*` and `src/realities/*` never import UI or engine internals (the one
+  historical cycle — engine ⇄ realities via surface types — was cut in Phase 3;
+  surface content types now live in `src/realities/types.ts`).
 - The engine speaks to React **only** through `EngineCallbacks` (engine.ts:56).
-- `state.ts` is the single mutation surface; components never mutate the engine.
+- `src/state/` (its `actions`) is the single mutation surface; components never mutate the engine.
 - `server/` never imports from `src/` (codegen templates emit text, they don't import).
 
 ## 2. The map (one line per module)
@@ -75,8 +66,8 @@ DESKTOP (tauri)      src-tauri/*  (mirrors the server API in Rust; C++ core via 
 | Path | What it is |
 |---|---|
 | `src/App.tsx` | App shell: engine boot + `EngineCallbacks` wiring, window manager, global keys, lazy chunk loading |
-| `src/state.ts` | Observable store (`useSyncExternalStore`), ~60 actions, debounced persistence (localStorage + Tauri file) |
-| `src/types.ts` | Domain types for the whole app (highest inbound count — treat changes as API changes) |
+| `src/state/` | Observable store (`useSyncExternalStore`), ~60 actions, debounced persistence (localStorage + Tauri file) |
+| `src/domain/` | Domain types for the whole app (`universe.ts`, `vault.ts`; `realities/types.ts` re-exports for generated content — highest inbound count, treat changes as API changes) |
 | `src/engine/engine.ts` | `UniverseEngine` — three.js cosmos orchestrator (6.6k lines; R52 register: decompose into systems) |
 | `src/engine/blackhole.ts` | Composite (baked) black hole — the infallible fallback tier |
 | `src/engine/blackholeRaymarch.ts` | Geodesic raymarched hole (dgreenheck port, R20.4 tuning) — overlay tier |
@@ -86,13 +77,13 @@ DESKTOP (tauri)      src-tauri/*  (mirrors the server API in Rust; C++ core via 
 | `src/engine/surface/` | Per-reality planet-surface lens/dome renderer |
 | `src/engine/systems/` | Level/stage labels, portal phase chain, stage thresholds |
 | `src/physics/` | Cached body physics + `LivingGravityField` n-body |
-| `src/backend/` | The Vault domain: `storage/` (EFS, crypto, indexedDB, seeds, importers, metrics…), `executors/` (JS/Py/PDF/ISO sandboxes) |
-| `src/desktop/adapter.ts` | Web↔Tauri switch: HTTP API paths → Tauri commands; payload/file stores |
-| `src/native/cpp_bridge.ts` | C++ core via WASM (`src/native/wasm/`) or Tauri FFI; TS fallback |
+| `src/vault/` | The Vault domain: `storage/` (EFS, crypto, indexedDB, seeds, importers, metrics…), `executors/` (JS/Py/PDF/ISO sandboxes) |
+| `src/platform/desktop/adapter.ts` | Web↔Tauri switch: HTTP API paths → Tauri commands; payload/file stores |
+| `src/platform/native/cpp_bridge.ts` | C++ core via WASM (`src/platform/native/wasm/`) or Tauri FFI; TS fallback |
 | `src/realities/` | **Path-locked** content packs, glob-loaded (`index.ts` per folder) + daemon-generated modules |
-| `src/sky`, `src/sync`, `src/sentiment` | Sky-photo registry client, disk-mirror sync queue, mood/aurora signals |
+| `src/platform/sky`, `src/platform/sync`, `src/platform/sentiment` | Sky-photo registry client, disk-mirror sync queue, mood/aurora signals |
 | `src/ui/` | Feature UI: VaultUI (5.5k lines — R52 register: split), DiaryWindow, FileManager, MediaPlates, CoreMode, toast bus |
-| `src/components/` | Console dashboard, HUD overlays, lineage modal, reality editors |
+| `src/ui/console/`, `src/ui/hud/`, `src/ui/lineage/`, `src/ui/reality/` | Console dashboard, HUD overlays, lineage modal, reality editors |
 | `server/` | Express: realities CRUD + bin + sky API; `realityDaemon` (3s scan/repair); `realityTemplates` (codegen) |
 | `src-tauri/` | Rust shell: `realities.rs` (API mirror), `store.rs` (files), `cosmos.rs` (C++ FFI) |
 | `scripts/` | `round16/17-gauntlet.ts` (verification), `audit-architecture.ts` (R52), `smoke.ts` (R52), toolchain helpers |
@@ -122,8 +113,8 @@ npm run audit:arch   architecture drift report (--snapshot / --check)
 |---|---|
 | `src/realities/<folder>/` layout | `import.meta.glob` (realities/index.ts), vite watch-ignore, tsconfig exclude, server cwd joins ×3 files, Rust dev fallback, daemon repair |
 | Generated imports `../types` + `../../engine/surface/types` | `server/realityTemplates.ts` (×2), `src-tauri/src/realities.rs` (×2), every disk `surface.ts` |
-| `src/native/cosmos_engine.cpp` | `src-tauri/build.rs` (cc compile) |
-| `src/native/wasm/` sibling of `cpp_bridge.ts` | `new URL('./wasm/…', import.meta.url)` probe |
+| `src/platform/native/cosmos_engine.cpp` | `src-tauri/build.rs` (cc compile) |
+| `src/platform/native/wasm/` sibling of `cpp_bridge.ts` | `new URL('./wasm/…', import.meta.url)` probe |
 | `dist/`, `/fonts/`, `/pyodide/` | tauri.conf `frontendDist`, index.html, pyodide `importScripts(document.baseURI)` |
 | Route strings `/api/realities/*` | server routes ⇄ `desktop/adapter.ts` map ⇄ Tauri command names |
 

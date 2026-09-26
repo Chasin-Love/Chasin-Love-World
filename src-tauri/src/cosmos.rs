@@ -1,4 +1,4 @@
-//! FFI surface to the C++ simulation core (src/native/cosmos_engine.cpp).
+//! FFI surface to the C++ simulation core (src/platform/native/cosmos_engine.cpp).
 //!
 //! Two compile modes (set by build.rs):
 //! - `cosmos_cpp`: the real C++ core is compiled into the binary via cc and

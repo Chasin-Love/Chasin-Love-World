@@ -432,7 +432,7 @@ Every cosmic body is a memory repository containing an interactive digital diary
 
 ## 6. UNIVERSAL VAULT & EVENTIDE VIRTUAL FILESYSTEM (EFS)
 
-The Universal Vault (`src/ui/VaultUI.tsx` and `src/backend/storage/efs.ts`) is a browser-local operating system environment anchored in the Singularity.
+The Universal Vault (`src/ui/VaultUI.tsx` and `src/vault/storage/efs.ts`) is a browser-local operating system environment anchored in the Singularity.
 
 ### 6.1 Cryptographic Identity Gate
 - **PBKDF2 Key Derivation**: Verifiers and master keys are derived using 310,000 rounds of SHA-256 with cryptographically secure random salts.
@@ -506,7 +506,7 @@ Navigation in MY UNIVERSE spans 10 continuous logarithmic orders of magnitude, b
 
 ## 8. UNIVERSAL SANDBOX EXECUTION ENGINE
 
-Located in `src/backend/executors/`:
+Located in `src/vault/executors/`:
 
 | Format | Execution Sandbox Boundary |
 | :--- | :--- |

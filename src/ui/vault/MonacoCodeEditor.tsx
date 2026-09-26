@@ -7,10 +7,14 @@
  * via `onChange`; FIND / WRAP / FORMAT toolbar actions reach the editor
  * through the ref handle.
  */
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import ReactMonaco from '@monaco-editor/react';
 import { ensureMonaco, languageOf } from './monacoSetup';
 
-const ReactMonaco = lazy(() => import('@monaco-editor/react'));
+/* Static import: this module is ALREADY the lazy chunk boundary (VaultUI and
+   siblings lazy-import it), and monacoSetup needs @monaco-editor/react up
+   front regardless — an inner lazy() only triggered Rollup's dynamic+static
+   chunk warning while changing nothing about what loads when. */
 
 export interface MonacoHandle {
   find: () => void;

@@ -5,6 +5,16 @@
  */
 
 import { desktopPayloads } from '../../platform/desktop/adapter';
+import {
+  decryptPayload,
+  encryptPayload,
+  hasPayloadEnvelope,
+  hasPayloadSession,
+} from './crypto';
+/* crypto is imported statically: this module already sits in the same bundle as
+   every consumer (they all pull the vault barrel), so dynamic imports here only
+   triggered Rollup's dynamic+static chunk warning without saving any bytes.
+   Actual key work stays lazy — hash-wasm's argon2/wasm loads on first use. */
 
 const DB_NAME = 'eventide-universe';
 const STORE = 'payloads';
@@ -118,7 +128,6 @@ export async function putStoredPayload(id: string, stored: Blob): Promise<void> 
 }
 
 export async function putPayload(id: string, blob: Blob): Promise<void> {
-  const { encryptPayload } = await import('./crypto');
   await putStoredPayload(id, await encryptPayload(blob));
 }
 
@@ -126,7 +135,6 @@ export async function getPayload(id: string): Promise<Blob | null> {
   const stored = await readStoredPayload(id);
   if (!stored) return null;
 
-  const { decryptPayload, encryptPayload, hasPayloadEnvelope, hasPayloadSession } = await import('./crypto');
   const raw = new Uint8Array(await stored.arrayBuffer());
   const payload = await decryptPayload(stored);
   if (hasPayloadSession() && !hasPayloadEnvelope(raw)) {
