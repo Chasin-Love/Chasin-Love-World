@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Builds the C++ simulation core to WebAssembly (src/native/wasm/).
+# Builds the C++ simulation core to WebAssembly (src/platform/native/wasm/).
 # Requires emsdk: https://emscripten.org/docs/getting_started/downloads.html
 #
 #   source ~/emsdk/emsdk_env.sh && bash scripts/build-wasm.sh
 #
-# The bridge (src/native/cpp_bridge.ts) detects ./wasm/cosmos_engine.js at
-# runtime and uses it automatically; without it the TypeScript reference
+# The bridge (src/platform/native/cpp_bridge.ts) detects ./wasm/cosmos_engine.js
+# at runtime and uses it automatically; without it the TypeScript reference
 # implementation serves. CI builds this artifact when emsdk is configured.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="$ROOT/src/native/wasm"
-SRC="$ROOT/src/native"
+OUT="$ROOT/src/platform/native/wasm"
+SRC="$ROOT/src/platform/native"
 
 mkdir -p "$OUT"
 

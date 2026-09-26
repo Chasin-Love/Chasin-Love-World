@@ -22,12 +22,14 @@ import { skyRouter } from './routes/sky';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  /* PORT env var so hosted deploys (Render/Railway/VPS behind a proxy) can
+     rebind; :3000 remains the default the desktop devUrl expects. */
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '10mb' }));
 
   // Start continuous background reality synchronization daemon
-  realityDaemon.start(3000);
+  realityDaemon.start(PORT);
 
   // API: Health check
   app.get('/api/health', (_req, res) => {
@@ -40,7 +42,13 @@ async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        /* HMR_PORT: two dev checkouts on one machine (e.g. parallel agent
+           sessions) collide on Vite's middleware-mode default 24678 — each
+           checkout gets its own HMR channel without touching the default. */
+        hmr: { port: Number(process.env.HMR_PORT) || 24678 },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

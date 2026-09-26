@@ -23,7 +23,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const BASE = 'http://127.0.0.1:3000';
+/* SMOKE_PORT lets a second checkout verify on its own port (the spawned
+   server honors PORT too) while :3000 stays the default contract. */
+const PORT = Number(process.env.SMOKE_PORT) || 3000;
+const BASE = `http://127.0.0.1:${PORT}`;
 const VERIFY_DIR = path.join(ROOT, 'scripts/verify');
 const REFERENCE = path.join(VERIFY_DIR, 'reference-hole.png');
 const METRICS = path.join(VERIFY_DIR, 'reference-metrics.json');

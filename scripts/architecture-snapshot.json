@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-26T12:48:14.845Z",
+  "generatedAt": "2026-09-26T19:55:24.217Z",
   "fileCount": 126,
   "deadExports": [
     {
@@ -741,8 +741,8 @@
     "scripts/make-icons.mjs": 101,
     "scripts/round16-gauntlet.ts": 103,
     "scripts/round17-gauntlet.ts": 363,
-    "scripts/smoke.ts": 230,
-    "server/index.ts": 77,
+    "scripts/smoke.ts": 233,
+    "server/index.ts": 85,
     "server/paths.ts": 35,
     "server/realityDaemon.ts": 464,
     "server/realityTemplates.ts": 153,
@@ -796,7 +796,7 @@
     "src/realities/testWorld/index.ts": 94,
     "src/realities/testWorld/surface.ts": 15,
     "src/realities/types.ts": 55,
-    "src/state/actions.ts": 1248,
+    "src/state/actions.ts": 1257,
     "src/state/index.ts": 12,
     "src/state/persist.ts": 386,
     "src/state/store.ts": 148,
@@ -898,7 +898,7 @@
     ],
     [
       "src/state/actions.ts",
-      1248
+      1257
     ],
     [
       "src/ui/vault/sandbox.tsx",
@@ -1027,16 +1027,16 @@
       "src/platform/sync/realitySync.ts:65",
       "src/platform/sync/realitySync.ts:66",
       "src/platform/sync/realitySync.ts:120",
-      "src/state/actions.ts:195",
-      "src/state/actions.ts:202",
-      "src/state/actions.ts:240",
-      "src/state/actions.ts:248",
-      "src/state/actions.ts:315",
-      "src/state/actions.ts:345",
-      "src/state/actions.ts:368",
-      "src/state/actions.ts:390",
-      "src/state/actions.ts:423",
-      "src/state/actions.ts:471",
+      "src/state/actions.ts:204",
+      "src/state/actions.ts:211",
+      "src/state/actions.ts:249",
+      "src/state/actions.ts:257",
+      "src/state/actions.ts:324",
+      "src/state/actions.ts:354",
+      "src/state/actions.ts:377",
+      "src/state/actions.ts:399",
+      "src/state/actions.ts:432",
+      "src/state/actions.ts:480",
       "src/ui/reality/CreateRealityModal.tsx:70"
     ],
     "localStorage keys": [
@@ -1051,11 +1051,11 @@
       "src/state/persist.ts:268"
     ],
     "window seams": [
-      "scripts/smoke.ts:150",
-      "scripts/smoke.ts:156",
-      "scripts/smoke.ts:161",
-      "scripts/smoke.ts:173",
-      "scripts/smoke.ts:183",
+      "scripts/smoke.ts:153",
+      "scripts/smoke.ts:159",
+      "scripts/smoke.ts:164",
+      "scripts/smoke.ts:176",
+      "scripts/smoke.ts:186",
       "src/platform/desktop/adapter.ts:5",
       "src/platform/performance.ts:72"
     ]

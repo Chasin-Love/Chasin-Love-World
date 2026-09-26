@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# contents: write — lets the release job publish installers on v* tags
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -64,3 +68,25 @@ jobs:
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
           if-no-files-found: error
+
+  # Publishes the built installers as a GitHub Release when a v* tag is pushed.
+  # Pull-request and plain-push runs stop after the build matrix above.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect built installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: my-universe-*
+          merge-multiple: true
+          path: release-assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: MY UNIVERSE ${{ github.ref_name }}
+          files: release-assets/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

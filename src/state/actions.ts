@@ -18,7 +18,7 @@ import {
   efsScrub, efsSubtreeIds, efsHeal, efsUniqueName, EFS_ROOT, migrateLegacyVault,
   seedVfs,
 } from '../vault';
-import { realityApi, syncedRealityApi } from '../platform/desktop/adapter';
+import { realityApi, syncedRealityApi, isDesktop } from '../platform/desktop/adapter';
 import { toast } from '../ui/toast';
 
 const DAY_MS = 86400000;
@@ -121,6 +121,15 @@ function uniqueFolderFor(name: string, realityId: string): string {
   return `${base}_${suffix}`;
 }
 
+/** Whether a failed disk-mirror mutation should toast a warning. On a plain
+    static web deploy the mirror is legitimately absent — the daemon never
+    answers, so warning on every reality switch would be pure noise (the
+    console tile already shows mirror status passively). Desktop and
+    daemon-backed web hosts still get the toast. */
+function mirrorWarnable(): boolean {
+  return isDesktop() || state.diskSync?.connected === true;
+}
+
 export const actions = {
   /* -------------------------- Multiverse & Lore -------------------------- */
   switchReality(realityId: string) {
@@ -198,7 +207,7 @@ export const actions = {
       if (res?.success && res.newFolderName) {
         actions.rememberRealityFolder(realityId, res.newFolderName);
       } else if (!res?.success) {
-        toast(`⚠ "${cleanName}" renamed in the multiverse — the disk folder rename will retry`, 'warn');
+        if (mirrorWarnable()) toast(`⚠ "${cleanName}" renamed in the multiverse — the disk folder rename will retry`, 'warn');
         void syncedRealityApi('/api/realities/rename-folder', { realityId, newName: cleanName, folderName });
       }
     });
@@ -244,7 +253,7 @@ export const actions = {
       actions.rememberRealityFolder(newReality.id, res.folderName ?? proposed);
       void actions.exportRealityData(newReality.id);
     } else {
-      toast(`⚠ "${newReality.name}" exists in the multiverse, but its disk folder could not be created — the sync engine will retry`, 'warn');
+      if (mirrorWarnable()) toast(`⚠ "${newReality.name}" exists in the multiverse, but its disk folder could not be created — the sync engine will retry`, 'warn');
       void syncedRealityApi('/api/realities/create-folder', { ...newReality, folderName: proposed });
     }
   },
@@ -314,7 +323,7 @@ export const actions = {
     // Synchronize disk transfer to src/realities/bin/
     const ok = await syncedRealityApi('/api/realities/bin/move-to-bin', { realityId, folderName });
     if (!ok) {
-      toast(`⚠ ${doomedReality?.name ?? realityId} collapsed in the multiverse, but its disk folder could not reach the bin — will retry`, 'warn');
+      if (mirrorWarnable()) toast(`⚠ ${doomedReality?.name ?? realityId} collapsed in the multiverse, but its disk folder could not reach the bin — will retry`, 'warn');
     }
   },
 
@@ -349,7 +358,7 @@ export const actions = {
     if (ok) {
       if (trashed.folderName) actions.rememberRealityFolder(realityId, trashed.folderName);
     } else {
-      toast(`⚠ ${trashed.name} restored in the multiverse, but its disk folder is still in the bin — will retry`, 'warn');
+      if (mirrorWarnable()) toast(`⚠ ${trashed.name} restored in the multiverse, but its disk folder is still in the bin — will retry`, 'warn');
     }
   },
 
@@ -370,7 +379,7 @@ export const actions = {
       folderName: diskFolderFor(realityId, item?.folderName),
     });
     if (!ok) {
-      toast(`⚠ ${item?.name ?? realityId} purged from the bin index, but its disk folder remains — will retry`, 'warn');
+      if (mirrorWarnable()) toast(`⚠ ${item?.name ?? realityId} purged from the bin index, but its disk folder remains — will retry`, 'warn');
     }
   },
 
@@ -389,7 +398,7 @@ export const actions = {
     // Empty bin on disk
     const ok = await syncedRealityApi('/api/realities/bin/empty', {});
     if (!ok) {
-      toast('⚠ Quantum Bin emptied in the multiverse, but the disk folders could not be cleared — will retry', 'warn');
+      if (mirrorWarnable()) toast('⚠ Quantum Bin emptied in the multiverse, but the disk folders could not be cleared — will retry', 'warn');
     }
   },
 
@@ -424,7 +433,7 @@ export const actions = {
       { realityId: id, folderName: diskFolderFor(id, cfg?.name), data }
     );
     if (!ok) {
-      toast(`⚠ "${cfg?.name ?? id}" world database could not reach its disk folder — will retry`, 'warn');
+      if (mirrorWarnable()) toast(`⚠ "${cfg?.name ?? id}" world database could not reach its disk folder — will retry`, 'warn');
     }
   },
 
@@ -472,7 +481,7 @@ export const actions = {
     if (ok) {
       toast(`src/realities/bin/${folderName} permanently deleted`);
     } else {
-      toast(`⚠ Could not delete src/realities/bin/${folderName} — will retry`, 'warn');
+      if (mirrorWarnable()) toast(`⚠ Could not delete src/realities/bin/${folderName} — will retry`, 'warn');
     }
   },
 
