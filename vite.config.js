@@ -35,12 +35,36 @@ export default defineConfig({
     },
   },
   build: {
-    chunkSizeWarningLimit: 1100,
+    /* The size floor is honest and stays LOW relative to what's left:
+       after the R52 monaco purge (74 unused grammars + the LSP client
+       removed — see monacoSetup.ts) the only chunks that can still cross
+       it are Monaco's irreducible living core (~2.7 MB minified — its own
+       CDN build is 3.5 MB; the standalone diff-editor machinery ships
+       inside editor.api.js and cannot be import-pruned) and ts.worker
+       (the TypeScript compiler itself — the price of real JS/TS
+       intellisense; drops 6.5 MB if that feature is ever cut). Anything
+       ELSE appearing above the floor is real fat: remove it, don't raise
+       this. The committed docs/verify/bundle-baseline.txt is the regression
+       gate — refresh it in the same commit and eyeball the delta. */
+    chunkSizeWarningLimit: 2900,
     rollupOptions: {
       output: {
-        manualChunks: {
-          three: ["three"],
-          react: ["react", "react-dom", "framer-motion"],
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          const p = id.replace(/\\/g, "/").split("node_modules/").pop();
+          if (p.startsWith("monaco-editor/")) {
+            /* three parallel slices instead of one 4 MB wall — the editor
+               core and the language layer load simultaneously */
+            const rest = p.slice("monaco-editor/".length);
+            if (/^esm\/vs\/(languages|language)\//.test(rest)) return "monaco-lang";
+            if (/^esm\/vs\/(base|platform)\//.test(rest)) return "monaco-core";
+            return "monaco-editor"; /* editor/ + features/ (contributions, services) */
+          }
+          if (p.startsWith("@monaco-editor/react")) return "monaco-editor";
+          const pkg = p.startsWith("@") ? p.split("/").slice(0, 2).join("/") : p.split("/")[0];
+          if (pkg === "three") return "three";
+          if (pkg === "react" || pkg === "react-dom" || pkg === "scheduler" || pkg === "framer-motion") return "react";
+          return undefined;
         },
       },
     },
