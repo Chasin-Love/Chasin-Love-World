@@ -10,6 +10,45 @@
 
 ## 1. The one diagram
 
+**Open [`docs/architecture-diagram.html`](architecture-diagram.html)** — the interactive skeleton:
+every file as a node, grouped into 10 dependency-ordered layer columns, 429 import arcs, sized by
+line count. Hover isolates a file's dependencies; drag pans; wheel zooms; the search box filters.
+It is **generated** from the auditor's snapshot by `scripts/generate-architecture-diagram.ts`, so
+it cannot drift from reality — rerun `npm run audit:arch` + the generator to refresh.
+
+A Mermaid flowchart of the top-34 files by mass lives in
+[`architecture-diagram.mmd`](architecture-diagram.mmd) for embedding elsewhere.
+
+```
+src/
+  main.tsx · App.tsx · index.css      entry point
+  domain/                             pure data contracts (universe, vault)
+  state/                              store + persist + actions
+  platform/                           audio · simClock · performance · storageKeys
+                                      · desktop/ · native/ · sky/ · sentiment/ · sync/
+  engine/                             three.js cosmos (+ blackhole/, surface/, systems/)
+  physics/                            orbital physics + living gravity
+  vault/                              the encrypted vault domain
+  realities/                          content packs (path-locked)
+  ui/                                 every visual component:
+                                      vault/ · diary/ · console/ · hud/ · lineage/
+                                      reality/ · shared kit (bits, toast, format…)
+server/   routes/ + daemon + templates
+src-tauri/ desktop shell
+```
+
+```
+UI (react)           src/ui/*  src/App.tsx
+  │  useUniverse() · callbacks · lazy chunks
+STATE                src/state/  (observable store + ~60 actions)
+  │
+DOMAIN               src/domain/  src/realities/  src/vault/
+  │
+PLATFORM             src/engine/  src/physics/  src/platform/*
+SERVER (node)        server/  (Express + reality daemon; dev host on :3000)
+DESKTOP (tauri)      src-tauri/  (mirrors the server API in Rust; C++ core via FFI)
+```
+
 ```
 UI (react)           src/ui/*  src/components/*  src/App.tsx
   │  useUniverse() · callbacks · lazy chunks

@@ -74,10 +74,12 @@ function resolveSpec(fromFile: string, spec: string): string | null {
 }
 
 const inbound = new Map<string, Set<string>>(); // file → importers
+const edgeSet = new Set<string>();             // "from → to" (deduped, for the diagram)
 const addEdge = (from: string, to: string) => {
   if (from === to) return;
   if (!inbound.has(to)) inbound.set(to, new Set());
   inbound.get(to)!.add(from);
+  edgeSet.add(`${from} → ${to}`);
 };
 
 for (const [relPath, text] of allText) {
@@ -223,6 +225,7 @@ const snapshot = {
   fileCount: codeFiles.length,
   deadExports, deadTypes, deadCss,
   importers: Object.fromEntries([...inbound.entries()].map(([k, v]) => [k, v.size]).sort()),
+  edges: [...edgeSet].sort(),
   loc, locLeaders, pathEncode,
 };
 
