@@ -9,7 +9,7 @@
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
 /** RFC 4648 base32 decode (padding-insensitive, whitespace-insensitive). */
-export function base32Decode(input: string): Uint8Array {
+function base32Decode(input: string): Uint8Array {
   const clean = input.replace(/[\s=-]/g, '').toUpperCase();
   let bits = 0;
   let value = 0;

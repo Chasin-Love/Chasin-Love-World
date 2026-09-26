@@ -37,7 +37,7 @@ export interface PortalTransition {
 }
 
 /** The linear chain in causal order. */
-export const PORTAL_CHAIN: readonly PortalTransition[] = [
+const PORTAL_CHAIN: readonly PortalTransition[] = [
   { from: 'arming', next: 'disturbance', duration: 0.18, reduced: 0.08 },
   { from: 'disturbance', next: 'deformation', duration: 0.42, reduced: 0.12 },
   { from: 'deformation', next: 'vortex', duration: 0.72, reduced: 0.18 },

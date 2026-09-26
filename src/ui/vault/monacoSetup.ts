@@ -29,7 +29,7 @@ self.MonacoEnvironment = {
 
 let themeDefined = false;
 
-export function defineEventideTheme(): void {
+function defineEventideTheme(): void {
   if (themeDefined) return;
   monaco.editor.defineTheme('eventide', {
     base: 'vs-dark',

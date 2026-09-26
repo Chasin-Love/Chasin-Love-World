@@ -8,10 +8,10 @@
  */
 
 /** Below this distance the engine shows APPROACH / SURFACE / inner-system labels instead. */
-export const WEB_LADDER_MIN_D = 260;
+
 
 /** Distances inside this band interpolate the nearest major galaxy's name into the label. */
-export const GALAXY_NAME_BAND_MAX = 38000;
+const GALAXY_NAME_BAND_MAX = 38000;
 
 /** Distance windows (exclusive upper bounds) for the web-stage ladder. */
 export const SCALE_BANDS = {

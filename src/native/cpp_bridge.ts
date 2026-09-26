@@ -54,7 +54,7 @@ export interface PhysicsBatchInput {
  * cosmos_engine.hpp and BodyPhysicsData in physicsEngine.ts. */
 export const PHYSICS_FIELD_COUNT = 41;
 
-export const COSMOS_KIND = { STAR: 0, PLANET: 1, DWARF: 2, NEBULA: 3, HOLE: 4, VAULT: 5 } as const;
+
 
 type TauriInvoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -100,7 +100,7 @@ interface WasmModule {
   HEAPF64?: Float64Array;
 }
 
-export class CosmosBridge {
+class CosmosBridge {
   private statusValue: CosmosStatus = {
     backend: 'typescript',
     version: 'ts-1.0',

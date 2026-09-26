@@ -34,7 +34,7 @@ import type {
 export const EFS_ROOT = 'vfs-root';
 
 let idCounter = 0;
-export function efsId(prefix = 'n'): string {
+function efsId(prefix = 'n'): string {
   idCounter += 1;
   return `${prefix}-${Date.now().toString(36)}-${idCounter.toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
@@ -108,7 +108,7 @@ export function efsPathString(vfs: VfsState, dirId: string): string {
 }
 
 /** Is `candidate` inside `dir`'s subtree (or equal to it)? Cycle guard for moves. */
-export function efsIsDescendant(vfs: VfsState, candidateId: string, dirId: string): boolean {
+function efsIsDescendant(vfs: VfsState, candidateId: string, dirId: string): boolean {
   if (candidateId === dirId) return true;
   let cur: VfsNode | undefined = vfs.nodes[candidateId];
   let guard = 0;
@@ -282,14 +282,7 @@ export function efsDedup(vault: VaultFile[]): DedupReport {
 }
 
 /** True when any OTHER live vault record still references this payload. */
-export function efsPayloadShared(vault: VaultFile[], file: VaultFile): boolean {
-  if (!file.payloadRef) return false;
-  return vault.some((o) => o.id !== file.id && (
-    o.payloadRef === file.payloadRef ||
-    o.dedupOf === file.id ||
-    (file.dedupOf !== undefined && o.dedupOf === file.dedupOf)
-  ));
-}
+
 
 /**
  * Re-attaches vault records whose tree node went missing (crashed migration,

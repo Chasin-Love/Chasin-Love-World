@@ -6,16 +6,16 @@
 import type { CosmicBody, DiaryEntry, UniverseState, VaultFile } from '../types';
 import { createVfs, efsCreateShadow, efsHeal, seedVfs } from './efs';
 
-export const ATLAS_HTML =
+const ATLAS_HTML =
   '<!doctype html><html><head><meta charset="utf-8"><title>Anchor Atlas</title><style>body{background:#070b16;color:#cfe0ee;font-family:monospace;padding:2rem}h1{color:#6fc2b4;letter-spacing:.3em}li{margin:.4rem 0}</style></head><body><h1>ANCHOR ATLAS</h1><ul><li>Anchor Star — core, 6.0 R</li><li>Aurelia — memory, 4 moons</li><li>Eventide — the vault</li></ul></body></html>';
 
-export const SCOPE_HTML =
+const SCOPE_HTML =
   '<!doctype html><html><head><meta charset="utf-8"><title>Signal Scope</title><style>html,body{margin:0;height:100%;background:#04060c;overflow:hidden}canvas{display:block;width:100%;height:100%}#n{position:fixed;top:12px;left:14px;color:#6fc2b4;font:11px monospace;letter-spacing:.2em}</style></head><body><div id="n">SIGNAL SCOPE — live</div><canvas id="c"></canvas><script>var c=document.getElementById("c"),x=c.getContext("2d");function R(){c.width=innerWidth;c.height=innerHeight}addEventListener("resize",R);R();var t=0;(function d(){t+=.02;x.fillStyle="rgba(4,6,12,.16)";x.fillRect(0,0,c.width,c.height);for(var i=0;i<3;i++){x.beginPath();x.strokeStyle=i?"rgba(242,193,120,.5)":"rgba(111,194,180,.7)";for(var p=0;p<c.width;p+=4){var y=c.height/2+Math.sin(p*.012+t*(1+i*.5)+i*2)*c.height*.18*Math.sin(t*.7+i);p?x.lineTo(p,y):x.moveTo(p,y)}x.stroke()}requestAnimationFrame(d)})()</script></body></html>';
 
-export const THEME_CSS =
+const THEME_CSS =
   '/* eventide theme — edit me and watch the preview */\n:root {\n  --void: #04060c;\n  --panel: #0b101d;\n  --teal: #6fc2b4;\n  --solar: #f2c178;\n  --paper: #e9ecf1;\n}\n\nbody {\n  margin: 0;\n  background: var(--void);\n  color: var(--paper);\n  font-family: monospace;\n}\n\n.card {\n  background: var(--panel);\n  border: 1px solid var(--teal);\n  padding: 1.5rem;\n  letter-spacing: 0.2em;\n  text-transform: uppercase;\n}\n\n.accent { color: var(--solar); }';
 
-export function synthWavDataUrl(): string {
+function synthWavDataUrl(): string {
   const sr = 22050;
   const secs = 1.4;
   const n = Math.floor(sr * secs);
@@ -52,7 +52,7 @@ export function synthWavDataUrl(): string {
   return 'data:audio/wav;base64,' + btoa(bin);
 }
 
-export function synthCsv(): string {
+function synthCsv(): string {
   let csv = 'node_id,ra_deg,dec_deg,dist_mly,cluster_mass\n';
   for (let i = 0; i < 180; i++) {
     csv += `${i},${(Math.sin(i * 7.3) * 180 + 180).toFixed(4)},${(Math.cos(i * 3.1) * 90).toFixed(4)},${((i * 51.7) % 9000).toFixed(1)},${(1e12 + ((i * 3.7e13) % 1e15)).toExponential(3)}\n`;
@@ -242,7 +242,7 @@ export function seedBodies(now: number, day: number): CosmicBody[] {
   ];
 }
 
-export function seedEntries(
+function seedEntries(
   now: number,
   day: number,
   newIdFn: () => string
@@ -388,7 +388,7 @@ export const VAULT_HOME_FOLDERS = [
   '/archives',
 ];
 
-export const SEED_FOLDERS = [
+const SEED_FOLDERS = [
   '/documents',
   '/documents/research',
   '/documents/logs',
@@ -402,7 +402,7 @@ export const SEED_FOLDERS = [
   '/projects/ring-sim',
 ];
 
-export function seedVault(
+function seedVault(
   now: number,
   day: number,
   newIdFn: () => string,

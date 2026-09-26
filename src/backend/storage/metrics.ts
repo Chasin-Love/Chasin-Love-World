@@ -39,7 +39,7 @@ export function eventsOf(s: UniverseState): TimelineEvent[] {
   return ev.sort((x, y) => x.t - y.t);
 }
 
-export function snapshotAt(s: UniverseState, t: number) {
+function snapshotAt(s: UniverseState, t: number) {
   return {
     bodies: s.bodies.filter((b) => b.createdAt <= t),
     entries: s.entries.filter((e) => e.createdAt <= t),
@@ -48,28 +48,7 @@ export function snapshotAt(s: UniverseState, t: number) {
   };
 }
 
-export function computeStats(s: UniverseState, asOf?: number) {
-  const snap = asOf ? snapshotAt(s, asOf) : s;
-  const thoughts = snap.entries.length;
-  const bytes = snap.vault.reduce((acc, f) => acc + f.size, 0);
-  return {
-    bodies: snap.bodies.filter((b) => b.id !== 'anchor').length,
-    planets: snap.bodies.filter((b) => b.kind === 'planet').length,
-    thoughts,
-    entries: thoughts,
-    memories: snap.bodies.filter((b) => b.meaning === 'memory').length,
-    connections: snap.connections.length,
-    personalObjects: snap.bodies.length,
-    projects:
-      snap.bodies.filter((b) => b.meaning === 'project').length +
-      snap.entries.filter((e) => e.tags.includes('code')).length,
-    vaultBytes: bytes,
-    vaultFiles: snap.vault.length,
-    vaultApps: snap.vault.filter((f) => f.kind === 'application' || f.kind === 'exe').length,
-    vaultGames: snap.vault.filter((f) => f.kind === 'game').length,
-    vaultDocs: snap.vault.filter((f) => f.kind === 'document').length,
-  };
-}
+
 
 /** Local calendar-day bucket — UTC day numbers made evening writers lose streaks at 7pm. */
 function localDay(ms: number): number {
@@ -94,6 +73,4 @@ export function computeStreak(entries: { createdAt: number }[]): number {
   return streak;
 }
 
-export function writingDays(entries: { createdAt: number }[]): number {
-  return new Set(entries.map((e) => localDay(e.createdAt))).size;
-}
+

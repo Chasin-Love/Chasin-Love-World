@@ -11,7 +11,7 @@
 
 import type { Mood, DiaryEntry } from '../types';
 
-export const MOOD_AURORA: Record<Mood, string> = {
+const MOOD_AURORA: Record<Mood, string> = {
   calm: '#7fc4e8',     /* soft daylight blue */
   warm: '#f2c178',     /* solar gold */
   bright: '#ffe9a8',   /* incandescent white-gold */
@@ -113,6 +113,4 @@ export function onThisDay(entries: DiaryEntry[], now = Date.now()): EchoEntry[] 
 }
 
 /** Does this reality have any echo today? (cheap gate for callers) */
-export function hasEchoToday(entries: DiaryEntry[], now = Date.now()): boolean {
-  return onThisDay(entries, now).length > 0;
-}
+

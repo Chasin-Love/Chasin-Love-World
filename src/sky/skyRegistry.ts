@@ -57,7 +57,7 @@ const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'ima
 /* ------------------------------ resolution ------------------------------ */
 
 /** Best-known disk folder for a reality (recorded map → build map → name). */
-export function skyFolderForReality(realityId: string): string {
+function skyFolderForReality(realityId: string): string {
   const st = getState();
   return (
     st.realityFolders?.[realityId] ??
@@ -101,9 +101,7 @@ function adopt(realityId: string, manifest: SkyManifest, force = false): SkyMani
 }
 
 /** Currently cached manifest (no network). */
-export function cachedSky(realityId: string): SkyManifest | undefined {
-  return cache.get(realityId);
-}
+
 
 /** The active photo spec for the engine dome — null when this reality has none. */
 export function getActiveSkySpec(realityId: string): ActiveSkySpec | null {
@@ -122,7 +120,7 @@ const EMPTY_SKY: SkyManifest = {
   settings: { blend: 0.85, dim: 0.45, blur: 0.12, vignette: 0.55, drift: 0.3 },
 };
 
-export async function fetchSky(realityId: string): Promise<SkyManifest> {
+async function fetchSky(realityId: string): Promise<SkyManifest> {
   try {
     const res = await realityApi<{ success?: boolean; manifest?: SkyManifest }>(
       `/api/realities/sky/status?folder=${encodeURIComponent(skyFolderForReality(realityId))}`,

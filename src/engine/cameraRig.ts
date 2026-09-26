@@ -14,8 +14,8 @@
 import * as THREE from 'three';
 import { clamp, damp } from './math';
 
-export const DIST_BASE = 3.0;
-export const DIST_SPAN = 800000;
+const DIST_BASE = 3.0;
+const DIST_SPAN = 800000;
 
 const PHI_MIN = 0.06;
 const PHI_MAX = Math.PI - 0.06;

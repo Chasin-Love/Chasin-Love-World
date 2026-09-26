@@ -5,7 +5,7 @@ import { toast } from './toast';
 import { synthBars } from './lib';
 import { highlightLine, langOf } from './syntax';
 import { looksMinified, prettyPrint } from './format';
-import { getLocalPayload } from '../backend';
+import { getLocalPayload } from '../backend/storage/indexedDB';
 import {
   Play,
   Pause,
@@ -63,7 +63,7 @@ function fmtSMPTE(sec: number): string {
 /** Best-effort mime from a filename — OPFS strips blob types on read-back,
  *  and <video>/<audio> refuse to play a typeless source (images get sniffed,
  *  which is why photos kept working while videos/GIFs didn't). */
-export function mimeFromName(name: string): string {
+function mimeFromName(name: string): string {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   const map: Record<string, string> = {
     mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
@@ -118,7 +118,7 @@ export function useAttachmentSource(att: Attachment): { src: string; missing: bo
 }
 
 /** Small honest overlay shown when an attachment's bytes cannot be found. */
-export function MissingPayloadNotice({ name }: { name: string }) {
+function MissingPayloadNotice({ name }: { name: string }) {
   return (
     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-black/70 text-center p-3">
       <span className="font-mono text-[10px] text-red-300 tracking-wider">PAYLOAD UNAVAILABLE</span>

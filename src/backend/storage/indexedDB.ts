@@ -10,7 +10,7 @@ const DB_NAME = 'eventide-universe';
 const STORE = 'payloads';
 let dbPromise: Promise<IDBDatabase> | null = null;
 
-export function openDb(): Promise<IDBDatabase> {
+function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {

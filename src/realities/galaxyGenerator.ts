@@ -44,13 +44,13 @@ const GALAXY_TYPE_POOL = [
 
 const GALAXY_COLOR_POOL = ['#38bdf8', '#f59e0b', '#ec4899', '#a78bfa', '#34d399', '#fbbf24', '#22d3ee', '#fb7185'];
 
-export function slugify(name: string): string {
+function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'galaxy';
 }
 
 /** Full 11-stage cosmic lineage for one galaxy, derived from its host cluster
     so the web→…→system ladder above the galaxy stays coherent. */
-export function buildGalaxyLineage(params: {
+function buildGalaxyLineage(params: {
   realityId: string;
   realityName: string;
   cluster: GalaxyClusterData | undefined;

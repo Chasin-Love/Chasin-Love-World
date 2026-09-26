@@ -191,4 +191,4 @@ export function highlightLine(line: string, lang: string): Tok[] {
   }
 }
 
-export const SYNTAX_COLORS = C;
+

@@ -38,12 +38,4 @@ import type { BackendStatus } from './types';
 /**
  * Returns real-time health and capabilities of the backend engine
  */
-export function getBackendStatus(): BackendStatus {
-  return {
-    version: '2.0.0-PRO',
-    hasOpfs: hasOpfs(),
-    hasIndexedDb: hasIdb(),
-    activeExecutors: ['iso', 'web-app', 'javascript', 'python', 'pdf', 'archive'],
-    filesystemMounted: true,
-  };
-}
+

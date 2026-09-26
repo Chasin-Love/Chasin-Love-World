@@ -37,7 +37,7 @@ export interface SkyManifest {
   };
 }
 
-export const DEFAULT_SKY_SETTINGS: SkyManifest['settings'] = {
+const DEFAULT_SKY_SETTINGS: SkyManifest['settings'] = {
   blend: 0.85,
   dim: 0.45,
   blur: 0.12,
@@ -99,7 +99,7 @@ function emptyManifest(): SkyManifest {
   return { version: 1, activeId: null, photos: [], settings: { ...DEFAULT_SKY_SETTINGS } };
 }
 
-export function readSkyManifest(folder: string | undefined): SkyManifest {
+function readSkyManifest(folder: string | undefined): SkyManifest {
   const dir = resolveSkyDir(folder);
   if (!dir) return emptyManifest();
   try {

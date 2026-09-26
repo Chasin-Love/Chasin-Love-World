@@ -32,7 +32,7 @@ export interface BlackHoleParams {
 
 /** The reference screenshot's values — dgreenheck's defaults (his panel
     displays 49.78 kK as "50k K"; diskTemperature itself is not tunable here). */
-export const BLACKHOLE_DEFAULTS: BlackHoleParams = {
+const BLACKHOLE_DEFAULTS: BlackHoleParams = {
   mass: 0.4,
   lensing: 2.4,
   doppler: 1.0,

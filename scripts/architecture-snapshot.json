@@ -1,295 +1,10 @@
 {
-  "generatedAt": "2026-09-25T19:18:24.693Z",
-  "fileCount": 108,
+  "generatedAt": "2026-09-26T03:23:31.363Z",
+  "fileCount": 110,
   "deadExports": [
-    {
-      "symbol": "realityVarNameOf",
-      "file": "server/realityTemplates.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "surfaceVarNameOf",
-      "file": "server/realityTemplates.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "$",
-      "file": "server/realityTemplates.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "DEFAULT_SKY_SETTINGS",
-      "file": "server/skyStore.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "readSkyManifest",
-      "file": "server/skyStore.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "BUILD",
-      "file": "src/App.tsx",
-      "action": "delete"
-    },
-    {
-      "symbol": "getBackendStatus",
-      "file": "src/backend/index.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "KDF_LEGACY_RECORD_ROUNDS",
-      "file": "src/backend/storage/crypto.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "KDF_PBKDF2_FLOOR",
-      "file": "src/backend/storage/crypto.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "ARGON2ID_SPEC",
-      "file": "src/backend/storage/crypto.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "deriveKey",
-      "file": "src/backend/storage/crypto.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "efsId",
-      "file": "src/backend/storage/efs.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "efsIsDescendant",
-      "file": "src/backend/storage/efs.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "efsPayloadShared",
-      "file": "src/backend/storage/efs.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "parseCsv",
-      "file": "src/backend/storage/importers.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "openDb",
-      "file": "src/backend/storage/indexedDB.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "snapshotAt",
-      "file": "src/backend/storage/metrics.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "computeStats",
-      "file": "src/backend/storage/metrics.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "writingDays",
-      "file": "src/backend/storage/metrics.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "hslToHex",
-      "file": "src/backend/storage/procedural.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "ATLAS_HTML",
-      "file": "src/backend/storage/seeds.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "SCOPE_HTML",
-      "file": "src/backend/storage/seeds.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "THEME_CSS",
-      "file": "src/backend/storage/seeds.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "synthWavDataUrl",
-      "file": "src/backend/storage/seeds.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "synthCsv",
-      "file": "src/backend/storage/seeds.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "seedEntries",
-      "file": "src/backend/storage/seeds.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "SEED_FOLDERS",
-      "file": "src/backend/storage/seeds.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "seedVault",
-      "file": "src/backend/storage/seeds.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "base32Decode",
-      "file": "src/backend/storage/totp.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "BLACKHOLE_DEFAULTS",
-      "file": "src/engine/blackholeParams.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "DIST_BASE",
-      "file": "src/engine/cameraRig.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "DIST_SPAN",
-      "file": "src/engine/cameraRig.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "SURFACE_PRESETS",
-      "file": "src/engine/surface/surfacePresets.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "WEB_LADDER_MIN_D",
-      "file": "src/engine/systems/levelSystem.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "GALAXY_NAME_BAND_MAX",
-      "file": "src/engine/systems/levelSystem.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "PORTAL_CHAIN",
-      "file": "src/engine/systems/portalPhases.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "COSMOS_KIND",
-      "file": "src/native/cpp_bridge.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "CosmosBridge",
-      "file": "src/native/cpp_bridge.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "getPerformanceSnapshot",
-      "file": "src/performance.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "NBODY_G",
-      "file": "src/physics/nbody.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "gravityFieldStats",
-      "file": "src/physics/nbody.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "buildCosmicAddress",
-      "file": "src/realities/clusterGenerator.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "slugify",
-      "file": "src/realities/galaxyGenerator.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "buildGalaxyLineage",
-      "file": "src/realities/galaxyGenerator.ts",
-      "action": "delete"
-    },
     {
       "symbol": "solPrimeSurface",
       "file": "src/realities/solPrime/surface.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "MOOD_AURORA",
-      "file": "src/sentiment/sentiment.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "hasEchoToday",
-      "file": "src/sentiment/sentiment.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "skyFolderForReality",
-      "file": "src/sky/skyRegistry.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "cachedSky",
-      "file": "src/sky/skyRegistry.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "fetchSky",
-      "file": "src/sky/skyRegistry.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "mimeFromName",
-      "file": "src/ui/MediaPlates.tsx",
-      "action": "delete"
-    },
-    {
-      "symbol": "MissingPayloadNotice",
-      "file": "src/ui/MediaPlates.tsx",
-      "action": "delete"
-    },
-    {
-      "symbol": "IcGrid",
-      "file": "src/ui/bits.tsx",
-      "action": "delete"
-    },
-    {
-      "symbol": "IcRows",
-      "file": "src/ui/bits.tsx",
-      "action": "delete"
-    },
-    {
-      "symbol": "IcPulse",
-      "file": "src/ui/bits.tsx",
-      "action": "delete"
-    },
-    {
-      "symbol": "WaveStrip",
-      "file": "src/ui/bits.tsx",
-      "action": "delete"
-    },
-    {
-      "symbol": "SYNTAX_COLORS",
-      "file": "src/ui/syntax.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "defineEventideTheme",
-      "file": "src/ui/vault/monacoSetup.ts",
       "action": "delete"
     }
   ],
@@ -471,79 +186,7 @@
       "file": "src/ui/toast.ts"
     }
   ],
-  "deadCss": [
-    "att-rename-input",
-    "av-viewport",
-    "book-scene",
-    "climate-bar",
-    "code-scroll",
-    "copy-flash",
-    "core-num",
-    "core-sigil",
-    "cosmos-hit",
-    "cosmos-results",
-    "crumb",
-    "crumb-sep",
-    "crumbs",
-    "drag-float",
-    "drop-marker",
-    "exec-scan",
-    "fm-actions",
-    "fm-btn",
-    "fm-check",
-    "fm-grid",
-    "fm-head",
-    "fm-marquee",
-    "fm-meta",
-    "fm-row",
-    "fm-th",
-    "fs-actions",
-    "fs-meta",
-    "fs-name",
-    "fs-row",
-    "fs-tree-item",
-    "fx-grid-bg",
-    "fx-pulse-dot",
-    "glue-audio-inner",
-    "glue-cap",
-    "glue-grip",
-    "glue-plate",
-    "glue-seal",
-    "hint-line",
-    "hud-chamfer",
-    "hud-pill-pod",
-    "jump-sel",
-    "kamui-disappear",
-    "leaf-shadow",
-    "leaf-shadow-left",
-    "obj-row",
-    "page-content",
-    "page-corner",
-    "page-counter",
-    "plate-audio",
-    "plate-audio-slot",
-    "plate-cap",
-    "plate-dur",
-    "plate-grip",
-    "plate-image",
-    "plate-play",
-    "plate-presets",
-    "plate-tools",
-    "plate-video",
-    "plate-wave",
-    "row-action",
-    "sifi-card",
-    "sifi-glass",
-    "sifi-glass-gold",
-    "sifi-grid-bg",
-    "sifi-scanlines",
-    "tele-sub",
-    "tilt-glyph",
-    "tl-slider",
-    "tone-swatch",
-    "tree-resize",
-    "turning-under"
-  ],
+  "deadCss": [],
   "importers": {
     "server/paths.ts": 3,
     "server/realityDaemon.ts": 1,
@@ -553,17 +196,17 @@
     "src/audio.ts": 4,
     "src/backend/executors/index.ts": 1,
     "src/backend/executors/isoExecutor.ts": 2,
-    "src/backend/index.ts": 7,
+    "src/backend/index.ts": 4,
     "src/backend/storage/breaches.ts": 1,
     "src/backend/storage/courier.ts": 1,
     "src/backend/storage/crypto.ts": 4,
     "src/backend/storage/efs.ts": 2,
-    "src/backend/storage/formatters.ts": 1,
+    "src/backend/storage/formatters.ts": 3,
     "src/backend/storage/importers.ts": 1,
-    "src/backend/storage/indexedDB.ts": 2,
-    "src/backend/storage/metrics.ts": 1,
+    "src/backend/storage/indexedDB.ts": 4,
+    "src/backend/storage/metrics.ts": 2,
     "src/backend/storage/procedural.ts": 1,
-    "src/backend/storage/sanitizeHtml.ts": 1,
+    "src/backend/storage/sanitizeHtml.ts": 2,
     "src/backend/storage/seeds.ts": 2,
     "src/backend/storage/totp.ts": 2,
     "src/backend/storage/zip.ts": 2,
@@ -644,28 +287,30 @@
     "src/ui/vault/monacoSetup.ts": 1
   },
   "loc": {
-    "scripts/audit-architecture.ts": 271,
+    "scripts/audit-architecture.ts": 274,
     "scripts/make-icons.mjs": 101,
     "scripts/round16-gauntlet.ts": 103,
-    "scripts/round17-gauntlet.ts": 325,
+    "scripts/round17-gauntlet.ts": 363,
+    "scripts/smoke.ts": 230,
+    "scripts/tmp-purge-exports.mjs": 148,
     "server/index.ts": 447,
     "server/paths.ts": 35,
-    "server/realityDaemon.ts": 459,
+    "server/realityDaemon.ts": 464,
     "server/realityTemplates.ts": 153,
     "server/skyStore.ts": 251,
     "src/App.tsx": 1353,
     "src/audio.ts": 194,
     "src/backend/executors/index.ts": 355,
     "src/backend/executors/isoExecutor.ts": 257,
-    "src/backend/index.ts": 50,
+    "src/backend/index.ts": 42,
     "src/backend/storage/breaches.ts": 133,
     "src/backend/storage/courier.ts": 126,
     "src/backend/storage/crypto.ts": 437,
-    "src/backend/storage/efs.ts": 488,
+    "src/backend/storage/efs.ts": 481,
     "src/backend/storage/formatters.ts": 32,
     "src/backend/storage/importers.ts": 271,
     "src/backend/storage/indexedDB.ts": 187,
-    "src/backend/storage/metrics.ts": 100,
+    "src/backend/storage/metrics.ts": 77,
     "src/backend/storage/procedural.ts": 60,
     "src/backend/storage/sanitizeHtml.ts": 122,
     "src/backend/storage/seeds.ts": 541,
@@ -710,7 +355,7 @@
     "src/engine/systems/stageThresholds.ts": 50,
     "src/main.tsx": 10,
     "src/native/cpp_bridge.ts": 456,
-    "src/performance.ts": 117,
+    "src/performance.ts": 115,
     "src/physics/nbody.ts": 319,
     "src/physics/physicsEngine.ts": 407,
     "src/realities/auroraTest/index.ts": 142,
@@ -729,22 +374,22 @@
     "src/realities/testWorld/index.ts": 94,
     "src/realities/testWorld/surface.ts": 15,
     "src/realities/types.ts": 39,
-    "src/sentiment/sentiment.ts": 119,
+    "src/sentiment/sentiment.ts": 117,
     "src/simClock.ts": 27,
-    "src/sky/skyRegistry.ts": 230,
+    "src/sky/skyRegistry.ts": 228,
     "src/state.ts": 1786,
     "src/sync/realitySync.ts": 145,
     "src/types.ts": 401,
     "src/ui/AttachmentEditor.tsx": 495,
     "src/ui/Book.tsx": 163,
     "src/ui/CoreMode.tsx": 920,
-    "src/ui/DiaryWindow.tsx": 1655,
+    "src/ui/DiaryWindow.tsx": 1658,
     "src/ui/FileManager.tsx": 1280,
     "src/ui/MediaPlates.tsx": 1271,
     "src/ui/PhysicsHUD.tsx": 485,
     "src/ui/VaultBits.tsx": 133,
     "src/ui/VaultUI.tsx": 5566,
-    "src/ui/bits.tsx": 153,
+    "src/ui/bits.tsx": 144,
     "src/ui/exportDiary.ts": 372,
     "src/ui/format.ts": 128,
     "src/ui/lib.ts": 31,
@@ -768,7 +413,7 @@
     ],
     [
       "src/ui/DiaryWindow.tsx",
-      1655
+      1658
     ],
     [
       "src/components/console/CoreConsole.tsx",
@@ -840,12 +485,12 @@
       "server/realityDaemon.ts:2",
       "server/realityDaemon.ts:37",
       "server/realityDaemon.ts:38",
-      "server/realityDaemon.ts:136",
-      "server/realityDaemon.ts:150",
-      "server/realityDaemon.ts:217",
-      "server/realityDaemon.ts:265",
-      "server/realityDaemon.ts:307",
-      "server/realityDaemon.ts:415",
+      "server/realityDaemon.ts:141",
+      "server/realityDaemon.ts:155",
+      "server/realityDaemon.ts:222",
+      "server/realityDaemon.ts:270",
+      "server/realityDaemon.ts:312",
+      "server/realityDaemon.ts:420",
       "server/skyStore.ts:6",
       "server/skyStore.ts:7",
       "server/skyStore.ts:64",
@@ -877,7 +522,11 @@
       "scripts/round17-gauntlet.ts:207",
       "scripts/round17-gauntlet.ts:208",
       "scripts/round17-gauntlet.ts:209",
-      "scripts/round17-gauntlet.ts:210"
+      "scripts/round17-gauntlet.ts:210",
+      "scripts/round17-gauntlet.ts:324",
+      "scripts/round17-gauntlet.ts:325",
+      "scripts/round17-gauntlet.ts:326",
+      "scripts/round17-gauntlet.ts:327"
     ],
     "public roots": [
       "index.html:11",
@@ -920,11 +569,11 @@
       "src/sky/skyRegistry.ts:9",
       "src/sky/skyRegistry.ts:10",
       "src/sky/skyRegistry.ts:70",
-      "src/sky/skyRegistry.ts:128",
-      "src/sky/skyRegistry.ts:168",
-      "src/sky/skyRegistry.ts:206",
-      "src/sky/skyRegistry.ts:215",
-      "src/sky/skyRegistry.ts:224",
+      "src/sky/skyRegistry.ts:126",
+      "src/sky/skyRegistry.ts:166",
+      "src/sky/skyRegistry.ts:204",
+      "src/sky/skyRegistry.ts:213",
+      "src/sky/skyRegistry.ts:222",
       "src/state.ts:733",
       "src/state.ts:740",
       "src/state.ts:778",
@@ -952,6 +601,11 @@
       "src/ui/VaultUI.tsx:4121"
     ],
     "window seams": [
+      "scripts/smoke.ts:150",
+      "scripts/smoke.ts:156",
+      "scripts/smoke.ts:161",
+      "scripts/smoke.ts:173",
+      "scripts/smoke.ts:183",
       "src/desktop/adapter.ts:5",
       "src/performance.ts:72"
     ]

@@ -34,7 +34,7 @@ export interface ImportResult {
 /* ------------------------------ CSV machine ------------------------------ */
 
 /** RFC 4180-ish CSV parser: quoted fields, embedded commas & newlines, "" escapes. */
-export function parseCsv(text: string): string[][] {
+function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';

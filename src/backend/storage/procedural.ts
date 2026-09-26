@@ -5,7 +5,7 @@
 
 import type { BodyKind, CosmicBody } from '../types';
 
-export function hslToHex(h: number, s: number, l: number): string {
+function hslToHex(h: number, s: number, l: number): string {
   s /= 100;
   l /= 100;
   const k = (n: number) => (n + h / 30) % 12;

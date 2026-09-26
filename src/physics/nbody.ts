@@ -48,7 +48,7 @@ import type { BodyKind } from '../types';
 /* ------------------------------ unit system ------------------------------ */
 export const SCENE_UNITS_PER_AU = 52;
 const GM_SUN_AU3_DAY2 = 2.9591220828559115e-4; /* Gaussian k² */
-export const NBODY_G = GM_SUN_AU3_DAY2 * Math.pow(SCENE_UNITS_PER_AU, 3); /* scene³ M☉⁻¹ day⁻² */
+const NBODY_G = GM_SUN_AU3_DAY2 * Math.pow(SCENE_UNITS_PER_AU, 3); /* scene³ M☉⁻¹ day⁻² */
 
 /* Plummer softening ε = 0.6 scene units (~1.8 million km) */
 const SOFTENING_SQ = 0.36;
@@ -92,7 +92,7 @@ export interface GravityTelemetry {
 /* Module-level telemetry read by React (PhysicsHUD) — high-frequency engine
    data must not ride the UI store's notify/persist cycle. */
 export const gravityTelemetry = new Map<string, GravityTelemetry>();
-export const gravityFieldStats = { nodes: 0, maxDeviationAU: 0 };
+const gravityFieldStats = { nodes: 0, maxDeviationAU: 0 };
 
 /* THE DIMENSIONAL ANCHOR — see header. */
 export function dynamicMassKg(massKg: number, kind: BodyKind): number {

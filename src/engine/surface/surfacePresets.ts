@@ -7,7 +7,7 @@ import type { UniverseSurfaceConfig } from './types';
  * synthesized on the fly in getSurfaceConfigForReality from its own colors,
  * and realities forged on disk ship their own surface.ts module.
  */
-export const SURFACE_PRESETS: Record<string, UniverseSurfaceConfig> = {
+const SURFACE_PRESETS: Record<string, UniverseSurfaceConfig> = {
   'sol-prime': {
     realityId: 'sol-prime',
     name: 'Sol Prime Horizon',

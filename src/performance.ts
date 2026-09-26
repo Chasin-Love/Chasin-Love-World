@@ -111,6 +111,4 @@ export function recordPersistence(bytes: number): void {
   }
 }
 
-export function getPerformanceSnapshot(): UniversePerformanceSnapshot {
-  return snapshot();
-}
+

@@ -12,16 +12,16 @@ import type { PasswordRecord, RingEnvelope, VaultFile, VaultSecrets } from '../t
 
 export const KDF_TARGET_ROUNDS = 310000;
 export const KDF_LEGACY_ROUNDS = 90000;
-export const KDF_LEGACY_RECORD_ROUNDS = 120000;
+const KDF_LEGACY_RECORD_ROUNDS = 120000;
 /** OWASP 2026 floor for PBKDF2-SHA256 when Argon2id cannot be used */
-export const KDF_PBKDF2_FLOOR = 600000;
+const KDF_PBKDF2_FLOOR = 600000;
 
 export type KdfSpec =
   | { type: 'argon2id'; mem: number; iters: number }
   | { type: 'pbkdf2'; rounds: number };
 
 /** Default seal: Argon2id 64 MiB × 3 passes (Bitwarden-class, OWASP-preferred) */
-export const ARGON2ID_SPEC: KdfSpec = { type: 'argon2id', mem: 64, iters: 3 };
+const ARGON2ID_SPEC: KdfSpec = { type: 'argon2id', mem: 64, iters: 3 };
 
 export const b64enc = (buf: ArrayBuffer): string =>
   btoa(String.fromCharCode(...new Uint8Array(buf)));
@@ -273,7 +273,7 @@ export async function rewrapMasterEnvelope(
 }
 
 /** Legacy PBKDF2 derivation — still used by the identity payload session. */
-export async function deriveKey(
+async function deriveKey(
   passphrase: string,
   salt: BufferSource,
   rounds: number

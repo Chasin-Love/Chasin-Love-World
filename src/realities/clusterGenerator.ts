@@ -119,7 +119,7 @@ const CLUSTER_TEMPLATES_BY_REALITY: Record<string, ClusterTemplate[]> = {
   ],
 };
 
-export function buildCosmicAddress(realityId: string, clusterIdx: number): CosmicAddress {
+function buildCosmicAddress(realityId: string, clusterIdx: number): CosmicAddress {
   return {
     realityId,
     cosmicWebId: `web-${realityId}`,

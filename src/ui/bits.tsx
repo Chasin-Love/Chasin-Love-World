@@ -82,10 +82,10 @@ export const IcStar = (p: IconProps & { filled?: boolean }) => (
 export const IcTerminal = (p: IconProps) => <I {...p} d="M4 5h16v14H4zM7.5 9l3 3-3 3M12.5 15h4" />;
 export const IcScan = (p: IconProps) => <I {...p} d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M3 12h18" />;
 export const IcFolder = (p: IconProps) => <I {...p} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />;
-export const IcGrid = (p: IconProps) => <I {...p} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />;
-export const IcRows = (p: IconProps) => <I {...p} d="M4 6h16M4 12h16M4 18h16" />;
+
+
 export const IcMove = (p: IconProps) => <I {...p} d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5" />;
-export const IcPulse = (p: IconProps) => <I {...p} d="M3 12h4l2.5-6 4 12L16 12h5" />;
+
 
 /* --------------------------------- toast -------------------------------- */
 
@@ -140,13 +140,4 @@ export function AudioChip({ dataUrl, peaks, duration }: { dataUrl: string; peaks
   );
 }
 
-export function WaveStrip({ name, height = 30 }: { name: string; height?: number }) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  const bars = Array.from({ length: 40 }, (_, i) => 0.25 + 0.75 * Math.abs(Math.sin(i * 0.8 + h % 7)));
-  return (
-    <div className="flex items-end gap-0.5 w-full" style={{ height }}>
-      {bars.map((b, i) => <span key={i} className="flex-1 bg-teal-ice/50" style={{ height: `${Math.round(b * 100)}%` }} />)}
-    </div>
-  );
-}
+

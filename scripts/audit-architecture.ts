@@ -116,8 +116,10 @@ for (const [relPath, text] of allText) {
   if (relPath === 'src/main.tsx' || relPath === 'server/index.ts') continue;          // entry points
 
   const names: Array<{ name: string; kind: 'value' | 'type' }> = [];
-  for (const m of text.matchAll(/export\s+(?:async\s+)?(?:const|let|var|function\s*\*?|class)\s+([A-Za-z_$][\w$]*)/g)) names.push({ name: m[1], kind: 'value' });
-  for (const m of text.matchAll(/export\s+(?:type|interface|enum)\s+([A-Za-z_$][\w$]*)/g)) names.push({ name: m[1], kind: 'type' });
+  /* `(?!\{)` — skip codegen template text like `export const ${varNameOf(...)}`,
+     where the interpolated `$` would otherwise be captured as the name */
+  for (const m of text.matchAll(/export\s+(?:async\s+)?(?:const|let|var|function\s*\*?|class)\s+([A-Za-z_$][\w$]*)(?!\{)/g)) names.push({ name: m[1], kind: 'value' });
+  for (const m of text.matchAll(/export\s+(?:type|interface|enum)\s+([A-Za-z_$][\w$]*)(?!\{)/g)) names.push({ name: m[1], kind: 'type' });
   for (const m of text.matchAll(/export\s*\{([^}]*)\}(?!\s*from)/g)) {
     for (const part of m[1].split(',')) {
       const nm = part.trim().split(/\s+as\s+/).pop()?.trim();
@@ -141,8 +143,9 @@ for (const [relPath, text] of allText) {
     }
     if (external) continue;
     if (kind === 'type') { deadTypes.push({ name, file: relPath }); continue; }
-    /* internal use beyond the export declaration? (>1 word occurrence) */
-    const uses = (text.match(word) ?? []).length;
+    /* internal use beyond the export declaration? (count ALL occurrences —
+       a non-global match would always report 1) */
+    const uses = (text.match(new RegExp(word.source, 'g')) ?? []).length;
     deadExports.push({ symbol: name, file: relPath, action: uses > 1 ? 'de-export' : 'delete' });
   }
 }

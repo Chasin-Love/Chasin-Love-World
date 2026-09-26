@@ -104,6 +104,11 @@ class RealitySyncDaemon {
       for (const dirent of items) {
         if (!dirent.isDirectory()) continue;
         if (dirent.name === 'bin' || dirent.name === '.bin') continue;
+        /* R52 — the seed reality's modules are canonical (its surface look lives
+           in engine/surface/surfacePresets.ts): never regenerate them, or a
+           deliberately removed file would return as a generic template within
+           one 3s scan */
+        if (dirent.name === 'solPrime') continue;
 
         /* grace window — the app owns this folder's files for now */
         const markedAt = this.recentlyWritten.get(dirent.name.toLowerCase());

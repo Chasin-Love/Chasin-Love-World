@@ -21,11 +21,11 @@ function ident(s: string): string {
   return /^[0-9]/.test(cleaned) ? `_${cleaned}` : cleaned || 'reality';
 }
 
-export function realityVarNameOf(folderName: string): string {
+function realityVarNameOf(folderName: string): string {
   return `${ident(folderName)}Reality`;
 }
 
-export function surfaceVarNameOf(folderName: string): string {
+function surfaceVarNameOf(folderName: string): string {
   return `${ident(folderName)}Surface`;
 }
 
