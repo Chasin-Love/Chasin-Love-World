@@ -317,7 +317,9 @@ binaries ship the genuine native core).
 2. Generated-code imports (Pyodide/Monaco vendored paths).
 3. Disk surface imports (`surface.ts` per reality).
 4. Native build path — `src-tauri/build.rs` compiles exactly
-   `../../src/platform/native/cosmos_engine.cpp`.
+   `src/platform/native/cosmos_engine.cpp`, anchored on `CARGO_MANIFEST_DIR`
+   (never CWD-relative — the old `../../src/...` resolved outside the repo and
+   broke every CI build with a real C++ toolchain).
 5. Gauntlet read targets — `scripts/round16-gauntlet.ts` / `round17-gauntlet.ts` assert source
    text of specific engine files.
 6. Public roots — `public/pyodide/`, `public/fonts/` are vendored and committed.
