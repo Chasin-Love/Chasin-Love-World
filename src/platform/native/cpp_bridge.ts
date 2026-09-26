@@ -416,7 +416,7 @@ class CosmosBridge {
 /* Local copies of the TS reference math (imports would create a cycle from
    physicsEngine's side; these mirror calculateKeplerPosition/calculatePhysics
    and are guarded by verifyParity against the C++ port). */
-import { calculatePhysics as calculatePhysicsTS } from '../physics/physicsEngine';
+import { calculatePhysics as calculatePhysicsTS } from '../../physics/physicsEngine';
 
 function kindFromCode(code: number): string {
   switch (code) {

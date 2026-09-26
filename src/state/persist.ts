@@ -17,7 +17,7 @@ import {
 } from '../vault';
 import { VAULT_HOME_FOLDERS } from '../vault/storage/seeds';
 import { recordPersistence } from '../platform/performance';
-import { desktopStore } from '../desktop/adapter';
+import { desktopStore } from '../platform/desktop/adapter';
 import { toast } from '../ui/toast';
 
 export const STORAGE_KEY = STORAGE_KEYS.universeState;

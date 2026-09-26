@@ -21,7 +21,7 @@ fn main() {
         // through the invoke commands in src/lib.rs — no dlopen/LoadLibrary.
         cc::Build::new()
             .cpp(true)
-            .file("../../src/native/cosmos_engine.cpp")
+            .file("../../src/platform/native/cosmos_engine.cpp")
             .include("../../src/native")
             .std("c++20")
             .flag_if_supported("/O2")

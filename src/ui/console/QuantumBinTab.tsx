@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Trash2, RefreshCw, RotateCcw, ShieldCheck, ShieldX, Activity, Folder, CheckCircle2, Clock, HardDriveDownload } from 'lucide-react';
 import { actions, useUniverse } from '../../state';
-import { reconcileNow } from '../../sync/realitySync';
+import { reconcileNow } from '../../platform/sync/realitySync';
 import { toast } from '../../ui/toast';
 import type { TrashedReality } from '../../domain/universe';
 

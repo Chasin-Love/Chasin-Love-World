@@ -4,7 +4,7 @@
  * Legacy raw payloads are accepted for migration and re-sealed on authenticated read.
  */
 
-import { desktopPayloads } from '../../desktop/adapter';
+import { desktopPayloads } from '../../platform/desktop/adapter';
 
 const DB_NAME = 'eventide-universe';
 const STORE = 'payloads';

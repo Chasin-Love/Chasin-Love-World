@@ -28,11 +28,11 @@ import { HIERARCHY_DIALS } from '../realities/hierarchyStages';
 import { generateStellarSystemForGalaxy } from '../realities/galaxyGenerator';
 import { calculateKeplerPosition, calculatePhysics } from '../physics/physicsEngine';
 import { LivingGravityField, lensHaloFor, dynamicMassKg, gravityTelemetry, SCENE_UNITS_PER_AU } from '../physics/nbody';
-import { cosmosBridge } from '../native/cpp_bridge';
+import { cosmosBridge } from '../platform/native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../platform/performance';
-import { isDesktop } from '../desktop/adapter';
-import { ensureSkyFor, getActiveSkySpec, type ActiveSkySpec } from '../sky/skyRegistry';
-import { MOOD_HEX, type AuroraSignal, type EchoEntry } from '../sentiment/sentiment';
+import { isDesktop } from '../platform/desktop/adapter';
+import { ensureSkyFor, getActiveSkySpec, type ActiveSkySpec } from '../platform/sky/skyRegistry';
+import { MOOD_HEX, type AuroraSignal, type EchoEntry } from '../platform/sentiment/sentiment';
 import {
   WEB_CEILING, WEB_EDGE_TRIGGER, WARP_ZOOM_VEL,
   MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,

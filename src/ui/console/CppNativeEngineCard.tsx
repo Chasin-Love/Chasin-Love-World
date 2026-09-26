@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Cpu, Terminal, Play, Zap, Copy, Check, BadgeCheck, BadgeX, FlaskConical, Gauge } from 'lucide-react';
-import { cosmosBridge, type CosmosStatus } from '../../native/cpp_bridge';
+import { cosmosBridge, type CosmosStatus } from '../../platform/native/cpp_bridge';
 import { getQualityTier, setQualityTier, probeCapability, type QualityTier } from '../../engine/capability';
 import { toast } from '../../ui/toast';
 

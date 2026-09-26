@@ -18,7 +18,7 @@ import {
   efsScrub, efsSubtreeIds, efsHeal, efsUniqueName, EFS_ROOT, migrateLegacyVault,
   seedVfs,
 } from '../vault';
-import { realityApi, syncedRealityApi } from '../desktop/adapter';
+import { realityApi, syncedRealityApi } from '../platform/desktop/adapter';
 import { toast } from '../ui/toast';
 
 const DAY_MS = 86400000;

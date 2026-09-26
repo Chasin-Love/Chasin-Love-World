@@ -14,8 +14,8 @@
  * a reality's sky is addressed by that reality's OWN disk folder.
  */
 import { realityApi } from '../desktop/adapter';
-import { folderNameForReality, deriveFolderName, getReality } from '../realities';
-import { getState } from '../state';
+import { folderNameForReality, deriveFolderName, getReality } from '../../realities';
+import { getState } from '../../state';
 
 export interface SkyPhoto {
   id: string;

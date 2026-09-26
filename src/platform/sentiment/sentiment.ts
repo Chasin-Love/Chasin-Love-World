@@ -9,7 +9,7 @@
  * and the light it lends the star always agree.
  */
 
-import type { Mood, DiaryEntry } from '../domain/universe';
+import type { Mood, DiaryEntry } from '../../domain/universe';
 
 const MOOD_AURORA: Record<Mood, string> = {
   calm: '#7fc4e8',     /* soft daylight blue */

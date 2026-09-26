@@ -11,7 +11,7 @@ import {
   ensureSkyFor, uploadSkyPhoto, activateSkyPhoto, deleteSkyPhoto,
   saveSkySettings, onSkyChanged, skyAssetUrl,
   type SkyManifest, type SkySettings,
-} from '../../sky/skyRegistry';
+} from '../../platform/sky/skyRegistry';
 
 type Tab = 'identity' | 'lore' | 'galaxies' | 'sky';
 
