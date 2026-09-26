@@ -17,6 +17,8 @@ fn has_cpp_compiler() -> bool {
 }
 
 fn main() {
+    println!("cargo:rustc-check-cfg=cfg(cosmos_cpp)");
+    println!("cargo:rustc-check-cfg=cfg(cosmos_stub)");
     // Cargo runs build scripts with the CWD set to this package's root
     // (src-tauri/) — but never rely on the CWD: anchor every path on
     // CARGO_MANIFEST_DIR so the core is found no matter who invokes cargo,

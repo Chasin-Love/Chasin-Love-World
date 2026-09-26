@@ -96,7 +96,7 @@ fn resolve_folder(folder_name: Option<&str>, reality_id: Option<&str>) -> Result
         fallback = sanitize_folder_name(f);
     }
     if fallback.is_empty() {
-        return Err(format!("No folder found for {}", reality_id.or(folder_name).unwrap_or("?")));
+        return Err(format!("No folder found for {}", reality_id.or(folder_name).as_deref().unwrap_or("?")));
     }
     Ok(fallback)
 }
@@ -189,7 +189,7 @@ pub fn restore_from_bin(reality_id: Option<String>, folder_name: Option<String>)
         }
     }
     if target.is_empty() {
-        return Err(format!("No trashed folder found for {}", reality_id.or(folder_name).unwrap_or("?")));
+        return Err(format!("No trashed folder found for {}", reality_id.or(folder_name).as_deref().unwrap_or("?")));
     }
     let src = bin_dir()?.join(&target);
     let dst = realities_dir()?.join(&target);
@@ -401,9 +401,9 @@ pub fn create_folder(
         sv = surface_var,
         cid = esc(&clean_id),
         name = esc(&name),
-        ca = esc(color_a),
-        cb = esc(color_b),
-        sc = esc(star_color),
+        ca = esc(&color_a),
+        cb = esc(&color_b),
+        sc = esc(&star_color),
     );
     fs::write(target.join("surface.ts"), surface).map_err(|e| e.to_string())?;
 
@@ -416,9 +416,9 @@ pub fn create_folder(
         cn = esc(code_name.as_deref().unwrap_or(&format!("REALITY-{}", folder.to_uppercase()))),
         sp = esc(spectral.as_deref().unwrap_or("Quantum Singularity")),
         desc = esc(description.as_deref().unwrap_or(&format!("The {} continuum realm.", name))),
-        ca = esc(color_a),
-        cb = esc(color_b),
-        sc = esc(star_color),
+        ca = esc(&color_a),
+        cb = esc(&color_b),
+        sc = esc(&star_color),
         bodies = if bodies_json.trim().is_empty() || bodies_json == "[]" {
             default_bodies_json(&clean_id, &name, &color_a, &color_b)
         } else {

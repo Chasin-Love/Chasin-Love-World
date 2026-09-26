@@ -14,7 +14,7 @@
 //! in an object URL (see skyRegistry.ts). No base64: 6 MB photos cross the
 //! IPC bridge as raw arrays once and are cached as blob URLs.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
@@ -51,7 +51,7 @@ pub struct SkyPhoto {
     pub added_at: f64,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SkySettings {
     pub blend: f64,
     pub dim: f64,

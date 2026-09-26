@@ -160,7 +160,6 @@ fn store_payload_put(request: Request) -> Result<(), String> {
         tauri::ipc::InvokeBody::Json(_) => {
             return Err("store_payload_put requires a raw binary body".into())
         }
-        _ => return Err("unsupported payload body".into()),
     };
     if raw.len() < 2 {
         return Err("payload body too short".into());
@@ -169,7 +168,7 @@ fn store_payload_put(request: Request) -> Result<(), String> {
     if raw.len() < 2 + id_len {
         return Err("payload id length exceeds body".into());
     }
-    let id = String::from_utf8(raw[2..2 + id_len].to_vec()).map_err(|_| "invalid id encoding".into())?;
+    let id = String::from_utf8(raw[2..2 + id_len].to_vec()).map_err(|_| "invalid id encoding".to_string())?;
     let bytes = raw[2 + id_len..].to_vec();
     store::payload_put(id, bytes)
 }

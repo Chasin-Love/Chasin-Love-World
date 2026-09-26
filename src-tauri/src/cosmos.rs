@@ -9,6 +9,7 @@
 
 #![allow(dead_code)]
 
+#[allow(unused_imports)]
 use std::ffi::{c_char, c_double, c_int};
 
 /// Body kind encoding — must mirror COSMOS_KIND_* in cosmos_engine.hpp and
@@ -23,7 +24,7 @@ pub const KIND_VAULT: i32 = 5;
 pub const PHYSICS_FIELD_COUNT: usize = 41;
 
 #[cfg(cosmos_cpp)]
-mod ffi {
+pub(crate) mod ffi {
     use std::ffi::{c_char, c_double, c_int, c_void};
 
     extern "C" {
@@ -88,7 +89,7 @@ mod ffi {
 }
 
 #[cfg(cosmos_stub)]
-mod ffi {
+pub(crate) mod ffi {
     use std::ffi::{c_char, c_double, c_int, c_void};
 
     pub unsafe fn cosmos_version() -> *const c_char {
@@ -124,15 +125,6 @@ mod ffi {
     }
     pub unsafe fn cosmos_terrain_fbm(_x: c_double, _y: c_double) -> c_double { 0.0 }
     pub unsafe fn cosmos_benchmark_rk4(_n: c_int, _i: c_int) -> c_double { 0.0 }
-    pub unsafe fn cosmos_orbit_position(
-        _a: c_double, _e: c_double, _phase: c_double, _incl: c_double,
-        _days: c_double, _speed: c_double, out: *mut c_double,
-    ) {
-        if !out.is_null() {
-            *out.add(0) = 0.0; *out.add(1) = 0.0; *out.add(2) = 0.0;
-            *out.add(3) = 0.0; *out.add(4) = 0.0;
-        }
-    }
     pub unsafe fn cosmos_create_simulator() -> *mut c_void { std::ptr::null_mut() }
     pub unsafe fn cosmos_destroy_simulator(_h: *mut c_void) {}
     pub unsafe fn cosmos_add_body(
