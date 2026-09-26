@@ -48,7 +48,8 @@ fn dirs() -> Option<PathBuf> {
 pub struct StateSnapshot {
     pub json: Option<String>,
     pub path: String,
-    pub migratedFromWebview: bool,
+    #[serde(rename = "migratedFromWebview")]
+    pub migrated_from_webview: bool,
 }
 
 /// Read the persisted universe state. `migratedFromWebview` tells the frontend
@@ -62,7 +63,7 @@ pub fn state_read() -> Result<StateSnapshot, String> {
     Ok(StateSnapshot {
         json,
         path: path.to_string_lossy().into_owned(),
-        migratedFromWebview: false,
+        migrated_from_webview: false,
     })
 }
 
@@ -136,7 +137,8 @@ pub fn payload_list() -> Result<Vec<String>, String> {
 #[derive(Serialize)]
 pub struct PayloadStats {
     pub count: u64,
-    pub totalBytes: u64,
+    #[serde(rename = "totalBytes")]
+    pub total_bytes: u64,
     pub dir: String,
 }
 
@@ -155,7 +157,7 @@ pub fn payload_stats() -> Result<PayloadStats, String> {
     }
     Ok(PayloadStats {
         count,
-        totalBytes: total,
+        total_bytes: total,
         dir: dir.to_string_lossy().into_owned(),
     })
 }
