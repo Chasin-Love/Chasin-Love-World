@@ -71,7 +71,9 @@ async function loadTauriInvoke(): Promise<TauriInvoke | null> {
 
 async function loadWasm(): Promise<WasmModule | null> {
   try {
-    const url = new URL('./wasm/cosmos_engine.js', import.meta.url);
+    /* the WASM artifact is optional (built on demand via scripts/build-wasm.sh)
+       — @vite-ignore tells the bundler the runtime probe is intentional */
+    const url = new URL(/* @vite-ignore */ './wasm/cosmos_engine.js', import.meta.url);
     const probe = await fetch(url.href, { method: 'HEAD' });
     if (!probe.ok) return null;
     /* @vite-ignore — the artifact is optional and may not exist at build time */
