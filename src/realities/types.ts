@@ -1,4 +1,4 @@
-import { CosmicBody, DiaryEntry } from '../types';
+import { CosmicBody, DiaryEntry } from '../domain/universe';
 import { CosmicLineage, GalaxyClusterData, GalaxyData } from './hierarchyTypes';
 
 export * from './hierarchyTypes';
@@ -35,4 +35,3 @@ export interface RealityConfig {
   galaxyCountHint?: number;
   homeLineage?: CosmicLineage;
 }
-

@@ -3,7 +3,7 @@
 /* -------------------------------------------------------------------------- */
 
 import React, { useEffect, useState } from 'react';
-import type { CosmicBody } from '../types';
+import type { CosmicBody } from '../domain/universe';
 import { calculatePhysics, type BodyPhysicsData } from '../physics/physicsEngine';
 import { gravityTelemetry } from '../physics/nbody';
 

@@ -1,6 +1,6 @@
 import { Component, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { getState, subscribe } from '../state';
-import type { UniverseState } from '../types';
+import type { UniverseState } from '../domain/universe';
 import { registerToastHandler } from './toast';
 
 export function useUniverse(): UniverseState {

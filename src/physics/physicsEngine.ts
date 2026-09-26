@@ -2,7 +2,7 @@
 /*             REAL UNIVERSE PHYSICS ENGINE & ASTROPHYSICS LAWS              */
 /* -------------------------------------------------------------------------- */
 
-import type { CosmicBody } from '../types';
+import type { CosmicBody } from '../domain/universe';
 
 /* Physical Constants (SI & Astronomical) */
 export const CONSTANTS = {

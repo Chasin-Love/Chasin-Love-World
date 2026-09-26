@@ -1,3 +1,4 @@
+import { STORAGE_KEYS } from '../../platform/storageKeys';
 /**
  * Comet Courier & Stellar Will — offline E2E sharing and legacy release.
  *
@@ -72,7 +73,7 @@ export type CometOpenResult =
   | { ok: true; records: PasswordRecord[]; packet: CometPacket }
   | { ok: false; reason: 'expired' | 'burned' | 'bad-key' | 'bad-file'; message: string };
 
-const BURN_LEDGER = 'eventide:comet-burned';
+const BURN_LEDGER = STORAGE_KEYS.cometBurned;
 
 function burned(): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem(BURN_LEDGER) ?? '[]') as string[]); }

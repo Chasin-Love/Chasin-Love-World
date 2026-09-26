@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useRef, useState, useCallback } from 'react';
-import type { Attachment } from '../types';
-import { sfxTick } from '../audio';
+import type { Attachment } from '../domain/universe';
+import { sfxTick } from '../platform/audio';
 import { toast } from './toast';
 import { synthBars } from './lib';
 import { highlightLine, langOf } from './syntax';

@@ -8,9 +8,10 @@
  *  - Planetary Diary Linkage Engine
  */
 
-import type { VaultFile } from '../types';
+import type { VaultFile } from '../domain/vault';
 
-export * from '../types';
+export * from '../domain/universe';
+export * from '../domain/vault';
 
 export type RunnerKind = 'web-app' | 'javascript' | 'python' | 'pdf' | 'archive' | 'iso';
 

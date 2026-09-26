@@ -43,7 +43,7 @@
    days. */
 
 import { CONSTANTS, calculateKeplerPosition } from './physicsEngine';
-import type { BodyKind } from '../types';
+import type { BodyKind } from '../domain/universe';
 
 /* ------------------------------ unit system ------------------------------ */
 export const SCENE_UNITS_PER_AU = 52;

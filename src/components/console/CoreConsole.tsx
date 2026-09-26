@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { REALITIES, getReality, createNewRealityConfig, RealityConfig } from '../../realities';
 import { actions, useUniverse } from '../../state';
-import type { DiskSyncState } from '../../types';
+import type { DiskSyncState } from '../../domain/universe';
 import { toast } from '../../ui/toast';
 import { prettyPrint } from '../../ui/format';
 import { CreateRealityModal } from '../realities/CreateRealityModal';
@@ -19,7 +19,7 @@ import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
 import { QuantumBinTab } from './QuantumBinTab';
 import { CppNativeEngineCard } from './CppNativeEngineCard';
 import { BlackHoleTuningCard } from './BlackHoleTuningCard';
-import { getSimDate, subscribeSimDate } from '../../simClock';
+import { getSimDate, subscribeSimDate } from '../../platform/simClock';
 
 interface Props {
   onClose: () => void;

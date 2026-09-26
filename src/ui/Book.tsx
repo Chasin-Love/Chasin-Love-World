@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
-import { sfxPage } from '../audio';
+import { sfxPage } from '../platform/audio';
 import { IcChevL, IcChevR } from './bits';
 
 const SEGMENTS = 12;

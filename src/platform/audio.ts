@@ -1,7 +1,8 @@
+import { STORAGE_KEYS } from './storageKeys';
 /* procedural spatial audio — ambient drones per mode + tiny interaction SFX */
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
-let muted = localStorage.getItem('my-universe:muted') === '1';
+let muted = localStorage.getItem(STORAGE_KEYS.muted) === '1';
 let droneNodes: AudioNode[] = [];
 let currentMode: 'space' | 'diary' | 'vault' | 'core' = 'space';
 let rec: MediaRecorder | null = null;
@@ -37,7 +38,7 @@ export function initAudio() {
 export function isMuted() { return muted; }
 export function toggleMute(): boolean {
   muted = !muted;
-  localStorage.setItem('my-universe:muted', muted ? '1' : '0');
+  localStorage.setItem(STORAGE_KEYS.muted, muted ? '1' : '0');
   if (master && ctx) master.gain.setTargetAtTime(muted ? 0 : 0.55, ctx.currentTime, 0.2);
   return muted;
 }

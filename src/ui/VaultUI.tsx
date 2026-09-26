@@ -1,3 +1,4 @@
+import { STORAGE_KEYS } from '../platform/storageKeys';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { actions, newId } from '../state';
@@ -24,7 +25,8 @@ import {
   parseIsoBlob, extractIsoFile, flattenIsoRecords,
   type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
 } from '../backend';
-import type { AvatarFit, AuditEntry, FileVersion, PasswordField, PasswordRecord, VaultFile, VfsNode, VaultKind, VaultSecrets, VaultUser } from '../types';
+import type { AvatarFit, FileVersion, PasswordField, PasswordRecord, VaultFile, VfsNode, VaultKind, VaultSecrets, VaultUser } from '../domain/vault';
+import type { AuditEntry } from '../domain/universe';
 import {
   AudioChip, IcClose, IcCopy, IcDownload, IcEdit, IcEye, IcFolder, IcLock, IcMove, IcPlus,
   IcScan, IcSearch, IcTerminal, IcTrash, IcUnlock, IcUser, useUniverse,
@@ -3628,7 +3630,7 @@ function PasswordVault({ masterPass, keyName }: { masterPass: string; keyName: s
   const [showReceive, setShowReceive] = useState(false);
   const [showWill, setShowWill] = useState(false);
   const [showGate, setShowGate] = useState(false);
-  const [autoLock, setAutoLock] = useState(() => Number(localStorage.getItem('eventide:autolock') ?? 0));
+  const [autoLock, setAutoLock] = useState(() => Number(localStorage.getItem(STORAGE_KEYS.vaultAutolock) ?? 0));
   const [unlockPass, setUnlockPass] = useState('');
   const [unlockErr, setUnlockErr] = useState('');
   const [form, setForm] = useState({ label: '', user: '', secret: '', category: 'site', notes: '', otpauth: '', urls: '', fields: '' });
@@ -4118,7 +4120,7 @@ function PasswordVault({ masterPass, keyName }: { masterPass: string; keyName: s
           <button onClick={() => setShowAudit((v) => !v)} title="the ring's memory — every sensitive act, timestamped" className={`kr-btn ${showAudit ? 'on' : ''}`}>audit</button>
         </div>
         <input ref={importRef} type="file" accept="application/json" className="hidden" onChange={(e) => { void importBackup(e.target.files?.[0]); e.target.value = ''; }} />
-        <select value={autoLock} onChange={(e) => { const v = Number(e.target.value); setAutoLock(v); localStorage.setItem('eventide:autolock', String(v)); }}
+        <select value={autoLock} onChange={(e) => { const v = Number(e.target.value); setAutoLock(v); localStorage.setItem(STORAGE_KEYS.vaultAutolock, String(v)); }}
           className="field px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-slate-soft bg-void/60 cursor-pointer" title="auto-lock after inactivity">
           <option value={0}>no auto-lock</option>
           <option value={60}>lock · 1m</option>

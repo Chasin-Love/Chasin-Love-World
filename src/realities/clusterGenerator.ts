@@ -1,4 +1,4 @@
-import { CosmicBody } from '../types';
+import type { CosmicBody } from '../domain/universe';
 import { CosmicAddress, CosmicLineage, GalaxyClusterData } from './hierarchyTypes';
 
 interface ClusterTemplate {

@@ -1,6 +1,6 @@
 import { toPng, toCanvas } from 'html-to-image';
 import { jsPDF } from 'jspdf';
-import type { CosmicBody, DiaryEntry } from '../types';
+import type { CosmicBody, DiaryEntry } from '../domain/universe';
 import { fmtDate } from '../backend/storage/formatters';
 import { toast } from './toast';
 

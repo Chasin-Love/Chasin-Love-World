@@ -3,7 +3,7 @@ import { Trash2, RefreshCw, RotateCcw, ShieldCheck, ShieldX, Activity, Folder, C
 import { actions, useUniverse } from '../../state';
 import { reconcileNow } from '../../sync/realitySync';
 import { toast } from '../../ui/toast';
-import { TrashedReality } from '../../types';
+import type { TrashedReality } from '../../domain/universe';
 
 /** Prettifies a disk folder name for the "orphaned folder" row. */
 function folderDisplay(name: string): string {

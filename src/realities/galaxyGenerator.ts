@@ -6,7 +6,7 @@
    reality's roster the full list is persisted in state.customGalaxies. */
 
 import { CosmicLineage, GalaxyClusterData, GalaxyData } from './hierarchyTypes';
-import type { CosmicBody, Palette } from '../types';
+import type { CosmicBody, Palette } from '../domain/universe';
 
 /* deterministic string hash → uint32 seed */
 export function seedOf(str: string): number {

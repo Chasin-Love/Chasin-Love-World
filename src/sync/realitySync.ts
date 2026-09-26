@@ -12,7 +12,7 @@
  * The poll backs off when the daemon is unreachable (8s → 20s) so serving the
  * app without the Express disk mirror stays quiet instead of spamming errors.
  */
-import type { BinFolderInfo, DiskSyncState } from '../types';
+import type { BinFolderInfo, DiskSyncState } from '../domain/universe';
 import { realityApi, flushDiskQueue } from '../desktop/adapter';
 import { folderNameForReality } from '../realities';
 import { getState, actions } from '../state';

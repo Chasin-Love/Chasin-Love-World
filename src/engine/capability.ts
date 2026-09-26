@@ -1,3 +1,4 @@
+import { STORAGE_KEYS } from '../platform/storageKeys';
 /**
  * GPU capability probe + render quality tiers.
  *
@@ -21,8 +22,8 @@ export interface GpuCapability {
   maxPixelRatio: number;
 }
 
-const STORAGE_KEY = 'my-universe:quality';
-const MIGRATION_KEY = 'my-universe:quality-migrated';
+const STORAGE_KEY = STORAGE_KEYS.quality;
+const MIGRATION_KEY = STORAGE_KEYS.qualityMigrated;
 export const QUALITY_CHANGE_EVENT = 'eventide-quality-change';
 
 let cached: GpuCapability | null = null;

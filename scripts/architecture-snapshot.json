@@ -1,10 +1,15 @@
 {
-  "generatedAt": "2026-09-26T03:23:31.363Z",
-  "fileCount": 110,
+  "generatedAt": "2026-09-26T04:36:37.737Z",
+  "fileCount": 114,
   "deadExports": [
     {
       "symbol": "solPrimeSurface",
       "file": "src/realities/solPrime/surface.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "getSnapshot",
+      "file": "src/state/store.ts",
       "action": "delete"
     }
   ],
@@ -82,6 +87,30 @@
       "file": "src/components/console/CommandPalette.tsx"
     },
     {
+      "name": "Connection",
+      "file": "src/domain/universe.ts"
+    },
+    {
+      "name": "RealityMetaPatch",
+      "file": "src/domain/universe.ts"
+    },
+    {
+      "name": "VfsNodeType",
+      "file": "src/domain/vault.ts"
+    },
+    {
+      "name": "EfsSuperblock",
+      "file": "src/domain/vault.ts"
+    },
+    {
+      "name": "VaultLock",
+      "file": "src/domain/vault.ts"
+    },
+    {
+      "name": "PasswordHistoryEntry",
+      "file": "src/domain/vault.ts"
+    },
+    {
       "name": "SpacetimeFunnel",
       "file": "src/engine/blackhole.ts"
     },
@@ -130,10 +159,6 @@
       "file": "src/native/cpp_bridge.ts"
     },
     {
-      "name": "UniversePerformanceSnapshot",
-      "file": "src/performance.ts"
-    },
-    {
       "name": "GravityNode",
       "file": "src/physics/nbody.ts"
     },
@@ -142,32 +167,12 @@
       "file": "src/physics/nbody.ts"
     },
     {
+      "name": "UniversePerformanceSnapshot",
+      "file": "src/platform/performance.ts"
+    },
+    {
       "name": "HierarchyStage",
       "file": "src/realities/hierarchyStages.ts"
-    },
-    {
-      "name": "Connection",
-      "file": "src/types.ts"
-    },
-    {
-      "name": "VfsNodeType",
-      "file": "src/types.ts"
-    },
-    {
-      "name": "EfsSuperblock",
-      "file": "src/types.ts"
-    },
-    {
-      "name": "VaultLock",
-      "file": "src/types.ts"
-    },
-    {
-      "name": "PasswordHistoryEntry",
-      "file": "src/types.ts"
-    },
-    {
-      "name": "RealityMetaPatch",
-      "file": "src/types.ts"
     },
     {
       "name": "ExportFormat",
@@ -193,10 +198,9 @@
     "server/realityTemplates.ts": 2,
     "server/skyStore.ts": 1,
     "src/App.tsx": 1,
-    "src/audio.ts": 4,
     "src/backend/executors/index.ts": 1,
     "src/backend/executors/isoExecutor.ts": 2,
-    "src/backend/index.ts": 4,
+    "src/backend/index.ts": 6,
     "src/backend/storage/breaches.ts": 1,
     "src/backend/storage/courier.ts": 1,
     "src/backend/storage/crypto.ts": 4,
@@ -207,7 +211,7 @@
     "src/backend/storage/metrics.ts": 2,
     "src/backend/storage/procedural.ts": 1,
     "src/backend/storage/sanitizeHtml.ts": 2,
-    "src/backend/storage/seeds.ts": 2,
+    "src/backend/storage/seeds.ts": 4,
     "src/backend/storage/totp.ts": 2,
     "src/backend/storage/zip.ts": 2,
     "src/backend/types.ts": 11,
@@ -229,7 +233,9 @@
     "src/components/realities/CreateRealityModal.tsx": 2,
     "src/components/realities/RealityAdvancedModal.tsx": 1,
     "src/components/realities/RealityAdvancedPanel.tsx": 2,
-    "src/desktop/adapter.ts": 5,
+    "src/desktop/adapter.ts": 6,
+    "src/domain/universe.ts": 22,
+    "src/domain/vault.ts": 9,
     "src/engine/blackhole.ts": 3,
     "src/engine/blackholeParams.ts": 2,
     "src/engine/blackholeRaymarch.ts": 2,
@@ -248,26 +254,30 @@
     "src/engine/systems/portalPhases.ts": 1,
     "src/engine/systems/stageThresholds.ts": 1,
     "src/native/cpp_bridge.ts": 2,
-    "src/performance.ts": 4,
     "src/physics/nbody.ts": 2,
     "src/physics/physicsEngine.ts": 4,
+    "src/platform/audio.ts": 4,
+    "src/platform/performance.ts": 4,
+    "src/platform/simClock.ts": 2,
+    "src/platform/storageKeys.ts": 6,
     "src/realities/auroraTest/surface.ts": 1,
     "src/realities/chasinLove/surface.ts": 1,
     "src/realities/clusterGenerator.ts": 1,
     "src/realities/galaxyGenerator.ts": 2,
     "src/realities/hierarchyStages.ts": 4,
-    "src/realities/hierarchyTypes.ts": 6,
-    "src/realities/index.ts": 16,
+    "src/realities/hierarchyTypes.ts": 8,
+    "src/realities/index.ts": 18,
     "src/realities/solPrime/index.ts": 1,
     "src/realities/testOne/surface.ts": 1,
     "src/realities/testWorld/surface.ts": 1,
     "src/realities/types.ts": 9,
     "src/sentiment/sentiment.ts": 2,
-    "src/simClock.ts": 2,
     "src/sky/skyRegistry.ts": 3,
-    "src/state.ts": 16,
+    "src/state/actions.ts": 1,
+    "src/state/index.ts": 16,
+    "src/state/persist.ts": 2,
+    "src/state/store.ts": 3,
     "src/sync/realitySync.ts": 2,
-    "src/types.ts": 22,
     "src/ui/AttachmentEditor.tsx": 1,
     "src/ui/Book.tsx": 1,
     "src/ui/CoreMode.tsx": 1,
@@ -282,7 +292,7 @@
     "src/ui/format.ts": 4,
     "src/ui/lib.ts": 3,
     "src/ui/syntax.ts": 2,
-    "src/ui/toast.ts": 19,
+    "src/ui/toast.ts": 20,
     "src/ui/vault/MonacoCodeEditor.tsx": 1,
     "src/ui/vault/monacoSetup.ts": 1
   },
@@ -292,19 +302,17 @@
     "scripts/round16-gauntlet.ts": 103,
     "scripts/round17-gauntlet.ts": 363,
     "scripts/smoke.ts": 230,
-    "scripts/tmp-purge-exports.mjs": 148,
     "server/index.ts": 447,
     "server/paths.ts": 35,
     "server/realityDaemon.ts": 464,
     "server/realityTemplates.ts": 153,
     "server/skyStore.ts": 251,
-    "src/App.tsx": 1353,
-    "src/audio.ts": 194,
+    "src/App.tsx": 1354,
     "src/backend/executors/index.ts": 355,
     "src/backend/executors/isoExecutor.ts": 257,
     "src/backend/index.ts": 42,
     "src/backend/storage/breaches.ts": 133,
-    "src/backend/storage/courier.ts": 126,
+    "src/backend/storage/courier.ts": 127,
     "src/backend/storage/crypto.ts": 437,
     "src/backend/storage/efs.ts": 481,
     "src/backend/storage/formatters.ts": 32,
@@ -316,7 +324,7 @@
     "src/backend/storage/seeds.ts": 541,
     "src/backend/storage/totp.ts": 106,
     "src/backend/storage/zip.ts": 108,
-    "src/backend/types.ts": 68,
+    "src/backend/types.ts": 69,
     "src/components/console/BlackHoleTuningCard.tsx": 111,
     "src/components/console/CommandPalette.tsx": 334,
     "src/components/console/CoreConsole.tsx": 1619,
@@ -336,11 +344,13 @@
     "src/components/realities/RealityAdvancedModal.tsx": 80,
     "src/components/realities/RealityAdvancedPanel.tsx": 521,
     "src/desktop/adapter.ts": 248,
+    "src/domain/universe.ts": 164,
+    "src/domain/vault.ts": 176,
     "src/engine/blackhole.ts": 717,
-    "src/engine/blackholeParams.ts": 104,
+    "src/engine/blackholeParams.ts": 105,
     "src/engine/blackholeRaymarch.ts": 558,
     "src/engine/cameraRig.ts": 422,
-    "src/engine/capability.ts": 128,
+    "src/engine/capability.ts": 129,
     "src/engine/engine.ts": 6667,
     "src/engine/math.ts": 42,
     "src/engine/shaders.ts": 1431,
@@ -355,9 +365,12 @@
     "src/engine/systems/stageThresholds.ts": 50,
     "src/main.tsx": 10,
     "src/native/cpp_bridge.ts": 456,
-    "src/performance.ts": 115,
     "src/physics/nbody.ts": 319,
     "src/physics/physicsEngine.ts": 407,
+    "src/platform/audio.ts": 195,
+    "src/platform/performance.ts": 115,
+    "src/platform/simClock.ts": 27,
+    "src/platform/storageKeys.ts": 22,
     "src/realities/auroraTest/index.ts": 142,
     "src/realities/auroraTest/surface.ts": 15,
     "src/realities/chasinLove/index.ts": 94,
@@ -373,22 +386,23 @@
     "src/realities/testOne/surface.ts": 15,
     "src/realities/testWorld/index.ts": 94,
     "src/realities/testWorld/surface.ts": 15,
-    "src/realities/types.ts": 39,
+    "src/realities/types.ts": 38,
     "src/sentiment/sentiment.ts": 117,
-    "src/simClock.ts": 27,
     "src/sky/skyRegistry.ts": 228,
-    "src/state.ts": 1786,
+    "src/state/actions.ts": 1248,
+    "src/state/index.ts": 12,
+    "src/state/persist.ts": 386,
+    "src/state/store.ts": 148,
     "src/sync/realitySync.ts": 145,
-    "src/types.ts": 401,
     "src/ui/AttachmentEditor.tsx": 495,
     "src/ui/Book.tsx": 163,
-    "src/ui/CoreMode.tsx": 920,
-    "src/ui/DiaryWindow.tsx": 1658,
+    "src/ui/CoreMode.tsx": 921,
+    "src/ui/DiaryWindow.tsx": 1659,
     "src/ui/FileManager.tsx": 1280,
     "src/ui/MediaPlates.tsx": 1271,
     "src/ui/PhysicsHUD.tsx": 485,
     "src/ui/VaultBits.tsx": 133,
-    "src/ui/VaultUI.tsx": 5566,
+    "src/ui/VaultUI.tsx": 5568,
     "src/ui/bits.tsx": 144,
     "src/ui/exportDiary.ts": 372,
     "src/ui/format.ts": 128,
@@ -405,15 +419,11 @@
     ],
     [
       "src/ui/VaultUI.tsx",
-      5566
-    ],
-    [
-      "src/state.ts",
-      1786
+      5568
     ],
     [
       "src/ui/DiaryWindow.tsx",
-      1658
+      1659
     ],
     [
       "src/components/console/CoreConsole.tsx",
@@ -425,7 +435,7 @@
     ],
     [
       "src/App.tsx",
-      1353
+      1354
     ],
     [
       "src/ui/FileManager.tsx",
@@ -436,8 +446,12 @@
       1271
     ],
     [
+      "src/state/actions.ts",
+      1248
+    ],
+    [
       "src/ui/CoreMode.tsx",
-      920
+      921
     ],
     [
       "src/engine/blackhole.ts",
@@ -574,31 +588,30 @@
       "src/sky/skyRegistry.ts:204",
       "src/sky/skyRegistry.ts:213",
       "src/sky/skyRegistry.ts:222",
-      "src/state.ts:733",
-      "src/state.ts:740",
-      "src/state.ts:778",
-      "src/state.ts:786",
-      "src/state.ts:853",
-      "src/state.ts:883",
-      "src/state.ts:906",
-      "src/state.ts:928",
-      "src/state.ts:961",
-      "src/state.ts:1009",
+      "src/state/actions.ts:195",
+      "src/state/actions.ts:202",
+      "src/state/actions.ts:240",
+      "src/state/actions.ts:248",
+      "src/state/actions.ts:315",
+      "src/state/actions.ts:345",
+      "src/state/actions.ts:368",
+      "src/state/actions.ts:390",
+      "src/state/actions.ts:423",
+      "src/state/actions.ts:471",
       "src/sync/realitySync.ts:65",
       "src/sync/realitySync.ts:66",
       "src/sync/realitySync.ts:120"
     ],
     "localStorage keys": [
-      "src/audio.ts:4",
-      "src/audio.ts:40",
-      "src/backend/storage/courier.ts:75",
-      "src/engine/blackholeParams.ts:56",
-      "src/engine/capability.ts:24",
-      "src/engine/capability.ts:25",
-      "src/state.ts:55",
-      "src/state.ts:421",
-      "src/ui/VaultUI.tsx:3631",
-      "src/ui/VaultUI.tsx:4121"
+      "src/platform/storageKeys.ts:6",
+      "src/platform/storageKeys.ts:8",
+      "src/platform/storageKeys.ts:10",
+      "src/platform/storageKeys.ts:12",
+      "src/platform/storageKeys.ts:14",
+      "src/platform/storageKeys.ts:16",
+      "src/platform/storageKeys.ts:18",
+      "src/platform/storageKeys.ts:20",
+      "src/state/persist.ts:268"
     ],
     "window seams": [
       "scripts/smoke.ts:150",
@@ -607,7 +620,7 @@
       "scripts/smoke.ts:173",
       "scripts/smoke.ts:183",
       "src/desktop/adapter.ts:5",
-      "src/performance.ts:72"
+      "src/platform/performance.ts:72"
     ]
   }
 }

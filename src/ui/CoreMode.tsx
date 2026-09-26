@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BodyKind, CosmicBody, Meaning, UniverseState, VaultFile } from '../types';
-import { MEANING_LABEL, MEANINGS } from '../types';
+import type { BodyKind, CosmicBody, Meaning, UniverseState } from '../domain/universe';
+import type { VaultFile } from '../domain/vault';
+import { MEANING_LABEL, MEANINGS } from '../domain/universe';
 import { actions } from '../state';
 import {
   fmtDate, fmtStamp,

@@ -1,3 +1,4 @@
+import { STORAGE_KEYS } from '../platform/storageKeys';
 /**
  * Live tuning parameters for the raymarched black hole (Round 20.4).
  *
@@ -53,7 +54,7 @@ export const BLACKHOLE_RANGES: Record<keyof BlackHoleParams, { min: number; max:
   rotSpeed: { min: -20.0, max: 20.0, step: 0.1 },
 };
 
-const STORAGE_KEY = 'my-universe:blackhole:v1';
+const STORAGE_KEY = STORAGE_KEYS.blackholeTuning;
 export const BLACKHOLE_CHANGE_EVENT = 'eventide-blackhole-change';
 
 let cached: BlackHoleParams | null = null;

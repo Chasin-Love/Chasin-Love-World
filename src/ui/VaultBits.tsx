@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from 'react';
-import type { VaultFile, VaultKind } from '../types';
+import type { VaultFile, VaultKind } from '../domain/vault';
 
 export function seedRnd(name: string): () => number {
   let h = 2166136261;
