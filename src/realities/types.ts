@@ -3,6 +3,23 @@ import { CosmicLineage, GalaxyClusterData, GalaxyData } from './hierarchyTypes';
 
 export * from './hierarchyTypes';
 
+/* The visual content contract for a reality's cosmic background — pure data,
+   declared by the reality (R52: moved here from engine/surface/types so the
+   content layer never imports the renderer; this killed the engine⇄realities
+cycle). */
+export interface UniverseSurfaceConfig {
+  realityId: string;
+  name: string;
+  colorA: string;
+  colorB: string;
+  deepColor: string;
+  starColor: string;
+  webFilaments: string;
+  nebulaIntensity: number;
+  dustLaneIntensity: number;
+  starDensity: number;
+}
+
 /* user-authored appearance/identity overrides — persisted per reality id */
 export interface RealityMetaOverride {
   name?: string;

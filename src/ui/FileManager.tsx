@@ -18,7 +18,7 @@ import { actions } from '../state';
 import {
   fmtBytes, fmtDate,
   efsChildren, efsPath, efsPathString, efsSubtreeIds, EFS_ROOT,
-} from '../backend';
+} from '../vault';
 import type { TrashedFile, VaultFile, VfsNode } from '../domain/vault';
 import { IcClose, IcCopy, IcDownload, IcEdit, IcFolder, IcLock, IcPlus, IcScan, IcSearch, IcTrash, useUniverse } from './bits';
 import { toast } from './toast';

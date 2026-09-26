@@ -5,7 +5,7 @@ import { toast } from './toast';
 import { synthBars } from './lib';
 import { highlightLine, langOf } from './syntax';
 import { looksMinified, prettyPrint } from './format';
-import { getLocalPayload } from '../backend/storage/indexedDB';
+import { getLocalPayload } from '../vault/storage/indexedDB';
 import {
   Play,
   Pause,

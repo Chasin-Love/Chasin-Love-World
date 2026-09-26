@@ -1,5 +1,5 @@
 import type { RealityConfig } from '../../realities/types';
-import type { UniverseSurfaceConfig } from './types';
+import type { UniverseSurfaceConfig } from '../../realities/types';
 
 /**
  * Deterministic surface profiles for each reality in the multiverse.

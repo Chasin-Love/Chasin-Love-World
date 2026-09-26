@@ -7,7 +7,7 @@ import {
   fmtDate, fmtStamp,
   eventsOf,
   getStoredPayload, putStoredPayload,
-} from '../backend';
+} from '../vault';
 import { useUniverse } from './bits';
 import { toast } from './toast';
 

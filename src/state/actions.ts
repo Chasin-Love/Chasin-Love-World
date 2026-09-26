@@ -4,7 +4,7 @@
 import type { GalaxyData } from '../realities/hierarchyTypes';
 import type { UniverseState, DiaryEntry, CosmicBody, BodyKind, Meaning, DiskSyncState, BinFolderInfo, Attachment } from '../domain/universe';
 import type { VaultFile, TrashedFile, VfsNode, VaultUser, FileVersion, VaultSecrets, VfsShadow, EfsScrubReport } from '../domain/vault';
-import { VAULT_HOME_FOLDERS } from '../backend/storage/seeds';
+import { VAULT_HOME_FOLDERS } from '../vault/storage/seeds';
 import { state, bucket, ensureBucket, newId, listeners, refreshSnapshot, EMPTY_DISK_SYNC, getState, rebindState } from './store';
 import { persistState, externalizeLargeDiaryAttachments, STORAGE_KEY, primeState, sanitizeDiaryEntries, normalizeVaultFiles, normalizeLegacyLock } from './persist';
 import { getReality, REALITIES, RAW_REALITIES, computeAllRealities, setRuntimeRealities, createGalaxyData, folderNameForReality, deriveFolderName, RealityMetaOverride, RealityConfig } from '../realities';
@@ -17,7 +17,7 @@ import {
   efsDeleteShadow, efsMkdir, efsMove, efsNodeOf, efsPathString, efsRename,
   efsScrub, efsSubtreeIds, efsHeal, efsUniqueName, EFS_ROOT, migrateLegacyVault,
   seedVfs,
-} from '../backend';
+} from '../vault';
 import { realityApi, syncedRealityApi } from '../desktop/adapter';
 import { toast } from '../ui/toast';
 

@@ -1,9 +1,9 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { actions, newId } from '../state';
-import { fmtDate } from '../backend/storage/formatters';
-import { computeStreak } from '../backend/storage/metrics';
-import { sanitizeDiaryHtml } from '../backend/storage/sanitizeHtml';
-import { delLocalPayload } from '../backend/storage/indexedDB';
+import { fmtDate } from '../vault/storage/formatters';
+import { computeStreak } from '../vault/storage/metrics';
+import { sanitizeDiaryHtml } from '../vault/storage/sanitizeHtml';
+import { delLocalPayload } from '../vault/storage/indexedDB';
 import { MEANING_LABEL } from '../domain/universe';
 import type { Attachment, CosmicBody, DiaryEntry, Mood, Weather } from '../domain/universe';
 import { sfxConnect, sfxTick, startRecording, stopRecording } from '../platform/audio';

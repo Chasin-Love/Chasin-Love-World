@@ -41,7 +41,7 @@ export interface SurfaceTemplateInput {
 }
 
 export function renderSurfaceModule(input: SurfaceTemplateInput): string {
-  return `import { UniverseSurfaceConfig } from '../../engine/surface/types';
+  return `import { UniverseSurfaceConfig } from '../types';
 
 export const ${surfaceVarNameOf(input.folderName)}: UniverseSurfaceConfig = {
   realityId: ${esc(input.id)},

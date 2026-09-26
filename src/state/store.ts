@@ -4,8 +4,8 @@
    ./persist, mutations in ./actions; both read state via the live binding. */
 import { useSyncExternalStore } from 'react';
 import { REALITIES, createGalaxyData } from '../realities';
-import { createVfs, seedVfs, EFS_ROOT } from '../backend';
-import { VAULT_HOME_FOLDERS } from '../backend/storage/seeds';
+import { createVfs, seedVfs, EFS_ROOT } from '../vault';
+import { VAULT_HOME_FOLDERS } from '../vault/storage/seeds';
 import type { DiskSyncState, RealityBucket, UniverseState, CosmicBody, DiaryEntry } from '../domain/universe';
 import type { VfsState } from '../domain/vault';
 import type { GalaxyData } from '../realities/hierarchyTypes';

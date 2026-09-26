@@ -14,8 +14,8 @@ import {
   efsDeleteShadow, efsMkdir, efsMove, efsNodeOf, efsPathString, efsRename,
   efsScrub, efsSubtreeIds, efsHeal, efsUniqueName, EFS_ROOT, migrateLegacyVault,
   seedVfs,
-} from '../backend';
-import { VAULT_HOME_FOLDERS } from '../backend/storage/seeds';
+} from '../vault';
+import { VAULT_HOME_FOLDERS } from '../vault/storage/seeds';
 import { recordPersistence } from '../platform/performance';
 import { desktopStore } from '../desktop/adapter';
 import { toast } from '../ui/toast';

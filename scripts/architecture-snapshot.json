@@ -1,12 +1,7 @@
 {
-  "generatedAt": "2026-09-26T04:36:37.737Z",
-  "fileCount": 114,
+  "generatedAt": "2026-09-26T04:51:52.108Z",
+  "fileCount": 113,
   "deadExports": [
-    {
-      "symbol": "solPrimeSurface",
-      "file": "src/realities/solPrime/surface.ts",
-      "action": "delete"
-    },
     {
       "symbol": "getSnapshot",
       "file": "src/state/store.ts",
@@ -21,66 +16,6 @@
     {
       "name": "RealityTemplateInput",
       "file": "server/realityTemplates.ts"
-    },
-    {
-      "name": "JsRunHandle",
-      "file": "src/backend/executors/index.ts"
-    },
-    {
-      "name": "LogSink",
-      "file": "src/backend/executors/index.ts"
-    },
-    {
-      "name": "PythonRunHandle",
-      "file": "src/backend/executors/index.ts"
-    },
-    {
-      "name": "NovaVerdict",
-      "file": "src/backend/storage/breaches.ts"
-    },
-    {
-      "name": "NovaScanResult",
-      "file": "src/backend/storage/breaches.ts"
-    },
-    {
-      "name": "CometOpenResult",
-      "file": "src/backend/storage/courier.ts"
-    },
-    {
-      "name": "KdfSpec",
-      "file": "src/backend/storage/crypto.ts"
-    },
-    {
-      "name": "BuildRingOptions",
-      "file": "src/backend/storage/crypto.ts"
-    },
-    {
-      "name": "DedupReport",
-      "file": "src/backend/storage/efs.ts"
-    },
-    {
-      "name": "ScrubProgress",
-      "file": "src/backend/storage/efs.ts"
-    },
-    {
-      "name": "ImportResult",
-      "file": "src/backend/storage/importers.ts"
-    },
-    {
-      "name": "TotpParams",
-      "file": "src/backend/storage/totp.ts"
-    },
-    {
-      "name": "ExtractedFile",
-      "file": "src/backend/storage/zip.ts"
-    },
-    {
-      "name": "ExecutionContext",
-      "file": "src/backend/types.ts"
-    },
-    {
-      "name": "ExecutionResult",
-      "file": "src/backend/types.ts"
     },
     {
       "name": "PaletteApi",
@@ -189,6 +124,66 @@
     {
       "name": "ToastHandler",
       "file": "src/ui/toast.ts"
+    },
+    {
+      "name": "JsRunHandle",
+      "file": "src/vault/executors/index.ts"
+    },
+    {
+      "name": "LogSink",
+      "file": "src/vault/executors/index.ts"
+    },
+    {
+      "name": "PythonRunHandle",
+      "file": "src/vault/executors/index.ts"
+    },
+    {
+      "name": "NovaVerdict",
+      "file": "src/vault/storage/breaches.ts"
+    },
+    {
+      "name": "NovaScanResult",
+      "file": "src/vault/storage/breaches.ts"
+    },
+    {
+      "name": "CometOpenResult",
+      "file": "src/vault/storage/courier.ts"
+    },
+    {
+      "name": "KdfSpec",
+      "file": "src/vault/storage/crypto.ts"
+    },
+    {
+      "name": "BuildRingOptions",
+      "file": "src/vault/storage/crypto.ts"
+    },
+    {
+      "name": "DedupReport",
+      "file": "src/vault/storage/efs.ts"
+    },
+    {
+      "name": "ScrubProgress",
+      "file": "src/vault/storage/efs.ts"
+    },
+    {
+      "name": "ImportResult",
+      "file": "src/vault/storage/importers.ts"
+    },
+    {
+      "name": "TotpParams",
+      "file": "src/vault/storage/totp.ts"
+    },
+    {
+      "name": "ExtractedFile",
+      "file": "src/vault/storage/zip.ts"
+    },
+    {
+      "name": "ExecutionContext",
+      "file": "src/vault/types.ts"
+    },
+    {
+      "name": "ExecutionResult",
+      "file": "src/vault/types.ts"
     }
   ],
   "deadCss": [],
@@ -198,23 +193,6 @@
     "server/realityTemplates.ts": 2,
     "server/skyStore.ts": 1,
     "src/App.tsx": 1,
-    "src/backend/executors/index.ts": 1,
-    "src/backend/executors/isoExecutor.ts": 2,
-    "src/backend/index.ts": 6,
-    "src/backend/storage/breaches.ts": 1,
-    "src/backend/storage/courier.ts": 1,
-    "src/backend/storage/crypto.ts": 4,
-    "src/backend/storage/efs.ts": 2,
-    "src/backend/storage/formatters.ts": 3,
-    "src/backend/storage/importers.ts": 1,
-    "src/backend/storage/indexedDB.ts": 4,
-    "src/backend/storage/metrics.ts": 2,
-    "src/backend/storage/procedural.ts": 1,
-    "src/backend/storage/sanitizeHtml.ts": 2,
-    "src/backend/storage/seeds.ts": 4,
-    "src/backend/storage/totp.ts": 2,
-    "src/backend/storage/zip.ts": 2,
-    "src/backend/types.ts": 11,
     "src/components/console/BlackHoleTuningCard.tsx": 1,
     "src/components/console/CommandPalette.tsx": 1,
     "src/components/console/CoreConsole.tsx": 1,
@@ -249,7 +227,7 @@
     "src/engine/surface/photoDome.ts": 1,
     "src/engine/surface/surfacePresets.ts": 2,
     "src/engine/surface/surfaceShaders.ts": 4,
-    "src/engine/surface/types.ts": 8,
+    "src/engine/surface/types.ts": 2,
     "src/engine/systems/levelSystem.ts": 1,
     "src/engine/systems/portalPhases.ts": 1,
     "src/engine/systems/stageThresholds.ts": 1,
@@ -270,7 +248,7 @@
     "src/realities/solPrime/index.ts": 1,
     "src/realities/testOne/surface.ts": 1,
     "src/realities/testWorld/surface.ts": 1,
-    "src/realities/types.ts": 9,
+    "src/realities/types.ts": 12,
     "src/sentiment/sentiment.ts": 2,
     "src/sky/skyRegistry.ts": 3,
     "src/state/actions.ts": 1,
@@ -294,7 +272,24 @@
     "src/ui/syntax.ts": 2,
     "src/ui/toast.ts": 20,
     "src/ui/vault/MonacoCodeEditor.tsx": 1,
-    "src/ui/vault/monacoSetup.ts": 1
+    "src/ui/vault/monacoSetup.ts": 1,
+    "src/vault/executors/index.ts": 1,
+    "src/vault/executors/isoExecutor.ts": 2,
+    "src/vault/index.ts": 6,
+    "src/vault/storage/breaches.ts": 1,
+    "src/vault/storage/courier.ts": 1,
+    "src/vault/storage/crypto.ts": 4,
+    "src/vault/storage/efs.ts": 2,
+    "src/vault/storage/formatters.ts": 3,
+    "src/vault/storage/importers.ts": 1,
+    "src/vault/storage/indexedDB.ts": 4,
+    "src/vault/storage/metrics.ts": 2,
+    "src/vault/storage/procedural.ts": 1,
+    "src/vault/storage/sanitizeHtml.ts": 2,
+    "src/vault/storage/seeds.ts": 4,
+    "src/vault/storage/totp.ts": 2,
+    "src/vault/storage/zip.ts": 2,
+    "src/vault/types.ts": 11
   },
   "loc": {
     "scripts/audit-architecture.ts": 274,
@@ -308,23 +303,6 @@
     "server/realityTemplates.ts": 153,
     "server/skyStore.ts": 251,
     "src/App.tsx": 1354,
-    "src/backend/executors/index.ts": 355,
-    "src/backend/executors/isoExecutor.ts": 257,
-    "src/backend/index.ts": 42,
-    "src/backend/storage/breaches.ts": 133,
-    "src/backend/storage/courier.ts": 127,
-    "src/backend/storage/crypto.ts": 437,
-    "src/backend/storage/efs.ts": 481,
-    "src/backend/storage/formatters.ts": 32,
-    "src/backend/storage/importers.ts": 271,
-    "src/backend/storage/indexedDB.ts": 187,
-    "src/backend/storage/metrics.ts": 77,
-    "src/backend/storage/procedural.ts": 60,
-    "src/backend/storage/sanitizeHtml.ts": 122,
-    "src/backend/storage/seeds.ts": 541,
-    "src/backend/storage/totp.ts": 106,
-    "src/backend/storage/zip.ts": 108,
-    "src/backend/types.ts": 69,
     "src/components/console/BlackHoleTuningCard.tsx": 111,
     "src/components/console/CommandPalette.tsx": 334,
     "src/components/console/CoreConsole.tsx": 1619,
@@ -354,12 +332,12 @@
     "src/engine/engine.ts": 6667,
     "src/engine/math.ts": 42,
     "src/engine/shaders.ts": 1431,
-    "src/engine/surface/UniverseSurfaceManager.ts": 498,
+    "src/engine/surface/UniverseSurfaceManager.ts": 499,
     "src/engine/surface/index.ts": 13,
     "src/engine/surface/photoDome.ts": 307,
     "src/engine/surface/surfacePresets.ts": 56,
     "src/engine/surface/surfaceShaders.ts": 362,
-    "src/engine/surface/types.ts": 34,
+    "src/engine/surface/types.ts": 17,
     "src/engine/systems/levelSystem.ts": 42,
     "src/engine/systems/portalPhases.ts": 52,
     "src/engine/systems/stageThresholds.ts": 50,
@@ -381,12 +359,11 @@
     "src/realities/hierarchyTypes.ts": 132,
     "src/realities/index.ts": 362,
     "src/realities/solPrime/index.ts": 51,
-    "src/realities/solPrime/surface.ts": 15,
     "src/realities/testOne/index.ts": 142,
     "src/realities/testOne/surface.ts": 15,
     "src/realities/testWorld/index.ts": 94,
     "src/realities/testWorld/surface.ts": 15,
-    "src/realities/types.ts": 38,
+    "src/realities/types.ts": 55,
     "src/sentiment/sentiment.ts": 117,
     "src/sky/skyRegistry.ts": 228,
     "src/state/actions.ts": 1248,
@@ -410,7 +387,24 @@
     "src/ui/syntax.ts": 195,
     "src/ui/toast.ts": 16,
     "src/ui/vault/MonacoCodeEditor.tsx": 152,
-    "src/ui/vault/monacoSetup.ts": 98
+    "src/ui/vault/monacoSetup.ts": 98,
+    "src/vault/executors/index.ts": 355,
+    "src/vault/executors/isoExecutor.ts": 257,
+    "src/vault/index.ts": 42,
+    "src/vault/storage/breaches.ts": 133,
+    "src/vault/storage/courier.ts": 127,
+    "src/vault/storage/crypto.ts": 437,
+    "src/vault/storage/efs.ts": 481,
+    "src/vault/storage/formatters.ts": 32,
+    "src/vault/storage/importers.ts": 271,
+    "src/vault/storage/indexedDB.ts": 187,
+    "src/vault/storage/metrics.ts": 77,
+    "src/vault/storage/procedural.ts": 60,
+    "src/vault/storage/sanitizeHtml.ts": 122,
+    "src/vault/storage/seeds.ts": 541,
+    "src/vault/storage/totp.ts": 106,
+    "src/vault/storage/zip.ts": 108,
+    "src/vault/types.ts": 69
   },
   "locLeaders": [
     [
@@ -470,7 +464,7 @@
       558
     ],
     [
-      "src/backend/storage/seeds.ts",
+      "src/vault/storage/seeds.ts",
       541
     ]
   ],
@@ -517,11 +511,10 @@
       "src-tauri/src/realities.rs:401"
     ],
     "disk surface.ts imports": [
-      "src/realities/auroraTest/surface.ts:1 — import { UniverseSurfaceConfig } from '../../engine/surface/types';",
-      "src/realities/chasinLove/surface.ts:1 — import { UniverseSurfaceConfig } from '../../engine/surface/types';",
-      "src/realities/solPrime/surface.ts:1 — import { UniverseSurfaceConfig } from '../../engine/surface/types';",
-      "src/realities/testOne/surface.ts:1 — import { UniverseSurfaceConfig } from '../../engine/surface/types';",
-      "src/realities/testWorld/surface.ts:1 — import { UniverseSurfaceConfig } from '../../engine/surface/types';"
+      "src/realities/auroraTest/surface.ts:1 — import { UniverseSurfaceConfig } from '../types';",
+      "src/realities/chasinLove/surface.ts:1 — import { UniverseSurfaceConfig } from '../types';",
+      "src/realities/testOne/surface.ts:1 — import { UniverseSurfaceConfig } from '../types';",
+      "src/realities/testWorld/surface.ts:1 — import { UniverseSurfaceConfig } from '../types';"
     ],
     "native build path": [
       "src-tauri/build.rs:19",
@@ -543,8 +536,7 @@
       "scripts/round17-gauntlet.ts:327"
     ],
     "public roots": [
-      "index.html:11",
-      "src/backend/executors/index.ts:319"
+      "index.html:11"
     ],
     "route↔command strings": [
       "server/index.ts:41",

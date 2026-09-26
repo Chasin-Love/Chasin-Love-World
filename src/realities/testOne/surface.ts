@@ -1,4 +1,4 @@
-import { UniverseSurfaceConfig } from '../../engine/surface/types';
+import { UniverseSurfaceConfig } from '../types';
 
 export const testOneSurface: UniverseSurfaceConfig = {
   realityId: "reality-muey9188-ayqk",

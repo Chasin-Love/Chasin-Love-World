@@ -1,26 +1,9 @@
 import type * as THREE from 'three';
-import type { RealityConfig } from '../../realities/types';
-
-/**
- * Visual configuration for the Universe Surface (cosmic background).
- * Allows each reality in the multiverse to project its own distinct
- * chromatic palette, nebula clouds, stellar density, and cosmic web colors.
- */
-export interface UniverseSurfaceConfig {
-  realityId: string;
-  name: string;
-  colorA: string;
-  colorB: string;
-  deepColor: string;
-  starColor: string;
-  webFilaments: string;
-  nebulaIntensity: number;
-  dustLaneIntensity: number;
-  starDensity: number;
-}
 
 /**
  * Runtime frame update parameters passed to the Universe Surface engine.
+ * Engine-only (three.js types) — the CONTENT contract, UniverseSurfaceConfig,
+ * lives in realities/types.ts (R52 cycle cut).
  */
 export interface UniverseSurfaceUpdateParams {
   dt: number;

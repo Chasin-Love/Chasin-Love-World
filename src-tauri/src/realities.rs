@@ -387,7 +387,7 @@ pub fn create_folder(
     let esc = |s: &str| -> String { serde_json::to_string(s).unwrap_or_else(|_| "\"\"".into()) };
 
     let surface = format!(
-        "import {{ UniverseSurfaceConfig }} from '../../engine/surface/types';\n\nexport const {sv}: UniverseSurfaceConfig = {{\n  realityId: '{cid}',\n  name: {name},\n  colorA: '{ca}',\n  colorB: '{cb}',\n  deepColor: '#030108',\n  starColor: '{sc}',\n  webFilaments: '{ca}',\n  nebulaIntensity: 1.0,\n  dustLaneIntensity: 0.8,\n  starDensity: 0.85,\n}};\n",
+        "import {{ UniverseSurfaceConfig }} from '../types';\n\nexport const {sv}: UniverseSurfaceConfig = {{\n  realityId: '{cid}',\n  name: {name},\n  colorA: '{ca}',\n  colorB: '{cb}',\n  deepColor: '#030108',\n  starColor: '{sc}',\n  webFilaments: '{ca}',\n  nebulaIntensity: 1.0,\n  dustLaneIntensity: 0.8,\n  starDensity: 0.85,\n}};\n",
         sv = surface_var,
         cid = clean_id,
         name = esc(&name),

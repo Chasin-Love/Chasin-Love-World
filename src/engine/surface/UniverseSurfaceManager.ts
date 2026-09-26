@@ -4,7 +4,8 @@ import { universeSurfaceVert, universeSurfaceFrag, LENS_VERT_GLSL } from './surf
 import { getSurfaceConfigForReality } from './surfacePresets';
 import { makeGlowTexture } from '../math';
 import { PhotoDome } from './photoDome';
-import type { UniverseSurfaceConfig, UniverseSurfaceUpdateParams } from './types';
+import type { UniverseSurfaceConfig } from '../../realities/types';
+import type { UniverseSurfaceUpdateParams } from './types';
 
 /**
  * UniverseSurfaceManager

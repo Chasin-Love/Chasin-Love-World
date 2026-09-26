@@ -24,7 +24,7 @@ import {
   pulseVault, readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
   parseIsoBlob, extractIsoFile, flattenIsoRecords,
   type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
-} from '../backend';
+} from '../vault';
 import type { AvatarFit, FileVersion, PasswordField, PasswordRecord, VaultFile, VfsNode, VaultKind, VaultSecrets, VaultUser } from '../domain/vault';
 import type { AuditEntry } from '../domain/universe';
 import {
