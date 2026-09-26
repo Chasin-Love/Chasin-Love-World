@@ -100,16 +100,28 @@ npm run audit:arch   architecture drift report (--snapshot / --check)
 | IndexedDB/OPFS | Vault binary payloads |
 | Tauri app-data | `universe-state.json` + `payloads/` (desktop) |
 
-## 6. Known debt register (R52)
+## 6. Known debt register (R52 — updated at Phase 4)
 
 1. **`engine.ts` god class** (6.6k lines) — decomposition planned as the last,
-   optional R52 phase; guarded by the smoke gate.
-2. **`ui/VaultUI.tsx`** (5.5k lines, ~40 components) — feature-folder split
-   planned in R52 Phase 4.
-3. **engine ⇄ realities type cycle** — `UniverseSurfaceConfig` belongs in the
-   realities contract; cutting it touches generator TS + Rust + disk files.
-4. **44 exported-but-unreferenced types** — prune opportunistically; type-only
+   OPTIONAL R52 phase; guarded by the smoke gate. Not yet executed.
+2. **`src/state/actions.ts`** (~1,100 lines) — the mutators were kept as one
+   file during the state split (behavior-safe); a domain split
+   (realities/galaxies/bodies/entries/vault) is follow-up work.
+3. **`ui/CoreConsole.tsx`** (1,6k lines) — internal split (CoreBackdrop,
+   HolographicRadar, BentoRealityCard, DeepHierarchyExplorer) deferred.
+4. **`App.tsx` engine-wiring block** (~250 lines inside the boot effect) —
+   extraction needs a 15-callback options object; judged worse than the
+   entanglement it removes. Revisit with the engine decomposition.
+5. **44 exported-but-unreferenced types** — prune opportunistically; type-only
    deadness needs per-symbol review (structural usage).
-5. `docs/ROUND-8`, `docs/ROUND-18` gaps are historical (no docs were written
+6. `docs/ROUND-8`, `docs/ROUND-18` gaps are historical (no docs were written
    for those rounds); `ROUND-20-KEYRING` vs `ROUND-20-BLACKHOLE` were
    disambiguated in R52 Phase 1.
+
+### Delivered by R52 (this branch)
+Phases 0–4: verify gate (`npm run verify` = typecheck + gauntlets + headless
+smoke), architecture auditor (`npm run audit:arch`), dead-code purge, domain
+layer (`src/domain/`), state folder (`src/state/`), platform layer
+(`src/platform/` + storage-key registry), engine⇄realities cycle cut
+(Generators updated in TS and Rust), `backend/` → `vault/` rename, server
+routers (`server/routes/`), UI feature folders (`ui/vault/`, `ui/diary/`).
