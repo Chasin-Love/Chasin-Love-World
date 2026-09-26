@@ -13,19 +13,19 @@ import { ensureSkyFor, onSkyChanged } from './sky/skyRegistry';
 import { computeAurora, onThisDay } from './sentiment/sentiment';
 import { perfMark } from './platform/performance';
 import { publishSimDate } from './platform/simClock';
-import { MultiverseBar } from './components/hud/MultiverseBar';
-import { RealityHoverCard } from './components/hud/RealityHoverCard';
-import { ClusterHoverCard } from './components/hud/ClusterHoverCard';
+import { MultiverseBar } from './ui/hud/MultiverseBar';
+import { RealityHoverCard } from './ui/hud/RealityHoverCard';
+import { ClusterHoverCard } from './ui/hud/ClusterHoverCard';
 
-import { CosmicWebHUD, type CosmicWebSettings } from './components/hud/CosmicWebHUD';
+import { CosmicWebHUD, type CosmicWebSettings } from './ui/hud/CosmicWebHUD';
 const DiaryWindow = lazy(() => import('./ui/diary/DiaryWindow'));
 const CoreMode = lazy(() => import('./ui/CoreMode'));
 const VaultUI = lazy(() => import('./ui/VaultUI'));
-const CosmicLineageModal = lazy(() => import('./components/lineage/CosmicLineageModal').then((module) => ({ default: module.CosmicLineageModal })));
-const CoreConsole = lazy(() => import('./components/console/CoreConsole').then((module) => ({ default: module.CoreConsole })));
-const RealityAdvancedModal = lazy(() => import('./components/realities/RealityAdvancedModal').then((module) => ({ default: module.RealityAdvancedModal })));
-const CommandPalette = lazy(() => import('./components/console/CommandPalette').then((module) => ({ default: module.CommandPalette })));
-import { GalaxyHoverCard } from './components/hud/GalaxyHoverCard';
+const CosmicLineageModal = lazy(() => import('./ui/lineage/CosmicLineageModal').then((module) => ({ default: module.CosmicLineageModal })));
+const CoreConsole = lazy(() => import('./ui/console/CoreConsole').then((module) => ({ default: module.CoreConsole })));
+const RealityAdvancedModal = lazy(() => import('./ui/reality/RealityAdvancedModal').then((module) => ({ default: module.RealityAdvancedModal })));
+const CommandPalette = lazy(() => import('./ui/console/CommandPalette').then((module) => ({ default: module.CommandPalette })));
+import { GalaxyHoverCard } from './ui/hud/GalaxyHoverCard';
 import { getReality, type RealityConfig, type GalaxyClusterData, type GalaxyData } from './realities';
 
 interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean; maximized?: boolean }
@@ -408,9 +408,9 @@ export default function App() {
       void import('./ui/VaultUI');
       void import('./ui/CoreMode');
       void import('./ui/diary/DiaryWindow');
-      void import('./components/lineage/CosmicLineageModal');
-      void import('./components/console/CoreConsole');
-      void import('./components/realities/RealityAdvancedModal');
+      void import('./ui/lineage/CosmicLineageModal');
+      void import('./ui/console/CoreConsole');
+      void import('./ui/reality/RealityAdvancedModal');
     };
     const gate = window.setTimeout(() => {
       if (typeof window.requestIdleCallback === 'function') {

@@ -3,7 +3,7 @@ import { REALITIES, getReality, RealityConfig, GalaxyClusterData, GalaxyData, cr
 import { HIERARCHY_STAGES } from '../../realities/hierarchyStages';
 import { actions, getState, useUniverse } from '../../state';
 import { Globe, Sparkles, Orbit, Layers, ChevronRight, Compass, Zap, Eye, Edit3, Shield, ShieldCheck, Flame, X, Plus, Trash2, CircleDot } from 'lucide-react';
-import { CreateRealityModal } from '../realities/CreateRealityModal';
+import { CreateRealityModal } from '../reality/CreateRealityModal';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
 import { toast } from '../../ui/toast';
 
