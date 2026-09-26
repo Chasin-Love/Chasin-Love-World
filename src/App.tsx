@@ -4,7 +4,7 @@ import { actions, getState, newId, hydrateDesktopSnapshot } from './state';
 import { MEANING_LABEL } from './domain/universe';
 import type { CosmicBody, Meaning } from './domain/universe';
 import { chime, initAudio, isMuted, setAudioMode, toggleMute } from './platform/audio';
-import type { WinRect } from './ui/DiaryWindow';
+import type { WinRect } from './ui/diary/DiaryWindow';
 import { PhysicsHUD } from './ui/PhysicsHUD';
 import { ErrorBoundary, IcLink, ToastHost, useUniverse } from './ui/bits';
 import { toast } from './ui/toast';
@@ -18,7 +18,7 @@ import { RealityHoverCard } from './components/hud/RealityHoverCard';
 import { ClusterHoverCard } from './components/hud/ClusterHoverCard';
 
 import { CosmicWebHUD, type CosmicWebSettings } from './components/hud/CosmicWebHUD';
-const DiaryWindow = lazy(() => import('./ui/DiaryWindow'));
+const DiaryWindow = lazy(() => import('./ui/diary/DiaryWindow'));
 const CoreMode = lazy(() => import('./ui/CoreMode'));
 const VaultUI = lazy(() => import('./ui/VaultUI'));
 const CosmicLineageModal = lazy(() => import('./components/lineage/CosmicLineageModal').then((module) => ({ default: module.CosmicLineageModal })));
@@ -407,7 +407,7 @@ export default function App() {
       if (cancelled) return;
       void import('./ui/VaultUI');
       void import('./ui/CoreMode');
-      void import('./ui/DiaryWindow');
+      void import('./ui/diary/DiaryWindow');
       void import('./components/lineage/CosmicLineageModal');
       void import('./components/console/CoreConsole');
       void import('./components/realities/RealityAdvancedModal');

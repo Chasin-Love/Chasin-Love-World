@@ -1,11 +1,11 @@
 import React, { memo, useEffect, useRef, useState, useCallback } from 'react';
-import type { Attachment } from '../domain/universe';
-import { sfxTick } from '../platform/audio';
-import { toast } from './toast';
-import { synthBars } from './lib';
-import { highlightLine, langOf } from './syntax';
-import { looksMinified, prettyPrint } from './format';
-import { getLocalPayload } from '../vault/storage/indexedDB';
+import type { Attachment } from '../../domain/universe';
+import { sfxTick } from '../../platform/audio';
+import { toast } from '../toast';
+import { synthBars } from '../lib';
+import { highlightLine, langOf } from '../syntax';
+import { looksMinified, prettyPrint } from '../format';
+import { getLocalPayload } from '../../vault/storage/indexedDB';
 import {
   Play,
   Pause,

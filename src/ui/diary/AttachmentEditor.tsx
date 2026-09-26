@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from './toast';
+import { toast } from '../toast';
 
 /**
  * AttachmentEditor — the advanced image editor for diary attachments.

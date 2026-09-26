@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
-import { sfxPage } from '../platform/audio';
-import { IcChevL, IcChevR } from './bits';
+import { sfxPage } from '../../platform/audio';
+import { IcChevL, IcChevR } from '../bits';
 
 const SEGMENTS = 12;
 const TURN_MS = 900;

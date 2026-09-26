@@ -1,20 +1,20 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { actions, newId } from '../state';
-import { fmtDate } from '../vault/storage/formatters';
-import { computeStreak } from '../vault/storage/metrics';
-import { sanitizeDiaryHtml } from '../vault/storage/sanitizeHtml';
-import { delLocalPayload } from '../vault/storage/indexedDB';
-import { MEANING_LABEL } from '../domain/universe';
-import type { Attachment, CosmicBody, DiaryEntry, Mood, Weather } from '../domain/universe';
-import { sfxConnect, sfxTick, startRecording, stopRecording } from '../platform/audio';
+import { actions, newId } from '../../state';
+import { fmtDate } from '../../vault/storage/formatters';
+import { computeStreak } from '../../vault/storage/metrics';
+import { sanitizeDiaryHtml } from '../../vault/storage/sanitizeHtml';
+import { delLocalPayload } from '../../vault/storage/indexedDB';
+import { MEANING_LABEL } from '../../domain/universe';
+import type { Attachment, CosmicBody, DiaryEntry, Mood, Weather } from '../../domain/universe';
+import { sfxConnect, sfxTick, startRecording, stopRecording } from '../../platform/audio';
 import Book from './Book';
-import { IcBook, IcClose, IcCompress, IcCopy, IcDownload, IcEdit, IcExpand, IcGlobe, IcImage, IcInline, IcMic, IcMin, IcMoon, IcPause, IcPlay, IcPlus, IcSearch, IcStar, IcStop, IcTrash, useUniverse } from './bits';
-import { toast } from './toast';
-import { readAsDataURL, synthBars } from './lib';
+import { IcBook, IcClose, IcCompress, IcCopy, IcDownload, IcEdit, IcExpand, IcGlobe, IcImage, IcInline, IcMic, IcMin, IcMoon, IcPause, IcPlay, IcPlus, IcSearch, IcStar, IcStop, IcTrash, useUniverse } from '../bits';
+import { toast } from '../toast';
+import { readAsDataURL, synthBars } from '../lib';
 import { AudioPlate, VideoPlate, ImageOrGifPlate, FileOrCodePlate, useAttachmentSource } from './MediaPlates';
 import AttachmentEditor from './AttachmentEditor';
-import { highlightLine, langOf } from './syntax';
-import { prettyPrint } from './format';
+import { highlightLine, langOf } from '../syntax';
+import { prettyPrint } from '../format';
 
 export interface WinRect { x: number; y: number; w: number; h: number; }
 
