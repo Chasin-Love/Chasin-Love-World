@@ -83,10 +83,18 @@ jobs:
           merge-multiple: true
           path: release-assets
 
+      # upload-artifact@v4 preserves each build's directory structure, so the
+      # installers land at varying depths — recurse instead of a flat glob.
+      - name: List collected installers
+        run: ls -R release-assets
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: MY UNIVERSE ${{ github.ref_name }}
-          files: release-assets/*
+          files: |
+            release-assets/**/*.exe
+            release-assets/**/*.deb
+            release-assets/**/*.AppImage
           generate_release_notes: true
           fail_on_unmatched_files: true
