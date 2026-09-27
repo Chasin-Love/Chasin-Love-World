@@ -1,62 +1,63 @@
 import * as THREE from 'three';
-import type { BlackHoleVisual } from './blackhole';
 import { BLACKHOLE_CHANGE_EVENT, getBlackHoleParams, type BlackHoleParams } from './blackholeParams';
 
 /**
- * Geodesic black hole renderer — the cinematic tier.
+ * THE black hole renderer — one geodesic raymarcher, nothing stacked on it.
  *
- * ROUND 20 — the corrected port of https://github.com/dgreenheck/webgpu-black-hole
- * (Copyright (c) 2025 Daniel Greenheck, MIT License). Round 19 transliterated
- * his physics but broke the presentation in five ways; this round fixes all of
- * them and, more importantly, adopts his RUNTIME-TUNED look (the config that
- * produces the demo's reference image) instead of his shader fallbacks:
+ * ROUND 54 — the single-renderer rebuild. The old flat "composite"
+ * (blackhole.ts: baked disk textures, painted photon ring, fake lensed
+ * halos, the spacetime funnel) is deleted; this module is the whole hole.
+ * It is the corrected port of https://github.com/dgreenheck/webgpu-black-hole
+ * (Copyright (c) 2025 Daniel Greenheck, MIT License) — and Round 54 closes
+ * the one gap Round 20 left open on purpose: his BACKGROUND.
  *
- *   • HIS EXACT UNIT CONVENTION: the march runs in units where rs = 0.8
- *     (his mass 0.4 × 2). One uScale uniform converts world → shader units,
- *     so every constant below transfers from his config VERBATIM — zero
- *     rescaling drift, and the renderer stays scale-invariant at any hole
- *     size. R20.4: rs is the live uniform uRs (R20.3's baked 0.66 shrank the
- *     shadow and grandified the disk — away from the reference look).
- *   • HIS LENSING, VERBATIM: his bend per step is (rs/r²)·stepSize·lensing —
- *     the SAME form as ours — so bend per unit path = rs × lensing and the
- *     step size CANCELS. uLensing is therefore his gravitationalLensing
- *     (2.4) directly, not a step-compensated derivative: R20's 8.0 ("0.3 ×
- *     8.0 = 1.0 × 2.4") compared per-step products, forgot his step is 3.33×
- *     longer, and bent light 2.75× too hard — a bloated shadow wrapping the
- *     disk into a donut. (Round 19 paired his fallback step with his
- *     fallback lensing → far too little bending → no wrap, a flat band.)
- *   • THE QUAD BILLBOARDS EVERY FRAME (updateRaymarchUniforms copies the
- *     camera rotation). Round 19 left it facing world +Z — a sheared window
- *     that clipped the photon ring and vanished edge-on.
- *   • HIS GAMMA STEP STAYS. His demo applies pow(1/2.2) inside the material
- *     and THEN the renderer's ACES + sRGB output — exactly our composer
- *     (material → UnrealBloom → OutputPass). Removing it would be the
- *     unfaithful choice, not the fix.
- *   • HIS TUNED CONFIG, verbatim: disk 4.1–14.5, T_peak 49.78 kK, falloff
- *     5.22, brightness 5, rotation −8.7, Doppler 1.0, turbulence
- *     1.81 / 0.75 / 7.4, cycle 5, lacunarity 3, persistence 0.8, softness
- *     0.18 / 0.5 — and the FULL 121-entry Mitchell–Charity LUT to 40,000 K
- *     (Round 19 truncated it at 10,000 K, so his blue-white core was impossible).
- *   • HIS DISK FUNCTION transliterated line-for-line, including the
- *     rotation-sign flip in the Doppler beaming (his rotation is NEGATIVE —
- *     it decides which side of the disk beams hot at the viewer).
+ *   • HIS BACKGROUND, VERBATIM: escaped rays sample his procedural sky —
+ *     hashed-grid stars (core + glow, bluish↔warm) and two FBM nebula
+ *     layers — with the FINAL BENT ray direction. That is what smears the
+ *     sky into streaks around the shadow: spacetime bending you can see
+ *     beyond the disk. His shipped config: density 0.1, size 1.2,
+ *     brightness 0.1, near-black navies (#071f44 @ 0.01, #010615 @ 0.21).
+ *   • THE SEAM LAW: the quad is finite, so his sky is weighted by the
+ *     ray's impact parameter b (full bent sky inside uBgInner ≈ 16 shader
+ *     units ≈ 20 rs — shadow, photon ring, streaking zone, whole disk —
+ *     fading to fully transparent by uBgOuter ≈ 22, inside the quad's
+ *     inscribed 24). Beyond the fade OUR universe shows, still bent by the
+ *     R52 sky lens. Both skies are near-black in the band, so the handoff
+ *     is seamless.
+ *   • THE EARLY-OUT: bending only pulls rays inward, so a ray with
+ *     b > uBgInner can never cross the disk (outer radius 14.5) — it skips
+ *     the march entirely. The outer half of the quad renders
+ *     background-only and is CHEAPER than the R20 version, paying for the
+ *     background sampling.
+ *   • NO GLOW SPRITE: the R20 sprite fatted the halo into a blob and washed
+ *     the arch out. The reference's blaze comes from bloom — the engine now
+ *     damps the project bloom toward his 0.68 while a hole is on stage.
+ *   • ROUND 56 — THE BACKGROUND IS OURS: his procedural starfield/nebula are
+ *     gone. The engine captures the REAL scene into an offscreen buffer each
+ *     frame and this shader samples it through the camera with the FINAL
+ *     BENT ray direction — your nebula and your stars, displaced and
+ *     streaked around the shadow. No seam: at the quad's edge the
+ *     deflection is ~0, so the bent background meets the undisplaced one
+ *     pixel-for-pixel. Rays whose deflection throws them behind the camera
+ *     or out of frame fade out (that zone is shadow/disk dominated).
  *
- * What we deliberately keep OURS: escaped rays exit transparent — our real
- * universe is the background, his procedural stars/nebulae are dropped.
- * Captured rays stay opaque (his contract): the shader owns the black shadow,
- * disk light crossing in front of it survives.
- *
- * Units: 1 shader unit = rs_world / uRs (rs = mass × 2; ÷0.8 at the default
- * mass 0.4 — uScale·uRs always equals rs_world, so the shader shadow stays
- * aligned with the composite's baked sphere beneath at any mass). The march
- * sphere (r ≤ 16), capture (r < 1.01·uRs) and escape (r > 100) all live in
- * that space.
- *
- * SAFETY CONTRACT (preserved): this is an overlay on the infallible
- * composite. If its shader fails, the eventide-shader-error hook hides it,
- * the engine restores the composite's baked disk, and the hole survives.
- * Nothing here writes depth.
+ * Physics (unchanged since R20.4): his bend per step −(rs/r²)·step·lensing,
+ * capture 1.01·rs, escape 100, every disk-plane crossing painted front-to-
+ * back, blackbody LUT, Doppler D³, adaptive stepping. Units: 1 shader unit
+ * = rs_world / uRs (rs = mass × 2; ÷0.8 at the default mass 0.4).
  */
+
+export interface BlackHoleVisual {
+  group: THREE.Group;
+  /** true while the geodesic marcher renders the hole (false = hidden) */
+  geodesic: boolean;
+  update(time: number, camQuat?: THREE.Quaternion, portal?: number): void;
+  /** show/hide the geodesic renderer (fallback paths) */
+  setGeodesic(on: boolean): void;
+  /** point the escaped-ray sampler at the engine's captured-scene buffer */
+  setBgTexture(tex: THREE.Texture | null): void;
+  dispose(): void;
+}
 
 const VERT = /* glsl */ `
 varying vec2 vUv;
@@ -104,6 +105,14 @@ uniform float uSoftInner;    /* 0.18 */
 uniform float uSoftOuter;    /* 0.5 */
 uniform float uLensing;      /* his gravitationalLensing — bend per unit path
                                 = uRs × uLensing, step-size independent */
+
+/* ---- ROUND 56 — the REAL background: the engine captures the scene (holes
+   hidden, R52 lens zeroed) into uBgTexture each frame; escaped rays sample
+   it through the camera with the FINAL BENT direction ---- */
+uniform sampler2D uBgTexture;
+uniform mat4 uProjMatrix;    /* camera projection */
+uniform mat4 uViewMatrix;    /* camera world inverse */
+uniform float uBgActive;     /* 1 while the capture is fresh (hole on stage) */
 
 #define MARCH_STEP 0.3
 
@@ -192,89 +201,109 @@ void main() {
   vec3 p = (uCamPos - uCenter) / uScale;
   vec3 v = normalize(vWorld.xyz - uCamPos);
 
+  /* Round 54 — impact parameter of the UNBENT ray (its line's distance from
+     the hole). Bending only pulls rays inward, so a ray with b beyond the
+     disk outer edge (+ bending margin) can never cross the disk: those rays
+     skip both march loops — the outer half of the quad stays fully
+     transparent (the real scene shows, deflection there is ~0 anyway). */
+  float b = length(cross(p, v));
+
   vec3 color = vec3(0.0);
   float alpha = 0.0;
   bool captured = false;
 
-  /* COARSE APPROACH — the one adaptation his fullscreen demo never needed:
-     our camera can be hundreds of units out. Walk the ray straight down to
-     the r=16 march sphere in a few long steps (bending is ∝ 1/r² — out there
-     the leg stays straight, so its plane crossings are exact for any step
-     length and are composited too). Steps brake to land ON the sphere
-     (min(r−16, r/2)), never overshooting into the capture zone. */
-  for (int i = 0; i < 12; i++) {
-    float r0 = length(p);
-    if (r0 <= 16.0) break;
-    vec3 pPrev = p;
-    p += v * min(r0 - 16.0, r0 * 0.5);
-    vec3 lPrevA = uDiskBasis * pPrev;
-    vec3 lCurA = uDiskBasis * p;
-    if (lPrevA.y * lCurA.y < 0.0 && alpha < 0.99) {
-      float fA = lPrevA.y / (lPrevA.y - lCurA.y);
-      vec3 hitA = mix(lPrevA, lCurA, clamp(fA, 0.0, 1.0));
-      float hitRA = length(hitA.xz);
-      if (hitRA > uDiskInner && hitRA < uDiskOuter) {
-        vec4 dA = diskColor(hitRA, atan(hitA.z, hitA.x), normalize(uDiskBasis * v));
-        float remA = 1.0 - alpha;
-        color += dA.rgb * dA.a * remA;
-        alpha += remA * dA.a;
+  if (b <= uDiskOuter + 2.5) {
+    /* COARSE APPROACH — the one adaptation his fullscreen demo never needed:
+       our camera can be hundreds of units out. Walk the ray straight down to
+       the r=16 march sphere in a few long steps (bending is ∝ 1/r² — out there
+       the leg stays straight, so its plane crossings are exact for any step
+       length and are composited too). Steps brake to land ON the sphere
+       (min(r−16, r/2)), never overshooting into the capture zone. */
+    for (int i = 0; i < 12; i++) {
+      float r0 = length(p);
+      if (r0 <= 16.0) break;
+      vec3 pPrev = p;
+      p += v * min(r0 - 16.0, r0 * 0.5);
+      vec3 lPrevA = uDiskBasis * pPrev;
+      vec3 lCurA = uDiskBasis * p;
+      if (lPrevA.y * lCurA.y < 0.0 && alpha < 0.99) {
+        float fA = lPrevA.y / (lPrevA.y - lCurA.y);
+        vec3 hitA = mix(lPrevA, lCurA, clamp(fA, 0.0, 1.0));
+        float hitRA = length(hitA.xz);
+        if (hitRA > uDiskInner && hitRA < uDiskOuter) {
+          vec4 dA = diskColor(hitRA, atan(hitA.z, hitA.x), normalize(uDiskBasis * v));
+          float remA = 1.0 - alpha;
+          color += dA.rgb * dA.a * remA;
+          alpha += remA * dA.a;
+        }
+      }
+    }
+
+    /* HIS MARCH — bending = uRs/r² per unit × uLensing (his invariant: bend
+       per unit path = uRs × uLensing, step-size independent), capture
+       1.01·uRs, escape 100. EVERY disk-plane crossing along the BENT
+       ray paints — that is what builds the continuous lensed halo over and
+       under the shadow, by construction.
+       ADAPTIVE STEP (Round 20, iGPU lifeline): the per-unit bending of his
+       integrator is step-size-INDEPENDENT (bend ∝ step·lensing per step, over
+       a step of length step), so growing the step away from the hole keeps the
+       exact same trajectory at ~3× fewer iterations — fine 0.3 where the
+       photon-ring arcs live (r < 8), up to 1.2 out at the march sphere. */
+    for (int i = 0; i < 128; i++) {
+      if (i >= uSteps) break;
+      if (alpha > 0.99) break;
+      float r = length(p);
+      if (r < uRs * 1.01) { captured = true; break; }
+      if (r > 100.0) break;
+      /* fully clear of the disk and receding — no further crossing can occur */
+      if (r > uDiskOuter && dot(v, p) > 0.0) break;
+
+      float stepLen = MARCH_STEP * clamp(r * 0.125, 1.0, 4.0);
+      /* gravitational light bending: a = −rs/r² toward the center */
+      vec3 toCenter = -p / r;
+      v = normalize(v + toCenter * (uRs / (r * r)) * stepLen * uLensing);
+      vec3 pPrev = p;
+      p += v * stepLen;
+
+      vec3 lPrev = uDiskBasis * pPrev;
+      vec3 lCur = uDiskBasis * p;
+      if (lPrev.y * lCur.y < 0.0 && alpha < 0.99) {
+        float f = lPrev.y / (lPrev.y - lCur.y);
+        vec3 hit = mix(lPrev, lCur, clamp(f, 0.0, 1.0));
+        float hitR = length(hit.xz);
+        if (hitR > uDiskInner && hitR < uDiskOuter) {
+          /* hit and angle already live in the disk-LOCAL frame (via uDiskBasis);
+             the photon direction must be expressed in the SAME frame for the
+             Doppler term. The basis is a pure rotation, so length(v) survives. */
+          vec4 d = diskColor(hitR, atan(hit.z, hit.x), normalize(uDiskBasis * v));
+          float remaining = 1.0 - alpha;
+          color += d.rgb * d.a * remaining;
+          alpha += remaining * d.a;
+        }
       }
     }
   }
 
-  /* HIS MARCH — bending = uRs/r² per unit × uLensing (his invariant: bend
-     per unit path = uRs × uLensing, step-size independent), capture
-     1.01·uRs, escape 100. EVERY disk-plane crossing along the BENT
-     ray paints — that is what builds the continuous lensed halo over and
-     under the shadow, by construction.
-     ADAPTIVE STEP (Round 20, iGPU lifeline): the per-unit bending of his
-     integrator is step-size-INDEPENDENT (bend ∝ step·lensing per step, over
-     a step of length step), so growing the step away from the hole keeps the
-     exact same trajectory at ~3× fewer iterations — fine 0.3 where the
-     photon-ring arcs live (r < 8), up to 1.2 out at the march sphere. */
-  for (int i = 0; i < 128; i++) {
-    if (i >= uSteps) break;
-    if (alpha > 0.99) break;
-    float r = length(p);
-    if (r < uRs * 1.01) { captured = true; break; }
-    if (r > 100.0) break;
-    /* fully clear of the disk and receding — no further crossing can occur
-       and the residual bending only affects the (transparent) background */
-    if (r > uDiskOuter && dot(v, p) > 0.0) break;
-
-    float stepLen = MARCH_STEP * clamp(r * 0.125, 1.0, 4.0);
-    /* gravitational light bending: a = −rs/r² toward the center */
-    vec3 toCenter = -p / r;
-    v = normalize(v + toCenter * (uRs / (r * r)) * stepLen * uLensing);
-    vec3 pPrev = p;
-    p += v * stepLen;
-
-    vec3 lPrev = uDiskBasis * pPrev;
-    vec3 lCur = uDiskBasis * p;
-    if (lPrev.y * lCur.y < 0.0 && alpha < 0.99) {
-      float f = lPrev.y / (lPrev.y - lCur.y);
-      vec3 hit = mix(lPrev, lCur, clamp(f, 0.0, 1.0));
-      float hitR = length(hit.xz);
-      if (hitR > uDiskInner && hitR < uDiskOuter) {
-        /* hit and angle already live in the disk-LOCAL frame (via uDiskBasis);
-           the photon direction must be expressed in the SAME frame for the
-           Doppler term. The basis is a pure rotation, so length(v) survives. */
-        vec4 d = diskColor(hitR, atan(hit.z, hit.x), normalize(uDiskBasis * v));
-        float remaining = 1.0 - alpha;
-        color += d.rgb * d.a * remaining;
-        alpha += remaining * d.a;
-      }
-    }
-  }
-
-  /* HIS OUTPUT CONTRACT: captured rays carry the accumulated foreground disk
-     light, fully opaque (the shadow itself is black because nothing
-     accumulated; disk light in FRONT of the shadow survives). Escaped
-     untouched rays are transparent — our sky shows through. His gamma step
-     is kept: his pipeline runs it before the renderer's ACES + sRGB, and so
-     does ours (OutputPass). */
+  /* OUTPUT: his gamma step applies to the DISK light only (his LUT colors
+     are display-referred; the step pushes the white-hot band past the bloom
+     threshold). The background sample is scene-LINEAR — the same space as
+     the buffer it came from — so it must NOT be gamma-encoded here; the
+     composer's OutputPass (ACES + sRGB) finishes it exactly like every
+     other scene pixel, which is what makes the bent background seamless
+     with the undisplaced background outside the quad. Captured rays stay
+     fully opaque. */
   color *= uIntensity;
   color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
+  if (!captured && uBgActive > 0.5) {
+    vec4 clip = uProjMatrix * uViewMatrix * vec4(uCamPos + v * 1000.0, 1.0);
+    vec2 bgUv = clip.xy / clip.w * 0.5 + 0.5;
+    float inFront = step(0.0, clip.w);
+    float edge = smoothstep(0.0, 0.02, bgUv.x) * smoothstep(0.0, 0.02, 1.0 - bgUv.x)
+               * smoothstep(0.0, 0.02, bgUv.y) * smoothstep(0.0, 0.02, 1.0 - bgUv.y);
+    float wa = inFront * edge * (1.0 - alpha);
+    color += texture2D(uBgTexture, bgUv).rgb * wa;
+    alpha += wa;
+  }
   gl_FragColor = vec4(color, captured ? 1.0 : clamp(alpha, 0.0, 1.0));
 }
 `;
@@ -297,9 +326,9 @@ const BLACKBODY_ANCHORS: Array<[number, number, number, number]> = [
   [6500, 1, 0.9436, 0.9621], [6600, 1, 0.9513, 0.9844], [6700, 0.9937, 0.9526, 1], [6800, 0.9726, 0.9395, 1], [6900, 0.9526, 0.927, 1],
   [7000, 0.9337, 0.915, 1], [7100, 0.9157, 0.9035, 1], [7200, 0.8986, 0.8925, 1], [7300, 0.8823, 0.8819, 1], [7400, 0.8668, 0.8718, 1],
   [7500, 0.852, 0.8621, 1], [7600, 0.8379, 0.8527, 1], [7700, 0.8244, 0.8437, 1], [7800, 0.8115, 0.8351, 1], [7900, 0.7992, 0.8268, 1],
-  [8000, 0.7874, 0.8187, 1], [8100, 0.7761, 0.811, 1], [8200, 0.7652, 0.8035, 1], [8300, 0.7548, 0.7963, 1], [8400, 0.7449, 0.7894, 1],
+  [8000, 0.7874, 0.8187, 1], [8100, 0.7761, 0.811, 1], [8200, 0.7652, 0.8035, 1], [8300, 0.7548, 0.7963, 1], [8400, 0.7449, 0.789, 1],
   [8500, 0.7353, 0.7827, 1], [8600, 0.726, 0.7762, 1], [8700, 0.7172, 0.7699, 1], [8800, 0.7086, 0.7638, 1], [8900, 0.7004, 0.7579, 1],
-  [9000, 0.6925, 0.7522, 1], [9100, 0.6848, 0.7467, 1], [9200, 0.6774, 0.7414, 1], [9300, 0.6703, 0.7362, 1], [9400, 0.6635, 0.7311, 1],
+  [9000, 0.6925, 0.7522, 1], [9100, 0.6848, 0.7467, 1], [9200, 0.6774, 0.7414, 1], [9300, 0.6703, 0.7362, 1], [9400, 0.6635, 0.731, 1],
   [9500, 0.6568, 0.7263, 1], [9600, 0.6504, 0.7215, 1], [9700, 0.6442, 0.7169, 1], [9800, 0.6382, 0.7124, 1], [9900, 0.6324, 0.7081, 1],
   [10000, 0.6268, 0.7039, 1], [11000, 0.5791, 0.6674, 1], [12000, 0.5431, 0.6389, 1], [13000, 0.5152, 0.6162, 1], [14000, 0.493, 0.5978, 1],
   [15000, 0.4749, 0.5824, 1], [16000, 0.4599, 0.5696, 1], [17000, 0.4474, 0.5586, 1], [18000, 0.4367, 0.5492, 1], [19000, 0.4275, 0.541, 1],
@@ -356,13 +385,10 @@ function buildBlackbodyLut(): THREE.DataTexture {
   return tex;
 }
 
-/* the composite's disk plane (must match blackhole.ts) — its inverse rotation
-   maps world offsets into the disk-local frame for the plane-crossing test.
-   Round 20.1 — THE FRAME FIX: the shader tests the plane on local **Y**
-   (lPrev.y · lCur.y, hitR = length(hit.xz)), so the basis must map local +Y
-   → the disk normal. R19/R20 built it from (0,0,1)→normal, silently mapping
-   local +Y → an in-plane world direction — the disk rendered STANDING
-   VERTICAL in the world XY plane instead of lying flat on the XZ ground. */
+/* The disk rides a hair off world-horizontal (a natural, slightly inclined
+   plane); its inverse rotation maps world offsets into the disk-local frame
+   for the plane-crossing test. The basis maps local +Y → the disk normal
+   (the Round 20.1 frame fix — local Y is the plane axis the shader tests). */
 const DISK_NORMAL = new THREE.Vector3(0.055, 1.0, 0.04).normalize();
 
 function buildDiskBasis(): THREE.Matrix3 {
@@ -371,48 +397,32 @@ function buildDiskBasis(): THREE.Matrix3 {
   return new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(worldToLocal));
 }
 
-export interface RaymarchBlackHoleOptions {
+/** The geodesic marcher is the ONLY black hole renderer that has ever existed.
+ *  When it cannot run (unsupported GPU, shader failure, the Studio switch),
+ *  the hole simply hides itself — the R52 sky lens keeps bending the sky
+ *  where it stands. There is no stand-in sphere, no painted fallback. */
+
+export interface BlackHoleOptions {
+  /** start with the geodesic marcher live (false = the hole renders nothing) */
+  geodesic?: boolean;
   /** global emission multiplier */
   intensity?: number;
   /** ray steps (quality) */
   steps?: number;
 }
 
-/** Soft radial glow texture — the local stand-in for the demo's bloom
-    (strength 0.68 / threshold 0.4, far hotter than the project-wide bloom
-    the planets depend on). Warm white core → amber → transparent. */
-function buildGlowTexture(): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
-  const ctx = c.getContext('2d')!;
-  const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-  g.addColorStop(0.00, 'rgba(255, 244, 224, 0.85)');
-  g.addColorStop(0.22, 'rgba(255, 214, 150, 0.42)');
-  g.addColorStop(0.45, 'rgba(255, 166, 87, 0.16)');
-  g.addColorStop(0.72, 'rgba(120, 60, 24, 0.05)');
-  g.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 256, 256);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.NoColorSpace;
-  return tex;
-}
-
-/**
- * Builds the geodesic renderer. Returns null when the caller should use the
- * composite alone (unsupported tier). Same contract as ever: parent the
- * group to the body, never move it.
- */
-export function createRaymarchBlackHole(R: number, opts: RaymarchBlackHoleOptions = {}): BlackHoleVisual {
+export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHoleVisual {
   const rs = R * 0.62;
   /* Round 20.2 — 1.35 pushes the white-hot band past the project bloom
      threshold (0.90) so it visibly blazes, as in the demo */
   const intensity = opts.intensity ?? 1.35;
   /* R20.4 — start from the persisted tuning panel (defaults = the reference
      config). Mass sets the shader-space rs = mass × 2; uScale tracks it so
-     uScale·uRs stays = rs_world — the shader shadow never drifts off the
-     composite's baked sphere beneath, at any mass. */
+     uScale·uRs stays = rs_world — the shader shadow keeps the reference
+     proportions at any mass. */
   const params = getBlackHoleParams();
+  let geodesicOn = opts.geodesic ?? true;
+
   const group = new THREE.Group();
   group.userData.baseIntensity = intensity;
 
@@ -455,40 +465,29 @@ export function createRaymarchBlackHole(R: number, opts: RaymarchBlackHoleOption
       uSoftInner: { value: 0.18 },
       uSoftOuter: { value: 0.5 },
       uLensing: { value: params.lensing },
+      /* ROUND 56 — the REAL background: the engine captures the scene into
+         this buffer (holes hidden, R52 lens zeroed) and escaped rays sample
+         it through the camera with the final bent direction */
+      uBgTexture: { value: null as THREE.Texture | null },
+      uProjMatrix: { value: new THREE.Matrix4() },
+      uViewMatrix: { value: new THREE.Matrix4() },
+      uBgActive: { value: 0 },
     },
   });
 
   /* quad frames the disk (14.5 u ≈ 18 rs at the default mass) plus the
-     lensed wrap */
+     lensed wrap and the bent background */
   const quadSize = rs * 60;
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(quadSize, quadSize), material);
-  quad.renderOrder = 12; /* after the composite's transparent layers */
+  quad.renderOrder = 12;
   quad.frustumCulled = false;
+  quad.visible = geodesicOn;
   group.add(quad);
-
-  /* Round 20.2 — the local bloom stand-in. The demo's glow comes from its
-     hot bloom (0.68 / 0.4); the project-wide bloom is deliberately gentle
-     (0.12 / 0.90) to protect the planets. A warm additive halo sized just
-     past the disk recreates that soft blaze locally — the side character
-     glows without re-lighting the whole universe. Must stay children[1]:
-     updateRaymarchUniforms addresses the quad as children[0]. */
-  const glowTex = buildGlowTexture();
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: glowTex,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    opacity: 0.45,
-  }));
-  glow.scale.setScalar(rs * 56);
-  glow.renderOrder = 11;
-  glow.frustumCulled = false;
-  group.add(glow);
 
   /* R20.4 — live tuning: panel changes land on this material immediately.
      Mass below ~0.28 would let the fixed 29 u disk diameter outgrow the
      quad's 60·uRs-u span, so the quad mesh rescales up to keep the disk
-     framed (the glow halo stays hole-sized by design). */
+     framed. */
   const applyParams = (p: BlackHoleParams) => {
     const shaderRs = p.mass * 2;
     material.uniforms.uRs.value = shaderRs;
@@ -505,53 +504,71 @@ export function createRaymarchBlackHole(R: number, opts: RaymarchBlackHoleOption
   window.addEventListener(BLACKHOLE_CHANGE_EVENT, onParams);
   applyParams(params);
 
-  return {
+  const visual: BlackHoleVisual = {
     group,
-    update(time, camQuat, portal) {
+    geodesic: geodesicOn,
+    update(time, camQuat, _portal) {
       material.uniforms.uTime.value = time;
-      /* billboard: copy the camera's world orientation so the quad faces it */
+      /* billboard: the quad must face the camera EVERY frame or the lensed
+         image reads as a sheared window clipped by the quad's straight
+         edges. Round 20.1 — NO portal fade: in cinematic mode this renderer
+         IS the hole; full glory, always. */
       if (camQuat) quad.quaternion.copy(camQuat);
-      /* Round 20.1 — NO portal fade: in cinematic mode this renderer IS the
-         hole, and fading it during a dive left the bare black sphere. Full
-         glory, always (the baked composite carries portal tear effects when
-         it is the active look in fallback mode). */
       material.uniforms.uIntensity.value = intensity;
+    },
+    setGeodesic(on: boolean) {
+      geodesicOn = on;
+      visual.geodesic = on;
+      quad.visible = on;
+    },
+    setBgTexture(tex: THREE.Texture | null) {
+      material.uniforms.uBgTexture.value = tex;
     },
     dispose() {
       window.removeEventListener(BLACKHOLE_CHANGE_EVENT, onParams);
       quad.geometry.dispose();
       const lut = material.uniforms.uBlackbody.value as THREE.DataTexture;
       lut.dispose();
-      glow.material.map?.dispose();
-      glow.material.dispose();
       material.dispose();
     },
   };
+  return visual;
 }
 
+/* scratch for the parent-aware billboard below */
+const _parentQ = new THREE.Quaternion();
+
 /**
- * Convenience wrapper the engine calls per frame with the live camera. Sets
- * EVERYTHING the shader needs: the billboard orientation (Round 20 — the R19
- * sheared-window bug), the true camera position for the geodesic integration,
- * the hole's world center, time, and the intensity. The portal argument is
- * accepted for interface compatibility but deliberately IGNORED since
- * Round 20.1 — fading this renderer during a dive left the bare black sphere.
+ * Per-frame driver the engine calls with the live camera. Sets EVERYTHING
+ * the shader needs: the billboard orientation (parent-aware — body groups
+ * can ride inside tilted pivots, so the quad's WORLD orientation must equal
+ * the camera's, not its local one), the true camera position for the
+ * geodesic integration, the hole's world center, time, and the intensity.
+ * The portal argument is accepted for interface compatibility but
+ * deliberately IGNORED since Round 20.1.
  */
 export function updateRaymarchUniforms(
   visual: BlackHoleVisual,
   camera: THREE.Camera,
   time: number,
-  _portal?: number,
+  bgActive = false,
 ): void {
   const quad = visual.group.children[0] as THREE.Mesh | undefined;
   const mat = quad?.material as THREE.ShaderMaterial | undefined;
   if (!quad || !mat || !mat.uniforms) return;
-  /* billboard: the quad must face the camera EVERY frame or the lensed image
-     reads as a sheared window clipped by the quad's straight edges */
-  if (camera.quaternion) quad.quaternion.copy(camera.quaternion);
+  if (camera.quaternion) {
+    /* world billboard: parentWorld⁻¹ · cameraWorld → local orientation */
+    visual.group.getWorldQuaternion(_parentQ).invert().multiply(camera.quaternion);
+    quad.quaternion.copy(_parentQ);
+  }
   mat.uniforms.uCenter.value.setFromMatrixPosition(visual.group.matrixWorld);
   mat.uniforms.uCamPos.value.setFromMatrixPosition(camera.matrixWorld);
   mat.uniforms.uTime.value = time;
-  const base = (visual.group.userData.baseIntensity as number | undefined) ?? 1.0;
+  const base = (visual.group.userData.baseIntensity as number | undefined) ?? 1.35;
   mat.uniforms.uIntensity.value = base;
+  /* ROUND 56 — the escaped-ray background sampler needs the camera's
+     projection + view to convert a bent direction into a screen UV */
+  mat.uniforms.uProjMatrix.value.copy(camera.projectionMatrix);
+  mat.uniforms.uViewMatrix.value.copy(camera.matrixWorldInverse);
+  mat.uniforms.uBgActive.value = bgActive ? 1 : 0;
 }

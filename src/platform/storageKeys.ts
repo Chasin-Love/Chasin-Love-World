@@ -12,6 +12,8 @@ export const STORAGE_KEYS = {
   qualityMigrated: 'my-universe:quality-migrated',
   /** Black hole studio panel (engine/blackholeParams) */
   blackholeTuning: 'my-universe:blackhole:v1',
+  /** Geodesic-tier override for the black hole (engine/blackholeTier) */
+  blackholeTier: 'my-universe:blackhole:tier:v1',
   /** Audio mute flag */
   muted: 'my-universe:muted',
   /** Vault auto-lock minutes */

@@ -4,8 +4,9 @@ import {
   X, Zap, Globe, Sparkles, Orbit, Trash2, ChevronDown, ChevronRight,
   Plus, ShieldCheck, Crosshair, Wind, Compass, Search,
   Edit2, Palette, Check, Layers, Disc, Sun, Radio, ExternalLink,
-  Cpu, Database
+  Cpu, Database, Wallpaper
 } from 'lucide-react';
+import { useConsoleBackdrop } from './backdropStore';
 import { REALITIES, getReality, createNewRealityConfig, RealityConfig } from '../../realities';
 import { actions, useUniverse } from '../../state';
 import type { DiskSyncState } from '../../domain/universe';
@@ -13,6 +14,7 @@ import { toast } from '../../ui/toast';
 import { prettyPrint } from '../../ui/format';
 import { CreateRealityModal } from '../reality/CreateRealityModal';
 import { CoreSigil } from './CoreSigil';
+import { ScenicBackdrop, FALLBACK_NIGHT } from './ScenicBackdrop';
 import { TiltButton } from './TiltButton';
 import { RealityAdvancedPanel } from '../reality/RealityAdvancedPanel';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
@@ -37,15 +39,6 @@ interface Props {
 }
 
 type Tab = 'dashboard' | 'realities' | 'hierarchy' | 'bin';
-
-/* Per-tab accent color — the whole deck recolors via the --cc CSS variable
-   keyed off the plate's data-accent attribute (see index.css). */
-const TAB_ACCENTS: Record<Tab, string> = {
-  dashboard: '#22d3ee',
-  realities: '#f2c178',
-  hierarchy: '#a78bfa',
-  bin: '#fb7185',
-};
 
 /* Quantum Glass motion system — staggered deck entrance + tab transitions.
    Transform/opacity only; MotionConfig reducedMotion="user" in the main
@@ -97,269 +90,17 @@ function StatSeal({ icon, value, label }: { icon: React.ReactNode; value: number
         maxTilt={9}
         lift={10}
         aria-label={`${value} ${label}`}
-        className="px-2 py-1 rounded-lg bg-white/5 border border-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] flex items-center gap-1.5 cursor-default"
+        className="px-1 py-0.5 flex items-center gap-1.5 cursor-default"
       >
-        <span className="text-cyan-300/95">{icon}</span>
-        <AnimatedNumber className="text-[11px] font-bold text-white tabular-nums" value={value} />
+        <span className="text-slate-400">{icon}</span>
+        <AnimatedNumber className="cc-statnum text-white tabular-nums" value={value} />
       </TiltButton>
-      {/* the full name — rises above the seal on hover */}
-      <span
-        className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 rounded-lg bg-abyss/80 backdrop-blur-xl border border-cyan-300/40 shadow-[0_8px_22px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.18)] whitespace-nowrap opacity-0 translate-y-1 group-hover/stat:opacity-100 group-hover/stat:translate-y-0 transition-all duration-200 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100 z-50"
-      >
+      {/* the name — rises in a smoked cloud chip on hover */}
+      <span className="cc-cloud-card pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap opacity-0 translate-y-1 group-hover/stat:opacity-100 group-hover/stat:translate-y-0 transition-all duration-200 z-50">
         {value} {label}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-cyan-300/40" />
       </span>
     </span>
   );
-}
-
-/* ------------------------------------------------------------------ */
-/* 1. Live 3D Holographic Backdrop — perspective starfield + rotating  */
-/*    cosmic-web spheres, mouse parallax (2D canvas, 3D projection)    */
-/* ------------------------------------------------------------------ */
-function CoreBackdrop() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let raf = 0;
-    let w = (canvas.width = window.innerWidth);
-    let h = (canvas.height = window.innerHeight);
-    const onResize = () => {
-      w = canvas.width = window.innerWidth;
-      h = canvas.height = window.innerHeight;
-    };
-    window.addEventListener('resize', onResize);
-
-    /* --- mouse parallax --- */
-    const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
-    const onMouse = (e: MouseEvent) => {
-      mouse.tx = (e.clientX / w - 0.5) * 2;
-      mouse.ty = (e.clientY / h - 0.5) * 2;
-    };
-    window.addEventListener('mousemove', onMouse);
-
-    /* --- 3D helpers --- */
-    const FOV = 620;
-    const project = (x: number, y: number, z: number) => {
-      const scale = FOV / Math.max(1, FOV + z);
-      return {
-        sx: w / 2 + mouse.x * 40 + x * scale,
-        sy: h / 2 + mouse.y * 40 + y * scale,
-        scale,
-      };
-    };
-
-    /* --- perspective starfield flying past the camera --- */
-    interface Star3 { x: number; y: number; z: number; r: number; color: string; phase: number; tw: number }
-    const starColors = ['#00f5d4', '#38bdf8', '#8b5cf6', '#ec4899', '#ffffff', '#fbbf24'];
-    const STAR_COUNT = 460;
-    const STARS: Star3[] = Array.from({ length: STAR_COUNT }, () => ({
-      x: (Math.random() - 0.5) * 2400,
-      y: (Math.random() - 0.5) * 1600,
-      z: Math.random() * 1400,
-      r: 0.6 + Math.random() * 1.7,
-      color: starColors[Math.floor(Math.random() * starColors.length)],
-      phase: Math.random() * Math.PI * 2,
-      tw: 1.2 + Math.random() * 2.8,
-    }));
-
-    /* --- rotating wireframe cosmic-web spheres --- */
-    interface WebSphere {
-      cx: number; cy: number; radius: number; spin: number; tilt: number;
-      hue: string; points: { x: number; y: number; z: number }[]; edges: [number, number][];
-    }
-    const makeSphere = (cfg: Omit<WebSphere, 'points' | 'edges'>, count: number): WebSphere => {
-      /* fibonacci sphere distribution */
-      const pts = Array.from({ length: count }, (_, i) => {
-        const phi = Math.acos(1 - (2 * (i + 0.5)) / count);
-        const theta = Math.PI * (1 + Math.sqrt(5)) * i;
-        return {
-          x: Math.sin(phi) * Math.cos(theta),
-          y: Math.cos(phi),
-          z: Math.sin(phi) * Math.sin(theta),
-        };
-      });
-      /* connect each point to its 2 nearest neighbors */
-      const edges: [number, number][] = [];
-      pts.forEach((p, i) => {
-        const dists = pts
-          .map((q, j) => ({ j, d: (p.x - q.x) ** 2 + (p.y - q.y) ** 2 + (p.z - q.z) ** 2 }))
-          .filter((e) => e.j !== i)
-          .sort((a, b) => a.d - b.d)
-          .slice(0, 2);
-        dists.forEach((e) => {
-          if (e.j > i) edges.push([i, e.j]);
-        });
-      });
-      return { ...cfg, points: pts, edges };
-    };
-    const spheres: WebSphere[] = [
-      makeSphere({ cx: 0.16, cy: 0.24, radius: 300, spin: 0.05, tilt: 0.42, hue: '0, 245, 212' }, 70),
-      makeSphere({ cx: 0.85, cy: 0.72, radius: 380, spin: -0.035, tilt: -0.3, hue: '139, 92, 246' }, 88),
-    ];
-
-    interface Shooter {
-      x: number; y: number; vx: number; vy: number; life: number; max: number; color: string;
-    }
-    const shooters: Shooter[] = [];
-    let t = 0;
-    let last = performance.now();
-
-    const nebulae = [
-      { hue: 'rgba(6,182,212,', x: 0.18, y: 0.25, r: 0.55, dx: 0.012, dy: 0.006 },
-      { hue: 'rgba(139,92,246,', x: 0.82, y: 0.65, r: 0.6, dx: -0.009, dy: 0.008 },
-      { hue: 'rgba(255,45,120,', x: 0.5, y: 0.15, r: 0.45, dx: 0.007, dy: -0.01 },
-      { hue: 'rgba(16,185,129,', x: 0.75, y: 0.3, r: 0.4, dx: -0.006, dy: 0.007 },
-    ];
-
-    const draw = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      t += dt;
-      /* ease mouse toward target for buttery parallax */
-      mouse.x += (mouse.tx - mouse.x) * Math.min(1, dt * 2.5);
-      mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 2.5);
-      ctx.clearRect(0, 0, w, h);
-
-      /* Chromatic Nebulae Drift — the cyan/violet pair slowly breathes
-         against each other, a violet↔cyan tide across the void */
-      nebulae.forEach((n, i) => {
-        const cx = (n.x + Math.sin(t * n.dx * 8 + i) * 0.06) * w;
-        const cy = (n.y + Math.cos(t * n.dy * 8 + i * 2) * 0.06) * h;
-        const rad = n.r * Math.min(w, h);
-        const breath = i < 2 ? 0.72 + 0.28 * Math.sin(t * 0.35 + (i === 0 ? 0 : Math.PI)) : 1;
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-        g.addColorStop(0, `${n.hue}${(0.13 + 0.05 * Math.sin(t * 0.8 + i)) * breath})`);
-        g.addColorStop(1, `${n.hue}0)`);
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, w, h);
-      });
-
-      /* 3D Perspective Starfield — stars fly past the camera */
-      STARS.forEach((s) => {
-        s.z -= (90 + s.r * 40) * dt;
-        if (s.z < 8) {
-          s.z = 1400;
-          s.x = (Math.random() - 0.5) * 2400;
-          s.y = (Math.random() - 0.5) * 1600;
-        }
-        const { sx, sy, scale } = project(s.x, s.y, s.z);
-        if (sx < -8 || sx > w + 8 || sy < -8 || sy > h + 8) return;
-        const depth = 1 - s.z / 1400;
-        /* twinkle — each star breathes on its own phase */
-        ctx.globalAlpha = Math.min(1, (0.12 + depth * 0.75) * (0.72 + 0.28 * Math.sin(t * s.tw + s.phase)));
-        ctx.fillStyle = s.color;
-        ctx.beginPath();
-        ctx.arc(sx, sy, s.r * scale, 0, Math.PI * 2);
-        ctx.fill();
-        /* warp streak on near stars */
-        if (depth > 0.82) {
-          ctx.globalAlpha = (depth - 0.82) * 2.2;
-          ctx.strokeStyle = s.color;
-          ctx.lineWidth = s.r * scale * 0.7;
-          const tail = project(s.x, s.y, s.z + 46);
-          ctx.beginPath();
-          ctx.moveTo(sx, sy);
-          ctx.lineTo(tail.sx, tail.sy);
-          ctx.stroke();
-        }
-      });
-      ctx.globalAlpha = 1;
-
-      /* Rotating Wireframe Cosmic-Web Spheres */
-      spheres.forEach((sp, si) => {
-        const cx = sp.cx * w + mouse.x * (18 + si * 14);
-        const cy = sp.cy * h + mouse.y * (18 + si * 14);
-        const cosT = Math.cos(sp.tilt);
-        const sinT = Math.sin(sp.tilt);
-        const screen: { sx: number; sy: number; z: number }[] = [];
-
-        sp.points.forEach((p) => {
-          /* spin around Y */
-          const a = t * sp.spin + si * 2;
-          const rx = p.x * Math.cos(a) - p.z * Math.sin(a);
-          const rz = p.x * Math.sin(a) + p.z * Math.cos(a);
-          /* tilt around X */
-          const ry = p.y * cosT - rz * sinT;
-          const rz2 = p.y * sinT + rz * cosT;
-          const s = project(cx + rx * sp.radius, cy + ry * sp.radius, rz2 * sp.radius * 0.5);
-          screen.push({ sx: s.sx, sy: s.sy, z: rz2 });
-        });
-
-        /* filaments */
-        ctx.lineWidth = 1;
-        sp.edges.forEach(([i, j]) => {
-          const a = screen[i];
-          const b = screen[j];
-          const depth = 0.5 + ((a.z + b.z) / 2) * 0.5;
-          ctx.strokeStyle = `rgba(${sp.hue},${(0.26 * (1 - depth)).toFixed(3)})`;
-          ctx.beginPath();
-          ctx.moveTo(a.sx, a.sy);
-          ctx.lineTo(b.sx, b.sy);
-          ctx.stroke();
-        });
-        /* nodes */
-        screen.forEach((p) => {
-          const depth = 0.5 + p.z * 0.5;
-          ctx.fillStyle = `rgba(${sp.hue},${(0.85 * (1 - depth) + 0.08).toFixed(3)})`;
-          ctx.beginPath();
-          ctx.arc(p.sx, p.sy, Math.max(0.6, 2.4 * (1 - depth)), 0, Math.PI * 2);
-          ctx.fill();
-        });
-      });
-
-      /* Tachyon Particle Beams */
-      if (Math.random() < dt * 0.65 && shooters.length < 3) {
-        const fromLeft = Math.random() > 0.5;
-        const colors = ['#00f5d4', '#38bdf8', '#c084fc', '#f472b6'];
-        shooters.push({
-          x: fromLeft ? -40 : w + 40,
-          y: Math.random() * h * 0.5,
-          vx: (fromLeft ? 1 : -1) * (420 + Math.random() * 380),
-          vy: 100 + Math.random() * 160,
-          life: 0,
-          max: 1.2,
-          color: colors[Math.floor(Math.random() * colors.length)],
-        });
-      }
-
-      for (let i = shooters.length - 1; i >= 0; i--) {
-        const sh = shooters[i];
-        sh.life += dt;
-        sh.x += sh.vx * dt;
-        sh.y += sh.vy * dt;
-        const k = 1 - sh.life / sh.max;
-        if (k <= 0) {
-          shooters.splice(i, 1);
-          continue;
-        }
-        const grad = ctx.createLinearGradient(sh.x, sh.y, sh.x - sh.vx * 0.16, sh.y - sh.vy * 0.16);
-        grad.addColorStop(0, `${sh.color}`);
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.moveTo(sh.x, sh.y);
-        ctx.lineTo(sh.x - sh.vx * 0.16, sh.y - sh.vy * 0.16);
-        ctx.stroke();
-      }
-
-      raf = requestAnimationFrame(draw);
-    };
-    raf = requestAnimationFrame(draw);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('mousemove', onMouse);
-    };
-  }, []);
-
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -674,21 +415,15 @@ function BentoRealityCard({
       whileHover={{ y: -3 }}
       className={`group relative rounded-2xl border transition-[border-color,box-shadow] duration-300 flex flex-col justify-between overflow-hidden ${
         active
-          ? 'cc-glass-card border-cyan-400/55 shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_30px_rgba(6,182,212,0.25)] cc-sheen'
-          : 'cc-glass-card hover:border-cyan-400/35 hover:shadow-[0_16px_40px_rgba(0,0,0,0.45),0_0_18px_rgba(6,182,212,0.12)]'
+          ? 'cc-glass-card border-cyan-400/45 shadow-[0_16px_40px_rgba(0,0,0,0.42)]'
+          : 'cc-glass-card hover:border-cyan-400/35 hover:shadow-[0_16px_40px_rgba(0,0,0,0.42)]'
       }`}
     >
-      {/* Top Accent Line — the anchored reality's line carries a travelling spark */}
+      {/* Top Accent Line — the reality's own two colors, quiet and proud */}
       <div
         className="relative h-1 w-full overflow-hidden"
         style={{ background: `linear-gradient(90deg, ${reality.colorA}, ${reality.colorB})` }}
       >
-        {active && (
-          <div
-            className="cc-line-sheen absolute inset-y-0 left-0 w-1/4 bg-white/60"
-            style={{ filter: 'blur(2px)' }}
-          />
-        )}
       </div>
 
       {/* Card Header */}
@@ -1044,6 +779,15 @@ export const CoreConsole: React.FC<Props> = ({
   const [showCreate, setShowCreate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'anchored' | 'custom' | 'dense'>('all');
+  const backdrop = useConsoleBackdrop();
+  const [studioOpen, setStudioOpen] = useState(false);
+
+  /* Backdrop Studio — hang the user's own image / GIF / muted video on the wall */
+  const handleBackdropFile = async (file: File) => {
+    const err = await backdrop.set(file);
+    if (err) toast(`✗ ${err}`);
+    else toast(`Backdrop hung — ${file.name} is the night now`);
+  };
 
   const activeRealityId = state.activeRealityId || 'sol-prime';
   const realities: RealityConfig[] = REALITIES;
@@ -1085,73 +829,68 @@ export const CoreConsole: React.FC<Props> = ({
   return (
     <MotionConfig reducedMotion="user">
     <div
-      className="fixed inset-0 z-100 overlay-in flex items-center justify-center p-2 sm:p-4 lg:p-6 select-none"
-      style={{
-        /* the live 3D universe stays visible behind the deck — the glass
-           reads as luxury because the cosmos glows through it */
-        background: 'linear-gradient(160deg, rgba(4,6,12,0.55) 0%, rgba(4,6,12,0.35) 45%, rgba(4,6,12,0.6) 100%)',
-        backdropFilter: 'blur(3px) saturate(1.15)',
-      }}
+      className="cc-root fixed inset-0 z-[130] overlay-in select-none text-slate-100"
+      data-accent={tab}
       onClick={onClose}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        const f = e.dataTransfer.files?.[0];
+        if (f) void handleBackdropFile(f);
+      }}
+      style={{ background: FALLBACK_NIGHT }}
     >
-      {/* 3D Holographic Backdrop */}
-      <CoreBackdrop />
-
-      {/* Aurora Ambient Lighting */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(90% 70% at 50% 40%, rgba(6,182,212,0.14), transparent 60%), radial-gradient(70% 60% at 75% 80%, rgba(139,92,246,0.16), transparent 65%)',
-        }}
+      {/* THE CRIMSON WATCH — a lonely Obito night behind everything; no plate,
+          no border, no blur: the scene itself is the interface. The overlay
+          itself paints the night (opaque), so the cosmos can never bleed
+          through — full screen regardless of page content. */}
+      <ScenicBackdrop
+        media={backdrop.kind !== 'shader' && backdrop.url ? { kind: backdrop.kind, url: backdrop.url } : null}
+        dim={backdrop.kind !== 'shader' ? backdrop.dim : 0}
       />
 
-      {/* THE 3D HOLOGRAPHIC COMMAND DECK PLATE — accent recolors with the active tab */}
+      {/* readability breath — a hint of dark behind the floating top bar */}
+      <div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-black/45 to-transparent pointer-events-none" />
+
+      {/* THE FLOATING DECK — a slim bar and cards resting directly on the night */}
       <div
-        className="core-plate relative w-full max-w-[1440px] h-[92vh] max-h-[920px] rounded-[28px] text-slate-100 flex flex-col overflow-hidden"
-        data-accent={tab}
+        className="relative h-full flex flex-col px-4 sm:px-8 lg:px-12 pt-3 pb-4"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Specular Edge Highlighting */}
-        <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-cyan-300/90 to-transparent pointer-events-none" />
 
-        {/* TOP COMMAND HEADER BAR */}
-        <div className="shrink-0 flex items-center justify-between gap-4 px-5 sm:px-7 py-3.5 border-b border-cyan-500/20 bg-white/4">
-          <div className="flex items-center gap-3.5 min-w-0">
-            {/* THE CORE SIGIL — a live-rendered 3D gyroscope instrument:
-                60 escapement-stepping bezel ticks, three true-axis gimbal
-                rings, geodesic cage, breathing plasma core, one orbiting
-                satellite. Accent-tinted by the active tab. */}
-            <div className="shrink-0 rounded-full p-1 bg-white/5 border border-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_0_24px_rgb(var(--cc)/0.25)]">
-              <CoreSigil size={54} />
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="cc-display cc-glow-title">
-                  MULTIVERSE CORE COMMAND DECK
-                </h2>
-                <span
-                  className={`flex items-center gap-1.5 text-[9px] font-mono px-2 py-0.5 rounded-full border ${
-                    (state.diskSync?.connected ?? false)
-                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/40'
-                      : 'bg-rose-500/15 text-rose-300 border-rose-400/40'
-                  }`}
-                  title={state.diskSync?.lastError ?? 'Reality daemon telemetry'}
-                >
-                  <Database className="w-2.5 h-2.5" />
-                  {(state.diskSync?.connected ?? false)
-                    ? `DISK MIRROR LIVE${(state.diskSync?.pendingOps ?? 0) > 0 ? ` · ${(state.diskSync?.pendingOps ?? 0)} RETRYING` : ''}`
-                    : 'DISK MIRROR OFFLINE'}
-                </span>
+        {/* TOP BAR — identity · icon tabs · tools, floating on the night */}
+        <div className="shrink-0 flex items-center justify-between gap-4 flex-wrap">
+          {/* identity */}
+          <div className="flex items-center gap-3 min-w-0">
+            <CoreSigil size={40} />
+            <div className="min-w-0 leading-none">
+              <div className="flex items-baseline gap-2.5">
+                <span className="cc-wordmark">Core Deck</span>
+                <span className="cc-sub hidden sm:inline">Multiverse Command</span>
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                <span className="cc-badge">
-                  <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-                  Sovereign Continuum Active
+              <div className="flex items-center gap-4 mt-1.5">
+                {/* disk mirror — a lone dot; full telemetry in the thought cloud */}
+                <span className="relative inline-flex group/disk">
+                  <span
+                    className={`flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] cursor-default ${
+                      (state.diskSync?.connected ?? false) ? 'text-emerald-300/90' : 'text-rose-300/90'
+                    }`}
+                  >
+                    <Database className="w-3 h-3" />
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        (state.diskSync?.connected ?? false) ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'
+                      }`}
+                    />
+                  </span>
+                  <span className="cc-cloud-card pointer-events-none absolute top-full left-0 mt-2 opacity-0 translate-y-1 group-hover/disk:opacity-100 group-hover/disk:translate-y-0 transition-all duration-200 z-50 whitespace-nowrap">
+                    {(state.diskSync?.connected ?? false)
+                      ? `Disk mirror live${(state.diskSync?.pendingOps ?? 0) > 0 ? ` · ${(state.diskSync?.pendingOps ?? 0)} retrying` : ''}`
+                      : 'Disk mirror offline'}
+                    {state.diskSync?.lastError ? ` · ${state.diskSync.lastError}` : ''}
+                  </span>
                 </span>
-                {/* STAT SEALS — icon-only, each feature its own unique symbol;
-                    the full name pops up on hover (no symbol ever shared) */}
+                {/* STAT SEALS — bare numerals; names rise on hover */}
                 <StatSeal icon={<Globe className="w-3.5 h-3.5" />} value={realities.length} label="Realities" />
                 <StatSeal icon={<Layers className="w-3.5 h-3.5" />} value={totalClusters} label="Clusters" />
                 <StatSeal icon={<Orbit className="w-3.5 h-3.5" />} value={totalGalaxies} label="Galaxies" />
@@ -1160,111 +899,171 @@ export const CoreConsole: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Top Quick Tools & Close */}
-          <div className="flex items-center gap-3">
-            {/* Celestial Forge Symbol with Animated Thinking Cloud */}
-            <ThinkingCloudTooltip
-              onClick={() => setShowCreate(true)}
-              label="Forge Reality Continuum"
-              subtitle="Manifest a new parallel realm & disk directory"
-              position="bottom"
-              size="md"
-              iconType="forge"
-              id="core-forge-reality-btn"
-            />
-            <TiltButton
-              onClick={onClose}
-              maxTilt={12}
-              lift={18}
-              className="w-9 h-9 rounded-xl bg-white/6 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white flex items-center justify-center shrink-0 cursor-pointer"
-              title="Close Console (Esc)"
-            >
-              <X className="w-4 h-4" />
-            </TiltButton>
-          </div>
-        </div>
-
-        {/* TAB CONTROLS & SEARCH BAR */}
-        <div className="shrink-0 flex items-center justify-between gap-3 px-5 sm:px-7 py-2.5 border-b border-white/10 bg-white/4 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* ICON TABS — symbols only; full names rise in the thought cloud */}
+          <nav className="flex items-center gap-2">
             {([
-              { id: 'dashboard' as Tab, label: 'Command Matrix', icon: <Cpu className="w-3.5 h-3.5" /> },
-              { id: 'realities' as Tab, label: `Realities Grid (${realities.length})`, icon: <Globe className="w-3.5 h-3.5" /> },
-              { id: 'hierarchy' as Tab, label: 'Deep Hierarchy', icon: <Layers className="w-3.5 h-3.5" /> },
+              { id: 'dashboard' as Tab, label: 'Command Matrix', sub: 'Live multiverse telemetry & controls', icon: <Cpu className="w-4 h-4" /> },
+              { id: 'realities' as Tab, label: 'Realities Grid', sub: `${realities.length} parallel realities, one card each`, icon: <Globe className="w-4 h-4" /> },
+              { id: 'hierarchy' as Tab, label: 'Deep Hierarchy', sub: 'The 11-stage cosmological ladder', icon: <Layers className="w-4 h-4" /> },
               {
                 id: 'bin' as Tab,
-                label: `Quantum Bin (${(state.binRealities || []).length})`,
-                icon: <Trash2 className="w-3.5 h-3.5" />,
+                label: 'Quantum Bin',
+                sub: 'Deleted realities rest in stasis',
+                icon: <Trash2 className="w-4 h-4" />,
                 badge: (state.binRealities || []).length > 0 ? (state.binRealities || []).length : undefined,
               },
             ]).map((t) => (
-              <TiltButton
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                maxTilt={7}
-                className={`cc-tab px-3.5 py-1.5 rounded-xl text-xs font-mono uppercase tracking-wider border cursor-pointer ${
-                  tab === t.id ? 'cc-tab-active text-white' : 'bg-white/4 text-slate-300 border-white/10 hover:text-white'
-                }`}
-                style={tab === t.id ? { ['--cc' as string]: TAB_ACCENTS[t.id] } : undefined}
-              >
-                {t.icon} <span>{t.label}</span>
+              <span key={t.id} className="relative inline-flex">
+                <ThinkingCloudTooltip
+                  onClick={() => setTab(t.id)}
+                  icon={t.icon}
+                  active={tab === t.id}
+                  label={t.label}
+                  subtitle={t.sub}
+                  hint={tab === t.id ? 'Current view' : 'Switch view'}
+                  position="bottom"
+                  size="sm"
+                  id={`cc-tab-${t.id}`}
+                />
                 {t.badge !== undefined && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold">
+                  <span className="absolute -top-1 -right-1 z-10 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center pointer-events-none shadow-[0_0_10px_rgba(251,113,133,0.6)]">
                     {t.badge}
                   </span>
                 )}
-              </TiltButton>
+              </span>
             ))}
-          </div>
+          </nav>
 
-          {/* Live Search & Filter Bar */}
-          <div className="flex items-center gap-2 flex-1 max-w-md ml-auto">
-            <div className="relative flex-1">
-              <Search className="w-3.5 h-3.5 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          {/* TOOLS — search · filters · forge · close */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative hidden md:block w-44 lg:w-60">
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search reality, spectral code, galaxy..."
+                placeholder="Search realities..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400/60 font-mono"
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-black/45 border border-white/12 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white/35 font-mono"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-xs"
                 >
                   ✕
                 </button>
               )}
             </div>
 
-            <div className="hidden sm:flex items-center gap-1 font-mono text-[9.5px]">
+            <div className="hidden lg:flex items-center gap-2.5 font-mono text-[9px] uppercase tracking-[0.12em]">
               {[
                 { id: 'all', label: 'All' },
                 { id: 'anchored', label: 'Anchor' },
                 { id: 'custom', label: 'Custom' },
                 { id: 'dense', label: 'Dense' },
               ].map((f) => (
-              <TiltButton
-                key={f.id}
-                onClick={() => setFilterType(f.id as typeof filterType)}
-                maxTilt={10}
-                lift={10}
-                className={`px-2 py-1 rounded-lg border ${
-                  filterType === f.id
-                    ? 'bg-cyan-500/20 text-cyan-200 border-cyan-400/50'
-                    : 'bg-white/4 text-slate-400 border-white/10 hover:text-white'
-                }`}
-              >
-                {f.label}
-              </TiltButton>
+                <button
+                  key={f.id}
+                  onClick={() => setFilterType(f.id as typeof filterType)}
+                  className={`pb-0.5 border-b cursor-pointer transition-colors ${
+                    filterType === f.id
+                      ? 'text-white border-[rgb(var(--cc))]'
+                      : 'text-slate-500 border-transparent hover:text-slate-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
               ))}
             </div>
+
+            {/* BACKDROP STUDIO — the user's own night: image, GIF or muted video */}
+            <span className="relative inline-flex">
+              <ThinkingCloudTooltip
+                onClick={() => setStudioOpen((v) => !v)}
+                icon={<Wallpaper className="w-4 h-4" />}
+                label="Backdrop Studio"
+                subtitle="Hang your own picture, GIF or muted video"
+                hint={backdrop.kind === 'shader' ? 'Open' : 'Your night is up'}
+                position="bottom"
+                size="sm"
+                id="cc-backdrop-btn"
+              />
+              {studioOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStudioOpen(false);
+                    }}
+                  />
+                  <div
+                    className="cc-cloud-rise absolute right-0 top-full z-50 mt-3 w-64 rounded-2xl bg-[#0a0d16]/95 border border-white/15 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.6)]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400 mb-3">Backdrop Studio</div>
+                    <label className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400">
+                      <span>Night veil</span>
+                      <span className="text-slate-200">{Math.round(backdrop.dim * 100)}%</span>
+                    </label>
+                    <input
+                      type="range" min={0} max={0.7} step={0.05} value={backdrop.dim}
+                      onChange={(e) => backdrop.setDim(Number(e.target.value))}
+                      className="w-full accent-cyan-400 mt-1 mb-3 cursor-pointer"
+                    />
+                    <label className="cc-btn-glass block text-center rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-200 cursor-pointer hover:text-white transition-colors">
+                      Choose image / GIF
+                      <input
+                        type="file" accept="image/*" className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleBackdropFile(f); e.target.value = ''; }}
+                      />
+                    </label>
+                    <label className="cc-btn-glass mt-2 block text-center rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-200 cursor-pointer hover:text-white transition-colors">
+                      Choose video (muted)
+                      <input
+                        type="file" accept="video/*" className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleBackdropFile(f); e.target.value = ''; }}
+                      />
+                    </label>
+                    {backdrop.kind !== 'shader' && (
+                      <button
+                        onClick={() => { backdrop.clear(); toast('The Crimson Watch returns — shader night restored'); setStudioOpen(false); }}
+                        className="w-full mt-2 rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-rose-200 border border-rose-400/30 hover:bg-rose-500/10 cursor-pointer transition-colors"
+                      >
+                        Reset to Crimson Night
+                      </button>
+                    )}
+                    <p className="font-mono text-[8px] text-slate-500 mt-3 leading-relaxed">
+                      Stored offline in this browser only — or drop a file anywhere on the deck.
+                    </p>
+                  </div>
+                </>
+              )}
+            </span>
+            <ThinkingCloudTooltip
+              onClick={() => setShowCreate(true)}
+              label="Forge Reality Continuum"
+              subtitle="Manifest a new parallel realm & disk directory"
+              position="bottom"
+              size="sm"
+              iconType="forge"
+              id="core-forge-reality-btn"
+            />
+            <ThinkingCloudTooltip
+              onClick={onClose}
+              icon={<X className="w-4 h-4" />}
+              label="Close Console"
+              subtitle="Return to the cosmos — Esc works too"
+              hint="Close"
+              position="bottom"
+              size="sm"
+              id="cc-close-btn"
+            />
           </div>
         </div>
 
-        {/* MAIN BODY AREA (HORIZONTAL COCKPIT LAYOUT) */}
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scroll px-5 sm:px-7 py-4">
+        {/* MAIN BODY AREA — cards resting directly on the night */}
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scroll pt-5">
           <AnimatePresence mode="wait">
           {tab === 'dashboard' && (
             /* 12-col bento: radar(4×2 rows) · vitals(8) · physics(8) ·
@@ -1385,44 +1184,49 @@ export const CoreConsole: React.FC<Props> = ({
                   play on the universe and must not fire behind the glass. */}
               <motion.div variants={rise} className="lg:col-span-4 cc-panel p-4">
                 <span className="cc-panel-title block mb-2">Singularity Quick Pods</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <TiltButton
+                <div className="flex flex-wrap gap-2">
+                  <ThinkingCloudTooltip
                     onClick={() => { onClose(); onZoomToCore(); }}
-                    maxTilt={11}
-                    lift={16}
-                    style={{ ['--btn' as string]: '34 211 238' }}
-                    className="cc-btn-glass p-2.5 rounded-xl text-cyan-100 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
-                  >
-                    <Crosshair className="w-3.5 h-3.5" /> Frame Core
-                  </TiltButton>
-                  <TiltButton
+                    icon={<Crosshair className="w-4 h-4" />}
+                    label="Frame Core"
+                    subtitle="Pull the camera back to the Astral Core"
+                    hint="Frame"
+                    position="bottom"
+                    size="sm"
+                    id="pod-frame-core"
+                  />
+                  <ThinkingCloudTooltip
                     onClick={() => { onClose(); onTriggerKamui(); }}
-                    maxTilt={11}
-                    lift={16}
-                    style={{ ['--btn' as string]: '251 113 133' }}
-                    className="cc-btn-glass p-2.5 rounded-xl text-rose-200 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
-                  >
-                    <Zap className="w-3.5 h-3.5" /> Kamui Warp
-                  </TiltButton>
+                    icon={<Zap className="w-4 h-4" />}
+                    label="Kamui Warp"
+                    subtitle="Bend space, release — the signature warp"
+                    hint="Warp"
+                    position="bottom"
+                    size="sm"
+                    id="pod-kamui-warp"
+                  />
                   {onShowToolbar && (
-                    <TiltButton
+                    <ThinkingCloudTooltip
                       onClick={onShowToolbar}
-                      maxTilt={11}
-                      lift={16}
-                      style={{ ['--btn' as string]: '167 139 250' }}
-                      className="cc-btn-glass p-2.5 rounded-xl text-violet-200 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
-                    >
-                      <Compass className="w-3.5 h-3.5" /> Toolbar
-                    </TiltButton>
+                      icon={<Compass className="w-4 h-4" />}
+                      label="Toolbar"
+                      subtitle="Summon the hierarchy toolbar"
+                      hint="Summon"
+                      position="bottom"
+                      size="sm"
+                      id="pod-toolbar"
+                    />
                   )}
-                  <TiltButton
+                  <ThinkingCloudTooltip
                     onClick={() => setShowCreate(true)}
-                    maxTilt={11}
-                    lift={16}
-                    className="cc-btn-glass p-2.5 rounded-xl text-slate-200 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> New Reality
-                  </TiltButton>
+                    icon={<Plus className="w-4 h-4" />}
+                    label="New Reality"
+                    subtitle="Manifest a parallel realm & disk folder"
+                    hint="Forge"
+                    position="bottom"
+                    size="sm"
+                    id="pod-new-reality"
+                  />
                 </div>
               </motion.div>
 
