@@ -109,6 +109,10 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
+      # the manifest generator reads src-tauri/tauri.conf.json — the repo
+      # must be present in this job too, not just in the build matrix
+      - uses: actions/checkout@v4
+
       - name: Collect built installers
         uses: actions/download-artifact@v4
         with:
