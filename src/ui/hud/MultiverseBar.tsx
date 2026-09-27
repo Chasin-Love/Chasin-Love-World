@@ -22,6 +22,9 @@ interface MultiverseBarProps {
   onEditRealityLore?: (reality: RealityConfig) => void;
   onInspectLineage?: (cluster: GalaxyClusterData) => void;
   onCloseBar?: () => void;
+  /* KAMUI (v1) — the red vortex tear; the key re-mounts the bar mid-vortex */
+  onTriggerKamui?: () => void;
+  kamuiKey?: number;
 }
 
 export const MultiverseBar: React.FC<MultiverseBarProps> = ({
@@ -39,6 +42,8 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
   onEditRealityLore,
   onInspectLineage,
   onCloseBar,
+  onTriggerKamui,
+  kamuiKey = 0,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showHierarchyBar, setShowHierarchyBar] = useState(true);
@@ -96,17 +101,18 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
         onCreate={handleCreateReality}
       />
 
-      {/* Floating Multiverse HUD Controls at Top Center */}
-      <div 
-        className="rise-in fixed top-4 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 select-none pointer-events-none"
+      {/* Floating Multiverse HUD Controls at Top Center with Kamui Animation */}
+      <div
+        key={kamuiKey}
+        className="kamui-appear fixed top-4 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 select-none pointer-events-none"
       >
         {/* Top Control Bar */}
         <div className="pointer-events-auto flex items-center gap-2 bg-slate-950/15 hover:bg-slate-950/25 backdrop-blur-md border border-cyan-400/25 hover:border-cyan-400/40 rounded-full px-4 py-1.5 text-xs shadow-[0_4px_24px_rgba(0,0,0,0.35)] transition-all">
-          {/* Core Controller Badge — opens the Multiverse Core Console */}
+          {/* Core Controller Badge — Kamui vortex, then the Core Console */}
           <button
-            onClick={() => onOpenCoreConsole?.()}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-950/35 hover:bg-red-900/50 border border-red-500/50 hover:border-red-400 text-red-300 hover:text-white transition-all font-mono text-[11px] font-bold shadow-[0_0_10px_rgba(255,23,68,0.35)] cursor-pointer backdrop-blur-sm"
-            title="The Astral Core at (0,0,0) — click to open the Multiverse Core Console (create, rename & collapse realities, forge galaxies)"
+            onClick={() => { if (onTriggerKamui) onTriggerKamui(); onOpenCoreConsole?.(); }}
+            className="kamui-demon-badge flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-950/35 hover:bg-red-900/50 border border-red-500/50 hover:border-red-400 text-red-300 hover:text-white transition-all font-mono text-[11px] font-bold shadow-[0_0_10px_rgba(255,23,68,0.35)] cursor-pointer backdrop-blur-sm"
+            title="The Astral Core at (0,0,0) — click to trigger the Kamui vortex and open the Multiverse Core Console"
           >
             <span className="demon-eye-spin inline-block w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_#ff1744] ring-1 ring-white/80" />
             <span className="tracking-wider text-red-200">CORE</span>

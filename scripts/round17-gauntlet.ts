@@ -369,6 +369,39 @@ function inv(d: [number, number, number]): [number, number] {
   check('R55: the portal is a plain zoom (no tear singularity machinery)', portal, `${portal}`);
 }
 
+/* ==== ROUND 61 — the hole is a hole in the surface; the one-law well ==== */
+{
+  const rmSrc = readFileSync(new URL('../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
+  const ssSrc = readFileSync(new URL('../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
+  const usmSrc = readFileSync(new URL('../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
+  const pdSrc = readFileSync(new URL('../src/engine/surface/photoDome.ts', import.meta.url), 'utf8');
+
+  /* THE SURFACE LAW — the hole paints in the sky band (after the domes at
+     -100/-99 and the sky shells at -98, before every stellar-system object
+     at 0+), so from no camera angle can it ever appear in front of the
+     system. The march itself is untouched (the render-order line is the
+     only change to the file's output stage). */
+  const surfaceOrder = /quad\.renderOrder = -80;/.test(rmSrc)
+    && !/quad\.renderOrder = 12;/.test(rmSrc)
+    && /pts\.renderOrder = -98;/.test(usmSrc)
+    && /far\.renderOrder = -98;/.test(usmSrc)
+    && /near\.renderOrder = -98;/.test(usmSrc);
+  check('R61: the hole sits in the sky paint band (-80; shells -98; system 0+) — never in front of the system', surfaceOrder, `${surfaceOrder}`);
+
+  /* ONE WELL LAW — the shared C¹ gradient lives in the shared warp block
+     and EVERY sky stage consumes it: the dome, the photo dome and all three
+     star shells. The old bespoke dome-only loop is gone (no second law). */
+  const oneWell = /float lensWellDarken\(vec3 dir\)/.test(ssSrc)
+    && /1\.0 \/ \(x \* x\)/.test(ssSrc)
+    && /1\.0 - smoothstep\(3\.1, 4\.0, x\)/.test(ssSrc)
+    && /lensWellDarken\(rawD\)/.test(ssSrc)
+    && !/wellDarken = max\(wellDarken, 1\.0 - smoothstep\(bcW/.test(ssSrc)
+    && /float well = 1\.0 - lensWellDarken\(normalize\(vDir\)\);/.test(pdSrc)
+    && /lensWellFactor\(position\)/.test(usmSrc)
+    && (usmSrc.match(/lensWellFactor\(position\)/g)?.length ?? 0) === 3;
+  check('R61: ONE well law — shared C¹ gradient (zero at 4·b_c) consumed by dome + photo + all shells', oneWell, `${oneWell}`);
+}
+
 /* ================================ verdict ================================ */
 console.log(failures === 0 ? '\n● GAUNTLET GREEN — Round 17 math verified' : `\n● ${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

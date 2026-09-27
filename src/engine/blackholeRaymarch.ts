@@ -445,7 +445,17 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
      (R58) — no giant quad, no capture mismatch, no square. */
   const quadSize = rs * 64;
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(quadSize, quadSize), material);
-  quad.renderOrder = 12;
+  /* ROUND 61 — THE HOLE IS A HOLE IN THE SURFACE, NOT A FLOATING BODY (the
+     user's law). Transparent paint order: sky domes (-100/-99) → sky star
+     shells (-98) → THIS QUAD (-80) → the stellar system (0+). The hole now
+     paints BEFORE the belt, planets and coronas, so from NO camera angle can
+     it ever cover them — it always reads as sitting in the sky surface, and
+     the system passes in front of it. It paints AFTER the sky shells, so
+     they vanish behind its shadow and arc around it (their own vertex lens),
+     exactly like the reference's captured rays. The march itself — shadow,
+     disk, geodesics — is untouched; this is only WHERE the finished image
+     sits in the sky's own paint order. */
+  quad.renderOrder = -80;
   quad.frustumCulled = false;
   quad.visible = geodesicOn;
   group.add(quad);

@@ -151,7 +151,12 @@ export class PhotoDome {
 
       /* floor: even at blend 0 keep a 6% ghost so the fade never pops */
       alpha = max(alpha, uHasMap * 0.06 * uFade);
-      gl_FragColor = vec4(color, alpha);
+      /* ROUND 61 — the shared well: the photo pours into the hole by the
+         SAME one-law curve as the procedural dome and every star shell
+         (lensWellDarken in LENS_WARP_GLSL). No layer can disagree with
+         another about how dark the sky is in the same direction. */
+      float well = 1.0 - lensWellDarken(normalize(vDir));
+      gl_FragColor = vec4(color * well, alpha * well);
     }
   `;
 

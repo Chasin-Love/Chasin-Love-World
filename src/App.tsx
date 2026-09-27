@@ -134,7 +134,9 @@ export default function App() {
     showCoordinates: true,
   });
   const [showMultiverseBar, setShowMultiverseBar] = useState(false);
-  const [kamuiEnergy, setKamuiEnergy] = useState(100);
+  /* KAMUI (v1) — each trigger bumps the key so the MultiverseBar re-enters
+     through the red vortex (the kamui-appear CSS animation) */
+  const [kamuiKey, setKamuiKey] = useState(0);
   const [showCosmicHud, setShowCosmicHud] = useState(false);
   /* THE COSMIC ECHO — the memory meteor under the pointer (for the card) */
   const [echoHover, setEchoHover] = useState<{ entryId: string; planetId: string; title: string; x: number; y: number } | null>(null);
@@ -296,8 +298,7 @@ export default function App() {
       },
       onPortalDone: () => undefined,
       onContext: (id, x, y) => setMenu({ id, x, y }),
-      onKamuiEnergy: (v, m) => setKamuiEnergy(Math.round((v / m) * 100)),
-      onKamuiRejected: () => { toast('✦ The eye needs rest — not enough energy'); chime(240); },
+      onKamuiTrigger: () => setKamuiKey((k) => k + 1),
       onFirstFrame: () => setEngineReady(true),
       onEchoOpen: (entryId, planetId, title) => {
         /* a memory meteor was caught — reopen the page it remembers */
@@ -342,7 +343,8 @@ export default function App() {
       },
       onSelectDemonCore: () => {
         setShowMultiverseBar(true);
-        toast('✦ Core Activated');
+        setKamuiKey((k) => k + 1);
+        toast('✦ Kamui: Core Activated');
         chime(960);
       },
     });
@@ -965,7 +967,8 @@ export default function App() {
               onJumpTo: (id) => {
                 setMode('space');
                 engineRef.current?.jumpTo(id);
-                toast('✦ Kamui jump — space torn and crossed');
+                setKamuiKey((k) => k + 1);
+                toast('✦ Kamui: Focused on Core');
                 chime(880);
               },
               onOpenVault: () => { setMode('vault'); setAudioMode('vault'); },
@@ -993,15 +996,7 @@ export default function App() {
         </Suspense>
       )}
 
-      {/* KAMUI energy — the jutsu is not free (regenerates when idle) */}
-      {mode === 'space' && kamuiEnergy < 100 && (
-        <div className="fixed bottom-4 left-4 z-40 flex items-center gap-2 pointer-events-none select-none">
-          <span className="text-[10px] font-mono tracking-[0.25em] text-fuchsia-300/80">✦ KAMUI</span>
-          <div className="w-24 h-1 rounded-full bg-slate-800/80 overflow-hidden">
-            <div className="h-full rounded-full bg-linear-to-r from-fuchsia-500 to-amber-400 transition-[width] duration-200" style={{ width: `${kamuiEnergy}%` }} />
-          </div>
-        </div>
-      )}
+
       {/* shortcuts */}
       {showKeys && (
         <div className="fixed inset-0 z-130 flex items-center justify-center overlay-in" style={{ background: 'rgba(3,5,10,0.7)' }} onClick={() => setShowKeys(false)}>
@@ -1097,6 +1092,12 @@ export default function App() {
           onCloseBar={() => {
             setShowMultiverseBar(false);
           }}
+          onTriggerKamui={() => {
+            engineRef.current?.triggerKamui();
+            setKamuiKey((k) => k + 1);
+            toast('✦ Kamui: Core Activated');
+          }}
+          kamuiKey={kamuiKey}
         />
       )}
 

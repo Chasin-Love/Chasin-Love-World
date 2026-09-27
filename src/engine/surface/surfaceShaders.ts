@@ -110,6 +110,41 @@ vec3 applyLensBend(vec3 d){
   }
   return d;
 }
+
+/* ROUND 61 — THE WELL. One law for every sky layer: the depression around a
+   black hole — the embedding-diagram funnel the user described with the
+   water-cone analogy: space pours gradually into the hole, nothing pours at
+   a distance. As a function of angular distance x in units of the capture
+   boundary b_c = (3√3/2)·rs:
+
+       x ≥ 4   → exactly 0   untouched sky (the user's 1→1.9 band)
+       x ≈ 3   → a whisper   the depression just begins (their ~2)
+       x = 2   → gentle      growing continuously
+       x → 1   → deep        the super-sensitive band into the rim (3.55→4)
+
+   The depth follows the deflection's own inverse-square shape, and a
+   smoothstep reach melts it to EXACTLY zero at 4·b_c — the whole profile is
+   one C¹ curve of one angle: no band, no layer, no edge can exist. EVERY
+   sky stage (procedural dome, photo dome, every star shell) calls this same
+   function, so no two layers can ever disagree about how dark the sky is
+   in the same direction. Scales with the damped strength (uLensBend): the
+   physics toggle heals the sky whole. */
+float lensWellDarken(vec3 dir){
+  float darken = 0.0;
+  for (int i = 0; i < 16; i++) {
+    if (i >= uLensCount) break;
+    if (uLensStrong[i] < 0.5) continue;
+    float rsA = 0.62 * max(uLensRim[i], 1e-6);
+    float bc = 2.5980762 * rsA;                  /* b_c = (3√3/2) rs */
+    float ang = acos(clamp(dot(dir, uLenses[i].xyz), -1.0, 1.0));
+    float x = max(ang, bc * 0.25) / bc;
+    float well = 1.0 / (x * x);                  /* the deflection's own shape */
+    float reach = 1.0 - smoothstep(3.1, 4.0, x); /* melts to zero at 4·b_c */
+    if (reach < 0.001) continue;
+    darken = max(darken, min(well, 1.0) * reach);
+  }
+  return min(darken, 1.0) * 0.95 * uLensBend;
+}
 `;
 
 /* For vertex stages (star shells, nebula points): uniforms + warp + a helper
@@ -119,6 +154,16 @@ vec3 applyLensBend(vec3 d){
 export const LENS_VERT_GLSL = /* glsl */ `
 ${LENS_UNIFORMS_GLSL}
 ${LENS_WARP_GLSL}
+/* ROUND 61 — the star shells share the well: a background star dims by the
+   same one-law curve as the dome as its direction pours toward the hole,
+   so no shell can disagree with the sky it lives in (the "layers" sin).
+   Exactly zero beyond 4·b_c — the outer sky is untouched. */
+float lensWellFactor(vec3 worldPos){
+  vec3 dir = worldPos - cameraPosition;
+  float dist = length(dir);
+  if (dist < 1e-4) return 1.0;
+  return 1.0 - lensWellDarken(dir / dist);
+}
 vec3 lensBentPosition(vec3 position){
   float r = length(position);
   if (r < 1e-4) return position;
@@ -279,18 +324,11 @@ void main(){
      its silhouette, and the rest of the sky holds still. */
   d = applyLensBend(d);
 
-  /* ROUND 60 — THE DEPRESSION GRADIENT: the sky darkens gradually as it
-     approaches the hole's silhouette (the embedding-diagram well) — no hard
-     edge; the capture disc itself stays pure black. Foreground bodies are
-     never darkened (they are not sky). */
-  float wellDarken = 0.0;
-  for (int i = 0; i < uLensCount; i++) {
-    if (uLensStrong[i] < 0.5) continue;
-    float rsAw = 0.62 * uLensRim[i];
-    float bcW = 2.5980762 * rsAw;
-    float angH = acos(clamp(dot(rawD, uLenses[i].xyz), -1.0, 1.0));
-    wellDarken = max(wellDarken, 1.0 - smoothstep(bcW, bcW * 2.2, angH));
-  }
+  /* ROUND 61 — the well is the ONE shared law now (lensWellDarken above):
+     the dome, the photo sky and every star shell darken by the same curve
+     of the same angle, so the depression the user asked for — gradual pour,
+     super-steep only at the rim — shows as ONE smooth well, never layers. */
+  float wellDarken = lensWellDarken(rawD);
 
   /* Round 16 — CAPTURED rays paint the TRUE SHADOW: inside b_c = (3√3/2)·rs
      no image of the background exists, so the sky is genuinely absent — pure

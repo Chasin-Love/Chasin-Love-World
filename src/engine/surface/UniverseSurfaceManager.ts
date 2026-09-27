@@ -169,7 +169,8 @@ export class UniverseSurfaceManager {
           void main(){
             vColor = aColor;
             float tw = uTwinkle > 0.5 ? (0.8 + 0.2 * sin(uTime * 1.5 + position.x * 0.001)) : 1.0;
-            vAlpha = aAlpha * tw;
+            /* ROUND 61 — the shared well dims the shell exactly as the dome */
+            vAlpha = aAlpha * tw * lensWellFactor(position);
             vec4 mv = modelViewMatrix * vec4(lensBentPosition(position), 1.0);
             gl_PointSize = clamp(aSize * uScale * (260.0 / max(-mv.z, 0.001)), 2.0, 48.0);
             gl_Position = projectionMatrix * mv;
@@ -195,6 +196,9 @@ export class UniverseSurfaceManager {
       const pts = new THREE.Points(geo, mat);
       pts.userData.immuneToVortex = true;
       pts.frustumCulled = false;
+      /* ROUND 61 — sky shells paint in the sky band: after the domes, before
+         the hole (-80) — they pour INTO the hole, never over its shadow */
+      pts.renderOrder = -98;
       this.skyNebulae.push(pts);
       this.scene.add(pts);
     };
@@ -250,7 +254,8 @@ export class UniverseSurfaceManager {
         varying vec3 vColor; varying float vAlpha;
         void main(){
           vColor = aColor;
-          vAlpha = aAlpha;
+          /* ROUND 61 — the shared well dims the shell exactly as the dome */
+          vAlpha = aAlpha * lensWellFactor(position);
           vec4 mv = modelViewMatrix * vec4(lensBentPosition(position), 1.0);
           gl_PointSize = clamp(aSize * uScale * (260.0 / max(-mv.z, 0.001)), 1.5, 36.0);
           gl_Position = projectionMatrix * mv;
@@ -276,6 +281,7 @@ export class UniverseSurfaceManager {
     const far = new THREE.Points(geo, mat);
     far.userData.immuneToVortex = true;
     far.frustumCulled = false;
+    far.renderOrder = -98; /* ROUND 61 — the sky band: see the nebulae above */
     this.farStarsPoints = far;
     this.scene.add(far);
   }
@@ -331,7 +337,8 @@ export class UniverseSurfaceManager {
         void main(){
           vColor = aColor;
           float tw = uTwinkle > 0.5 ? (0.76 + 0.24 * sin(uTime * 2.6 + position.x * 17.3 + position.y * 11.1 + position.z * 7.7)) : 1.0;
-          vAlpha = aAlpha * tw;
+          /* ROUND 61 — the shared well dims the shell exactly as the dome */
+          vAlpha = aAlpha * tw * lensWellFactor(position);
           vec4 mv = modelViewMatrix * vec4(lensBentPosition(position), 1.0);
           gl_PointSize = clamp(aSize * uScale * (260.0 / max(-mv.z, 0.001)), 1.5, 36.0);
           gl_Position = projectionMatrix * mv;
@@ -357,6 +364,7 @@ export class UniverseSurfaceManager {
     const near = new THREE.Points(geo, mat);
     near.userData.immuneToVortex = true;
     near.frustumCulled = false;
+    near.renderOrder = -98; /* ROUND 61 — the sky band: see the nebulae above */
     this.gNeighborhood.add(near);
 
     // Named neighbor star sprites

@@ -153,6 +153,63 @@ void main(){
 
 /* ----------------------------- planet ----------------------------- */
 
+/* --------------------------- KAMUI vortex pass (v1) --------------------------
+   The full-screen post-process from the original MY UNIVERSE — the red demonic
+   space-time vortex: high-frequency spiral twist, gravitational implosion
+   pull, chromatic dispersion, the central singularity void and the concentric
+   rift energy rings. Driven by triggerKamui() in engine.ts via uCenter/
+   uStrength/uColor; at uStrength 0 it is a single texture fetch passthrough. */
+export const portalFrag = /* glsl */ `
+uniform sampler2D tDiffuse; uniform vec2 uCenter; uniform float uStrength;
+uniform float uTime; uniform vec3 uColor; uniform float uAspect;
+varying vec2 vUv;
+void main(){
+  vec2 uv = vUv;
+  vec2 o = uv - uCenter;
+  vec2 d = vec2(o.x * uAspect, o.y);
+  float r = length(d);
+  float s = uStrength;
+  if (s < 0.001) { gl_FragColor = texture2D(tDiffuse, uv); return; }
+
+  // Kamui Space-Time Vortex Distortion
+  float fall = exp(-r * 3.8);
+  // High-frequency spiral twisting effect
+  float spiralTwist = s * 6.5 * fall;
+  float ripple = sin(r * 32.0 - uTime * 6.0) * s * 0.18 * fall;
+  float ang = spiralTwist + ripple;
+
+  float ca = cos(ang); float sa = sin(ang);
+  d = mat2(ca, -sa, sa, ca) * d;
+
+  // Gravitational implosion pull towards portal center
+  vec2 pullDir = normalize(o + vec2(1e-6));
+  vec2 suv = uCenter + vec2(d.x / uAspect, d.y) - pullDir * s * 0.28 * fall;
+
+  // Chromatic dispersion (RGB separation caused by extreme spatial warping)
+  float ab = s * 0.025 * fall + 0.0002;
+  vec3 col;
+  col.r = texture2D(tDiffuse, suv + vec2(ab, 0.0)).r;
+  col.g = texture2D(tDiffuse, suv).g;
+  col.b = texture2D(tDiffuse, suv - vec2(ab, 0.0)).b;
+
+  // Central Kamui singularity void
+  float coreR = 0.22 * s;
+  float core = smoothstep(coreR, coreR * 0.2, r);
+  col *= 1.0 - core * 0.98;
+
+  // Concentric spatial rift energy rings
+  float ring = exp(-abs(r - (0.15 + 0.12 * s)) * 28.0);
+  float ring2 = exp(-abs(r - (0.06 + 0.24 * s)) * 45.0);
+  float KamuiGlow = exp(-abs(r - 0.05) * 50.0) * s;
+
+  vec3 portalHue = mix(uColor, vec3(0.3, 0.9, 1.0), sin(uTime * 4.0) * 0.3 + 0.3);
+  col += portalHue * (ring * 1.2 + ring2 * 0.6 + KamuiGlow * 1.5) * s;
+  col += vec3(1.0, 0.95, 0.85) * core * 0.2 * s;
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
 export const planetVert = /* glsl */ `
 uniform float uTear; uniform float uTearTime; uniform float uReverse;
 uniform vec3 uGravityCenter; uniform vec3 uGravityLocalCenter;

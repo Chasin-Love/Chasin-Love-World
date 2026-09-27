@@ -232,6 +232,10 @@ export class CameraRig {
     if (phi !== null) this.tPhi = clamp(phi, PHI_MIN, PHI_MAX);
   }
   clearPan() { this.panOffset.set(0, 0, 0); this.panVel.set(0, 0, 0); }
+  /** ROUND 61 — re-place a saved pan offset without touching the dial or
+      orbit (the camera-memory boot restore). Momentum stays killed: the
+      rig was just constructed, nothing is moving. */
+  restorePan(pan: [number, number, number]) { this.panOffset.set(pan[0], pan[1], pan[2]); }
   /** Keep a cinematic effect locked to its live world-space subject. */
   holdFocus(point: THREE.Vector3) {
     this.focus.copy(point);
