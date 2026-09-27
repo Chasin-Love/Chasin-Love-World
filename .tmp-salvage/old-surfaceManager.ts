@@ -4,7 +4,6 @@ import { universeSurfaceVert, universeSurfaceFrag, LENS_VERT_GLSL } from './surf
 import { getSurfaceConfigForReality } from './surfacePresets';
 import { makeGlowTexture } from '../math';
 import { PhotoDome } from './photoDome';
-import { getBlackHoleParams, BLACKHOLE_CHANGE_EVENT } from '../blackholeParams';
 import type { UniverseSurfaceConfig } from '../../realities/types';
 import type { UniverseSurfaceUpdateParams } from './types';
 
@@ -12,7 +11,7 @@ import type { UniverseSurfaceUpdateParams } from './types';
  * UniverseSurfaceManager
  * 
  * Manages the entire visual backdrop of the universe ("Universe Surface"):
- * - Inverted Celestial Sky Sphere with multi-layered cosmic web & nebulae
+ * - Inverted Celestial Sky Sphere with multi-layered cosmic web, nebulae & Kamui vacuum
  * - Deep-space outer star shell (far stars)
  * - Volumetric deep nebular clouds
  * - Near-neighborhood celestial bodies (Sirius, Vega, Proxima, etc.)
@@ -54,9 +53,6 @@ export class UniverseSurfaceManager {
     uLensStrong: { value: new Array(16).fill(0) },
     uLensCount: { value: 0 },
     uLensBend: { value: 1 },
-    /* ROUND 58 — the sky lens scales with the panel's Grav. Lensing so the
-       dome's bend is exactly continuous with the geodesic quad's */
-    uLensScale: { value: getBlackHoleParams().lensing },
   };
 
   constructor(scene: THREE.Scene, initialReality?: RealityConfig | string | null) {
@@ -70,35 +66,6 @@ export class UniverseSurfaceManager {
        uniform objects bends the procedural cosmos, the star shells and the
        uploaded photo alike, so every sky agrees around the hole */
     this.photoDome.build(scene, this.lensUniforms);
-
-    /* ROUND 58 — the sky lives on render layer 1: the geodesic black hole's
-       cubemap captures layer 1 ONLY, so its lensed background can never
-       contain foreground bodies (the star, planets and belt stay on layer 0
-       and never bend — their light doesn't pass the hole). */
-    this.setSkyLayer(1);
-
-    /* ROUND 58 — the sky lens scales with the panel's Grav. Lensing, so the
-       dome's bend is EXACTLY continuous with the geodesic quad's at every
-       setting (both express α = 2·L·rs/b in their own units). */
-    window.addEventListener(BLACKHOLE_CHANGE_EVENT, (e) => {
-      this.lensUniforms.uLensScale.value = (e as CustomEvent<{ lensing: number }>).detail.lensing;
-    });
-  }
-
-  /** ROUND 58 — move every sky layer (and nothing else) to a render layer.
-      The geodesic cubemap captures this layer; the main camera sees it plus
-      layer 0, so the visual result is identical — only the capture is
-      filtered. */
-  setSkyLayer(layer: number): void {
-    const apply = (o: THREE.Object3D | null) => {
-      if (!o) return;
-      o.traverse((child) => child.layers.set(layer));
-    };
-    apply(this.skyDomeMesh);
-    apply(this.farStarsPoints);
-    apply(this.gNeighborhood);
-    for (const n of this.skyNebulae) apply(n);
-    apply(this.photoDome.object);
   }
 
   /**
@@ -428,17 +395,15 @@ export class UniverseSurfaceManager {
    * Called on every animation frame.
    */
   public update(params: UniverseSurfaceUpdateParams): void {
-    const { clockT, skyVisible, neighborhoodVisibility } = params;
-    const kamuiErase = params.kamuiErase ?? 0;
-    const vortexDir = params.vortexDir ?? new THREE.Vector3(0, 0, -1);
+    const { clockT, kamuiErase, vortexDir, skyVisible, neighborhoodVisibility } = params;
 
     if (this.skyDomeMesh) {
       this.skyDomeMesh.visible = skyVisible;
     }
 
     if (this.backdropMat) {
-      this.backdropMat.uniforms.uTime.value = clockT;
       this.backdropMat.uniforms.uKamuiErase.value = kamuiErase * 0.5;
+      this.backdropMat.uniforms.uTime.value = clockT;
       (this.backdropMat.uniforms.uVortexDir.value as THREE.Vector3).copy(vortexDir);
     }
 

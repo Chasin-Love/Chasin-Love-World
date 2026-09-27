@@ -203,12 +203,15 @@ function inv(d: [number, number, number]): [number, number] {
   check('R53: focusing a hole frames the reference camera (25.8 rs, 14° below plane)', cinematicFrame, `${cinematicFrame}`);
 
   /* ==== ROUND 20.4 — reference restore + live tuning panel ==== */
-  const proportions = /uRs: \{ value: params\.mass \* 2 \}/.test(rmSrc) && /const quadSize = rs \* 60;/.test(rmSrc);
-  check('R20.4: live uRs (mass × 2) + 60 rs quad (disk stays framed)', proportions, `${proportions}`);
+  /* ROUND 57/58 — the quad spans the strong field only (80·rs: shadow + disk
+     + the near-hole wrap); the gradual far field lives in the sky layers'
+     own lens (the R58 law) — no giant quad, no foreground in any capture */
+  const proportions = /uRs: \{ value: params\.mass \* 2 \}/.test(rmSrc) && /const quadSize = rs \* 64;/.test(rmSrc);
+  check('R58: live uRs (mass × 2) + 80·rs quad (the strong field stays framed)', proportions, `${proportions}`);
   const liveTuning = /window\.addEventListener\(BLACKHOLE_CHANGE_EVENT, onParams\)/.test(rmSrc)
-    && /quad\.scale\.setScalar\(Math\.max\(1, 34 \/ \(60 \* shaderRs\)\)\)/.test(rmSrc)
+    && /material\.uniforms\.uLensing\.value = p\.lensing;/.test(rmSrc)
     && /window\.removeEventListener\(BLACKHOLE_CHANGE_EVENT, onParams\)/.test(rmSrc);
-  check('R20.4: panel events apply live (uniforms + quad rescale, dispose-safe)', liveTuning, `${liveTuning}`);
+  check('R20.4: panel events apply live (uniforms, dispose-safe)', liveTuning, `${liveTuning}`);
 }
 
 /* ==== 5. ROUND 52 — spacetime bending of the BACKGROUND (the star clouds) ==== */
@@ -317,15 +320,15 @@ function inv(d: [number, number, number]): [number, number] {
     && /vec3 v = normalize\(vWorld\.xyz - uCamPos\);/.test(rmSrc)
     && /textureCube\(uBgCube, v\)/.test(rmSrc)
     && /uBgCube/.test(rmSrc);
-  check('R56: escaped rays sample the captured REAL scene with the bent ray (no procedural sky)', rtLens, `${rtLens}`);
+  check('R56: escaped rays sample the captured REAL sky with the bent ray (no procedural sky)', rtLens, `${rtLens}`);
 
-  /* the engine captures it as a cube map every ~6th frame, holes hidden,
-     R52 lens zeroed, restored after */
+  /* the engine sweeps the cube ONE 512² FACE PER FRAME (a 6-face burst
+     spiked to ~600 ms), holes hidden, R52 lens zeroed, restored after */
   const capture = /WebGLCubeRenderTarget/.test(engSrc) && /new THREE\.CubeCamera/.test(engSrc)
     && /uLensBend\.value = 0;/.test(engSrc)
-    && /this\.cubeCam\.update\(this\.renderer, this\.scene\);/.test(engSrc)
+    && /this\.renderer\.setRenderTarget\(this\.bgCube, face\);/.test(engSrc)
     && /for \(const visual of this\.blackHoles\) visual\.group\.visible = false;/.test(engSrc);
-  check('R56: capture pass — 512² cubemap, holes hidden, R52 lens zeroed, restored after', capture, `${capture}`);
+  check('R56c: capture sweep — one 512² face per frame, holes hidden, R52 lens zeroed, restored after', capture, `${capture}`);
 
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
      the blaze now comes from the damped project bloom. */

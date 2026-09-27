@@ -190,12 +190,15 @@ void main() {
   vec3 p = (uCamPos - uCenter) / uScale;
   vec3 v = normalize(vWorld.xyz - uCamPos);
 
-  /* Round 54 — impact parameter of the UNBENT ray (its line's distance from
-     the hole). Bending only pulls rays inward, so a ray with b beyond the
-     disk outer edge (+ bending margin) can never cross the disk: those rays
-     skip both march loops — the outer half of the quad stays fully
-     transparent (the real scene shows, deflection there is ~0 anyway). */
+  /* ROUND 57 — impact parameter of the UNBENT ray (its line's distance from
+     the hole). Gravity's deflection never hits zero — it decays as π·rs/b —
+     so the bend is applied EVERYWHERE: near the hole the full march
+     integrates it; far from it the analytic weak-field law does (see the
+     output stage). No hard cutoff, no layers — a gradual 1/b ramp exactly
+     like the real thing. */
   float b = length(cross(p, v));
+  vec3 p0 = p;
+  vec3 v0 = v;
 
   vec3 color = vec3(0.0);
   float alpha = 0.0;
@@ -274,18 +277,20 @@ void main() {
   }
 
   /* OUTPUT: his gamma step applies to the DISK light only (his LUT colors
-     are display-referred; the step pushes the white-hot band past the bloom
-     threshold). The background sample comes from the cubemap in scene-linear
-     space — the same space as the capture — so it is NOT gamma-encoded here;
-     the composer's OutputPass (ACES + sRGB) finishes it exactly like every
-     other scene pixel. Every escaped ray gets the sky along its FINAL BENT
-     direction — valid at any distance, any deflection. Captured rays stay
-     fully opaque. */
+     are display-referred). Escaped rays that passed INSIDE the march gate
+     (the wrapped/multiple-image rays near the hole) sample the sky-only
+     cubemap along their final bent direction. Escaped rays BEYOND the gate
+     exit TRANSPARENT — the live sky shows through, already bent by its own
+     lens (surfaceShaders), whose law is mathematically identical to the
+     march's integrated deflection (both = 2·L·rs/b) — so the handoff at the
+     gate is seamless and the far field never enters any capture. Captured
+     rays stay fully opaque. */
   color *= uIntensity;
   color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
-  if (!captured) {
-    color += textureCube(uBgCube, v).rgb * (1.0 - alpha);
-    alpha = 1.0;
+  if (!captured && b <= uDiskOuter + 2.5) {
+    float wa = 1.0 - alpha;
+    color += textureCube(uBgCube, v).rgb * wa;
+    alpha += wa;
   }
   gl_FragColor = vec4(color, captured ? 1.0 : clamp(alpha, 0.0, 1.0));
 }
@@ -448,14 +453,18 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
       uSoftInner: { value: 0.18 },
       uSoftOuter: { value: 0.5 },
       uLensing: { value: params.lensing },
-      /* ROUND 56c — the REAL background cubemap */
+      /* ROUND 56c — the REAL background cubemap (sky layers only, layer 1) */
       uBgCube: { value: null as THREE.Texture | null },
     },
   });
 
   /* quad frames the disk (14.5 u ≈ 18 rs at the default mass) plus the
      lensed wrap and the bent background */
-  const quadSize = rs * 60;
+  /* ROUND 58 — the quad covers the STRONG field only: shadow + disk + the
+     near-hole wrapped rays (b ≤ disk outer + margin subtends ≤ ~44° at the
+     closest focus). The gradual far field lives in the sky layers' own lens
+     (R58) — no giant quad, no capture mismatch, no square. */
+  const quadSize = rs * 64;
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(quadSize, quadSize), material);
   quad.renderOrder = 12;
   quad.frustumCulled = false;
@@ -476,8 +485,9 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
     material.uniforms.uDoppler.value = p.doppler;
     material.uniforms.uRotSpeed.value = p.rotSpeed;
     material.uniforms.uLensing.value = p.lensing;
-    quad.scale.setScalar(Math.max(1, 34 / (60 * shaderRs)));
-  };
+    /* ROUND 57 — the quad spans the whole gradual bend at every mass (the
+       disk is always deep inside it), so no rescale is needed anymore */
+    };
   const onParams = (e: Event) => applyParams((e as CustomEvent<BlackHoleParams>).detail);
   window.addEventListener(BLACKHOLE_CHANGE_EVENT, onParams);
   applyParams(params);
