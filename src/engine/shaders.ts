@@ -661,6 +661,7 @@ attribute float aSize; attribute vec3 aColor; attribute float aAlpha;
 uniform float uScale; uniform float uTime; uniform float uTwinkle;
 uniform vec3 uVortexC; uniform float uVortexR; uniform float uVortexS; uniform float uVortexT;
 uniform float uVortexPull; uniform float uVortexRev;
+uniform float uSpiralMix;
 varying vec3 vColor; varying float vAlpha; varying float vSize;
 void main(){
   vColor = aColor;
@@ -679,7 +680,7 @@ void main(){
       vec3 axis = normalize(vec3(0.18, 1.0, 0.12));
       vec3 dir = vp - uVortexC;
       float rev = uVortexRev < 0.0 ? -1.0 : 1.0;
-      float a = infl * (5.0 + uVortexT * 3.5) * rev;
+      float a = infl * (5.0 + uVortexT * 3.5) * rev * uSpiralMix;
       vec3 spun = dir * cos(a) + cross(axis, dir) * sin(a) * 1.15;
       float pullAmt = clamp(abs(uVortexPull), 0.0, 1.0);
       float radial = infl * (0.5 + pullAmt * 0.5) * (uVortexPull < 0.0 ? -1.45 : 1.0);
@@ -868,6 +869,7 @@ export const backdropFrag = /* glsl */ `
 uniform float uTime;
 uniform float uKamuiErase;
 uniform vec3 uVortexDir;
+uniform float uBreachCrack;
 varying vec3 vDir;
 ${NOISE}
 
@@ -1015,6 +1017,18 @@ void main(){
     col += specCol * b * 0.85;
   }
   
+  /* THE BREACH — hairline reality fractures across the deep sky */
+  if (uBreachCrack > 0.001) {
+    vec3 crackCoord = d * 9.0 + vec3(uTime * 0.04, -uTime * 0.03, uTime * 0.035);
+    float ridge = abs(snoise(crackCoord));
+    float ridge2 = abs(snoise(crackCoord * 2.8 + vec3(3.9)));
+    float crackCore = smoothstep(0.045 * uBreachCrack + 0.005, 0.0, ridge);
+    float crackEdge = smoothstep(0.14 * uBreachCrack + 0.01, 0.0, ridge);
+    float subCrack = smoothstep(0.035 * uBreachCrack + 0.005, 0.0, ridge2) * 0.55;
+    float crackMask = smoothstep(1.0 - uBreachCrack * 1.1, 1.0 - uBreachCrack * 0.6, fbm3(d * 2.6));
+    vec3 crackCol = mix(vec3(1.0, 0.4, 0.8), vec3(1.0, 0.92, 0.75), 0.5 + 0.5 * sin(uTime * 6.0 + crackCoord.y * 5.0));
+    col += crackCol * (crackCore * 2.8 + crackEdge * 0.8 + subCrack * 0.7) * crackMask * (0.45 + uBreachCrack);
+  }
   float alpha = edgeAlpha * (1.0 - smoothstep(0.88, 0.998, k));
   gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
 }
@@ -1358,6 +1372,7 @@ uniform vec3 uColorA;
 uniform vec3 uColorB;
 uniform float uKamuiErase;
 uniform vec3 uVortexDir;
+uniform float uBreachCrack;
 varying vec3 vN;
 varying vec3 vW;
 varying vec3 vP;
@@ -1425,6 +1440,21 @@ void main(){
   }
   
   float alpha = rim * 0.28 + grid * 0.16 + aurora * 0.07;
-  gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.55));
+
+  /* THE BREACH — the membrane resisting: hairline light fractures crawl
+     across the hypersphere as the Tier II warp fights the barrier */
+  if (uBreachCrack > 0.001) {
+    vec3 crackCoord = q * 6.5 + vec3(uTime * 0.05, -uTime * 0.04, uTime * 0.045);
+    float ridge = abs(snoise(crackCoord));
+    float ridge2 = abs(snoise(crackCoord * 2.6 + vec3(4.2)));
+    float crackCore = smoothstep(0.05 * uBreachCrack + 0.006, 0.0, ridge);
+    float crackEdge = smoothstep(0.16 * uBreachCrack + 0.01, 0.0, ridge);
+    float subCrack = smoothstep(0.04 * uBreachCrack + 0.006, 0.0, ridge2) * 0.6;
+    float crackMask = smoothstep(1.0 - uBreachCrack * 1.2, 1.0 - uBreachCrack * 0.7, fbm3(q * 2.2));
+    vec3 crackCol = mix(vec3(1.0, 0.35, 0.75), vec3(1.0, 0.9, 0.7), 0.5 + 0.5 * sin(uTime * 5.0 + crackCoord.y * 4.0));
+    col += crackCol * (crackCore * 3.2 + crackEdge * 0.9 + subCrack * 0.8) * crackMask * (0.5 + uBreachCrack);
+    alpha = min(0.95, alpha + crackMask * (crackCore * 0.6 + crackEdge * 0.25) * uBreachCrack);
+  }
+  gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.95));
 }
 `;

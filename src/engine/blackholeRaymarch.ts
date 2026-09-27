@@ -8,22 +8,20 @@ import { BLACKHOLE_CHANGE_EVENT, getBlackHoleParams, type BlackHoleParams } from
  * (blackhole.ts: baked disk textures, painted photon ring, fake lensed
  * halos, the spacetime funnel) is deleted; this module is the whole hole.
  * It is the corrected port of https://github.com/dgreenheck/webgpu-black-hole
- * (Copyright (c) 2025 Daniel Greenheck, MIT License) — and Round 56 goes
- * beyond his demo: the bending acts on YOUR real universe.
+ * (Copyright (c) 2025 Daniel Greenheck, MIT License).
  *
- *   • ROUND 56c — THE BACKGROUND IS OURS, BY DIRECTION: escaped rays look the
- *     sky up in a CUBEMAP of the real captured scene (the engine renders the
- *     universe — holes hidden, R52 lens zeroed — into a 512² cube from the
- *     camera every 6th frame) using the FINAL BENT ray direction. A direction
- *     lookup has no screen-position dependence: the bending works at ANY
- *     distance, and rays wrapping the hole sample the opposite sky — the
- *     multiple-image Einstein ring emerges naturally. At the quad's edge the
- *     deflection is ~0, so the cube lookup meets the undisplaced sky
- *     pixel-for-pixel — seamless, near or far.
+ *   • ROUND 59 — NO CAPTURES, NO LAYERS: every previous attempt to bend the
+ *     background *around* this quad (screen buffers, cubemaps) pasted a
+ *     stale copy of the sky in a visible square over the live sky. The
+ *     final architecture: this quad renders ONLY the hole itself — shadow,
+ *     disk, and the marched light — and every escaped ray exits
+ *     TRANSPARENT. The live sky shows through, bent by its OWN lens (the
+ *     surface manager's 1/θ law in surfaceShaders, scaled to be exactly
+ *     continuous with this march's integrated deflection: both = 2·L·rs/b).
+ *     One bending law, one renderer of the sky — no boundary can exist.
  *   • THE EARLY-OUT: bending only pulls rays inward, so a ray with b beyond
- *     the disk outer edge (+ margin) can never cross the disk — it skips the
- *     march entirely and stays transparent (the real scene shows; the
- *     deflection there is ~0 anyway).
+ *     the disk outer edge (+ margin) can never cross the disk — it skips
+ *     the march entirely and stays transparent.
  *   • NO GLOW SPRITE: the R20 sprite fatted the halo into a blob and washed
  *     the arch out. The reference's blaze comes from bloom — the engine now
  *     damps the project bloom toward his 0.68 while a hole is on stage.
@@ -41,8 +39,8 @@ export interface BlackHoleVisual {
   update(time: number, camQuat?: THREE.Quaternion, portal?: number): void;
   /** show/hide the geodesic renderer (fallback paths) */
   setGeodesic(on: boolean): void;
-  /** point the escaped-ray sampler at the engine's captured sky cubemap */
-  setBgCube(tex: THREE.Texture | null): void;
+  /** R56c — hand the captured background cubemap to the marcher (null hides) */
+  setBgCube?(tex: THREE.Texture | null): void;
   dispose(): void;
 }
 
@@ -92,13 +90,6 @@ uniform float uSoftInner;    /* 0.18 */
 uniform float uSoftOuter;    /* 0.5 */
 uniform float uLensing;      /* his gravitationalLensing — bend per unit path
                                 = uRs × uLensing, step-size independent */
-
-/* ---- ROUND 56c — the REAL background, by DIRECTION: the engine captures
-   the scene into a cubemap (holes hidden, R52 lens zeroed) from the camera;
-   escaped rays look the sky up with the FINAL BENT direction. A direction
-   lookup has no screen-position dependence — the bending works at ANY
-   distance, and rays wrapping the hole sample the opposite sky. ---- */
-uniform samplerCube uBgCube;
 
 /* ROUND 56b — step 0.38 (was 0.3): the bend-per-unit-path is step-size
    independent (his invariant), so the trajectory is preserved while the
@@ -197,8 +188,6 @@ void main() {
      output stage). No hard cutoff, no layers — a gradual 1/b ramp exactly
      like the real thing. */
   float b = length(cross(p, v));
-  vec3 p0 = p;
-  vec3 v0 = v;
 
   vec3 color = vec3(0.0);
   float alpha = 0.0;
@@ -277,21 +266,13 @@ void main() {
   }
 
   /* OUTPUT: his gamma step applies to the DISK light only (his LUT colors
-     are display-referred). Escaped rays that passed INSIDE the march gate
-     (the wrapped/multiple-image rays near the hole) sample the sky-only
-     cubemap along their final bent direction. Escaped rays BEYOND the gate
-     exit TRANSPARENT — the live sky shows through, already bent by its own
-     lens (surfaceShaders), whose law is mathematically identical to the
-     march's integrated deflection (both = 2·L·rs/b) — so the handoff at the
-     gate is seamless and the far field never enters any capture. Captured
-     rays stay fully opaque. */
+     are display-referred). Escaped rays exit TRANSPARENT — the live sky
+     shows through, already bent by its own lens (the sky layers' 1/θ law in
+     surfaceShaders, exactly continuous with the march's integrated
+     deflection: both = 2·L·rs/b). Captured rays stay fully opaque black:
+     the shadow. The disk's light in front of the shadow survives. */
   color *= uIntensity;
   color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
-  if (!captured && b <= uDiskOuter + 2.5) {
-    float wa = 1.0 - alpha;
-    color += textureCube(uBgCube, v).rgb * wa;
-    alpha += wa;
-  }
   gl_FragColor = vec4(color, captured ? 1.0 : clamp(alpha, 0.0, 1.0));
 }
 `;
@@ -453,8 +434,6 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
       uSoftInner: { value: 0.18 },
       uSoftOuter: { value: 0.5 },
       uLensing: { value: params.lensing },
-      /* ROUND 56c — the REAL background cubemap (sky layers only, layer 1) */
-      uBgCube: { value: null as THREE.Texture | null },
     },
   });
 
@@ -508,9 +487,6 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
       geodesicOn = on;
       visual.geodesic = on;
       quad.visible = on;
-    },
-    setBgCube(tex: THREE.Texture | null) {
-      material.uniforms.uBgCube.value = tex;
     },
     dispose() {
       window.removeEventListener(BLACKHOLE_CHANGE_EVENT, onParams);

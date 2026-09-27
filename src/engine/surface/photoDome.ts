@@ -194,13 +194,6 @@ export class PhotoDome {
     this.group = group;
   }
 
-  /* ROUND 58 — the photo sky rides render layer 1 with the rest of the sky
-     (the geodesic cubemap captures layer 1 only), so its stars bend with the
-     procedural cosmos while foreground bodies stay untouched */
-  get object(): THREE.Object3D | null {
-    return this.group;
-  }
-
   /** Which reality's sky is active. Changing reality triggers the crossfade. */
   setReality(realityId: string | null): void {
     if (this.realityId === realityId) return;

@@ -1,45 +1,51 @@
 /**
- * KAMUI — Dimensional Traversal Engine · the director
+ * KAMUI — Dimensional Traversal Engine · the director (v2)
  *
  * One owner for the whole teleportation sequence. A Kamui is the bridge
  * between two places that either lie an impossible distance apart or are
  * fully isolated from each other (no scroll, no flight — only the jutsu
- * connects them). The grammar (see docs/KAMUI-RESEARCH.md):
+ * connects them). The grammar (docs/KAMUI-RESEARCH.md):
  *
- *   ARM → PULL → VORTEX → COLLAPSE → THROAT → EJECT → SETTLE
+ *   ignition → onsetPull → angularCapture → horizonClose
+ *     → [breach — Tier II only] → threshold → emergence → resolution
  *
- * - PULL/VORTEX: a highly compressed gravitational field activates at the
- *   source and attracts everything nearby — the reality surface bends
- *   around it (frame dragging), point clouds are swept in nearest-first
- *   (tidal spaghettification), and bodies inside the field region are
- *   drawn toward the center with a tidal shear.
- * - COLLAPSE/THROAT: the swirl compresses to a singularity and the aperture
- *   opens — a Morris–Thorne throat, which physically REQUIRES exotic energy
- *   (null-energy-condition violation), so it wears the signature ramp:
- *   violet → magenta → orange → gold → white-hot.
- * - EJECT: a white hole — the time-reversal of the entrance — expels the
- *   traveler at the destination while it resolves behind the burst.
+ * - onsetPull: a highly compressed gravitational field activates at the
+ *   source and attracts everything nearby RADIALLY — no spiral yet, because
+ *   real infalling matter bends only as angular momentum takes over.
+ * - angularCapture: the spiral visibly forms (accretion-disk formation);
+ *   `spiralMix` 0→1 drives every swirl term in the engine.
+ * - horizonClose → threshold: the tear collapses to the exotic throat and
+ *   the traveler crosses (the stage swap hides at mid-threshold).
+ * - breach (Tier II only): the vortex stalls against the membrane between
+ *   isolated realities — cracks, stutter, desaturation, one failed attempt —
+ *   then tears through. `breachK`, `crackK`, `glitchK`, `desatK` drive it.
+ * - emergence: a white hole — the time-reversal of the entrance — expels
+ *   the traveler at the destination while it resolves behind the burst.
  *
  * The director is deliberately three.js-light on policy: it owns the phase
- * machine, the driven VALUES (erase, field strength, envelopes), the
- * camera-riding tunnel and the throat quad. The engine applies the values
- * to its materials and keeps all stage/focus/overlay state.
+ * machine, the driven VALUES, the camera-riding tunnel and the throat quad.
+ * The engine applies the values to its materials and keeps all stage/focus/
+ * overlay/energy state.
  */
 import * as THREE from 'three';
 import {
   KAMUI_PHASE_WEIGHTS, KAMUI_RAMP,
-  kamuiBeatDurations, type KamuiPhase, type KamuiProfile,
+  kamuiBeatDurations, kamuiPhaseSequence,
+  type KamuiPhase, type KamuiProfile, type KamuiTier,
 } from './kamuiPhases';
 
 /** Reverse traversal — the jutsu replays backward: re-form → eject → settle. */
 const REVERSE_QUEUE: { phase: KamuiPhase; duration: number }[] = [
-  { phase: 'vortex', duration: 0.55 },
-  { phase: 'eject', duration: 0.7 },
-  { phase: 'settle', duration: 0.45 },
+  { phase: 'angularCapture', duration: 0.55 },
+  { phase: 'emergence', duration: 0.7 },
+  { phase: 'resolution', duration: 0.45 },
 ];
 
 export interface KamuiFireSpec {
   profile: KamuiProfile;
+  /** Tier I = continuum warp (same spacetime) · Tier II = breach warp. Tier
+      II inserts the breach stall and pays the greater cost. */
+  tier?: KamuiTier;
   /** world-space point the tear opens at (the engine may keep updating this
       for moving targets — the director reads it live each frame) */
   source: THREE.Vector3;
@@ -50,7 +56,9 @@ export interface KamuiFireSpec {
   toDial?: number;
   /** world radius of the target body / galaxy (sizes the field + throat) */
   targetRadius?: number;
-  /** called once at mid-throat — the hidden stage/reality swap */
+  /** hierarchy level factor — planet-scale 1 · galaxy-scale 8 · stage 16 */
+  levelFactor?: number;
+  /** called once at mid-threshold — the hidden stage/reality swap */
   onSwap?: () => void;
   /** called once as the white-hole eject peaks — the destination reveal */
   onArrive?: () => void;
@@ -72,19 +80,24 @@ const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
 /** Surface-tear target per phase (the damped value that becomes uKamuiErase). */
 const ERASE_TARGET: Record<KamuiPhase, number> = {
-  idle: 0, arm: 0.12, pull: 0.55, vortex: 0.95, collapse: 1, throat: 1, eject: 0.4, settle: 0,
+  idle: 0, ignition: 0.1, onsetPull: 0.45, angularCapture: 0.85, horizonClose: 1,
+  breach: 0.85, /* the stall — the tear holds, refusing to close */
+  threshold: 1, emergence: 0.4, resolution: 0,
 };
 /** Body-field target per phase (planet deformation + attraction strength). */
 const FIELD_TARGET: Record<KamuiPhase, number> = {
-  idle: 0, arm: 0.25, pull: 0.7, vortex: 1, collapse: 1, throat: 0.65, eject: 0.3, settle: 0,
+  idle: 0, ignition: 0.25, onsetPull: 0.6, angularCapture: 1, horizonClose: 1,
+  breach: 0.7, threshold: 0.6, emergence: 0.3, resolution: 0,
 };
 const FIELD_TARGET_REVERSE: Record<KamuiPhase, number> = {
-  idle: 0, arm: 0, pull: 0, vortex: 0.92, collapse: 0, throat: 0, eject: 0.2, settle: 0,
+  idle: 0, ignition: 0, onsetPull: 0, angularCapture: 0.92, horizonClose: 0,
+  breach: 0, threshold: 0, emergence: 0.2, resolution: 0,
 };
 
 export class KamuiDirector {
   phase: KamuiPhase = 'idle';
   profile: KamuiProfile = 'portal';
+  tier: KamuiTier = 1;
 
   /* ---- driven values — the engine reads these every frame ---- */
   /** 0..1 surface tear — drives uKamuiErase on the backdrop, sky, photo dome
@@ -95,12 +108,24 @@ export class KamuiDirector {
   /** 0..1 body-field strength — planet deformation + attraction of nearby
       bodies (additive, visual-only) */
   fieldStrength = 0;
+  /** 0 = pure radial pull (onsetPull) · 1 = full spiral (angularCapture+) —
+      conservation of angular momentum: the spiral FORMS, it isn't there
+      from frame one */
+  spiralMix = 0;
   /** +1 = suction (forward), −1 = reverse traversal (expulsion) */
   reverse = 1;
   /** 0..1 throat-aperture progress (the quad + the ramp mix) */
   throatK = 0;
-  /** 0 = the reality's own palette · 1 = the signature ramp (throat/eject) */
+  /** 0 = the reality's own palette · 1 = the signature ramp (threshold) */
   rampMix = 0;
+  /** BREACH (Tier II): 0..1 stall progress */
+  breachK = 0;
+  /** BREACH: 0..1 hairline light fractures */
+  crackK = 0;
+  /** BREACH: stepped stutter envelope (3–4 sharp dips) */
+  glitchK = 0;
+  /** BREACH: 0..0.6 brief desaturation */
+  desatK = 0;
   /** live source point (the engine may re-copy a moving target's position) */
   readonly source = new THREE.Vector3();
   /** the direction spacetime drags around (camera sightline through the tear) */
@@ -126,6 +151,9 @@ export class KamuiDirector {
   private swapFired = false;
   private arriveFired = false;
   private clockT = 0;
+  private reduced = false;
+  /** a rejection pulse is playing (invalid/unaffordable target) */
+  private rejecting = false;
   private disposed = false;
 
   /* ---- stage objects ---- */
@@ -136,6 +164,13 @@ export class KamuiDirector {
 
   get active(): boolean {
     return this.phase !== 'idle';
+  }
+
+  /** True while the traversal is still before its point of no return — the
+      only window where a cancel is honored (and the energy refunded). */
+  get cancelable(): boolean {
+    return this.active
+      && (this.phase === 'ignition' || this.phase === 'onsetPull' || this.phase === 'angularCapture');
   }
 
   /** Build the camera-riding tunnel and the throat quad. Call once. */
@@ -288,6 +323,9 @@ export class KamuiDirector {
     if (this.disposed || this.phase !== 'idle') return false;
     this.spec = spec;
     this.profile = spec.profile;
+    this.tier = spec.tier ?? 1;
+    this.reduced = reducedMotion;
+    this.rejecting = false;
     this.source.copy(spec.source);
     this.reverse = spec.reverse ? -1 : 1;
     this.swapFired = false;
@@ -298,30 +336,39 @@ export class KamuiDirector {
       ? this.fieldRadius
       : spec.profile === 'warp'
         ? 0
-        : Math.max(8, (spec.targetRadius ?? 6) * (spec.profile === 'dive' ? 8 : 3.2));
-    this.queue = spec.reverse
+        : Math.max(8, (spec.targetRadius ?? 6) * (spec.profile === 'dive' ? 8 : 3.2) * (spec.levelFactor ?? 1));
+    const durations = kamuiBeatDurations(spec.profile, reducedMotion, this.tier);
+    const sequence = spec.reverse
       ? REVERSE_QUEUE.map((b) => ({ ...b }))
-      : this.buildQueue(spec.profile, reducedMotion);
+      : kamuiPhaseSequence(this.tier).map((phase, i) => ({ phase, duration: durations[i] }));
+    this.queue = sequence;
     this.total = this.queue.reduce((a, b) => a + b.duration, 0);
-    this.phase = this.queue[0]?.phase ?? 'settle';
+    this.phase = this.queue[0]?.phase ?? 'resolution';
     return true;
   }
 
-  private buildQueue(profile: KamuiProfile, reducedMotion: boolean): { phase: KamuiPhase; duration: number }[] {
-    const durations = kamuiBeatDurations(profile, reducedMotion);
-    const chain: KamuiPhase[] = ['arm', 'pull', 'vortex', 'collapse', 'throat', 'eject', 'settle'];
-    /* kamuiBeatDurations covers the six beats arm→eject; settle rides the
-       last entry's tail — build the queue phase-by-phase */
-    const beatPhases: KamuiPhase[] = ['arm', 'pull', 'vortex', 'collapse', 'throat', 'eject'];
-    const queue = beatPhases.map((phase, i) => ({ phase, duration: durations[i] }));
-    queue.push({ phase: 'settle', duration: durations[durations.length - 1] });
-    return queue;
+  /** THE REJECTION — an invalid or unaffordable target: the ignition ring
+      breathes in and back out (never a silent failure). Cheap, quick, and
+      it does not block the next real Kamui. */
+  reject(source: THREE.Vector3, reducedMotion: boolean): boolean {
+    if (this.disposed || this.phase !== 'idle') return false;
+    this.profile = 'portal';
+    this.tier = 1;
+    this.reduced = reducedMotion;
+    this.rejecting = true;
+    this.source.copy(source);
+    this.reverse = 1;
+    this.beatT = 0;
+    this.elapsed = 0;
+    this.queue = [{ phase: 'ignition', duration: reducedMotion ? 0.3 : 0.55 }];
+    this.total = this.queue[0].duration;
+    this.phase = 'ignition';
+    return true;
   }
 
   /** Abort a running traversal (guards changed, reality switched, …). */
   cancel(): void {
     if (this.phase === 'idle') return;
-    this.spec?.onSwap; /* swap callbacks are fire-once; a cancel skips them */
     this.spec = null;
     this.queue = [];
     this.phase = 'idle';
@@ -330,6 +377,10 @@ export class KamuiDirector {
     this.fieldStrength = 0;
     this.throatK = 0;
     this.rampMix = 0;
+    this.breachK = 0;
+    this.crackK = 0;
+    this.glitchK = 0;
+    this.desatK = 0;
     this.reverse = 1;
     if (this.tunnel) this.tunnel.visible = false;
     if (this.throatQuad) this.throatQuad.visible = false;
@@ -347,23 +398,45 @@ export class KamuiDirector {
       this.fieldStrength = damp(this.fieldStrength, 0, 6, dt);
       this.throatK = damp(this.throatK, 0, 8, dt);
       this.rampMix = damp(this.rampMix, 0, 8, dt);
-      this.updateStageObjects(ctx, 0);
+      this.spiralMix = damp(this.spiralMix, 0, 6, dt);
+      this.breachK = damp(this.breachK, 0, 8, dt);
+      this.crackK = damp(this.crackK, 0, 8, dt);
+      this.glitchK = damp(this.glitchK, 0, 10, dt);
+      this.desatK = damp(this.desatK, 0, 8, dt);
+      this.updateStageObjects(ctx);
       return;
     }
 
     const spec = this.spec;
     const beat = this.queue[0];
+    if (this.rejecting) {
+      /* the bounce-back — a faint ring rises and dies; nothing is pulled */
+      const rp = Math.min(1, this.elapsed / Math.max(0.001, this.total));
+      this.erase = Math.sin(rp * Math.PI) * 0.22;
+      this.throatK = Math.sin(rp * Math.PI) * 0.3;
+      this.fieldStrength = 0;
+      this.spiralMix = 0;
+      this.vortexRadius = 0;
+      if (this.beatT >= beat.duration) {
+        this.rejecting = false;
+        this.phase = 'idle';
+        this.spec = null;
+        this.queue = [];
+      }
+      this.updateStageObjects(ctx);
+      return;
+    }
     this.beatT += dt;
     this.elapsed += dt;
     const p = Math.min(1, this.beatT / beat.duration);
     const overall = Math.min(1, this.elapsed / Math.max(0.001, this.total));
 
     /* fire-once hooks */
-    if (beat.phase === 'throat' && !this.swapFired && p >= 0.5) {
+    if (beat.phase === 'threshold' && !this.swapFired && p >= 0.5) {
       this.swapFired = true;
       spec?.onSwap?.();
     }
-    if (beat.phase === 'eject' && !this.arriveFired && p >= 0.05) {
+    if (beat.phase === 'emergence' && !this.arriveFired && p >= 0.05) {
       this.arriveFired = true;
       spec?.onArrive?.();
     }
@@ -390,14 +463,47 @@ export class KamuiDirector {
     const fieldTargets = this.reverse < 0 ? FIELD_TARGET_REVERSE : FIELD_TARGET;
     this.fieldStrength = damp(this.fieldStrength, fieldTargets[this.phase] ?? 0, 6, dt);
     this.warpFx = Math.sin(Math.min(overall, 0.95) / 0.95 * Math.PI);
-    this.throatK = this.phase === 'collapse'
-      ? Math.max(this.throatK, this.beatT / Math.max(0.001, this.queue[0].duration))
-      : this.phase === 'throat'
+
+    /* conservation of angular momentum — the spiral FORMS during
+       angularCapture, it is never there from frame one */
+    const spiralTarget = this.phase === 'ignition' || this.phase === 'onsetPull' ? 0
+      : this.phase === 'angularCapture' ? Math.max(0.15, this.beatT / Math.max(0.001, beat.duration))
+      : 1;
+    this.spiralMix = damp(this.spiralMix, spiralTarget, 5, dt);
+
+    this.throatK = this.phase === 'horizonClose'
+      ? Math.max(this.throatK, this.beatT / Math.max(0.001, beat.duration))
+      : this.phase === 'threshold'
         ? 1
-        : this.phase === 'eject'
-          ? Math.max(0, 1 - this.beatT / Math.max(0.001, this.queue[0].duration))
+        : this.phase === 'emergence'
+          ? Math.max(0, 1 - this.beatT / Math.max(0.001, beat.duration))
           : damp(this.throatK, 0, 8, dt);
     this.rampMix = Math.min(1, this.throatK * 1.25);
+
+    /* THE BREACH — the stall against the membrane between realities */
+    if (this.phase === 'breach') {
+      this.breachK = Math.min(1, this.beatT / Math.max(0.001, beat.duration));
+      /* hairline fractures crawl across the view through the first 40% */
+      this.crackK = Math.min(1, this.breachK / 0.4);
+      /* stepped stutter — 3 sharp dips at ~25% / 50% / 75% */
+      const dips = [0.25, 0.5, 0.75];
+      let g = 0;
+      for (const d of dips) {
+        const dist = Math.abs(this.breachK - d);
+        if (dist < 0.06) g = Math.max(g, 1 - dist / 0.06);
+      }
+      this.glitchK = g;
+      /* the failed attempt — one spike-and-drop pulse mid-stall */
+      const pulse = Math.max(0, 1 - Math.abs(this.breachK - 0.55) / 0.1);
+      this.desatK = Math.min(0.6, 0.45 * Math.min(1, this.breachK / 0.3) + 0.3 * pulse);
+      /* the whole frame trembles — a violent stutter layered on the envelope */
+      this.warpFx = Math.min(1, this.warpFx + pulse * 0.5 + this.glitchK * 0.25);
+    } else {
+      this.breachK = damp(this.breachK, 0, 8, dt);
+      this.crackK = damp(this.crackK, this.phase === 'threshold' && this.tier === 2 ? 0.5 : 0, 5, dt);
+      this.glitchK = damp(this.glitchK, 0, 10, dt);
+      this.desatK = damp(this.desatK, 0, 6, dt);
+    }
 
     /* the two live colors — reality palette pulled into the ramp as the
        throat opens (hybrid identity) */
@@ -430,33 +536,40 @@ export class KamuiDirector {
       const to = spec.toDial;
       /* every warp folds through the same deep beat before ejecting */
       const throatDial = Math.max(0.72, Math.min(from, to));
-      if (this.phase === 'arm' || this.phase === 'pull') {
+      if (this.phase === 'ignition' || this.phase === 'onsetPull') {
         ctx.setZoomTarget(THREE.MathUtils.lerp(from, throatDial, easeOutCubic(Math.min(1, overall * 2.2))));
-      } else if (this.phase === 'vortex' || this.phase === 'collapse' || this.phase === 'throat') {
+      } else if (this.phase === 'angularCapture' || this.phase === 'horizonClose' || this.phase === 'breach' || this.phase === 'threshold') {
         ctx.setZoomTarget(THREE.MathUtils.lerp(throatDial, to, easeOutCubic(Math.max(0, (overall - 0.62) / 0.38))));
       } else {
         ctx.setZoomTarget(to);
       }
     }
 
-    this.updateStageObjects(ctx, p);
+    this.updateStageObjects(ctx);
   }
 
   /** tunnel + throat quad — camera-facing, driven by the current beat */
-  private updateStageObjects(ctx: KamuiUpdateCtx, _p: number): void {
+  private updateStageObjects(ctx: KamuiUpdateCtx): void {
     const t = this.clockT;
 
     /* THE THROAT — the tunnel rides the camera through the deepest part */
-    const inThroatWindow = this.phase === 'collapse' || this.phase === 'throat';
+    const inThroatWindow = !this.reduced && (this.phase === 'horizonClose' || this.phase === 'threshold' || this.phase === 'breach');
     if (inThroatWindow && this.tunnel) {
-      const k = this.phase === 'collapse' ? this.beatT / Math.max(0.001, this.queue[0]?.duration ?? 1) * 0.25 : 0.25 + (this.phase === 'throat' ? this.beatT / Math.max(0.001, this.queue[0]?.duration ?? 1) * 0.4 : 0);
+      const beatLen = Math.max(0.001, this.queue[0]?.duration ?? 1);
+      const k = this.phase === 'horizonClose'
+        ? this.beatT / beatLen * 0.25
+        : this.phase === 'breach'
+          ? 0.25 + this.beatT / beatLen * 0.1
+          : 0.35 + this.beatT / beatLen * 0.4;
       this.tunnel.visible = true;
       this.tunnel.position.z = THREE.MathUtils.lerp(-1600000, 1600000, Math.min(0.99, k));
       this.tunnel.rotation.z += ctx.dt * (3.5 + k * 6);
+      /* during the breach the tunnel walls shake — the stutter made visible */
+      const shake = 1 + this.glitchK * 0.35;
       this.tunnelMats.forEach((m) => {
-        m.uniforms.uTime.value = t;
+        m.uniforms.uTime.value = t * shake;
         m.uniforms.uSpin.value = this.tunnel.rotation.z;
-        m.uniforms.uOpacity.value = Math.sin(Math.min(0.99, k) * Math.PI) * 0.9;
+        m.uniforms.uOpacity.value = Math.sin(Math.min(0.99, k) * Math.PI) * (0.9 - this.breachK * 0.35);
         (m.uniforms.uColorA.value as THREE.Color).copy(this.colorA);
         (m.uniforms.uColorB.value as THREE.Color).copy(this.colorB);
       });
@@ -477,7 +590,7 @@ export class KamuiDirector {
         this.throatQuad.scale.set(size * ctx.camera.aspect, size, 1);
         this.throatMat.uniforms.uTime.value = t;
         this.throatMat.uniforms.uProgress.value = this.throatK;
-        this.throatMat.uniforms.uIntensity.value = 0.55 + this.throatK * 1.35;
+        this.throatMat.uniforms.uIntensity.value = 0.55 + this.throatK * 1.35 - this.breachK * 0.2;
         (this.throatMat.uniforms.uColorA.value as THREE.Color).copy(this.colorA);
         (this.throatMat.uniforms.uColorB.value as THREE.Color).copy(this.colorB);
       }
@@ -506,3 +619,4 @@ export class KamuiDirector {
 /* the weights import is part of the public contract — re-exported so the
    engine and the gauntlet share one source of truth */
 export { KAMUI_PHASE_WEIGHTS };
+export type { KamuiProfile } from './kamuiPhases';

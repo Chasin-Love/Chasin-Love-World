@@ -193,14 +193,15 @@ function inv(d: [number, number, number]): [number, number] {
     && !/Math\.abs\(portal\) \* 1\.2/.test(rmSrc);
   check('R20.1: raymarch keeps full glory through portals (no fade)', noPortalFade, `${noPortalFade}`);
 
-  /* ==== ROUND 53 — the reference camera (supersedes the R20.2 constants):
-     focus lands 25.8 rs out, 13.9° BELOW the plane — the geometry that
-     reproduces his demo screenshot's wrapped arcs. ==== */
+  /* ==== ROUND 60 — the user's found composition (supersedes the R53
+     reference camera): focus lands ~31° ABOVE the plane at ~56 rs — the disk
+     reads as a tilted ellipse and the stellar belt sweeps around the hole,
+     the composition the user photographed and approved. ==== */
   const hotIntensity = /opts\.intensity \?\? 1\.35/.test(rmSrc);
-  const cinematicFrame = /geodesicHole/.test(engSrc) && /this\.rig\.tPhi = 1\.814;/.test(engSrc)
-    && /this\.rig\.setZoomTarget\(0\.1934\)/.test(engSrc);
+  const cinematicFrame = /geodesicHole/.test(engSrc) && /this\.rig\.tPhi = 1\.05;/.test(engSrc)
+    && /this\.rig\.setZoomTarget\(0\.25\)/.test(engSrc);
   check('R20.2: default intensity 1.35 (band feeds the bloom threshold)', hotIntensity, `${hotIntensity}`);
-  check('R53: focusing a hole frames the reference camera (25.8 rs, 14° below plane)', cinematicFrame, `${cinematicFrame}`);
+  check('R60: focusing a hole lands the user found composition (56 rs, 31° above plane)', cinematicFrame, `${cinematicFrame}`);
 
   /* ==== ROUND 20.4 — reference restore + live tuning panel ==== */
   /* ROUND 57/58 — the quad spans the strong field only (80·rs: shadow + disk
@@ -318,17 +319,28 @@ function inv(d: [number, number, number]): [number, number] {
      the capture is a 512² CUBEMAP sampled by direction (textureCube). */
   const rtLens = !/starField|nebulaField|uStarDensity/.test(rmSrc)
     && /vec3 v = normalize\(vWorld\.xyz - uCamPos\);/.test(rmSrc)
-    && /textureCube\(uBgCube, v\)/.test(rmSrc)
-    && /uBgCube/.test(rmSrc);
-  check('R56: escaped rays sample the captured REAL sky with the bent ray (no procedural sky)', rtLens, `${rtLens}`);
+    && /captured \? 1\.0 : clamp\(alpha/.test(rmSrc)
+    && !/textureCube/.test(rmSrc);
+  /* R58 — the march's escaped rays exit TRANSPARENT: the live sky shows
+     through, already bent by its own 1/θ lens (exactly continuous with the
+     integrated deflection). Captured rays stay fully opaque: the shadow. */
+  check('R56: escaped rays exit transparent — the live bent sky shows through (no procedural sky)', rtLens, `${rtLens}`);
 
-  /* the engine sweeps the cube ONE 512² FACE PER FRAME (a 6-face burst
-     spiked to ~600 ms), holes hidden, R52 lens zeroed, restored after */
-  const capture = /WebGLCubeRenderTarget/.test(engSrc) && /new THREE\.CubeCamera/.test(engSrc)
-    && /uLensBend\.value = 0;/.test(engSrc)
-    && /this\.renderer\.setRenderTarget\(this\.bgCube, face\);/.test(engSrc)
-    && /for \(const visual of this\.blackHoles\) visual\.group\.visible = false;/.test(engSrc);
-  check('R56c: capture sweep — one 512² face per frame, holes hidden, R52 lens zeroed, restored after', capture, `${capture}`);
+  /* ROUND 59 — NO CAPTURES, NO LAYERS: the sky layers bend themselves (the
+     surface manager's 1/θ law), so no second image of the sky exists
+     anywhere in the pipeline — no square, no layers, at any distance. */
+  const noCapture = !/WebGLCubeRenderTarget|new THREE\.CubeCamera|bgCube|setBgCube|bgScreenRT/.test(engSrc)
+    && !/textureCube|uBgCube|uBgScreen|uProjMatrix/.test(rmSrc);
+  check('R59: no background captures of any kind — no cubemap, no screen buffer, no layers', noCapture, `${noCapture}`);
+
+  /* ROUND 58 — the sky lens law: the gradual 1/θ decay with NO artificial
+     cutoff, scaled by the march's lensing factor (exact continuity with the
+     geodesic quad at its edge). Lives in the surface shaders only. */
+  const ssSrc = readFileSync(new URL('../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
+  const skyLens = ssSrc.includes('uniform float uLensScale;')
+    && !/smoothstep\(m \* 0\.62, m, ang \/ rim\)/.test(ssSrc)
+    && /\) \* uLensScale \* uLensBend;/.test(ssSrc);
+  check('R58: the sky lens law — gradual 1/θ decay, no cutoff, scaled by the march lensing', skyLens, `${skyLens}`);
 
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
      the blaze now comes from the damped project bloom. */

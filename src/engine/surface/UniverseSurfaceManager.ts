@@ -71,34 +71,14 @@ export class UniverseSurfaceManager {
        uploaded photo alike, so every sky agrees around the hole */
     this.photoDome.build(scene, this.lensUniforms);
 
-    /* ROUND 58 — the sky lives on render layer 1: the geodesic black hole's
-       cubemap captures layer 1 ONLY, so its lensed background can never
-       contain foreground bodies (the star, planets and belt stay on layer 0
-       and never bend — their light doesn't pass the hole). */
-    this.setSkyLayer(1);
-
-    /* ROUND 58 — the sky lens scales with the panel's Grav. Lensing, so the
+    /* ROUND 58/59 — the sky lens scales with the panel's Grav. Lensing, so the
        dome's bend is EXACTLY continuous with the geodesic quad's at every
-       setting (both express α = 2·L·rs/b in their own units). */
+       setting (both express α = 2·L·rs/b in their own units). The sky layers
+       bend THEMSELVES, live, in their own shaders — the geodesic quad renders
+       only the hole, and no capture of any kind exists behind it. */
     window.addEventListener(BLACKHOLE_CHANGE_EVENT, (e) => {
       this.lensUniforms.uLensScale.value = (e as CustomEvent<{ lensing: number }>).detail.lensing;
     });
-  }
-
-  /** ROUND 58 — move every sky layer (and nothing else) to a render layer.
-      The geodesic cubemap captures this layer; the main camera sees it plus
-      layer 0, so the visual result is identical — only the capture is
-      filtered. */
-  setSkyLayer(layer: number): void {
-    const apply = (o: THREE.Object3D | null) => {
-      if (!o) return;
-      o.traverse((child) => child.layers.set(layer));
-    };
-    apply(this.skyDomeMesh);
-    apply(this.farStarsPoints);
-    apply(this.gNeighborhood);
-    for (const n of this.skyNebulae) apply(n);
-    apply(this.photoDome.object);
   }
 
   /**
@@ -115,6 +95,7 @@ export class UniverseSurfaceManager {
       uniforms: {
         uTime: { value: 0 },
         uKamuiErase: { value: 0 },
+        uBreachCrack: { value: 0 },
         uVortexDir: { value: new THREE.Vector3(0, 0, -1) },
         uColorA: { value: colA },
         uColorB: { value: colB },

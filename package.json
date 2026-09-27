@@ -10,7 +10,7 @@
     "lint": "tsc --noEmit",
     "audit:arch": "tsx scripts/audit-architecture.ts",
     "smoke": "tsx scripts/smoke.ts",
-    "verify": "npm run typecheck && tsx scripts/round16-gauntlet.ts && tsx scripts/round17-gauntlet.ts && tsx scripts/smoke.ts",
+    "verify": "npm run typecheck && tsx scripts/round16-gauntlet.ts && tsx scripts/round17-gauntlet.ts && tsx scripts/round18-kamui-gauntlet.ts && tsx scripts/smoke.ts",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
     "desktop:check": "cargo check --manifest-path src-tauri/Cargo.toml",
