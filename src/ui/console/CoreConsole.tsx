@@ -27,7 +27,6 @@ interface Props {
   onClose: () => void;
   onWarpReality: (realityId: string) => void;
   onZoomToCore: () => void;
-  onTriggerKamui: () => void;
   onEnterGalaxy: (realityId: string, galaxyId: string) => void;
   onShowToolbar?: () => void;
   /* Round 14 — physics laws (spacetime lensing + living gravity) */
@@ -775,7 +774,6 @@ export const CoreConsole: React.FC<Props> = ({
   onClose,
   onWarpReality,
   onZoomToCore,
-  onTriggerKamui,
   onEnterGalaxy,
   onShowToolbar,
   lensOn,
@@ -1221,7 +1219,6 @@ export const CoreConsole: React.FC<Props> = ({
               </motion.div>
 
               {/* QUICK PODS — 4-col, lands directly under the radar.
-                  Camera + Kamui pods dismiss the deck FIRST — their 3D effects
                   play on the universe and must not fire behind the glass. */}
               <motion.div variants={rise} className="lg:col-span-4 cc-panel p-4">
                 <span className="cc-panel-title block mb-2">Singularity Quick Pods</span>
@@ -1235,16 +1232,6 @@ export const CoreConsole: React.FC<Props> = ({
                     position="bottom"
                     size="sm"
                     id="pod-frame-core"
-                  />
-                  <ThinkingCloudTooltip
-                    onClick={() => { onClose(); onTriggerKamui(); }}
-                    icon={<Zap className="w-4 h-4" />}
-                    label="Kamui Warp"
-                    subtitle="Bend space, release — the signature warp"
-                    hint="Warp"
-                    position="bottom"
-                    size="sm"
-                    id="pod-kamui-warp"
                   />
                   {onShowToolbar && (
                     <ThinkingCloudTooltip

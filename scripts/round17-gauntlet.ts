@@ -311,19 +311,21 @@ function inv(d: [number, number, number]): [number, number] {
 
   /* ROUND 56 — THE BACKGROUND IS OURS: his procedural sky is gone; escaped
      rays sample the engine's captured real scene through the camera with
-     the FINAL BENT direction — the actual nebula and stars bend. */
+     the FINAL BENT direction — the actual nebula and stars bend. R56c —
+     the capture is a 512² CUBEMAP sampled by direction (textureCube). */
   const rtLens = !/starField|nebulaField|uStarDensity/.test(rmSrc)
-    && /uProjMatrix \* uViewMatrix \* vec4\(uCamPos \+ v \* 1000\.0, 1\.0\)/.test(rmSrc)
-    && /texture2D\(uBgTexture, bgUv\)/.test(rmSrc)
-    && /uBgActive/.test(rmSrc);
+    && /vec3 v = normalize\(vWorld\.xyz - uCamPos\);/.test(rmSrc)
+    && /textureCube\(uBgCube, v\)/.test(rmSrc)
+    && /uBgCube/.test(rmSrc);
   check('R56: escaped rays sample the captured REAL scene with the bent ray (no procedural sky)', rtLens, `${rtLens}`);
 
-  /* the engine captures it half-res, holes hidden, R52 lens zeroed */
-  const capture = /WebGLRenderTarget/.test(engSrc) && /getDrawingBufferSize/.test(engSrc)
+  /* the engine captures it as a cube map every ~6th frame, holes hidden,
+     R52 lens zeroed, restored after */
+  const capture = /WebGLCubeRenderTarget/.test(engSrc) && /new THREE\.CubeCamera/.test(engSrc)
     && /uLensBend\.value = 0;/.test(engSrc)
-    && /this\.renderer\.setRenderTarget\(this\.bgRT\);/.test(engSrc)
+    && /this\.cubeCam\.update\(this\.renderer, this\.scene\);/.test(engSrc)
     && /for \(const visual of this\.blackHoles\) visual\.group\.visible = false;/.test(engSrc);
-  check('R56: capture pass — half-res RT, holes hidden, R52 lens zeroed, restored after', capture, `${capture}`);
+  check('R56: capture pass — 512² cubemap, holes hidden, R52 lens zeroed, restored after', capture, `${capture}`);
 
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
      the blaze now comes from the damped project bloom. */
@@ -343,12 +345,13 @@ function inv(d: [number, number, number]): [number, number] {
     && /private setAllGeodesic\(on: boolean\): void \{/.test(engSrc);
   check('R55: setGeodesic hides the hole itself (one renderer, one switch)', hidden, `${hidden}`);
 
-  /* the portal tear's singularity is the geodesic renderer too, driven by
-     the late-tick pass like every other hole and popped on clear */
-  const portal = /geodesic: override !== 'off' && capable/.test(engSrc)
-    && /this\.blackHoles\.push\(visual\);/.test(engSrc)
-    && /this\.blackHoles\.splice\(i, 1\);/.test(engSrc);
-  check('R55: the portal tear singularity is the geodesic renderer, driven like every hole', portal, `${portal}`);
+  /* the portal is a plain camera zoom — the camera dives in toward the world
+     and the overlay opens on arrival; the old tear singularity machinery is
+     gone entirely */
+  const portal = /phase: 'entering', t: 0, fired: false,/.test(engSrc)
+    && /this\.cb\.onPortalPeak\(this\.portal\.kind, this\.portal\.bodyId\);/.test(engSrc)
+    && !/portalSingularity/.test(engSrc);
+  check('R55: the portal is a plain zoom (no tear singularity machinery)', portal, `${portal}`);
 }
 
 /* ================================ verdict ================================ */

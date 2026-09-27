@@ -180,12 +180,10 @@ void main(){
  * 3. Galactic plane and custom nebular ion fields matching the active reality palette.
  * 4. Interstellar dust lanes and relativistic dark matter folds.
  * 5. Multi-tiered star fields.
- * 6. Authentic geometric Kamui Space-Time vacuum vortex for dimension transitions.
+ * 6. Reality-specific palette blending across dimension scales.
  */
 export const universeSurfaceFrag = /* glsl */ `
 uniform float uTime;
-uniform float uKamuiErase;
-uniform vec3 uVortexDir;
 ${LENS_UNIFORMS_GLSL}
 
 // Reality-specific custom surface uniforms
@@ -211,63 +209,9 @@ float starHash(vec3 p){
 }
 
 void main(){
-  float k = clamp(uKamuiErase, 0.0, 1.0);
-  if (k >= 0.998) {
-    discard;
-  }
-  
-  vec3 rawD = normalize(vDir);
-  vec3 d = rawD;
-  float edgeAlpha = 1.0;
-  
-  // =========================================================================
-  // AUTHENTIC KAMUI SPACE-TIME VACUUM VORTEX (REALITY TRANSCENDENCE JUTSU)
-  // =========================================================================
-  if (k > 0.0005) {
-    vec3 vAxis = normalize(uVortexDir);
-    if (length(vAxis) < 0.01) {
-      vAxis = vec3(0.0, 0.0, -1.0);
-    }
-    
-    vec3 upRef = abs(vAxis.y) < 0.92 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-    vec3 tangentX = normalize(cross(vAxis, upRef));
-    vec3 tangentY = cross(tangentX, vAxis);
-    
-    float dotV = clamp(dot(rawD, vAxis), -1.0, 1.0);
-    float alpha = acos(dotV);
-    float r = alpha / 3.14159265;
-    
-    float theta = atan(dot(rawD, tangentY), dot(rawD, tangentX));
-    
-    // Logarithmic Spiral Frame-Dragging Streamlines
-    float vortexTwist = (18.0 * pow(k, 1.25)) / (pow(r, 0.58) + 0.035) + uTime * (5.5 + 4.5 * k);
-    float twistedTheta = theta + vortexTwist;
-    
-    // 3-Blade Spiral Streamline Phase Coordinate
-    float psi = 3.0 * theta + (14.0 * pow(k, 1.2)) / (pow(r, 0.52) + 0.05) - uTime * 7.2;
-    float spiralArmMetric = sin(psi) * 0.35 * k + cos(psi * 2.0 + uTime * 3.0) * 0.12 * k;
-    
-    // Suction Horizon
-    float spiralHorizon = (1.0 - pow(k, 1.12)) * 1.35 + spiralArmMetric * (1.0 - 0.3 * k);
-    spiralHorizon = max(0.0001, spiralHorizon);
-
-    // Coordinate Inward Draw
-    float rNorm = r / max(0.001, spiralHorizon);
-    float rSuction = pow(clamp(rNorm, 0.0002, 1.0), 1.0 + k * 1.5) * (1.0 + sin(psi) * 0.15 * k);
-    rSuction = clamp(rSuction, 0.0002, 1.0);
-    float warpedAlpha = rSuction * 3.14159265;
-
-    vec3 warpedRay = cos(twistedTheta) * sin(warpedAlpha) * tangentX +
-                     sin(twistedTheta) * sin(warpedAlpha) * tangentY +
-                     cos(warpedAlpha) * vAxis;
-    d = normalize(warpedRay);
-
-    float distToHorizon = spiralHorizon - r;
-    edgeAlpha = r > spiralHorizon ? smoothstep(0.12, 0.0, r - spiralHorizon) : smoothstep(-0.07, 0.0, distToHorizon);
-  }
-
+  vec3 d = normalize(vDir);
   /* GRAVITATIONAL LENSING — the masses bend this canvas and nothing else.
-     Applied after the Kamui transcendence warp, before any layer is sampled.
+     Applied before any layer is sampled.
      The black hole is one of these lenses with the strongest ring of all:
      the surface in contact with the hole bends into a circular halo around
      its silhouette, and the rest of the sky holds still. */
@@ -280,7 +224,7 @@ void main(){
      equations rather than painted on. Normal blending makes it a true hole
      in the luminous sky. */
   if (d.x < -0.99 && d.y < -0.99 && d.z < -0.99) {
-    gl_FragColor = vec4(vec3(0.0), edgeAlpha);
+    gl_FragColor = vec4(vec3(0.0), 1.0);
     return;
   }
 
@@ -355,7 +299,7 @@ void main(){
     col += specCol * b * 0.85;
   }
 
-  float alpha = edgeAlpha * (1.0 - smoothstep(0.88, 0.998, k));
+  float alpha = 1.0;
   gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
 }
 `;

@@ -2,8 +2,8 @@
 
 > **Document type:** Full vision-to-code audit + upgrade menu.
 > **Sources:** owner's feature notes ("features of chasin love world", "Chasin Love project in text my version"),
-> full source tree, README.md, ARCHITECTURE.md, AUDIT-2026-09-22.md, KAMUI-RESEARCH.md,
-> KAMUI-VISUAL-STORYBOARD.md, live typecheck (`tsc --noEmit` clean), git history (35 commits,
+> full source tree, README.md, ARCHITECTURE.md, AUDIT-2026-09-22.md,
+> live typecheck (`tsc --noEmit` clean), git history (35 commits,
 > v10.1 → v11.1), and a 2026 competitive-landscape scan.
 > **Status:** Research only — no code changed.
 
@@ -14,7 +14,7 @@
 **Chasin Love World (MY UNIVERSE)** is an offline-first desktop/web app that turns a
 personal life into a living 3D cosmos. Planets are diary entries, black holes are encrypted
 vaults with a btrfs-class copy-on-write filesystem, the multiverse is a real sphere of
-isolated realities orbiting a central Core, and travel between everything is the **Kamui** —
+isolated realities orbiting a central Core, and travel between everything is a continuous camera zoom —
 a gravitational swirl-and-tear traversal effect. It is simultaneously a personal diary
 (Obsidian-class), a password manager (Bitwarden-class crypto), a universal file vault +
 executor (runs HTML/JS/Python/ZIP/ISO in-browser), a real-universe physics simulator
@@ -44,9 +44,9 @@ Legend: ✅ shipped · 🟡 partial · ❌ not yet
 | Vision requirement | Status | Where |
 |---|---|---|
 | Stages: Multiverse → Cosmic Web → Supercluster Complex → Supercluster → Cluster/Group → Galaxy → Galactic Region → Spiral Arm → Star-Forming → Stellar System | ✅ | `hierarchyStages.ts` is the single source of truth (11 stages incl. Reality level), each with a calibrated camera dial |
-| Every stage real & navigable | ✅ | Continuous dial (`dist = 3·800000^zoomT`) + discrete stages bridged only by Kamui warps; stage-crossing flights scripted |
+| Every stage real & navigable | ✅ | Continuous dial (`dist = 3·800000^zoomT`) + discrete stages the dial crosses directly |
 | Galaxies get real stellar systems on entry | ✅ | `generateStellarSystemForGalaxy` builds full `CosmicBody[]` per galaxy (v11 wave 3 fixed this) |
-| Click planet → diary opens | ✅ | 9-phase portal Kamui → DiaryWindow (rich text, mood, weather, tags, voice memos, media plates, 3D flip-book, PDF/MD/HTML/JSON export) |
+| Click planet → diary opens | ✅ | Plain camera zoom-in → DiaryWindow (rich text, mood, weather, tags, voice memos, media plates, 3D flip-book, PDF/MD/HTML/JSON export) |
 | Attach ANY data type to diary entries | ✅ | AttachmentEditor + MediaPlates (image/gif/video/audio/code/docs), 80 MB video guard, >256 KB externalized to OPFS |
 | Click black hole → vault | ✅ | Eventide portal → VaultUI (4,534-line encrypted personal OS) |
 | Vault stores ANY type incl. ISO | ✅ | EFS inode filesystem + ISO 9660 parser (64 MB windowed directory read), ZIP via native DecompressionStream |
@@ -59,25 +59,6 @@ Legend: ✅ shipped · 🟡 partial · ❌ not yet
 | View logs of the system | 🟡 | PhysicsHUD telemetry + daemon ops log exist; no unified "system event log" for the star |
 | Advanced features to beat rivals | ✅ | Temporal scrubbing (time travel!), snapshots, backups, connections web, procedural everything |
 
-### 2.4 THE KAMUI (your #1 priority)
-The storyboard (`KAMUI-VISUAL-STORYBOARD.md`) defines a 7-phase masterpiece:
-**0 activation pulse → 1 reality bends first → 2 whirlpool grips → 3 form loss (spaghettification hero) → 4 feeding vortex → 5 the tear → 6 portal open.**
-
-What the engine actually ships today (4 distinct Kamui systems in `engine.ts`, 6,053 lines):
-| System | Trigger | Implemented phases | Missing vs storyboard |
-|---|---|---|---|
-| **Stage-crossing Kamui** (`beginKamui`) | web ↔ multiverse crossing | TEAR (vortex uniforms on point clouds) → SUCK (+z drift, layer dissolve) → TUNNEL (counter-rotating wobble cylinder riding the camera) → EJECT | Phase 3 form-loss: **no bodies spaghettify** — layers dissolve, they don't stretch/shred |
-| **Galaxy entry tear** (`beginGalaxyEntry` + `buildGalaxyTear`) | click a galaxy disc | Ragged event-horizon rupture, frame-dragged accretion disc, tidal streams, tear strands, **white-hole ejection exit** (source→destination crossover) — visually the most advanced | Deformation of the *clicked galaxy's neighbors* is point-cloud suction only |
-| **Portal Kamui** (9-phase FSM) | dive into planet / vault | arming → disturbance → deformation → vortex → collapse → opening → hold → out, with reverse white-hole replay; planet vertex shader does local bend/suction/shear | Storyboard phase 1 (background bends FIRST) is uniform-based on point clouds; named stars/planets don't visibly deform before the suck |
-| **Kamui pulse** (`triggerKamui`) | Core Console pod / Demon Core click | In-place jutsu pulse TEAR→SUCK→TUNNEL→SETTLE, dial dives and returns exactly home | Known limit (AUDIT §6): from multiverse stage the web-bend isn't drawn (no vortex hook on multiverse backdrop) |
-
-**Kamui verdict:** the skeleton of all 7 storyboard phases exists, but the **hero moment —
-phase 3 "form loss" (stars stretching into luminous TDE streams that wrap the vortex)** —
-is the single biggest gap between your notes and the pixels. The research doc's physics
-anchors (frame-dragging first, trailing log-spiral arms, Rankine vortex, tidal ladder
-bulge→elongate→shred→wrap→vanish, hard ISCO inner edge, Doppler side) are all specified
-and none are fully in-engine yet. Also: colors are currently cyan/violet (`#38bdf8`/`#8b5cf6`)
-where the storyboard's color script calls for purple→magenta→orange→gold→white-hot.
 
 ### 2.5 Isolation guarantee (your "most important rule")
 ✅ Enforced at 4 levels: (1) realities are separate configs/bubbles; (2) v11 moved each
@@ -99,21 +80,18 @@ per-reality by `buildRealityConfig` (guarantees exactly one vault per reality).
 
 ## 4. WHAT THE LAST WAVES ALREADY HEALED (don't re-litigate)
 
-- Wave 1–4 audit (2026-09-22): 8 crash/data-loss fixes, dead code purge, hidden features activated (real Kamui pulse, CosmicWebHUD on **G**, exoplanet plates, sim-clock epoch tile).
+- Wave 1–4 audit (2026-09-22): 8 crash/data-loss fixes, dead code purge, hidden features activated (CosmicWebHUD on **G**, exoplanet plates, sim-clock epoch tile).
 - v11 waves 1–6: creation truth (unique worlds, frozen home roster), per-reality containers, four-spectrum glass console, per-reality disk mirror, v3→v4 migration fixes.
 
 ## 5. HONEST GAP LIST — RANKED UPGRADE MENU
 
 ### Tier A — The owner's stated priorities
-1. **KAMUI Phase-3 "form loss" (HERO):** make stars/planets visibly spaghettify — tidal bulge → elongation → luminous stream → spiral wrap → vanish — using the storyboard ladder. Billboard-deform the clicked body's sprite/mesh + emit stream particles along log-spiral paths. This is the single highest-emotion upgrade in the whole project.
-2. **Kamui color script:** swap cyan/violet tunnel & tear palettes to the storyboard's purple→magenta→orange→gold ramp (small change, massive identity shift toward the eye-motif).
-3. **Multiverse-stage vortex hook:** `triggerKamui` from the multiverse stage currently skips the web-bend; add the missing backdrop vortex uniform so the pulse is complete everywhere.
-4. **Anchor-star god powers:** one-click "spawn planet/dwarf/nebula/hole" from the star itself (in-world, not console), plus a real system event log.
-5. **Galaxy CRUD parity:** full create/delete/rename of galaxies inside a reality from the Core Console (reality CRUD is already complete).
+1. **Anchor-star god powers:** one-click "spawn planet/dwarf/nebula/hole" from the star itself (in-world, not console), plus a real system event log.
+2. **Galaxy CRUD parity:** full create/delete/rename of galaxies inside a reality from the Core Console (reality CRUD is already complete).
 
 ### Tier B — Product strength (beat the rivals)
 6. **Reality isolation showcase:** a "Parallel Lives" comparison view (two realities side by side) — visually proves the multiverse concept and is a marketing wow.
-7. **Onboarding:** the 11-stage ladder + Kamui is unlike anything users have seen; a 60-second guided first-flight (auto-Kamui through all 11 stages) would convert "confused" into "hooked".
+7. **Onboarding:** the 11-stage ladder is unlike anything users have seen; a 60-second guided first-flight (auto-flying the dial through all 11 stages) would convert "confused" into "hooked".
 8. **Search-first retrieval:** the vault/diary has depth but retrieval is browse-based; a command-palette (Ctrl+K) across diary entries, vault files, planets and realities would make the cosmos *usable* at scale.
 9. **WebApp deployment story:** you already bundle+preview HTML apps; "publish to a planet" (host a stored web app as a planet's surface) would fuse the executor and the universe UI — no rival has anything like it.
 
@@ -127,8 +105,8 @@ per-reality by `buildRealityConfig` (guarantees exactly one vault per reality).
 Obsidian / Logseq / Tana / Capacities / Anytype / Joplin / Notion: local-first notes,
 links, blocks, encryption — **all flat 2D documents**. None offer: 3D spatial universe UI,
 11-scale cosmic navigation, gravitational physics telemetry, in-browser ISO mounting,
-per-reality filesystem mirrors, a living black-hole vault, or Kamui-class traversal
-cinematics. Closest genre neighbors are spatial-canvas tools (nothing ships real-universe
+per-reality filesystem mirrors, a living black-hole vault, or true 3D traversal
+ cinematics. Closest genre neighbors are spatial-canvas tools (nothing ships real-universe
 simulation). **Position to own: "the universe as your computer."** The risks to manage are
 the flip side: learning curve (fix via onboarding) and GPU requirements (already mitigated
 by 3 quality tiers).
@@ -157,9 +135,9 @@ by 3 quality tiers).
 
 ### The pathway to keep (evidence-backed)
 - **Keep shipping in audited, named waves** — it is empirically the cadence that produced the cleanest, highest-value commits.
-- **Keep reports in `docs/`** (ARCHITECTURE, AUDIT, KAMUI-*, DEEP-RESEARCH) — they are the project's institutional memory and the reason any AI/agent can resume instantly.
-- **Attack the monoliths only when a feature forces it** (Kamui form-loss work is the natural moment to extract a `KamuiDirector` module from engine.ts).
-- **Next waves stay Tier-A owner-first:** Kamui phase-3 form loss → color script → multiverse vortex hook → anchor-star god powers.
+- **Keep reports in `docs/`** (ARCHITECTURE, AUDIT, DEEP-RESEARCH) — they are the project's institutional memory and the reason any AI/agent can resume instantly.
+- **Attack the monoliths only when a feature forces it.**
+- **Next waves stay Tier-A owner-first:** anchor-star god powers → galaxy CRUD parity.
 
 ---
 *Compiled by Buffy, 2026-09-24. Vision sources: the owner's two notes on the Desktop.

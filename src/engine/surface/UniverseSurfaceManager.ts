@@ -11,7 +11,7 @@ import type { UniverseSurfaceUpdateParams } from './types';
  * UniverseSurfaceManager
  * 
  * Manages the entire visual backdrop of the universe ("Universe Surface"):
- * - Inverted Celestial Sky Sphere with multi-layered cosmic web, nebulae & Kamui vacuum
+ * - Inverted Celestial Sky Sphere with multi-layered cosmic web & nebulae
  * - Deep-space outer star shell (far stars)
  * - Volumetric deep nebular clouds
  * - Near-neighborhood celestial bodies (Sirius, Vega, Proxima, etc.)
@@ -81,8 +81,6 @@ export class UniverseSurfaceManager {
     this.backdropMat = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
-        uKamuiErase: { value: 0 },
-        uVortexDir: { value: new THREE.Vector3(0, 0, -1) },
         uColorA: { value: colA },
         uColorB: { value: colB },
         uDeepColor: { value: deepCol },
@@ -395,21 +393,19 @@ export class UniverseSurfaceManager {
    * Called on every animation frame.
    */
   public update(params: UniverseSurfaceUpdateParams): void {
-    const { clockT, kamuiErase, vortexDir, skyVisible, neighborhoodVisibility } = params;
+    const { clockT, skyVisible, neighborhoodVisibility } = params;
 
     if (this.skyDomeMesh) {
       this.skyDomeMesh.visible = skyVisible;
     }
 
     if (this.backdropMat) {
-      this.backdropMat.uniforms.uKamuiErase.value = kamuiErase * 0.5;
       this.backdropMat.uniforms.uTime.value = clockT;
-      (this.backdropMat.uniforms.uVortexDir.value as THREE.Vector3).copy(vortexDir);
     }
 
-    /* the uploaded photo sky obeys the same sky visibility + Kamui tear as
-       the procedural dome */
-    this.photoDome.update({ clockT, kamuiErase, skyVisible });
+    /* the uploaded photo sky obeys the same sky visibility as the procedural
+       dome */
+    this.photoDome.update({ clockT, skyVisible });
 
     // Neighborhood visibility and smooth opacity fade
     this.gNeighborhood.visible = neighborhoodVisibility > 0.01;

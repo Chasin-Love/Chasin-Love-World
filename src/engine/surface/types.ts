@@ -9,8 +9,6 @@ export interface UniverseSurfaceUpdateParams {
   dt: number;
   clockT: number;
   camera: THREE.Camera;
-  kamuiErase: number;
-  vortexDir: THREE.Vector3;
   skyVisible: boolean;
   neighborhoodVisibility: number;
 }

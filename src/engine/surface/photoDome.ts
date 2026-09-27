@@ -264,16 +264,14 @@ export class PhotoDome {
     u.uDrift.value = this.drift;
   }
 
-  update(params: { clockT: number; kamuiErase: number; skyVisible: boolean }): void {
+  update(params: { clockT: number; skyVisible: boolean }): void {
     if (!this.group || !this.mat) return;
     const hasMap = this.mat.uniforms.uHasMap.value > 0.5;
     this.group.visible = this.visible && params.skyVisible && (hasMap || this.fadeK < 0.999);
     if (!this.group.visible) return;
 
-    /* Kamui tear swallows the sky too — the photo dome obeys the same field */
-    const erase = Math.max(0, 1 - params.kamuiErase * 2.2);
     this.mat.uniforms.uTime.value = params.clockT;
-    this.mat.uniforms.uFade.value = this.fadeK * erase;
+    this.mat.uniforms.uFade.value = this.fadeK;
 
     /* advance the crossfade — full blend in ~1.2s at 60fps. While a previous
        sky is on screen and the new texture is still loading, hold the fade

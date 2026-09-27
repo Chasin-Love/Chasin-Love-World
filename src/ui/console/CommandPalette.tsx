@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Globe, Sun, Orbit, Search, Layers, Database, Cpu, Zap, Crosshair,
-  Compass, Radio, Sparkles, CircleDot, BookOpen, Star,
-} from 'lucide-react';
+import {Globe, Sun, Orbit, Search, Layers, Database, Cpu, Crosshair,
+  Compass, Radio, Sparkles, CircleDot, BookOpen, Star } from 'lucide-react';
 import { REALITIES } from '../../realities';
 import { HIERARCHY_STAGES } from '../../realities/hierarchyStages';
 import { useUniverse } from '../../state';
@@ -25,7 +23,6 @@ export interface PaletteApi {
   onOpenConsole: () => void;
   onZoomStage: (stageIndex: number) => void;
   onFrameCore: () => void;
-  onKamui: () => void;
   onOpenMemory: (entryId: string, planetId: string) => void;
   onConstellate: (bodyIds: string[]) => void;
 }
@@ -191,16 +188,6 @@ export const CommandPalette: React.FC<{ onClose: () => void; api: PaletteApi }> 
         section: 'Powers',
         accent: '#22d3ee',
         run: api.onFrameCore,
-      },
-      {
-        id: 'kamui',
-        label: 'Kamui Warp',
-        hint: 'bend reality in place',
-        keywords: 'kamui warp jutsu swirl teleport',
-        icon: <Zap className="w-3.5 h-3.5" />,
-        section: 'Powers',
-        accent: '#fb7185',
-        run: api.onKamui,
       },
       {
         id: 'survey',

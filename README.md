@@ -82,7 +82,7 @@ npm run desktop:dev / desktop:build   # Tauri desktop shell
 4. [Celestial Bodies & Rendering Mechanics (Deep Specification)](#4-celestial-bodies--rendering-mechanics-deep-specification)
    - [4.1 The Anchor Star (Photosphere, Convection, Flare & Corona)](#41-the-anchor-star-photosphere-convection-flare--corona)
    - [4.2 The Eventide Black Hole (Gargantua Composite Physics)](#42-the-eventide-black-hole-gargantua-composite-physics)
-   - [4.3 Terrestrial Planets (Terrains, Rayleigh Atmospheres & Local Kamui)](#43-terrestrial-planets-terrains-rayleigh-atmospheres--local-kamui)
+   - [4.3 Terrestrial Planets (Terrains & Rayleigh Atmospheres)](#43-terrestrial-planets-terrains--rayleigh-atmospheres)
    - [4.4 Orbital Dynamics & Astrophysics Laws (Kepler & Newton)](#44-orbital-dynamics--astrophysics-laws-kepler--newton)
    - [4.5 The Universe Surface (Cosmic Background Canvas & Presets)](#45-the-universe-surface-cosmic-background-canvas--presets)
 5. [The Living Planetary Digital Diary](#5-the-living-planetary-digital-diary)
@@ -333,7 +333,7 @@ The Eventide Black Hole houses the Universal Vault. Raymarched shaders fail on d
 
 ---
 
-### 4.3 Terrestrial Planets (Terrains, Rayleigh Atmospheres & Local Kamui)
+### 4.3 Terrestrial Planets (Terrains & Rayleigh Atmospheres)
 
 #### Procedural Multi-Octave Terrain Engine (`planetFrag`)
 Planetary shells are generated directly in GLSL via 3D coordinates:
@@ -350,23 +350,6 @@ Planetary shells are generated directly in GLSL via 3D coordinates:
    $$\text{cityMask} = \text{smoothstep}(0.52, 0.78, \text{fbm}(q \cdot 7.5 + 11.0)) \times (1 - \text{iceMask}) \times \text{land} \times (1 - \text{day})$$
 4. **Atmospheric Rayleigh Scattering Shell**:
    An inverted Fresnel rim shell ($1 - |\hat{N} \cdot \hat{V}|^{3.5}$) with solar terminator chromatic shifts.
-
-#### Local Planet Kamui Gravitational Singularity (`planetVert` & `planetFrag`)
-When traveling into a planet or opening its deep diary dimension, the planet's actual vertex geometry undergoes a dimensional suction tear without tearing open the mesh:
-```glsl
-// Local Planet Kamui: sphere surface caves inward and shears around its center
-float bodyRadius = max(length(position), 0.001);
-float angularVelocity = 1.15 / pow(max(radiusNorm, 0.07), 0.55); // Keplerian rotation
-float angle = field * angularVelocity * (0.55 + 0.22 * sin(uGravityTime * 1.7)) * uReverse;
-vec3 surfaceOffset = bentRadial * bodyRadius * 0.16 + bentTangent * bodyRadius * 0.12;
-
-// Inward suction along view vector
-float flow = uTear * uReverse;
-float suction = flow * spot * (0.34 + 0.22 * (0.5 + 0.5 * wave));
-float shear = flow * spot * (0.18 * wave + 0.08 * fracture);
-mv.xyz -= nView * radius * suction;
-mv.xyz += swirlAxis * radius * shear;
-```
 
 ---
 
@@ -410,10 +393,7 @@ The **Universe Surface** (`src/engine/surface/`) is an autonomous subsystem dedi
 To ensure that future reality backdrops can be authored independently without destabilizing the central solar system, the Universe Surface is isolated into its own module:
 - `UniverseSurfaceManager.ts`: Controls the inverted celestial sky dome mesh ($R = 460,000$), deep-sky volumetric nebulae point clouds ($R = 90,000 - 120,000$), the near star shell ($2,600$ stars), bright named stellar neighbors (Sirius, Vega, Proxima, Keid), and the ultra-far star shell ($320,000 - 480,000$).
 - `surfacePresets.ts`: Maps reality IDs (`sol_prime`, `biolume_primordial`, `chronos_paradox`, `singularity_rift`, `hyperion_lumina`, `ignis_ember`, `kardashev_matrix`, `vespera_twilight`) to distinct universe surface presets, controlling sky dome colors, nebula clouds, star temperatures, and cosmic dust density.
-- `surfaceShaders.ts`: Standalone GLSL shaders for the universe dome with procedural dynamic starlight and vortex distortion.
-- **Vortex Immunity Invariants**:
-  - Point sets and objects marked with `userData.immuneToVortex = true` (including the Anchor Star rings, planet orbital belts, and asteroid bands) are **strictly shielded** from vortex suction during planetary Kamui traversal.
-  - Planet Kamui deformation is strictly localized to the planet's atmospheric shell ($r \le 3.2 \cdot R_{\text{planet}}$), ensuring the home universe surface and star field remain rock-solid and stable.
+- `surfaceShaders.ts`: Standalone GLSL shaders for the universe dome with procedural dynamic starlight.
 
 ---
 
@@ -468,7 +448,7 @@ The built-in terminal exposes 21 Unix-like operations:
 
 ## 7. MULTIVERSE HIERARCHY & 10 COSMOLOGICAL SCALES
 
-Navigation in MY UNIVERSE spans 10 continuous logarithmic orders of magnitude, bridged by the **Kamui Traversal Engine**:
+Navigation in MY UNIVERSE spans 10 continuous logarithmic orders of magnitude, crossed with a continuous zoom dial:
 
 ```
 [Scale 1: Multiverse Filament Web] (Redshift z ~ 3.0, cosmic web strands)

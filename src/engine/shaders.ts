@@ -154,107 +154,24 @@ void main(){
 /* ----------------------------- planet ----------------------------- */
 
 export const planetVert = /* glsl */ `
-uniform float uTear; uniform float uTearTime; uniform float uReverse;
-uniform vec3 uGravityCenter; uniform vec3 uGravityLocalCenter;
-uniform float uGravityRadius; uniform float uGravityStrength; uniform float uGravityTime;
-varying vec3 vN; varying vec3 vW; varying vec3 vP; varying float vTear;
-${NOISE}
+varying vec3 vN; varying vec3 vW; varying vec3 vP;
 void main(){
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  vec3 nView = normalize(normalMatrix * normal);
-  vec3 centerView = (modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-  vec3 viewAxis = normalize(-centerView);
-  float front = max(dot(nView, viewAxis), 0.0);
-  float spot = pow(front, 5.0);
-  vec3 swirlAxis = normalize(cross(viewAxis, nView) + vec3(0.0001, 0.0, 0.0));
-
-  /* Embedded spatial core: object-space sphere deformation with radial
-     compression, differential rotation, and multi-scale flow noise. The
-     core center arrives pre-transformed into this mesh's local space
-     (uGravityLocalCenter) — no per-vertex matrix inverse needed. */
-  vec3 coreDelta = position - uGravityLocalCenter;
-  float coreDistance = length(coreDelta);
-  float field = uGravityRadius > 0.0
-    ? pow(max(0.0, 1.0 - coreDistance / uGravityRadius), 1.65) * uGravityStrength
-    : 0.0;
-  /* The portal field radius is intentionally much larger than the body.
-     Normalize the deformation to the actual sphere so the planet remains a
-     visible, continuous surface while its shell bends inward. */
-  float bodyRadius = max(length(position), 0.001);
-  float bodyInfluence = clamp(uGravityStrength, 0.0, 1.0);
-  float radiusNorm = clamp(coreDistance / max(bodyRadius * 2.0, 0.001), 0.001, 1.0);
-  /* Differential (Keplerian-style) rotation: the inner region spins far
-     faster than the rim, so the shell reads as matter shearing around a
-     gravitational structure — never like a texture merely rotating. */
-  float angularVelocity = 1.15 / pow(max(radiusNorm, 0.07), 0.55);
-  float angle = field * angularVelocity * (0.55 + 0.22 * sin(uGravityTime * 1.7 + coreDistance * 0.08)) * uReverse;
-  float cs = cos(angle);
-  vec3 radial = normalize(coreDelta + vec3(0.0001));
-  vec3 tangent = normalize(cross(vec3(0.0, 1.0, 0.0), radial) + vec3(0.0001));
-  float largeFlow = snoise(radial * 3.0 + vec3(uGravityTime * 0.12));
-  float mediumFlow = snoise(radial * 9.0 - vec3(uGravityTime * 0.4));
-  float turbulence = (largeFlow * 0.65 + mediumFlow * 0.35) * field;
-  float localField = field * bodyInfluence;
-  vec3 bentRadial = radial * (1.0 - localField * (0.12 + 0.10 * turbulence));
-  vec3 bentTangent = tangent * (sin(angle) * localField * (0.16 + 0.10 * mediumFlow));
-  vec3 surfaceOffset = bentRadial * bodyRadius * 0.16 + bentTangent * bodyRadius * 0.12;
-  /* Never displace the shell by more than a controlled fraction of its own
-     radius; this prevents the entire planet from vanishing. */
-  float offsetLimit = bodyRadius * 0.24;
-  surfaceOffset = clamp(length(surfaceOffset), 0.0, offsetLimit) * normalize(surfaceOffset + vec3(0.0001));
-  mv.xyz += mat3(viewMatrix * modelMatrix) * surfaceOffset;
-
-  float csFlow = cs - 1.0;
-  mv.xyz += mat3(viewMatrix * modelMatrix) * (radial * bodyRadius * csFlow * localField * 0.08);
-  float around = atan(nView.z, nView.x);
-  float wave = sin(around * 8.0 + uTearTime * 5.4 + front * 18.0);
-  float fracture = pow(max(0.0, 0.5 + 0.5 * sin(around * 13.0 - uTearTime * 4.2 + front * 31.0)), 8.0);
-  float shell = exp(-pow((front - (0.66 + 0.09 * sin(around * 5.0 + uTearTime * 1.7))) / 0.14, 2.0));
-  float radius = length(position);
-
-  /* Local Planet Kamui: the actual sphere surface caves inward and slides
-     around its own center. This is vertex geometry, never a screen overlay.
-     uReverse flips the whole flow for the return traversal — suction becomes
-     expulsion and the swirl unwinds the opposite way. */
-  float flow = uTear * uReverse;
-  float suction = flow * spot * (0.34 + 0.22 * (0.5 + 0.5 * wave));
-  float shear = flow * spot * (0.18 * wave + 0.08 * fracture);
-  float rimKick = flow * shell * fracture * 0.12;
-  mv.xyz -= nView * radius * suction;
-  mv.xyz += swirlAxis * radius * shear;
-  mv.xyz += nView * radius * rimKick;
-
   vN = normalize(mat3(modelMatrix) * normal);
   vW = (modelMatrix * vec4(position, 1.0)).xyz;
   vP = position;
-  vTear = uTear * spot;
-  gl_Position = projectionMatrix * mv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
 export const planetFrag = /* glsl */ `
 uniform vec3 uDeep; uniform vec3 uBase; uniform vec3 uHigh; uniform vec3 uIce;
-uniform vec3 uGravityCenter; uniform float uGravityRadius; uniform float uGravityStrength; uniform float uGravityTime;
 uniform vec3 uSunDir; uniform float uTime; uniform float uSea; uniform float uGhost;
 uniform float uNight; uniform vec3 uSeed; uniform float uFade;
-uniform float uTear; uniform float uTearTime; uniform float uReverse;
-varying vec3 vN; varying vec3 vW; varying vec3 vP; varying float vTear;
+varying vec3 vN; varying vec3 vW; varying vec3 vP;
 ${NOISE}
 void main(){
   vec3 n = normalize(vN);
   vec3 q = normalize(vP) + uSeed;
 
-  /* Planet-centered reality lens. The field is evaluated in world space and
-     only bends the rendered surface; no camera overlay or object transform is
-     involved. */
-  vec3 gravityDelta = vW - uGravityCenter;
-  float gravityDistance = length(gravityDelta);
-  float gravityFalloff = uGravityRadius > 0.0
-    ? pow(max(0.0, 1.0 - gravityDistance / uGravityRadius), 2.4) * uGravityStrength
-    : 0.0;
-  float gravityAngle = gravityFalloff * (1.8 + 2.4 * sin(uGravityTime * 2.0 + gravityDistance * 0.018));
-  float gravitySpin = sin(gravityAngle + gravityDistance * 0.03);
-  float gravityCompression = gravityFalloff * (0.35 + 0.25 * gravitySpin);
-  
   float warp = fbm3(q*2.3);
   float h = fbm(q*2.9 + warp*0.55);
   
@@ -280,44 +197,7 @@ void main(){
   // Gentle ambient boost
   vec3 lit = col * (0.15 + 1.15*day);
 
-  /* Surface-level event horizon and fracture light. The world remains the
-     source image; only the region being swallowed darkens, caves, and tears. */
   vec3 viewDir = normalize(cameraPosition - vW);
-  float visibleFront = max(dot(n, viewDir), 0.0);
-  float surfaceAngle = atan(n.z, n.x);
-  float tearNoise = fbm(q * 6.5 + vec3(uTearTime * 0.08, -uTearTime * 0.05, uTearTime * 0.06));
-  float fracture = pow(max(0.0, 0.5 + 0.5 * sin(surfaceAngle * 13.0 + visibleFront * 28.0 - uTearTime * 4.8 + tearNoise * 4.0)), 12.0);
-  float tearRing = exp(-pow((visibleFront - (0.68 + 0.08 * sin(surfaceAngle * 5.0 + uTearTime * 1.7))) / 0.12, 2.0));
-  float aperture = vTear * smoothstep(0.28, 0.92, visibleFront);
-  /* Darken the swallowed surface without adding a second camera-facing layer.
-     The embedded singularity is revealed through the planet's own shell. */
-  lit *= 1.0 - aperture * 0.82;
-  lit += vec3(1.0, 0.86, 0.58) * fracture * uTear * 0.62;
-  /* dense, high-energy edge glow traces the compressed reality surface */
-  lit += vec3(0.65, 0.82, 1.0) * gravityFalloff * (0.18 + 0.22 * sin(uGravityTime * 5.0 + gravityDistance * 0.04));
-  lit *= 1.0 + gravityCompression * 0.32;
-  lit += mix(vec3(0.9, 0.55, 0.25), vec3(0.42, 0.9, 1.0), 0.5 + 0.5 * sin(uTearTime * 2.0)) * tearRing * uTear * 0.48;
-
-  /* Spiral accretion flow — log-spiral bands wrap the opening and anisotropic
-     noise stretches them into elongated luminous streaks, never clean rings.
-     Color stays inside the body's own palette; uReverse unwinds the spiral
-     for the return traversal. */
-  float rr = 1.0 - visibleFront;
-  float armPhase = surfaceAngle * 3.0 + pow(max(rr, 0.001), 0.62) * 21.0
-    - uReverse * uTearTime * 2.6 + tearNoise * 2.4;
-  float arms = pow(max(0.0, 0.5 + 0.5 * sin(armPhase)), 2.2);
-  float streak = fbm3(vec3(cos(surfaceAngle) * 2.2, sin(surfaceAngle) * 2.2, rr * 9.0 - uReverse * uTearTime * 0.55));
-  arms *= 0.55 + 0.45 * streak;
-  float tearBand = uTear * smoothstep(0.30, 0.55, visibleFront) * (1.0 - smoothstep(0.88, 0.99, visibleFront));
-  vec3 flowCol = mix(vec3(1.0, 0.86, 0.6), col, 0.35);
-  lit += flowCol * arms * tearBand * uTear * 0.85;
-  /* bright compressed accretion rim around the deepening mouth */
-  float accretionRim = exp(-pow((visibleFront - 0.72) / 0.10, 2.0));
-  lit += mix(vec3(1.0, 0.9, 0.7), vec3(0.75, 0.85, 1.0), 0.4 + 0.4 * sin(uTearTime * 2.2))
-    * accretionRim * uTear * (0.35 + 0.5 * arms) * 0.8;
-  /* deep dimensional throat — normal surface information is swallowed */
-  float throat = smoothstep(0.86, 0.995, visibleFront) * uTear;
-  lit *= 1.0 - throat * 0.96;
 
   float spec = pow(max(dot(reflect(-normalize(uSunDir), n), viewDir), 0.0), 42.0);
   lit += vec3(1.0, 0.92, 0.78) * spec * (1.0 - land) * day * 0.55;
@@ -337,8 +217,6 @@ void main(){
 
 export const cloudFrag = /* glsl */ `
 uniform float uTime; uniform vec3 uSunDir; uniform vec3 uSeed; uniform float uCover; uniform float uFade;
-uniform vec3 uGravityCenter; uniform float uGravityRadius; uniform float uGravityStrength; uniform float uGravityTime;
-uniform float uTear;
 varying vec3 vN; varying vec3 vW; varying vec3 vP;
 ${NOISE}
 void main(){
@@ -346,9 +224,6 @@ void main(){
   float c = fbm(q*3.4 + vec3(uTime*0.012, 0.0, uTime*0.008));
   c += 0.35*fbm(q*8.0 - vec3(uTime*0.02));
   float a = smoothstep(0.62 - uCover*0.3, 0.86, c);
-  float front = max(dot(normalize(vN), normalize(cameraPosition - vW)), 0.0);
-  float aperture = uTear * smoothstep(0.28, 0.92, front);
-  if (uTear > 0.22 && aperture > 0.70) discard;
   float sun = dot(normalize(vN), normalize(uSunDir));
   float day = smoothstep(-0.2, 0.4, sun); // softened terminator
   vec3 col = vec3(1.0) * (0.25 + 0.85*day); // gentler ambient
@@ -359,14 +234,11 @@ void main(){
 
 export const atmoFrag = /* glsl */ `
 uniform vec3 uColor; uniform float uStrength; uniform vec3 uSunDir;
-uniform float uTear;
 varying vec3 vN; varying vec3 vW;
 void main(){
   vec3 n = normalize(vN);
   vec3 v = normalize(cameraPosition - vW);
   float ndotv = abs(dot(n, v));
-  float aperture = uTear * smoothstep(0.28, 0.92, max(dot(n, v), 0.0));
-  if (uTear > 0.22 && aperture > 0.66) discard;
   float rim = pow(max(1.0 - ndotv, 0.0), 3.5);
   float sun = dot(n, normalize(uSunDir));
   float day = smoothstep(-0.25, 0.25, sun);
@@ -378,26 +250,10 @@ void main(){
 /* ------------------------------ rings ----------------------------- */
 
 export const ringVert = /* glsl */ `
-uniform vec3 uGravityLocalCenter; uniform float uGravityStrength; uniform float uGravityTime;
-uniform float uOuter; uniform float uReverse;
 varying vec2 vP;
 void main(){
-  vec3 p3 = position;
-  /* Kamui field — the ring is real geometry beside the core: its radii
-     compress and the annulus shears into a spiral, inner edge leading.
-     Evaluated in the ring's own plane, normalized to the ring's span so the
-     inner edge always reacts harder than the trailing outer edge. */
-  vec2 delta = p3.xy - uGravityLocalCenter.xy;
-  float rn = clamp(length(delta) / max(uOuter, 0.001), 0.0, 1.0);
-  float infl = uGravityStrength * pow(1.0 - rn, 1.2);
-  if (infl > 0.001) {
-    float a = uReverse * infl * (3.0 + 5.0 * (1.0 - rn)) * (0.72 + 0.28 * sin(uGravityTime * 1.4 + rn * 9.0));
-    float ca = cos(a), sa = sin(a);
-    vec2 spun = vec2(delta.x * ca - delta.y * sa, delta.x * sa + delta.y * ca);
-    p3.xy = uGravityLocalCenter.xy + spun * (1.0 - infl * 0.26);
-  }
-  vP = p3.xy;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(p3, 1.0);
+  vP = position.xy;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
 export const ringFrag = /* glsl */ `
@@ -659,34 +515,12 @@ void main(){
 export const pointsVert = /* glsl */ `
 attribute float aSize; attribute vec3 aColor; attribute float aAlpha;
 uniform float uScale; uniform float uTime; uniform float uTwinkle;
-uniform vec3 uVortexC; uniform float uVortexR; uniform float uVortexS; uniform float uVortexT;
-uniform float uVortexPull; uniform float uVortexRev;
 varying vec3 vColor; varying float vAlpha; varying float vSize;
 void main(){
   vColor = aColor;
   float tw = uTwinkle > 0.5 ? (0.76 + 0.24 * sin(uTime * 2.6 + position.x * 17.3 + position.y * 11.1 + position.z * 7.7)) : 1.0;
   vAlpha = aAlpha * tw;
-  /* Kamui tear vortex — a consumption wave expands from the tear point:
-     nearest points are bent, spun and pulled into the center first, then the
-     wave reaches farther ones (nearest-first suction). Consumed points dissolve.
-     uVortexRev flips the swirl for the return traversal and a negative
-     uVortexPull ejects matter back outward (white-hole release). */
   vec3 vp = position;
-  if (uVortexS > 0.001) {
-    float d = distance(vp, uVortexC);
-    float infl = uVortexS * smoothstep(uVortexR, uVortexR * 0.1, d);
-    if (infl > 0.001) {
-      vec3 axis = normalize(vec3(0.18, 1.0, 0.12));
-      vec3 dir = vp - uVortexC;
-      float rev = uVortexRev < 0.0 ? -1.0 : 1.0;
-      float a = infl * (5.0 + uVortexT * 3.5) * rev;
-      vec3 spun = dir * cos(a) + cross(axis, dir) * sin(a) * 1.15;
-      float pullAmt = clamp(abs(uVortexPull), 0.0, 1.0);
-      float radial = infl * (0.5 + pullAmt * 0.5) * (uVortexPull < 0.0 ? -1.45 : 1.0);
-      vp = uVortexC + spun * max(0.035, 1.0 - radial);
-      vAlpha *= (1.0 - infl * (0.6 + pullAmt * 0.3));
-    }
-  }
   /* Round 52 — SPACETIME BENDING OF THE BACKGROUND. Every cloud built here is
      part of the sky (stars, dust, gas, distant galaxies), so the masses'
      curvature has to move IT — that is the observable signature of Einstein's
@@ -866,8 +700,6 @@ void main(){
 
 export const backdropFrag = /* glsl */ `
 uniform float uTime;
-uniform float uKamuiErase;
-uniform vec3 uVortexDir;
 varying vec3 vDir;
 ${NOISE}
 
@@ -878,73 +710,8 @@ float starHash(vec3 p){
 }
 
 void main(){
-  float k = clamp(uKamuiErase, 0.0, 1.0);
-  if (k >= 0.998) {
-    discard;
-  }
-  
-  vec3 rawD = normalize(vDir);
-  vec3 d = rawD;
-  float edgeAlpha = 1.0;
-  
-  // =========================================================================
-  // AUTHENTIC KAMUI SPACE-TIME NINJUTSU: PURE GEOMETRIC SPACE BENDING & VACUUM
-  // =========================================================================
-  // No external lightning, no artificial lines, no fake energy fx.
-  // Space itself bends, twists, spirals into a singularity vacuum that sucks
-  // reality in (and uncurls/releases when entering).
-  if (k > 0.0005) {
-    vec3 vAxis = normalize(uVortexDir);
-    if (length(vAxis) < 0.01) {
-      vAxis = vec3(0.0, 0.0, -1.0);
-    }
-    
-    // Dynamic orthonormal coordinate frame aligned directly with camera sightline
-    vec3 upRef = abs(vAxis.y) < 0.92 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-    vec3 tangentX = normalize(cross(vAxis, upRef));
-    vec3 tangentY = cross(tangentX, vAxis);
-    
-    // Angular displacement from the Kamui vortex center [0, PI]
-    float dotV = clamp(dot(rawD, vAxis), -1.0, 1.0);
-    float alpha = acos(dotV);
-    float r = alpha / 3.14159265; // Normalized spherical radius [0, 1]
-    
-    // Azimuthal angle around vortex center [-PI, PI]
-    float theta = atan(dot(rawD, tangentY), dot(rawD, tangentX));
-    
-    // 1. Relativistic Logarithmic Spiral Streamlines & Frame-Dragging Vortex
-    // In polar vortex flow, space flows along logarithmic spirals: theta'(r) = theta + Omega(r, t)
-    float vortexTwist = (18.0 * pow(k, 1.25)) / (pow(r, 0.58) + 0.035) + uTime * (5.5 + 4.5 * k);
-    float twistedTheta = theta + vortexTwist;
-    
-    // 2. 3-Blade Spiral Streamline Phase Coordinate
-    // Points of constant psi define continuous logarithmic spiral arms twisting into the core
-    float psi = 3.0 * theta + (14.0 * pow(k, 1.2)) / (pow(r, 0.52) + 0.05) - uTime * 7.2;
-    float spiralArmMetric = sin(psi) * 0.35 * k + cos(psi * 2.0 + uTime * 3.0) * 0.12 * k;
-    
-    // 3. Authentic Spiral Suction Horizon (True Spiraling Vortex Edge, NOT Concentric Circles)
-    // The reality boundary contracts inward as an authentic multi-armed spiral whirlpool
-    float spiralHorizon = (1.0 - pow(k, 1.12)) * 1.35 + spiralArmMetric * (1.0 - 0.3 * k);
-    spiralHorizon = max(0.0001, spiralHorizon);
+  vec3 d = normalize(vDir);
 
-    // 4. Inward Logarithmic Suction & Space-Time Metric Compression
-    // Coordinates are drawn inward along the logarithmic spiral streamlines into the throat
-    float rNorm = r / max(0.001, spiralHorizon);
-    float rSuction = pow(clamp(rNorm, 0.0002, 1.0), 1.0 + k * 1.5) * (1.0 + sin(psi) * 0.15 * k);
-    rSuction = clamp(rSuction, 0.0002, 1.0);
-    float warpedAlpha = rSuction * 3.14159265;
-
-    // Reconstruct the curved, twisted 3D ray through warped space-time
-    vec3 warpedRay = cos(twistedTheta) * sin(warpedAlpha) * tangentX +
-                     sin(twistedTheta) * sin(warpedAlpha) * tangentY +
-                     cos(warpedAlpha) * vAxis;
-    d = normalize(warpedRay);
-
-    // Smooth natural edge falloff at the spiraling horizon boundary of the vacuum portal
-    float distToHorizon = spiralHorizon - r;
-    edgeAlpha = r > spiralHorizon ? smoothstep(0.12, 0.0, r - spiralHorizon) : smoothstep(-0.07, 0.0, distToHorizon);
-  }
-  
   // Abyssal deep space vacuum background (360-degree dark universe base)
   vec3 col = vec3(0.001, 0.0015, 0.003);
   
@@ -1015,8 +782,7 @@ void main(){
     col += specCol * b * 0.85;
   }
   
-  float alpha = edgeAlpha * (1.0 - smoothstep(0.88, 0.998, k));
-  gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
@@ -1033,7 +799,6 @@ void main(){
 
 export const multiverseFrag = /* glsl */ `
 uniform float uTime; uniform vec3 uColorA; uniform vec3 uColorB; uniform float uOpacity;
-uniform float uTearStrength;
 varying vec3 vN; varying vec3 vW; varying vec3 vP; varying vec2 vUv;
 ${NOISE}
 void main(){
@@ -1052,42 +817,7 @@ void main(){
   col += rimCol * irid * 2.2;
   col += vec3(1.0, 0.96, 0.88) * galCore * 0.8;
   
-  // Semi-transparent animated surface tears & cracks overlay before entering Kamui vortex
-  float tear = clamp(uTearStrength, 0.0, 1.0);
-  float crackMask = 0.0;
-  if (tear > 0.001) {
-    vec3 spherePos = normalize(vP);
-    vec3 crackCoord = spherePos * 8.5 + vec3(uTime * 0.12, -uTime * 0.08, uTime * 0.09);
-    vec3 warp = vec3(
-      fbm3(crackCoord + vec3(0.0, 1.5, 3.1)),
-      fbm3(crackCoord + vec3(4.1, 0.9, 2.2)),
-      fbm3(crackCoord + vec3(2.3, 3.8, 0.5))
-    );
-    vec3 tearP = crackCoord * 1.5 + warp * 2.2;
-    
-    // Sharp zero-crossing ridge noise for jagged dimensional surface fissures
-    float ridge1 = abs(snoise(tearP));
-    float ridge2 = abs(snoise(tearP * 2.5 + vec3(3.8)));
-    
-    float crackCore = smoothstep(0.075 * tear + 0.008, 0.0, ridge1);
-    float crackEdge = smoothstep(0.24 * tear + 0.015, 0.0, ridge1);
-    float subCrack = smoothstep(0.055 * tear + 0.008, 0.0, ridge2) * 0.65;
-    
-    float crackPattern = max(crackCore, subCrack);
-    crackMask = smoothstep(1.0 - tear * 1.35, 1.0 - tear * 0.75, fbm3(spherePos * 3.2));
-    
-    // High-energy electric cyan / magenta / white hot rift glow bleeding through fractures
-    vec3 tearGlowCol = mix(vec3(0.0, 0.95, 1.0), vec3(1.0, 0.2, 0.75), sin(uTime * 4.5 + tearP.y * 3.0) * 0.5 + 0.5);
-    vec3 tearHotCore = vec3(1.0, 0.98, 0.92);
-    vec3 tearColor = mix(tearGlowCol * 3.0, tearHotCore * 5.0, crackCore);
-    
-    col = mix(col, col + tearColor * (crackPattern * 2.0 + crackEdge * 0.7), crackMask * tear);
-  }
-  
   float alpha = (irid * 0.88 + galCore * 0.5 + swirl * 0.2) * uOpacity;
-  if (tear > 0.001) {
-    alpha = max(alpha, crackMask * tear * 0.92);
-  }
   gl_FragColor = vec4(col * 1.25, alpha);
 }`;
 
@@ -1236,7 +966,6 @@ uniform float uTime;
 uniform vec3 uColorCore;
 uniform vec3 uColorAura;
 uniform float uHover;
-uniform float uTearStrength;
 varying vec3 vN;
 varying vec3 vW;
 varying vec3 vP;
@@ -1305,33 +1034,6 @@ void main(){
   // Hover & Active Resonance Boost (Clean & subtle)
   col *= 0.92 + uHover * 0.35 + sin(t * 2.5) * 0.06;
   
-  // Semi-transparent animated surface tears & cracks overlay before entering Kamui vortex
-  float tear = clamp(uTearStrength, 0.0, 1.0);
-  if (tear > 0.001) {
-    vec3 crackCoord = q * 9.5 + vec3(uTime * 0.14, -uTime * 0.09, uTime * 0.11);
-    vec3 warpTear = vec3(
-      fbm3(crackCoord + vec3(0.0, 1.5, 3.1)),
-      fbm3(crackCoord + vec3(4.1, 0.9, 2.2)),
-      fbm3(crackCoord + vec3(2.3, 3.8, 0.5))
-    );
-    vec3 tearP = crackCoord * 1.5 + warpTear * 2.4;
-    
-    float ridge1 = abs(snoise(tearP));
-    float ridge2 = abs(snoise(tearP * 2.7 + vec3(4.5)));
-    
-    float crackCore = smoothstep(0.08 * tear + 0.008, 0.0, ridge1);
-    float crackEdge = smoothstep(0.25 * tear + 0.015, 0.0, ridge1);
-    float subCrack = smoothstep(0.06 * tear + 0.008, 0.0, ridge2) * 0.65;
-    
-    float crackPattern = max(crackCore, subCrack);
-    float crackMask = smoothstep(1.0 - tear * 1.35, 1.0 - tear * 0.75, fbm3(q * 3.5));
-    
-    vec3 tearGlowCol = mix(vec3(0.0, 0.95, 1.0), vec3(1.0, 0.25, 0.75), sin(uTime * 4.0 + tearP.y * 3.0) * 0.5 + 0.5);
-    vec3 tearHotCore = vec3(1.0, 0.98, 0.92);
-    vec3 tearColor = mix(tearGlowCol * 3.2, tearHotCore * 5.0, crackCore);
-    
-    col = mix(col, col + tearColor * (crackPattern * 2.2 + crackEdge * 0.7), crackMask * tear);
-  }
   
   gl_FragColor = vec4(col, 0.95);
 }
@@ -1356,8 +1058,6 @@ export const multiverseBoundaryFrag = /* glsl */ `
 uniform float uTime;
 uniform vec3 uColorA;
 uniform vec3 uColorB;
-uniform float uKamuiErase;
-uniform vec3 uVortexDir;
 varying vec3 vN;
 varying vec3 vW;
 varying vec3 vP;
@@ -1365,36 +1065,8 @@ varying vec2 vUv;
 ${NOISE}
 
 void main(){
-  float k = clamp(uKamuiErase, 0.0, 1.0);
   vec3 q = normalize(vP);
   
-  // Kamui Space-Time Bending & Spiral Suction directly on the Multiverse Hypersphere surface
-  if (k > 0.001) {
-    vec3 vAxis = normalize(uVortexDir);
-    if (length(vAxis) < 0.01) vAxis = vec3(0.0, 0.0, -1.0);
-    
-    vec3 upRef = abs(vAxis.y) < 0.92 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-    vec3 tangentX = normalize(cross(vAxis, upRef));
-    vec3 tangentY = cross(tangentX, vAxis);
-    
-    float dotV = clamp(dot(q, vAxis), -1.0, 1.0);
-    float alpha = acos(dotV);
-    float r = alpha / 3.14159265;
-    float theta = atan(dot(q, tangentY), dot(q, tangentX));
-    
-    // Logarithmic spiral swirling on the giant sphere surface
-    float vortexTwist = (14.0 * pow(k, 1.25)) / (pow(r, 0.58) + 0.038) + uTime * (4.2 + 3.8 * k);
-    float twistedTheta = theta + vortexTwist;
-    
-    // Logarithmic metric suction pulling geodesic lines toward vortex axis
-    float rSuction = pow(clamp(r, 0.0001, 1.0), 1.0 + k * 1.5);
-    float warpedAlpha = rSuction * 3.14159265;
-    
-    vec3 warpedQ = cos(twistedTheta) * sin(warpedAlpha) * tangentX +
-                   sin(twistedTheta) * sin(warpedAlpha) * tangentY +
-                   cos(warpedAlpha) * vAxis;
-    q = normalize(warpedQ);
-  }
 
   vec3 n = normalize(vN);
   vec3 v = normalize(cameraPosition - vW);
@@ -1419,10 +1091,6 @@ void main(){
   vec3 col = mix(baseCol * 0.4, gridCol, grid * 0.55);
   col += vec3(0.65, 0.35, 0.95) * rim * 1.4;
   
-  if (k > 0.01) {
-    float kGlow = sin(uTime * 5.0 + lat * 4.0) * 0.2 + 0.8;
-    col += vec3(0.0, 0.95, 0.85) * k * kGlow * 0.45;
-  }
   
   float alpha = rim * 0.28 + grid * 0.16 + aurora * 0.07;
   gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.55));

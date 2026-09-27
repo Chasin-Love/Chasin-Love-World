@@ -36,11 +36,8 @@ import { MOOD_HEX, type AuroraSignal, type EchoEntry } from '../platform/sentime
 import {
   WEB_CEILING, WEB_EDGE_TRIGGER, WARP_ZOOM_VEL,
   MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,
-  GALAXY_BAND_UPPER, GALAXY_BAND_LOWER, GALAXY_ARRIVE_CROSS, GALAXY_DESCEND_CROSS,
-  GALAXY_ASCEND_ENTER, GALAXY_ASCEND_CROSS, GALAXY_DIAL, BAND_LATCH_TTL,
 } from './systems/stageThresholds';
 import { SCALE_BANDS, highScaleLabel } from './systems/levelSystem';
-import { PORTAL_PHASE_WEIGHTS, portalTransitionFor, type PortalPhase } from './systems/portalPhases';
 
 /* Round 52 — SPACETIME BENDING OF THE BACKGROUND, composed once.
 
@@ -298,38 +295,17 @@ export class UniverseEngine {
   private coreActive = false; private coreT = 0;
   private epoch = Date.now() - 400 * DAY;
   private portal = {
-    phase: 'idle' as PortalPhase,
+    phase: 'idle' as 'idle' | 'entering' | 'open' | 'leaving',
     t: 0, fired: false, kind: 'diary' as 'diary' | 'vault', bodyId: '',
   };
   /* Inner-galaxy worlds are synthetic runtime bodies, so their portal target
      must be resolved from the isolated system rather than the home body list. */
   private portalTargetInnerId: string | null = null;
-  /* 0..1 visual intensity fed into the actual target body's materials. */
-  private portalVisualT = 0;
-  private portalProfile: 'normal' | 'vault' = 'normal';
-  private portalReturn = false;
   private reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   private portalWasInner = false;
-  /* Planet Kamui is a local surface event. It must not take ownership of the
-     camera or move the anchor star / hierarchy groups. */
-  private portalLocalCenter = new THREE.Vector3();
-  private portalGravityUniforms: { center: THREE.Vector3; radius: number; strength: number; time: number } = {
-    center: new THREE.Vector3(), radius: 0, strength: 0, time: 0,
-  };
-  private portalBodyRadius = 0;
-  private portalSingularity: { parent: THREE.Group; visual: BlackHoleVisual } | null = null;
-  /* +1 = forward traversal (suction), −1 = reverse traversal (the swirl
-     unwinds backwards and the field expels matter instead of swallowing). */
-  private portalReverse = 1;
-  /* Field intensity at the instant the return traversal begins — the reverse
-     envelope continues from this level instead of popping. */
-  private portalCloseLevel = 0;
-  /* 0..1 white-hole ejection pulse during the reverse traversal — pushes the
-     captured point clouds back out of the closing aperture. */
-  private portalEject = 0;
-  /* Point clouds captured when the portal arms; the field pulls their points
-     toward the core (visual-only suction, transforms untouched). */
-  private portalPointSets: { points: THREE.Points; mat: THREE.ShaderMaterial }[] = [];
+  /* The dial value the entry zoom lands at / eases back to. */
+  private portalEnterDial = 0;
+  private portalReturnDial = 0;
 
   /* -------------- Round 14 — gravitational lensing + living gravity -------------- */
   /* The masses bend ONLY the universe surface (celestial dome + background
@@ -405,10 +381,14 @@ export class UniverseEngine {
   /* every black hole in the universe — one object each, so a disarm can
      hide them all at once (Round 55: there is no fallback renderer) */
   private blackHoles: BlackHoleVisual[] = [];
-  /* ROUND 56 — the real-background buffer: the scene (holes hidden, R52
-     lens zeroed) is captured here each frame at half resolution, and the
-     geodesic lens samples it with the bent rays — the actual universe bends */
-  private bgRT: THREE.WebGLRenderTarget | null = null;
+  /* ROUND 56c — the real-background CUBEMAP: the scene (holes hidden, R52
+     lens zeroed) is captured into a 512² cube from the camera every 6th
+     frame, and the geodesic lens samples it BY DIRECTION with the bent rays
+     — the actual universe bends, at any distance. */
+  private bgCube: THREE.WebGLCubeRenderTarget | null = null;
+  private cubeCam: THREE.CubeCamera | null = null;
+  private bgCubeFrame = 0;
+  private bgCubeDirty = true;
   private raymarchDisabled = false;
   private onQualityChange: () => void = () => {};
   private onTierOverride: () => void = () => {};
@@ -418,20 +398,16 @@ export class UniverseEngine {
      ever stands in. The 'on' override forces past the tier gate (a saved 'low'
      quality setting must not silently win over the user's explicit switch) but
      never past a software rasterizer, and never past a shader-failure disarm. */
-  /* ROUND 56 — the real-background buffer, created lazily at half the
-     drawing-buffer resolution */
-  private ensureBgRT(): THREE.WebGLRenderTarget {
-    if (!this.bgRT) {
-      const size = new THREE.Vector2();
-      this.renderer.getDrawingBufferSize(size);
-      this.bgRT = new THREE.WebGLRenderTarget(
-        Math.max(1, Math.floor(size.x / 2)), Math.max(1, Math.floor(size.y / 2)),
-        { depthBuffer: true },
-      );
-      this.bgRT.texture.minFilter = THREE.LinearFilter;
-      this.bgRT.texture.magFilter = THREE.LinearFilter;
-    }
-    return this.bgRT;
+  /* ROUND 56c — the real-sky cubemap, created lazily (512² faces, HDR) */
+  private ensureBgCube(): void {
+    if (this.bgCube) return;
+    this.bgCube = new THREE.WebGLCubeRenderTarget(512, {
+      depthBuffer: true,
+      type: THREE.HalfFloatType,
+    });
+    this.bgCube.texture.minFilter = THREE.LinearFilter;
+    this.bgCube.texture.magFilter = THREE.LinearFilter;
+    this.cubeCam = new THREE.CubeCamera(0.5, 1e7, this.bgCube);
   }
 
   private attachBlackHole(R: number, container: THREE.Object3D): BlackHoleVisual {
@@ -440,7 +416,11 @@ export class UniverseEngine {
       && (canUseRaymarchBlackHole() || (override === 'on' && !isSoftwareRasterizer()));
     const geodesic = override !== 'off' && capable;
     const visual = createBlackHole(R, { geodesic });
-    visual.setBgTexture(this.ensureBgRT().texture);
+    if (geodesic) {
+      this.ensureBgCube();
+      visual.setBgCube(this.bgCube!.texture);
+      this.bgCubeDirty = true; /* fill the cube on the next frames */
+    }
     container.add(visual.group);
     this.blackHoles.push(visual);
     if (geodesic) setRaymarchStatus(override === 'on' ? 'forced' : 'active', 'attached');
@@ -487,11 +467,6 @@ export class UniverseEngine {
       const r = Math.max(0.5, Math.round(this.pixelRatioApplied * 10) / 10);
       this.renderer.setPixelRatio(r);
       this.composer.setPixelRatio(r);
-      if (this.bgRT) {
-        const size = new THREE.Vector2();
-        this.renderer.getDrawingBufferSize(size);
-        this.bgRT.setSize(Math.max(1, Math.floor(size.x / 2)), Math.max(1, Math.floor(size.y / 2)));
-      }
     }
   }
   /* Round 54 — the reference's blaze: his demo runs bloom ≈ 0.68 while the
@@ -571,29 +546,13 @@ export class UniverseEngine {
   private realityMarbles: { spiral: THREE.Points; glassMat: THREE.ShaderMaterial; speed: number }[] = [];
   private marbleRingTex: THREE.CanvasTexture | null = null;
   /* Stage system — the Cosmic Web and the Multiverse are two SEPARATE places.
-     They are never visible at the same time and the zoom dial never carries
-     you between them: the ONLY bridge is the Kamui warp. */
+     They are never visible at the same time; the zoom dial carries you
+     between them and the stage swaps when you cross its edge. */
   private cosmicStage: 'web' | 'multiverse' = 'web';
-  /* Kamui — the teleportation jutsu. kamuiFlight: 0..1 scripted progress.
-     kamuiWarpFx: the tunnel envelope (fov kick + screen swirl). The suck
-     drifts the focus along +z into the vortex; the eject throws it along -z. */
-  private kamuiFlight: number | null = null;
-  private kamuiFromZoom = 0;
+  /* dial the camera eases to when arriving at your own reality marble */
   private arrivalZoom = REALITY_FLOOR;
-  private warpDir: 'toMultiverse' | 'toWeb' = 'toMultiverse';
-  private postWarpZoom: number | null = null;
-  private kamuiWarpFx = 0;
-  private kamuiEjectK = 0;
-  private kamuiSuckDrift = 0;
-  private kamuiTunnel!: THREE.Group;
-  private kamuiTunnelMats: THREE.ShaderMaterial[] = [];
-  /* In-place Kamui burst (Core Console pod / Demon Core click): the same
-     tear-suck-tunnel-settle script fired without changing stage or dial. */
-  private kamuiPulse: number | null = null;
-  private kamuiPulseFromZoom = 0;
-  /* the cold-open — the first 5.2 seconds are a Kamui arrival: the tunnel
-     slows, the walls part, your star ignites, the system builds one world
-     at a time, the sky arrives last */
+  /* the quiet boot — the scene sits fully formed behind the App's intro veil;
+     this finalize runs once on the first frame */
   private bootIntro = true;
   /* THE BIRTH — birthK drives the ejection: everything erupts outward from
      the single center point in a swirling bend (applied in updateBodies) */
@@ -604,22 +563,11 @@ export class UniverseEngine {
   private introMarbleSprites: THREE.SpriteMaterial[] = [];
   private realityFocused = false;
   private webLineMat!: THREE.ShaderMaterial;
-  /* the gWeb materials that carry the Kamui tear vortex */
-  private webVortexMats: THREE.ShaderMaterial[] = [];
+  /* plain zoom dive into a clicked galaxy — the dial eases on its own; this
+     watcher only flips into the isolated inner system once the camera is
+     actually inside the disc */
+  private galaxyDive: { galaxyId: string; endInner: boolean } | null = null;
   private beacon!: THREE.Sprite;
-  /* focused galaxy-entry tear — deliberately separate from the Cosmic Web /
-     Multiverse Kamui so a galaxy click reads as a local surface rupture */
-  private galaxyTearGroup = new THREE.Group();
-  private galaxyTearMat!: THREE.ShaderMaterial;
-  private galaxyEntryFlight: {
-    t: number;
-    fromDial: number;
-    toDial: number;
-    center: THREE.Vector3;
-    galaxyId: string | null;
-    radius: number;
-    endInner: boolean;
-  } | null = null;
   private surface = new THREE.Group();
   private surfaceLocked = false;
   private surfaceQuat = new THREE.Quaternion();
@@ -636,20 +584,6 @@ export class UniverseEngine {
   private activeRealityShieldMesh: THREE.Group | null = null;
   /* the galaxy the traveler last dove into — pinned to the GALAXY scale label */
   private activeGalaxyName: string | null = null;
-  /* THE GALAXY WARP — the Kamui-class reality bend around the galaxy band.
-     Crossing into the field folds space in a swirling +z bend; diving
-     through it counter-folds along −z and the stellar system appears. */
-  private galaxyWarp: {
-    dir: 'arrive' | 'descend' | 'ascend';
-    t: number;
-    fromDial: number;
-    toDial: number;
-    center: THREE.Vector3;
-    endInner: boolean;
-  } | null = null;
-  private galaxyWarpDrift = 0;
-  /* previous zoom-dial target — the warp triggers live on its crossings */
-  private prevDialTarget = 0.15;
   /* THE GALAXY STAGE — rebuilt from the active reality's real roster: one
      full spiral per major galaxy (the home galaxy centered & brightest) */
   private gGalaxyContents = new THREE.Group();
@@ -665,9 +599,6 @@ export class UniverseEngine {
   private galaxyFocusId: string | null = null;
   /* true while the camera is INSIDE a galaxy's own isolated stellar system */
   private galaxyInnerFocus = false;
-  /* a band crossing that was blocked by grab-cooldown — fires when the
-     cooldown expires so leaving a system always replays the return bend */
-  private bandLatch: { dir: 'arrive' | 'up' | 'down'; at: number } | null = null;
   /* THE CLUSTER STAGE — hot intracluster gas glow (tinted per reality) */
   private clusterGasMats: THREE.SpriteMaterial[] = [];
   /* THE ASTRAL CORE — the interactive multiverse core at (0,0,0); clicking it
@@ -691,7 +622,6 @@ export class UniverseEngine {
   private coreStabilizerBeams!: THREE.LineSegments;
   private coreStabilizerBeamMat!: THREE.LineBasicMaterial;
   private corePulseOrbs: THREE.Mesh[] = [];
-  private kamuiErase = 0;
   private demonCoreLight!: THREE.PointLight;
   private demonCoreCollider!: THREE.Mesh;
 
@@ -822,10 +752,8 @@ export class UniverseEngine {
     this.buildMultiverse();
     this.buildMeteors();
     this.buildSurface();
-    this.buildKamuiTunnel();
-    this.buildGalaxyTear();
     this.buildIntroMarble();
-    this.scene.add(this.camera); /* the tunnel rides the camera — it must live in the scene graph */
+    this.scene.add(this.camera); /* camera lives in the scene graph */
 
     /* collect level point-cloud materials for per-frame size compensation */
     [this.gNeighborhood, this.gGalaxy, this.gCluster, this.gSupercluster, this.gWeb, this.gMultiverse].forEach((g) => {
@@ -855,8 +783,6 @@ export class UniverseEngine {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.12, 0.15, 0.90);
     this.composer.addPass(this.bloomPass);
-    /* No full-screen Kamui pass: local Planet/Vault Kamui is rendered by the
-       target body, its singularity, and the world-space gravity field. */
     this.composer.addPass(new OutputPass());
 
     this.bindEvents();
@@ -907,8 +833,6 @@ export class UniverseEngine {
     const mat = new THREE.ShaderMaterial({
       uniforms: {
         uScale: { value: 1 }, uTime: { value: 0 }, uTwinkle: { value: twinkle ? 1 : 0 }, uOpacity: { value: 1 },
-        uVortexC: { value: new THREE.Vector3() }, uVortexR: { value: 0 }, uVortexS: { value: 0 }, uVortexT: { value: 0 }, uVortexPull: { value: 0 },
-        uVortexRev: { value: 1 },
         /* Round 52 — the SAME uniform objects the sky dome and the star shells
            use, so one setLenses() per frame bends the canvas, the shells and
            every discrete star cloud together. Nothing else has to be synced. */
@@ -1013,8 +937,6 @@ export class UniverseEngine {
         (i, a) => { const ang = (i / count) * Math.PI * 2 + R() * 0.06; const rr = radius + (R() - 0.5) * 0.7; a[i * 3] = Math.cos(ang) * rr; a[i * 3 + 1] = (R() - 0.5) * 0.35; a[i * 3 + 2] = Math.sin(ang) * rr; },
         () => 0.5 + R() * 0.9, () => color, () => 0.3 + R() * 0.55, size, true,
       );
-      (pts.material as THREE.ShaderMaterial).userData.immuneToVortex = true;
-      pts.userData.immuneToVortex = true;
       const pivot = new THREE.Group();
       pivot.rotation.x = tilt;
       pivot.add(pts);
@@ -1058,11 +980,6 @@ export class UniverseEngine {
           uDeep: { value: col(p.deep) }, uBase: { value: col(p.base) }, uHigh: { value: col(p.high) },
           uIce: { value: col(p.ice) }, uSunDir: { value: new THREE.Vector3(1, 0, 0) }, uTime: { value: 0 },
           uSea: { value: data.id === 'aurelia' ? 0.02 : -0.55 }, uGhost: { value: 0 }, uFade: { value: 1 },
-          uTear: { value: 0 }, uTearTime: { value: 0 },
-          uGravityCenter: { value: new THREE.Vector3() }, uGravityLocalCenter: { value: new THREE.Vector3() },
-          uGravityRadius: { value: 0 },
-          uGravityStrength: { value: 0 }, uGravityTime: { value: 0 },
-          uReverse: { value: 1 },
           uNight: { value: data.nightside ? 1 : 0 },
           uSeed: { value: new THREE.Vector3(hash(data.id.length, 3) * 40, hash(7, data.id.length) * 40, hash(data.id.length, 11) * 40) },
         },
@@ -1078,8 +995,6 @@ export class UniverseEngine {
       tilt.rotation.y = hash(data.id.length, 4) * Math.PI * 2;
       tilt.rotation.z = (physData.axialTiltDeg * Math.PI) / 180;
       g.add(tilt);
-      /* Extra tessellation is intentional: Kamui displaces the actual sphere
-         in object space, so the surface needs vertices to bend. */
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(data.radius, 64, 48), mat);
       tilt.add(mesh);
       rb.mat = mat;
@@ -1097,10 +1012,7 @@ export class UniverseEngine {
           uniforms: {
             uTime: { value: 0 }, uSunDir: { value: new THREE.Vector3(1, 0, 0) },
             uSeed: { value: new THREE.Vector3(3.7, 8.1, 1.9) }, uCover: { value: data.id === 'veil' ? 0.95 : 0.5 },
-            uFade: { value: 1 }, uTear: { value: 0 }, uTearTime: { value: 0 },
-            uGravityCenter: { value: new THREE.Vector3() }, uGravityLocalCenter: { value: new THREE.Vector3() },
-            uGravityRadius: { value: 0 }, uGravityStrength: { value: 0 }, uGravityTime: { value: 0 },
-            uReverse: { value: 1 },
+            uFade: { value: 1 },
           },
           vertexShader: planetVert, fragmentShader: cloudFrag, transparent: true, depthWrite: false,
         });
@@ -1113,11 +1025,7 @@ export class UniverseEngine {
       const am = new THREE.ShaderMaterial({
         uniforms: {
           uColor: { value: col(p.atmo) }, uStrength: { value: data.id === 'mirror' ? 1.5 : 0.85 },
-          uSunDir: { value: new THREE.Vector3(1, 0, 0) }, uTear: { value: 0 }, uTearTime: { value: 0 },
-          uGravityCenter: { value: new THREE.Vector3() }, uGravityLocalCenter: { value: new THREE.Vector3() },
-          uGravityRadius: { value: 0 },
-          uGravityStrength: { value: 0 }, uGravityTime: { value: 0 },
-          uReverse: { value: 1 },
+          uSunDir: { value: new THREE.Vector3(1, 0, 0) },
         },
         vertexShader: planetVert, fragmentShader: atmoFrag,
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide,
@@ -1132,8 +1040,6 @@ export class UniverseEngine {
         const rm = new THREE.ShaderMaterial({
           uniforms: {
             uInner: { value: inner }, uOuter: { value: outer }, uTint: { value: col(p.high) }, uSunLocal: { value: new THREE.Vector3(1, 0, 0.4) },
-            uGravityLocalCenter: { value: new THREE.Vector3() }, uGravityStrength: { value: 0 },
-            uGravityTime: { value: 0 }, uReverse: { value: 1 },
           },
           vertexShader: ringVert, fragmentShader: ringFrag,
           transparent: true, depthWrite: false, side: THREE.DoubleSide,
@@ -1312,8 +1218,6 @@ export class UniverseEngine {
       () => { const w = 0.38 + R() * 0.3; const warm = R() * 0.1; return [w + warm, w * 0.86, w * 0.7] as [number, number, number]; },
       () => 0.25 + R() * 0.55, 1.15, false,
     );
-    (dust.material as THREE.ShaderMaterial).userData.immuneToVortex = true;
-    dust.userData.immuneToVortex = true;
     g.add(dust);
 
     /* lumpy 3D rocks — a handful of CPU-displaced shapes, instanced around
@@ -1751,8 +1655,6 @@ export class UniverseEngine {
         uTime: { value: 0 },
         uColorA: { value: new THREE.Color('#06b6d4') },
         uColorB: { value: new THREE.Color('#8b5cf6') },
-        uKamuiErase: { value: 0 },
-        uVortexDir: { value: new THREE.Vector3(0, 0, -1) },
       },
       vertexShader: multiverseBoundaryVert,
       fragmentShader: multiverseBoundaryFrag,
@@ -2155,7 +2057,6 @@ void main(){
         uColorCore: { value: new THREE.Color('#ff0055') },
         uColorAura: { value: new THREE.Color('#8b5cf6') },
         uHover: { value: 0 },
-        uTearStrength: { value: 0 },
       },
       vertexShader: demonCoreVert,
       fragmentShader: demonCoreFrag,
@@ -2538,13 +2439,6 @@ void main(){
     this.astralCoreGroup = astralCore;
     this.gMultiverse.add(astralCore);
 
-    /* collect the gWeb materials that carry the Kamui tear vortex — the
-       filaments and the node clouds all spiral into the tear together */
-    this.gWeb.traverse((obj) => {
-      const m = (obj as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
-      if (m && m.uniforms && m.uniforms.uVortexS && !this.webVortexMats.includes(m)) this.webVortexMats.push(m);
-    });
-
     this.gMultiverse.add(gPair);
     this.scene.add(this.gMultiverse);
 
@@ -2692,34 +2586,21 @@ void main(){
     const lg = new THREE.BufferGeometry();
     lg.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3));
     lg.setAttribute('color', new THREE.Float32BufferAttribute(lineCol, 3));
-    /* the web filaments share the Kamui tear vortex — during the jutsu they
-       bend, swirl and spiral into the tear point with the same wave */
+    /* the web filaments — one plain additive line material, opacity driven
+       by the stage weight */
     this.webLineMat = new THREE.ShaderMaterial({
       uniforms: {
         uOpacity: { value: 0 },
-        uVortexC: { value: new THREE.Vector3() }, uVortexR: { value: 0 }, uVortexS: { value: 0 }, uVortexT: { value: 0 },
       },
       vertexShader: `
-        uniform vec3 uVortexC; uniform float uVortexR; uniform float uVortexS; uniform float uVortexT;
-        varying vec3 vColor; varying float vFade;
+        varying vec3 vColor;
         void main(){
           vColor = color;
-          vec3 vp = position;
-          float d = distance(vp, uVortexC);
-          float infl = uVortexS * smoothstep(uVortexR, uVortexR * 0.1, d);
-          if (infl > 0.001) {
-            vec3 axis = normalize(vec3(0.18, 1.0, 0.12));
-            vec3 dir = vp - uVortexC;
-            float a = infl * (5.0 + uVortexT * 3.5);
-            vec3 spun = dir * cos(a) + cross(axis, dir) * sin(a) * 1.15;
-            vp = uVortexC + spun * (1.0 - infl * 0.5);
-            vFade = 1.0 - infl * 0.6;
-          } else { vFade = 1.0; }
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(vp, 1.0);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: `
-        uniform float uOpacity; varying vec3 vColor; varying float vFade;
-        void main(){ gl_FragColor = vec4(vColor, uOpacity * vFade); }`,
+        uniform float uOpacity; varying vec3 vColor;
+        void main(){ gl_FragColor = vec4(vColor, uOpacity); }`,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors: true,
     });
     this.gWeb.add(new THREE.LineSegments(lg, this.webLineMat));
@@ -3020,8 +2901,6 @@ void main(){
         (i, a) => { const ang = (i / count) * Math.PI * 2 + rnd() * 0.06; const rr = radius + (rnd() - 0.5) * 0.7; a[i * 3] = Math.cos(ang) * rr; a[i * 3 + 1] = (rnd() - 0.5) * 0.35; a[i * 3 + 2] = Math.sin(ang) * rr; },
         () => 0.5 + rnd() * 0.9, () => color, () => 0.3 + rnd() * 0.55, size, true,
       );
-      (pts.material as THREE.ShaderMaterial).userData.immuneToVortex = true;
-      pts.userData.immuneToVortex = true;
       const pivot = new THREE.Group();
       pivot.rotation.x = tilt;
       pivot.add(pts);
@@ -3151,11 +3030,6 @@ void main(){
           uDeep: { value: col(p.deep) }, uBase: { value: col(p.base) }, uHigh: { value: col(p.high) },
           uIce: { value: col(p.ice) }, uSunDir: { value: new THREE.Vector3(1, 0, 0) }, uTime: { value: 0 },
           uSea: { value: data.nightside ? 0.02 : -0.55 }, uGhost: { value: 0 }, uFade: { value: 1 },
-          uTear: { value: 0 }, uTearTime: { value: 0 },
-          uGravityCenter: { value: new THREE.Vector3() }, uGravityLocalCenter: { value: new THREE.Vector3() },
-          uGravityRadius: { value: 0 },
-          uGravityStrength: { value: 0 }, uGravityTime: { value: 0 },
-          uReverse: { value: 1 },
           uNight: { value: data.nightside ? 1 : 0 },
           uSeed: { value: new THREE.Vector3(hash(data.id.length, 3) * 40, hash(7, data.id.length) * 40, hash(data.id.length, 11) * 40) },
         },
@@ -3181,10 +3055,7 @@ void main(){
           uniforms: {
             uTime: { value: 0 }, uSunDir: { value: new THREE.Vector3(1, 0, 0) },
             uSeed: { value: new THREE.Vector3(3.7, 8.1, 1.9) }, uCover: { value: 0.5 },
-            uFade: { value: 1 }, uTear: { value: 0 }, uTearTime: { value: 0 },
-            uGravityCenter: { value: new THREE.Vector3() }, uGravityLocalCenter: { value: new THREE.Vector3() },
-            uGravityRadius: { value: 0 }, uGravityStrength: { value: 0 }, uGravityTime: { value: 0 },
-            uReverse: { value: 1 },
+            uFade: { value: 1 },
           },
           vertexShader: planetVert, fragmentShader: cloudFrag, transparent: true, depthWrite: false,
         });
@@ -3198,10 +3069,6 @@ void main(){
       const am = new THREE.ShaderMaterial({
         uniforms: {
           uColor: { value: col(p.atmo) }, uStrength: { value: 0.85 }, uSunDir: { value: new THREE.Vector3(1, 0, 0) },
-          uTear: { value: 0 }, uTearTime: { value: 0 },
-          uGravityCenter: { value: new THREE.Vector3() }, uGravityLocalCenter: { value: new THREE.Vector3() },
-          uGravityRadius: { value: 0 }, uGravityStrength: { value: 0 }, uGravityTime: { value: 0 },
-          uReverse: { value: 1 },
         },
         vertexShader: planetVert, fragmentShader: atmoFrag,
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide,
@@ -3216,8 +3083,6 @@ void main(){
         const rm = new THREE.ShaderMaterial({
           uniforms: {
             uInner: { value: inner }, uOuter: { value: outer }, uTint: { value: col(p.high) }, uSunLocal: { value: new THREE.Vector3(1, 0, 0.4) },
-            uGravityLocalCenter: { value: new THREE.Vector3() }, uGravityStrength: { value: 0 },
-            uGravityTime: { value: 0 }, uReverse: { value: 1 },
           },
           vertexShader: ringVert, fragmentShader: ringFrag,
           transparent: true, depthWrite: false, side: THREE.DoubleSide,
@@ -3264,8 +3129,6 @@ void main(){
       () => { const w = 0.38 + R() * 0.3; const warm = R() * 0.1; return [w + warm, w * 0.86, w * 0.7] as [number, number, number]; },
       () => 0.25 + R() * 0.55, 1.15, false,
     );
-    (beltDust.material as THREE.ShaderMaterial).userData.immuneToVortex = true;
-    beltDust.userData.immuneToVortex = true;
     sys.beltDustMat = beltDust.material as THREE.ShaderMaterial;
     sys.belt.add(beltDust);
 
@@ -3391,16 +3254,11 @@ void main(){
       p.group.getWorldPosition(this._vScratch2);
       this._vScratch1.copy(this._vScratch2).sub(this._vScratch3).normalize().multiplyScalar(-1);
       this._vDirScratch.copy(this._vScratch1).applyQuaternion(this._qScratch);
-      const portalTear = this.portalTargetInnerId === p.data.id ? this.portalVisualT : 0;
       /* Round 54/55 — geodesic uniforms ride the late-tick pass (see tick);
          the old lattice-ring spin is erased with the rings themselves */
       if (p.mat) {
         if (p.mat.uniforms.uSunDir) (p.mat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vDirScratch);
         p.mat.uniforms.uTime.value = this.clockT;
-        if (p.mat.uniforms.uTear) p.mat.uniforms.uTear.value = portalTear;
-        if (p.mat.uniforms.uTearTime) p.mat.uniforms.uTearTime.value = this.clockT;
-        this.applyPortalGravityUniforms(p.mat);
-        this.setPortalLocalCenter(p.mat, p.spinMesh);
         /* the edge nebula's raymarch needs the camera in its own local space */
         if (p.mat.uniforms.uCamLocalP) {
           this._vScratch1.copy(this.camera.position);
@@ -3411,26 +3269,16 @@ void main(){
       if (p.spinMesh && p.spinRate) p.spinMesh.rotation.y += dt * p.spinRate;
       if (p.cloudMat) {
         p.cloudMat.uniforms.uTime.value = this.clockT;
-        if (p.cloudMat.uniforms.uTear) p.cloudMat.uniforms.uTear.value = portalTear;
-        if (p.cloudMat.uniforms.uTearTime) p.cloudMat.uniforms.uTearTime.value = this.clockT;
         (p.cloudMat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vDirScratch);
-        this.applyPortalGravityUniforms(p.cloudMat);
-        this.setPortalLocalCenter(p.cloudMat, p.cloudMesh);
       }
       if (p.cloudMesh && p.cloudSpinRate) p.cloudMesh.rotation.y += dt * p.cloudSpinRate;
       if (p.atmo) {
         const atmoMat = p.atmo.material as THREE.ShaderMaterial;
         (atmoMat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vDirScratch);
-        if (atmoMat.uniforms.uTear) atmoMat.uniforms.uTear.value = portalTear;
-        if (atmoMat.uniforms.uTearTime) atmoMat.uniforms.uTearTime.value = this.clockT;
-        this.applyPortalGravityUniforms(atmoMat);
-        this.setPortalLocalCenter(atmoMat, p.atmo);
       }
       if (p.ringMat) {
         p.ringMesh!.getWorldQuaternion(this._qScratch2).invert();
         (p.ringMat.uniforms.uSunLocal.value as THREE.Vector3).copy(this._vScratch1).applyQuaternion(this._qScratch2);
-        this.applyPortalGravityUniforms(p.ringMat);
-        this.setPortalLocalCenter(p.ringMat, p.ringMesh);
       }
       p.moons.forEach((m) => {
         const ma = m.phase + this.simDays * m.speed;
@@ -3602,150 +3450,6 @@ void main(){
       arc.rotation.set(R() * Math.PI, R() * Math.PI, R() * Math.PI);
       this.gCluster.add(arc);
     }
-  }
-
-  /** The Kamui tunnel — a round, unstable, high-torque fold in spacetime.
-      Built as a child of the CAMERA so it always surrounds the view; the
-      warp script sweeps it past the camera while two counter-rotating
-      wobble layers spin with great torque. */
-  private buildKamuiTunnel() {
-    const mkLayer = (radius: number, len: number, phase: number): THREE.Mesh => {
-      const mat = new THREE.ShaderMaterial({
-        uniforms: {
-          uTime: { value: 0 }, uSpin: { value: 0 }, uOpacity: { value: 0 }, uPhase: { value: phase },
-          uColorA: { value: new THREE.Color('#38bdf8') }, uColorB: { value: new THREE.Color('#8b5cf6') },
-        },
-        vertexShader: `
-          varying vec2 vUv; varying float vW;
-          uniform float uTime;
-          void main(){
-            vUv = uv;
-            vec3 p = position;
-            /* unstable — the wall radius breathes and shakes */
-            float w = sin(uv.x * 18.849 + uTime * 7.0) * 0.5 + sin(uv.y * 40.0 - uTime * 11.0) * 0.5;
-            p.xy *= 1.0 + w * 0.09;
-            vW = w;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-          }`,
-        fragmentShader: `
-          varying vec2 vUv; varying float vW;
-          uniform float uTime; uniform float uSpin; uniform float uOpacity; uniform float uPhase;
-          uniform vec3 uColorA; uniform vec3 uColorB;
-          void main(){
-            /* high-torque swirling bands streaming down the tunnel */
-            float bands = 0.5 + 0.5 * sin((vUv.x * 16.0 + uSpin * 1.4 + uPhase + vW * 1.6) * 6.2831);
-            float flow  = 0.5 + 0.5 * sin((vUv.y * 36.0 - uTime * 16.0 + vUv.x * 10.0) * 6.2831);
-            vec3 col = mix(uColorA, uColorB, 0.35 + 0.4 * bands);
-            col += vec3(1.0, 0.97, 0.9) * pow(bands, 3.0) * 0.9;
-            float ends = smoothstep(0.0, 0.22, vUv.y) * smoothstep(1.0, 0.78, vUv.y);
-            float a = (0.30 + bands * 0.38 + flow * 0.16) * uOpacity * ends;
-            gl_FragColor = vec4(col * (0.75 + flow * 0.7), a);
-          }`,
-        transparent: true, depthWrite: false, side: THREE.BackSide, blending: THREE.AdditiveBlending,
-      });
-      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, 64, 20, true), mat);
-      mesh.rotation.x = Math.PI / 2; /* length runs along the view axis */
-      return mesh;
-    };
-
-    this.kamuiTunnel = new THREE.Group();
-    const outer = mkLayer(300000, 3200000, 0);
-    const inner = mkLayer(252000, 3200000, 0.5);
-    this.kamuiTunnelMats.push(outer.material as THREE.ShaderMaterial, inner.material as THREE.ShaderMaterial);
-    this.kamuiTunnel.add(outer, inner);
-    this.kamuiTunnel.visible = false;
-    this.camera.add(this.kamuiTunnel);
-  }
-
-  /** A local Kamui tear for galaxy entry. Unlike the dimensional Kamui,
-      this rupture is anchored to the clicked galaxy and stays visible while
-      the camera is pulled directly into that galaxy's stellar system. */
-  private buildGalaxyTear() {
-    this.galaxyTearMat = new THREE.ShaderMaterial({
-      uniforms: {
-        uTime: { value: 0 },
-        uProgress: { value: 0 },
-        uIntensity: { value: 0 },
-        uColorA: { value: new THREE.Color('#38bdf8') },
-        uColorB: { value: new THREE.Color('#8b5cf6') },
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main(){
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }`,
-      fragmentShader: `
-        varying vec2 vUv;
-        uniform float uTime; uniform float uProgress; uniform float uIntensity;
-        uniform vec3 uColorA; uniform vec3 uColorB;
-        void main(){
-          vec2 q = vUv * 2.0 - 1.0;
-          float r = length(q);
-          float a = atan(q.y, q.x);
-          float p = clamp(uProgress, 0.0, 1.0);
-          float spin = uTime * (4.5 + 13.0 * p);
-          /* The source tears open first; the destination white hole takes over
-             after the camera has crossed the darkest part of the fold. */
-          float whiteHole = smoothstep(0.57, 0.78, p);
-          float source = 1.0 - whiteHole;
-          float turbulence = sin(a * 8.0 - spin * 1.7 + r * 26.0)
-            + 0.55 * sin(a * 15.0 + spin * 0.9 - r * 43.0)
-            + 0.22 * sin(a * 23.0 + spin * 2.7 + r * 71.0);
-
-          /* A ragged event horizon and a flattened, frame-dragged accretion
-             disc make this a gravitational surface rupture rather than a flat
-             circular portal. */
-          float horizonR = mix(0.12, 0.65, p) + turbulence * 0.022 * (0.35 + p * 0.65);
-          float horizonRim = exp(-abs(r - horizonR) * (78.0 + p * 48.0));
-          float diskR = 0.13 + p * 0.24 + sin(a * 3.0 - spin * 0.45) * 0.018;
-          float disk = exp(-abs(r - diskR) * 52.0) * (0.45 + 0.55 * sin(a * 5.0 - spin + r * 15.0));
-          disk = max(disk, 0.0);
-          float lensRingA = exp(-abs(r - (0.17 + p * 0.23)) * 48.0);
-          float lensRingB = exp(-abs(r - (0.30 + p * 0.27)) * 82.0);
-
-          /* Tidal streams stretch along the rotating gravitational field. */
-          float stream = pow(max(0.0, sin(a * 7.0 - spin * 1.8 + r * 21.0)), 8.0);
-          stream *= smoothstep(0.06, 0.72, r) * (1.0 - smoothstep(0.48, 0.98, r));
-          float tearStrands = pow(max(0.0, sin(a * 13.0 + r * 31.0 - spin * 2.4)), 12.0);
-          tearStrands *= smoothstep(0.10, 0.66, r) * (1.0 - smoothstep(0.52, 0.96, r));
-
-          vec3 sourceCol = mix(uColorA, uColorB, 0.5 + 0.5 * sin(a * 2.0 + spin * 0.2));
-          sourceCol += vec3(0.76, 0.93, 1.0) * (horizonRim * 1.45 + lensRingA * 0.62);
-          sourceCol += vec3(1.0, 0.68, 0.28) * (disk * 1.25 + tearStrands * 0.9);
-          sourceCol += vec3(0.5, 0.8, 1.0) * (stream * 0.72 + lensRingB * 0.38);
-
-          /* The exit is a white-hole burst: a hot photon ring, radial jets,
-             and matter being expelled instead of consumed. */
-          float exitR = mix(0.06, 0.48, whiteHole) + turbulence * 0.014;
-          float exitRim = exp(-abs(r - exitR) * 92.0);
-          float exitCore = exp(-r * (10.0 + whiteHole * 16.0)) * whiteHole;
-          float jet = pow(max(0.0, cos(a * 2.0 + spin * 0.65)), 18.0);
-          jet *= smoothstep(0.04, 0.62, r) * (1.0 - smoothstep(0.48, 0.92, r));
-          vec3 exitCol = vec3(1.0, 0.96, 0.82) * (exitCore * 2.3 + exitRim * 1.55);
-          exitCol += mix(vec3(0.28, 0.82, 1.0), vec3(1.0, 0.55, 0.18), 0.5 + 0.5 * sin(a + spin * 0.35)) * jet * 1.4;
-          exitCol += vec3(0.75, 0.9, 1.0) * (lensRingA * 0.5 + lensRingB * 0.35) * whiteHole;
-
-          vec3 col = sourceCol * source + exitCol * whiteHole;
-          float alpha = (horizonRim * 1.55 + disk * 0.8 + stream * 0.78 + tearStrands * 0.7
-            + lensRingA * 0.5 + lensRingB * 0.32) * source;
-          alpha += (exitRim * 1.65 + exitCore * 1.5 + jet * 0.9) * whiteHole;
-          alpha *= uIntensity * smoothstep(0.0, 0.10, p) * (1.0 - smoothstep(0.50, 1.02, r));
-          if (alpha < 0.002) discard;
-          gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
-        }`,
-      transparent: true,
-      depthWrite: false,
-      depthTest: false,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-    });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.galaxyTearMat);
-    mesh.renderOrder = 30;
-    this.galaxyTearGroup.add(mesh);
-    this.galaxyTearGroup.visible = false;
-    this.galaxyTearGroup.frustumCulled = false;
-    this.scene.add(this.galaxyTearGroup);
   }
 
   /** THE MARBLE — one glowing glass sphere with a universe coiled inside,
@@ -4157,7 +3861,6 @@ void main(){
           } else if (this.galaxyInnerFocus) {
             this.galaxyInnerFocus = false;
             this.rig.setZoomTarget(0.668);
-            this.prevDialTarget = 0.668;
           } else {
             this.focusId = null;
             this.galaxyFocusId = null;
@@ -4178,7 +3881,6 @@ void main(){
         } else if (this.galaxyInnerFocus) {
           this.galaxyInnerFocus = false;
           this.rig.setZoomTarget(0.668);
-          this.prevDialTarget = 0.668;
         } else {
           this.focusId = null;
           this.galaxyFocusId = null;
@@ -4216,44 +3918,50 @@ void main(){
   }
 
   resetView() {
-    this.cancelGalaxyEntryFlight();
+    this.cancelGalaxyDive();
     this.focusId = null;
     this.realityFocused = false;
     this.activeGalaxyName = null;
     this.galaxyFocusId = null;
     this.innerFocusBodyId = null;
-    if (this.cosmicStage === 'multiverse') this.beginKamui('toWeb', 0.15);
-    else { this.rig.setZoomTarget(0.15); this.rig.setOrbit(null, 1.12); this.rig.clearPan(); }
-    this.prevDialTarget = 0.15;
+    this.cosmicStage = 'web';
+    this.rig.setZoomTarget(0.15);
+    this.rig.setOrbit(null, 1.12);
+    this.rig.clearPan();
   }
   zoomToMultiverse() {
-    this.cancelGalaxyEntryFlight();
+    this.cancelGalaxyDive();
     this.focusId = null;
     this.realityFocused = false;
     this.activeGalaxyName = null;
     this.galaxyFocusId = null;
-    if (this.cosmicStage === 'web') this.beginKamui('toMultiverse');
-    else { this.realityFocused = true; this.rig.setOrbit(null, 1.05); this.rig.setZoomTarget(this.activeReality ? CameraRig.zoomTOf(this.activeReality.bubbleSize * 5.5) : REALITY_FLOOR); }
+    this.cosmicStage = 'multiverse';
+    this.realityFocused = true;
+    this.rig.setOrbit(null, 1.05);
+    this.rig.setZoomTarget(this.activeReality ? CameraRig.zoomTOf(this.activeReality.bubbleSize * 5.5) : REALITY_FLOOR);
   }
   zoomToSystem() {
-    this.cancelGalaxyEntryFlight();
+    this.cancelGalaxyDive();
     this.focusId = null;
     this.realityFocused = false;
     this.activeGalaxyName = null;
     this.galaxyFocusId = null;
-    if (this.cosmicStage === 'multiverse') this.beginKamui('toWeb', 0.15);
-    else { this.rig.setZoomTarget(0.15); this.rig.setOrbit(null, 1.12); this.rig.clearPan(); }
-    this.prevDialTarget = 0.15;
+    this.cosmicStage = 'web';
+    this.rig.setZoomTarget(0.15);
+    this.rig.setOrbit(null, 1.12);
+    this.rig.clearPan();
   }
   zoomToHierarchy(stageIndex: number) {
-    this.cancelGalaxyEntryFlight();
+    this.cancelGalaxyDive();
     this.focusId = null;
     this.rig.clearPan();
     if (stageIndex <= 2 || stageIndex > 6) { this.activeGalaxyName = null; this.galaxyFocusId = null; } /* outside the galaxy's domain */
     if (stageIndex === 0) { this.zoomToMultiverse(); return; }
     if (stageIndex === 1) { // Reality / Universe — multiverse side
-      if (this.cosmicStage === 'multiverse') { this.realityFocused = false; this.rig.setZoomTarget(0.88); this.rig.setOrbit(null, 1.05); }
-      else this.beginKamui('toMultiverse', 0.88);
+      this.cosmicStage = 'multiverse';
+      this.realityFocused = false;
+      this.rig.setZoomTarget(0.88);
+      this.rig.setOrbit(null, 1.05);
       return;
     }
     // stages 2..10 — cosmic web side. Dials live in the shared stage table
@@ -4262,35 +3970,11 @@ void main(){
     // its own label band.
     const dial = HIERARCHY_DIALS[stageIndex] ?? 0.15;
     const phi = stageIndex === 6 ? 1.08 : stageIndex <= 8 ? 1.1 : 1.12;
-    /* toolbar rides across the galaxy band's edges take the reality bend too */
-    const canWarp = this.cosmicStage === 'web' && this.galaxyWarp === null && this.kamuiFlight === null
-      && this.portal.phase === 'idle' && !this.bootIntro;
     if (this.galaxyInnerFocus && stageIndex >= 7) return; /* inside an isolated system — the origin-based ladder does not apply */
-    if (canWarp && stageIndex === 6) {
-      if (this.rig.tZoomT >= GALAXY_BAND_UPPER) { this.beginGalaxyWarp('arrive', dial, null); this.prevDialTarget = dial; return; }
-      if (this.rig.tZoomT <= GALAXY_DESCEND_CROSS) { this.beginGalaxyWarp('ascend', dial, this.galaxyFocusId, false); this.prevDialTarget = dial; return; }
-    }
-    if (canWarp && stageIndex >= 7 && this.rig.tZoomT >= GALAXY_ASCEND_ENTER && this.rig.tZoomT <= GALAXY_BAND_UPPER) {
-      this.beginGalaxyWarp('descend', dial, null);
-      this.prevDialTarget = dial;
-      return;
-    }
-    if (this.cosmicStage === 'multiverse') this.beginKamui('toWeb', dial);
-    else { this.realityFocused = false; this.rig.setZoomTarget(dial); this.rig.setOrbit(null, phi); }
-    this.prevDialTarget = dial;
-  }
-  /** fire the Kamui jutsu — the only bridge between the two stages */
-  private beginKamui(dir: 'toMultiverse' | 'toWeb', postWarpZoom: number | null = null) {
-    if (this.kamuiFlight !== null || this.galaxyEntryFlight !== null) return;
-    this.warpDir = dir;
-    this.postWarpZoom = postWarpZoom;
-    this.kamuiFlight = 0;
-    this.kamuiFromZoom = this.rig.zoomT;
-    this.grabCooldown = 1.2;
-    if (dir === 'toMultiverse') {
-      this.realityFocused = false; /* the suck owns the camera until the ejection */
-      this.arrivalZoom = this.activeReality ? CameraRig.zoomTOf(this.activeReality.bubbleSize * 5.5) : 0.787;
-    }
+    this.cosmicStage = 'web';
+    this.realityFocused = false;
+    this.rig.setZoomTarget(dial);
+    this.rig.setOrbit(null, phi);
   }
   zoomIn(step = 0.12) {
     this.rig.nudgeZoom(-step);
@@ -4302,7 +3986,11 @@ void main(){
     if (id === 'anchor') { this.resetView(); return; }
     this.focusId = id;
     this.realityFocused = false;
-    if (this.cosmicStage === 'multiverse') { this.beginKamui('toWeb', 0.16); return; }
+    if (this.cosmicStage === 'multiverse') {
+      this.cosmicStage = 'web';
+      this.rig.setZoomTarget(0.16);
+      return;
+    }
     this.rig.clearPan();
     /* Round 53 — cinematic hole framing: focus lands the camera at the
        REFERENCE'S OWN camera (dgreenheck demo: position (0, −5, 20) → 25.8 rs
@@ -4320,19 +4008,16 @@ void main(){
     if (geodesicHole) {
       this.rig.tPhi = 1.814;
       this.rig.setZoomTarget(0.1934);
-      this.prevDialTarget = this.rig.tZoomT;
       return;
     }
     this.rig.setZoomTarget(Math.min(this.rig.tZoomT, 0.16));
-    this.prevDialTarget = this.rig.tZoomT;
   }
   enterCoreMode() {
     this.coreActive = true;
     this.focusId = null;
     this.realityFocused = false;
-    if (this.cosmicStage === 'multiverse') this.beginKamui('toWeb', 0.24);
-    else this.rig.setZoomTarget(0.24);
-    this.prevDialTarget = 0.24;
+    this.cosmicStage = 'web';
+    this.rig.setZoomTarget(0.24);
   }
   exitCoreMode() {
     this.coreActive = false;
@@ -4374,57 +4059,12 @@ void main(){
     });
   }
 
-  private clearPortalSingularity() {
-    if (!this.portalSingularity) return;
-    const { parent, visual } = this.portalSingularity;
-    parent.remove(visual.group);
-    visual.dispose();
-    const i = this.blackHoles.indexOf(visual);
-    if (i >= 0) this.blackHoles.splice(i, 1);
-    this.portalSingularity = null;
-  }
-
-  private preparePortalSingularity(data: CosmicBody) {
-    this.clearPortalSingularity();
-    /* Vaults already contain their physical black hole. A planet, dwarf,
-       nebula, or ordinary hole receives a temporary singularity at its own
-       local center, which becomes visible through the torn surface. */
-    if (data.kind === 'vault') return;
-    let parent: THREE.Group | null = null;
-    const home = this.bodies.find((b) => b.data.id === data.id);
-    if (home) parent = home.group;
-    if (!parent) {
-      for (const node of this.galaxyStageNodes) {
-        const inner = node.innerSys?.planets.find((p) => p.data.id === data.id);
-        if (inner) { parent = inner.group; break; }
-      }
-    }
-    if (!parent) return;
-    /* Round 55 — the tear's singularity is the geodesic renderer itself
-       (hidden on GPUs that cannot run it). It rides the late-tick driver
-       like every other hole and is popped on clear. */
-    const override = getRaymarchOverride();
-    const capable = !this.raymarchDisabled
-      && (canUseRaymarchBlackHole() || (override === 'on' && !isSoftwareRasterizer()));
-    const visual = createBlackHole(Math.max(0.2, data.radius * 0.14), { geodesic: override !== 'off' && capable });
-    parent.add(visual.group);
-    this.blackHoles.push(visual);
-    this.portalSingularity = { parent, visual };
-  }
-
-  private updatePortalSingularity() {
-    if (!this.portalSingularity) return;
-    if (this.portal.phase === 'idle') this.clearPortalSingularity();
-  }
-
   beginPortal(b: { data: CosmicBody }) {
     if (this.portal.phase !== 'idle') return;
     const innerTarget = this.findInnerBody(b.data.id);
     this.portalTargetInnerId = innerTarget ? b.data.id : null;
-    /* Snapshot the traveler's exact camera and framing BEFORE the traversal.
-       The portal is a local surface event — it must not seize the camera, so
-       no focus is assigned and the dial stays where the user left it. On
-       close, leavePortal() cuts straight back to this snapshot. */
+    /* Snapshot the traveler's exact camera and framing BEFORE the zoom-in.
+       On close, leavePortal() eases the dial straight back to this framing. */
     this.portalSavedCam = {
       rig: this.rig.snapshot(),
       focusId: this.focusId,
@@ -4434,78 +4074,33 @@ void main(){
       realityFocused: this.realityFocused,
     };
     this.cosmicStage = 'web';
-    this.portalReturn = false;
     this.portalWasInner = Boolean(innerTarget);
-    /* Keep the camera and orbital frame fixed. The gravity field below uses
-       this center only to distort the rendered surface locally. */
-    if (innerTarget) {
-      const innerPlanet = this.galaxyStageNodes
-        .flatMap((node) => node.innerSys?.planets ?? [])
-        .find((planet) => planet.data.id === b.data.id);
-      innerPlanet?.group.getWorldPosition(this.portalLocalCenter);
-    } else {
-      this.bodies.find((body) => body.data.id === b.data.id)?.group.getWorldPosition(this.portalLocalCenter);
-    }
-    this.portalProfile = b.data.kind === 'vault' ? 'vault' : 'normal';
-    this.portalBodyRadius = Math.max(0.1, b.data.radius);
     this.portal = {
-      phase: 'arming', t: 0, fired: false,
+      phase: 'entering', t: 0, fired: false,
       kind: b.data.kind === 'vault' ? 'vault' : 'diary', bodyId: b.data.id,
     };
-    this.portalReverse = 1;
-    this.portalEject = 0;
-    this.portalCloseLevel = 0;
-    /* a portal must own the whole frame: any flight still driving the dial
-       (a galaxy entry that was mid-run, a scripted warp, a latched band
-       crossing) would keep steering the camera underneath the traversal —
-       cancel them all here and hold the dial where the traveler left it.
-       The inner-focus flag is view state the traveler already earned —
-       the cancel must not strip it (an inner-world portal keeps orbiting
-       that world). */
+    /* any galaxy dive still driving the dial would keep steering the camera
+       underneath the traversal — cancel it here. The inner-focus flag is
+       view state the traveler already earned — the cancel must not strip it
+       (an inner-world portal keeps orbiting that world). */
     const keepInnerFocus = this.galaxyInnerFocus;
-    this.cancelGalaxyEntryFlight();
+    this.cancelGalaxyDive();
     this.galaxyInnerFocus = keepInnerFocus;
-    this.galaxyWarp = null;
-    this.galaxyWarpDrift = 0;
-    this.bandLatch = null;
     this.rig.killZoomMomentum();
-    this.prevDialTarget = this.rig.tZoomT;
-    /* the traversal owns the screen — the traveler keeps full camera freedom
-       (orbit / pan / zoom) so the Kamui can be watched from any angle, but
-       the dial is bounded to a window around the armed framing: an
-       impatient scroll can no longer race it six decades out mid-animation
-       and force the close to slam it back (the "unstable camera" on open) */
-    this.rig.lockInput(true, 0.14);
-    /* Capture every vortex-capable point cloud once, at arm time: while the
-       portal is live the field will bend, spin and draw these points toward
-       the core — "everything near it is attracted" — without moving any
-       object's transform. Recaptured fresh on each opening. */
-    this.portalPointSets.length = 0;
-    this.scene.traverse((obj) => {
-      if ((obj as THREE.Points).isPoints) {
-        const m = (obj as THREE.Points).material as THREE.ShaderMaterial;
-        if (m?.uniforms?.uVortexC && m.uniforms.uVortexS && !m.userData?.immuneToVortex && !obj.userData?.immuneToVortex && !this.portalPointSets.some((s) => s.mat === m)) {
-          this.portalPointSets.push({ points: obj as THREE.Points, mat: m });
-        }
-      }
-    });
-    /* Normal bodies contain an invisible field, not a visible floating hole.
-       Vaults retain their authored black-hole geometry as the destination. */
-    if (b.data.kind === 'vault') this.preparePortalSingularity(b.data);
+    this.grabCooldown = 0.8;
+    /* THE PLAIN ZOOM — the camera dives in toward the world (the focus keeps
+       it centered); the diary or vault opens when the zoom lands. */
+    this.focusId = innerTarget ? null : b.data.id;
+    this.portalEnterDial = CameraRig.zoomTOf(Math.max(0.4, b.data.radius) * 3.2);
+    this.portalReturnDial = this.portalSavedCam.rig.tZoomT;
+    this.rig.setZoomTarget(this.portalEnterDial);
   }
   leavePortal() {
-    /* The return traversal: the vortex re-forms with its swirl unwinding the
-       opposite way, then ejects (white-hole release) and settles to idle. */
-    this.portalCloseLevel = this.portal.phase === 'idle' ? 0 : this.portalVisualT;
-    this.portalReverse = -1;
-    this.portalEject = 0;
-    this.portalReturn = true;
-    this.portal.phase = 'out';
-    this.portal.t = 1;
+    if (this.portal.phase === 'idle') return;
+    this.portal.phase = 'leaving';
+    this.portal.t = 0;
     this.portal.fired = false;
-    /* Cut the camera straight back to the exact pre-open framing. The reverse
-       traversal then plays from the user's own vantage point — no zoom slam
-       toward the anchor, no damped sideways glide. */
+    /* ease the camera back out to the traveler's pre-open framing */
     const saved = this.portalSavedCam;
     if (saved) {
       this.focusId = saved.focusId;
@@ -4513,26 +4108,13 @@ void main(){
       this.galaxyInnerFocus = saved.galaxyInnerFocus;
       this.innerFocusBodyId = saved.innerFocusBodyId;
       this.realityFocused = saved.realityFocused;
-      this.rig.restore(saved.rig);
-      this.prevDialTarget = saved.rig.tZoomT;
-      this.grabCooldown = Math.max(this.grabCooldown, 0.9);
-      this.portalSavedCam = null;
-    }
-    /* While the destination was open the forward traversal may have fully
-       settled to idle (finishEntry), which clears the inner target and the
-       embedded singularity — re-arm both so the reverse has its subject. */
-    const inner = this.findInnerBody(this.portal.bodyId);
-    if (inner) this.portalTargetInnerId = this.portal.bodyId;
-    if (!this.portalSingularity) {
-      const target = inner ?? this.bodies.find((b) => b.data.id === this.portal.bodyId);
-      if (target) this.preparePortalSingularity(target.data);
+      this.rig.setZoomTarget(saved.rig.tZoomT);
+      this.grabCooldown = Math.max(this.grabCooldown, 0.6);
     }
   }
-  /* called once the destination overlay appears — the distortion settles away */
+  /* called once the destination overlay appears */
   finishEntry() {
-    this.portalReturn = false;
-    this.portal.phase = 'out';
-    this.portal.t = Math.max(this.portal.t, 0.62);
+    if (this.portal.phase === 'entering') this.portal.phase = 'open';
   }
   /* public entry used by Core Mode "open world" */
   portalTo(id: string) {
@@ -4825,21 +4407,6 @@ void main(){
   }
 
 
-  /**
-   * Fire the Kamui jutsu in place: reality tears at the Astral Core, the
-   * surroundings bend into the swirl, the tunnel passes, and the view
-   * settles back where it started. No stage change — the visual experience
-   * of the warp without a destination.
-   */
-  triggerKamui(_targetUv?: THREE.Vector2) {
-    if (this.bootIntro || this.kamuiFlight !== null || this.kamuiPulse !== null
-      || this.galaxyEntryFlight !== null || this.galaxyWarp !== null) return;
-    this.kamuiPulse = 0;
-    this.kamuiPulseFromZoom = this.rig.tZoomT;
-    this.rig.killZoomMomentum();
-    this.grabCooldown = 1.2;
-  }
-
   /** Distant exoplanet horizon plates (cinematic tier): procedural billboard
       worlds drifting in the deep cosmic web. Built once; a tier upgrade
       after boot rebuilds them via onQualityChange. */
@@ -4874,169 +4441,55 @@ void main(){
   zoomToDemonCore() {
     this.focusId = null;
     this.realityFocused = false;
-    if (this.cosmicStage === 'web') this.beginKamui('toMultiverse', 0.94);
-    else { this.rig.setZoomTarget(0.94); this.prevDialTarget = 0.94; }
+    this.cosmicStage = 'multiverse';
+    this.rig.setZoomTarget(0.94);
     this.rig.setOrbit(0.82, 1.12);
     this.rig.clearPan();
   }
 
-  /** Frame the Astral Core (without the kamui flash) */
+  /** Frame the Astral Core */
   zoomToCore() {
     this.focusId = null;
     this.realityFocused = false;
-    if (this.cosmicStage === 'web') this.beginKamui('toMultiverse', 0.93);
-    else { this.rig.setZoomTarget(0.93); this.prevDialTarget = 0.93; }
+    this.cosmicStage = 'multiverse';
+    this.rig.setZoomTarget(0.93);
     this.rig.setOrbit(0.85, 1.1);
     this.rig.clearPan();
   }
 
-  private cancelGalaxyEntryFlight() {
-    const f = this.galaxyEntryFlight;
-    if (!f) return;
-    this.galaxyEntryFlight = null;
-    this.kamuiWarpFx = 0;
-    this.galaxyTearGroup.visible = false;
-    this.galaxyStagePointMats.forEach(({ mat }) => {
-      mat.uniforms.uVortexS.value = 0;
-      mat.uniforms.uVortexR.value = 0;
-      mat.uniforms.uVortexPull.value = 0;
-    });
-    if (f.galaxyId) {
-      this.galaxyStageNodes.find((n) => n.data.id === f.galaxyId)?.group.scale.setScalar(1);
-    }
+  private cancelGalaxyDive() {
+    this.galaxyDive = null;
     this.galaxyInnerFocus = false;
   }
 
-  /** Start the local galaxy-entry Kamui. This is intentionally not the
-      Cosmic Web ↔ Multiverse flight: the tear belongs to the clicked galaxy,
-      consumes its surrounding galaxy field, and lands at its stellar system. */
+  /** Enter a galaxy with a plain camera zoom: the dial eases from the web
+      frame down into the clicked galaxy. For galaxies other than home, the
+      camera lands inside that galaxy's own isolated stellar system. */
   private beginGalaxyEntry(gal: GalaxyData): boolean {
-    if (this.galaxyEntryFlight !== null || this.galaxyWarp !== null || this.kamuiFlight !== null || this.portal.phase !== 'idle' || this.bootIntro) return false;
+    if (this.galaxyDive !== null || this.portal.phase !== 'idle' || this.bootIntro) return false;
     if (this.cosmicStage !== 'web') return false;
     const node = this.galaxyStageNodes.find((n) => n.data.id === gal.id);
-    const center = new THREE.Vector3();
-    if (node) node.group.getWorldPosition(center);
-    else if (!gal.isHomeGalaxy) return false;
-    const radius = node?.radius ?? 5600;
+    if (!node && !gal.isHomeGalaxy) return false;
     const endInner = !gal.isHomeGalaxy;
     this.galaxyFocusId = endInner ? gal.id : null;
     this.galaxyInnerFocus = false;
-    this.galaxyEntryFlight = {
-      t: 0,
-      fromDial: this.rig.tZoomT,
-      toDial: gal.isHomeGalaxy ? 0.15 : CameraRig.zoomTOf(140),
-      center,
-      galaxyId: endInner ? gal.id : null,
-      radius,
-      endInner,
-    };
+    if (endInner) {
+      this.galaxyDive = { galaxyId: gal.id, endInner: true };
+    }
     this.grabCooldown = 1.25;
     this.rig.clearPan();
     this.rig.setOrbit(null, 1.08);
-    this.galaxyTearMat.uniforms.uProgress.value = 0;
-    this.galaxyTearMat.uniforms.uIntensity.value = 0.25;
-    (this.galaxyTearMat.uniforms.uColorA.value as THREE.Color).set(gal.color || this.activeReality?.colorA || '#38bdf8');
-    (this.galaxyTearMat.uniforms.uColorB.value as THREE.Color).set(this.activeReality?.colorB || '#8b5cf6');
-    this.galaxyTearGroup.visible = true;
+    this.rig.setZoomTarget(gal.isHomeGalaxy ? 0.15 : CameraRig.zoomTOf(140));
     return true;
-  }
-
-  /** Animate the clicked galaxy's local surface rupture and suction field. */
-  private updateGalaxyEntryFlight(dt: number) {
-    const f = this.galaxyEntryFlight;
-    if (!f) return;
-    f.t = Math.min(1, f.t + dt / 4.6);
-    const p = f.t;
-    const ease = 1 - Math.pow(1 - p, 3);
-    const pulse = Math.sin(Math.min(p, 0.96) / 0.96 * Math.PI);
-    const suction = THREE.MathUtils.smoothstep(p, 0.08, 0.52) * (1 - THREE.MathUtils.smoothstep(p, 0.82, 1) * 0.65);
-    const ejection = THREE.MathUtils.smoothstep(p, 0.68, 0.88);
-    const node = f.galaxyId ? this.galaxyStageNodes.find((n) => n.data.id === f.galaxyId) : null;
-    if (node) node.group.getWorldPosition(this._vScratch2);
-    else this._vScratch2.copy(f.center);
-    f.center.copy(this._vScratch2);
-
-    this.galaxyTearGroup.position.copy(f.center);
-    this.galaxyTearGroup.quaternion.copy(this.camera.quaternion);
-    this.galaxyTearGroup.rotateZ(dt * (2.0 + p * 9.0));
-    const tearSize = f.radius * (0.045 + ease * 1.55 + pulse * 0.18);
-    this.galaxyTearGroup.scale.set(tearSize * this.camera.aspect, tearSize, 1);
-    this.galaxyTearMat.uniforms.uTime.value = this.clockT;
-    this.galaxyTearMat.uniforms.uProgress.value = p;
-    this.galaxyTearMat.uniforms.uIntensity.value = 0.55 + pulse * 1.35 + ejection * 0.28;
-
-    /* Every staged galaxy cloud has its own local coordinate system. Reframe
-       the vortex center per cloud so neighboring galaxies are visibly pulled
-       toward the clicked one instead of merely disappearing behind a screen FX. */
-    const vortexRadius = f.radius * (1.8 + p * 18.0);
-    this.galaxyStagePointMats.forEach(({ points, mat }) => {
-      this._vScratch3.copy(f.center);
-      points.worldToLocal(this._vScratch3);
-      (mat.uniforms.uVortexC.value as THREE.Vector3).copy(this._vScratch3);
-      mat.uniforms.uVortexR.value = vortexRadius;
-      mat.uniforms.uVortexS.value = 0.05 + suction * 1.25;
-      mat.uniforms.uVortexT.value = this.clockT * 1.8;
-      mat.uniforms.uVortexPull.value = 1;
-    });
-    if (node) {
-      node.group.rotation.y += dt * (1.2 + p * 7.0);
-      node.group.rotation.z += dt * (0.7 + p * 4.0);
-      node.group.scale.setScalar(1 + pulse * 0.42 + suction * 0.14);
-    }
-    /* The destination system starts to resolve behind the white-hole burst,
-       while the final frames still carry the camera through the exit. */
-    if (f.endInner && p > 0.82) this.galaxyInnerFocus = true;
-
-    this.rig.killZoomMomentum();
-    this.rig.setZoomTarget(THREE.MathUtils.lerp(f.fromDial, f.toDial, ease));
-    this.kamuiWarpFx = pulse * 1.18 + ejection * 0.18;
-    if (f.t >= 1) {
-      this.galaxyEntryFlight = null;
-      this.kamuiWarpFx = 0;
-      this.galaxyTearGroup.visible = false;
-      this.galaxyStagePointMats.forEach(({ mat }) => {
-        mat.uniforms.uVortexS.value = 0;
-        mat.uniforms.uVortexR.value = 0;
-        mat.uniforms.uVortexPull.value = 0;
-      });
-      if (node) node.group.scale.setScalar(1);
-      this.galaxyInnerFocus = f.endInner;
-      this.rig.setZoomTarget(f.toDial);
-      this.prevDialTarget = this.rig.tZoomT;
-    }
-  }
-
-  /** THE GALAXY WARP — a scripted 2.6s bend used only when the hierarchy
-      navigator crosses the galaxy band. Direct galaxy clicks use the focused
-      surface tear above; Cosmic Web ↔ Multiverse keeps its own Kamui flight. */
-  private beginGalaxyWarp(dir: 'arrive' | 'descend' | 'ascend', toDial: number, focusGalaxyId: string | null, endInner = false): boolean {
-    if (this.galaxyEntryFlight !== null || this.galaxyWarp !== null || this.kamuiFlight !== null || this.portal.phase !== 'idle' || this.bootIntro) return false;
-    if (this.cosmicStage !== 'web') return false;
-    const center = new THREE.Vector3(0, 0, 0);
-    if (focusGalaxyId) {
-      const node = this.galaxyStageNodes.find((n) => n.data.id === focusGalaxyId);
-      if (node) node.group.getWorldPosition(center);
-    }
-    this.galaxyFocusId = focusGalaxyId;
-    if (!endInner) this.galaxyInnerFocus = false;
-    this.galaxyWarp = { dir, t: 0, fromDial: this.rig.tZoomT, toDial, center, endInner };
-    this.grabCooldown = 1.0;
-    return true;
-  }
-
-  /** The return bend — climbing out of a system re-folds the field and lands
-      in front of the specific galaxy you visited (or the home galaxy). */
-  private fireAscend() {
-    this.beginGalaxyWarp('ascend', 0.668, this.galaxyFocusId, this.galaxyInnerFocus);
   }
 
   /** Dive into a specific major galaxy. EVERY galaxy is a real, isolated
-      realm with its own stellar system — so clicking one triggers the bend
-      and carries the camera INTO its realm: the disc becomes the sky and the
-      galaxy's own star + worlds appear. The home galaxy's realm is the
-      anchor star system with all your memory worlds. The galaxy is resolved
-      from the engine's own stage (the runtime roster) — the static defaults
-      may not know about user-created galaxies. */
+      realm with its own stellar system — so clicking one zooms the camera
+      INTO its realm: the disc becomes the sky and the galaxy's own star +
+      worlds appear. The home galaxy's realm is the anchor star system with
+      all your memory worlds. The galaxy is resolved from the engine's own
+      stage (the runtime roster) — the static defaults may not know about
+      user-created galaxies. */
   enterGalaxy(realityId: string, galaxyId: string) {
     /* a dive into ANOTHER reality arrives before that reality's roster is
        on the stage (the App switches reality then calls this synchronously).
@@ -5055,8 +4508,9 @@ void main(){
     this.realityFocused = false;
     this.activeGalaxyName = gal.name;
     if (this.cosmicStage === 'multiverse') {
+      this.cosmicStage = 'web';
       this.galaxyFocusId = gal.id;
-      this.beginKamui('toWeb', CameraRig.zoomTOf(26000));
+      this.rig.setZoomTarget(CameraRig.zoomTOf(26000));
       return;
     }
     if (gal.isHomeGalaxy) {
@@ -5138,7 +4592,6 @@ void main(){
     this.selectedId = null;
     /* zoom back out to the system frame (the depth the dive landed at) */
     this.rig.setZoomTarget(CameraRig.zoomTOf(150));
-    this.prevDialTarget = CameraRig.zoomTOf(150);
     this.cb.onSelectInnerWorld?.(null);
   }
 
@@ -5151,11 +4604,6 @@ void main(){
     this.composer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    if (this.bgRT) {
-      const size = new THREE.Vector2();
-      this.renderer.getDrawingBufferSize(size);
-      this.bgRT.setSize(Math.max(1, Math.floor(size.x / 2)), Math.max(1, Math.floor(size.y / 2)));
-    }
   };
 
   private tick = () => {
@@ -5185,88 +4633,35 @@ void main(){
       this.cb.onSimDate(new Date(this.epoch + this.simDays * DAY).toISOString());
     }
 
-    /* Planet/Vault Kamui is a staged field, not an instant overlay. Each
-       state has its own timing so disturbance, deformation, vortex, collapse,
-       opening, and traversal remain causally connected. The linear chain's
-       timings live in systems/portalPhases.ts; hold/out stay bespoke. */
-    const advancePortal = (duration: number, next: PortalPhase) => {
-      this.portal.t = Math.min(1, this.portal.t + dt / duration);
-      if (this.portal.t >= 1) { this.portal.t = 0; this.portal.phase = next; }
-    };
-    const chainStep = portalTransitionFor(this.portal.phase);
-    if (chainStep) {
-      advancePortal(
-        this.reducedMotion ? chainStep.reduced : chainStep.duration,
-        chainStep.next,
-      );
-    } else if (this.portal.phase === 'opening') {
-      advancePortal(this.reducedMotion ? 0.15 : (this.portalProfile === 'vault' ? 0.72 : 0.9), 'hold');
-      if (!this.portal.fired && this.portal.t > 0.72) {
+    /* The portal — a plain camera zoom. Clicking a world dives the camera
+       in toward it; when the zoom lands the destination overlay opens.
+       Closing eases the camera back out to the pre-open framing. */
+    if (this.portal.phase === 'entering' || this.portal.phase === 'leaving') {
+      this.portal.t += dt;
+    }
+    if (this.portal.phase === 'entering') {
+      const arrived = Math.abs(this.rig.tZoomT - this.portalEnterDial) < 0.004
+        && Math.abs(this.rig.zoomT - this.portalEnterDial) < 0.004;
+      if (!this.portal.fired && (arrived || this.portal.t > 6)) {
         this.portal.fired = true;
+        this.portal.phase = 'open';
         this.cb.onPortalPeak(this.portal.kind, this.portal.bodyId);
       }
-    } else if (this.portal.phase === 'hold') {
-      this.portal.t = Math.min(1, this.portal.t + dt / 1.6);
-    } else if (this.portal.phase === 'out') {
-      /* Return traversal runs longer — it carries a full re-form → eject →
-         settle sequence instead of a plain decay. */
-      this.portal.t = Math.max(0, this.portal.t - dt / (this.portalReturn ? 1.5 : 1.15));
-    if (this.portal.t <= 0) {
-      const returningInner = this.portalWasInner || Boolean(this.portalTargetInnerId);
-      this.portal.phase = 'idle';
-      this.portalTargetInnerId = null;
-      this.portalReverse = 1;
-      this.portalEject = 0;
-      this.portalCloseLevel = 0;
-      this.kamuiWarpFx = 0;
-      this.portalPointSets.length = 0;
-      this.portalSavedCam = null;
-      /* the traversal is over — the traveler has the rig back */
-      this.rig.lockInput(false);
-      if (this.portalReturn) {
-        this.portalReturn = false;
+    } else if (this.portal.phase === 'leaving') {
+      const settled = Math.abs(this.rig.tZoomT - this.portalReturnDial) < 0.004
+        && Math.abs(this.rig.zoomT - this.portalReturnDial) < 0.004;
+      if (settled || this.portal.t > 6) {
+        const returningInner = this.portalWasInner || Boolean(this.portalTargetInnerId);
+        this.portal.phase = 'idle';
+        this.portalTargetInnerId = null;
         this.portalWasInner = false;
-        this.selectedId = null;
-        /* The camera was already cut back to the traveler's pre-open framing
-           by leavePortal(); nothing left to move here. Only the App's
-           inner-world selection card needs releasing. */
+        this.portalSavedCam = null;
         if (returningInner) this.cb.onSelectInnerWorld?.(null);
+        this.cb.onPortalDone();
       }
-      this.cb.onPortalDone();
     }
-    }
-    const phaseProgress = this.portal.t * this.portal.t * (3 - 2 * this.portal.t);
-    let ease = this.portal.phase === 'out'
-      ? phaseProgress
-      : Math.min(1, (PORTAL_PHASE_WEIGHTS[this.portal.phase] ?? 0) + phaseProgress * 0.22);
-    /* REVERSE KAMUI — the close of a diary/vault replays the jutsu backward:
-       RE-FORM (the vortex snaps back to strength, swirl unwinding the opposite
-       way) → EJECT (white-hole release: matter is pushed back out, FOV pulse)
-       → SETTLE (the field breathes out to idle). */
-    this.portalEject = 0;
-    if (this.portal.phase === 'out' && this.portalReturn) {
-      const rt = 1 - this.portal.t;
-      const smooth = (k: number) => k * k * (3 - 2 * k);
-      if (rt < 0.24) {
-        ease = THREE.MathUtils.lerp(this.portalCloseLevel, 0.92, smooth(rt / 0.24));
-      } else if (rt < 0.52) {
-        const k = (rt - 0.24) / 0.28;
-        ease = THREE.MathUtils.lerp(0.92, 0.18, k) + 0.10 * Math.sin(k * Math.PI);
-        this.portalEject = Math.sin(k * Math.PI);
-      } else {
-        ease = 0.18 * (1 - smooth((rt - 0.52) / 0.48));
-      }
-      /* no fov kick here — a planetary close must feel like the field
-         settling, not like a lens punch (the "random zoom" pulse) */
-    }
-    /* This value feeds only the embedded body field. Macro Kamui systems keep
-       their own geometry and remain completely independent. */
-    this.portalVisualT = this.portal.phase === 'idle' ? 0 : ease;
 
-    /* cinematic fov kick — only the macro Kamui warp stretches the lens now.
-       Planet/vault portals keep the fov pinned: the old ease-driven punch
-       (wide → snap back) read as random zoom pulsing on every open. */
-    const targetFov = 50 - this.coreT * 4 + this.kamuiWarpFx * 28;
+    const targetFov = 50 - this.coreT * 4;
     this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, dt * 4);
     this.camera.updateProjectionMatrix();
 
@@ -5282,170 +4677,21 @@ void main(){
       this.grabCooldown = 0.6;
     }
 
-    /* KAMUI — the teleportation jutsu. At the end of the Cosmic Web the
-       reality itself tears: the surface bends and swirls with black-hole
-       gravity, everything spirals into the vortex, the scene teleports, and
-       a second portal opens at your reality's marble that ejects you into
-       the multiverse. Fully automatic — the script owns the dial. The same
-       jutsu carries you back the other way. */
-    if (this.kamuiFlight !== null) {
-      /* KAMUI — the jutsu script. One continuous flight, four beats:
-         TEAR (reality rips at one point) → SUCK (+z, nearest-first wave)
-         → TUNNEL (through the fold) → EJECT (−z, out of the marble). */
-      this.kamuiFlight = Math.min(1, this.kamuiFlight + dt / 3.6);
-      const t = this.kamuiFlight;
-      this.rig.killZoomMomentum();
-      this.kamuiWarpFx = Math.sin(Math.min(t, 0.92) / 0.92 * Math.PI);
-      /* THE TUNNEL — a round unstable fold with great torque, sweeping past
-         the camera through the deepest part of the jutsu */
-      const tw0 = 0.3, tw1 = 0.68;
-      if (t > tw0 && t < tw1) {
-        const k = (t - tw0) / (tw1 - tw0);
-        this.kamuiTunnel.visible = true;
-        this.kamuiTunnel.position.z = THREE.MathUtils.lerp(-1600000, 1600000, k);
-        this.kamuiTunnel.rotation.z += dt * (3.5 + k * 6); /* great high torque */
-        this.kamuiTunnelMats.forEach((m) => {
-          m.uniforms.uTime.value = this.clockT;
-          m.uniforms.uSpin.value = this.kamuiTunnel.rotation.z;
-          m.uniforms.uOpacity.value = Math.sin(k * Math.PI) * 0.9;
-        });
-      } else if (this.kamuiTunnel.visible) this.kamuiTunnel.visible = false;
-      if (this.warpDir === 'toMultiverse') {
-        if (t < 0.55) {
-          /* web side — THE TEAR, THE SUCK, into THE TUNNEL */
-          const suck = Math.min(1, t / 0.45);
-          const R = 45000 + suck * 480000;
-          this.webVortexMats.forEach((m) => {
-            (m.uniforms.uVortexC.value as THREE.Vector3).set(0, 0, 0);
-            m.uniforms.uVortexR.value = R;
-            m.uniforms.uVortexS.value = 1;
-            m.uniforms.uVortexT.value = this.clockT;
-          });
-          this.kamuiSuckDrift = suck * 60000; /* dragged along +z into the vortex */
-          if (t < 0.45) this.rig.setZoomTarget(THREE.MathUtils.lerp(0.86, 0.855, Math.min(1, t / 0.45)));
-          else this.rig.setZoomTarget(THREE.MathUtils.lerp(0.855, 0.72, Math.min(1, (t - 0.45) / 0.1)));
-        } else {
-          /* through the fold — THE EJECT, spat out of the marble's glass along -z */
-          if (this.cosmicStage !== 'multiverse') {
-            this.cosmicStage = 'multiverse';
-            this.realityFocused = true;
-            this.kamuiSuckDrift = 0;
-            this.kamuiEjectK = 0;
-            this.webVortexMats.forEach((m) => { m.uniforms.uVortexS.value = 0; });
-          }
-          const k = Math.min(1, (t - 0.55) / 0.35);
-          this.kamuiEjectK = k;
-          const ease = 1 - Math.pow(1 - k, 3);
-          this.rig.setZoomTarget(THREE.MathUtils.lerp(0.72, this.arrivalZoom, ease) + 0.05 * Math.sin(k * Math.PI));
-        }
-      } else {
-        /* the return jutsu — the multiverse swirls you back into the web */
-        if (t < 0.55) {
-          if (this.cosmicStage !== 'multiverse') this.cosmicStage = 'multiverse';
-          if (t < 0.45) this.rig.setZoomTarget(THREE.MathUtils.lerp(this.kamuiFromZoom, 0.8, Math.min(1, t / 0.45)));
-          else this.rig.setZoomTarget(THREE.MathUtils.lerp(0.8, 0.72, Math.min(1, (t - 0.45) / 0.1)));
-        } else {
-          if (this.cosmicStage !== 'web') { this.cosmicStage = 'web'; this.realityFocused = false; }
-          const k = Math.min(1, (t - 0.55) / 0.35);
-          const end = this.postWarpZoom ?? 0.82;
-          const ease = 1 - Math.pow(1 - k, 3);
-          this.rig.setZoomTarget(THREE.MathUtils.lerp(0.72, end, ease) + 0.05 * Math.sin(k * Math.PI));
+    /* the galaxy dive — the dial eases on its own; flip into the isolated
+       inner system once the camera is actually inside the disc */
+    if (this.galaxyDive && this.galaxyDive.endInner && !this.galaxyInnerFocus && this.portal.phase === 'idle') {
+      const dive = this.galaxyDive;
+      const node = this.galaxyStageNodes.find((n) => n.data.id === dive.galaxyId);
+      if (node) {
+        node.group.getWorldPosition(this._vScratch2);
+        if (this.camera.position.distanceTo(this._vScratch2) < 6800) {
+          this.galaxyInnerFocus = true;
+          this.galaxyDive = null;
         }
       }
-      if (t >= 1) {
-        this.kamuiFlight = null;
-        this.kamuiEjectK = 0;
-        this.kamuiSuckDrift = 0;
-        if (this.postWarpZoom !== null) { this.rig.setZoomTarget(this.postWarpZoom); this.postWarpZoom = null; }
-        this.prevDialTarget = this.rig.tZoomT; /* the scripted ride must not re-trigger the band bends */
-      }
-    } else if (this.galaxyEntryFlight !== null) {
-      /* Local galaxy-entry Kamui: the clicked disc tears open and the
-         surrounding galaxy field is pulled into that rupture. */
-      this.updateGalaxyEntryFlight(dt);
-    } else if (this.galaxyWarp !== null) {
-      /* THE GALAXY WARP — reality folds in a swirling gravitational bend:
-         the web's structures whirl around the destination (+z pull), the
-         tunnel passes, then the −z counter-fold settles the destination into
-         view. The script owns the dial until it lands. */
-      const w = this.galaxyWarp;
-      w.t = Math.min(1, w.t + dt / 2.6);
-      const t = w.t;
-      this.rig.killZoomMomentum();
-      this.kamuiWarpFx = Math.sin(Math.min(t, 0.92) / 0.92 * Math.PI) * 0.8;
-      this.galaxyWarpDrift = Math.sin(t * Math.PI) * (w.dir === 'descend' ? 9000 : 7000);
-      const tw0 = 0.3, tw1 = 0.68;
-      if (t > tw0 && t < tw1) {
-        const k = (t - tw0) / (tw1 - tw0);
-        this.kamuiTunnel.visible = true;
-        this.kamuiTunnel.position.z = THREE.MathUtils.lerp(-1600000, 1600000, k);
-        this.kamuiTunnel.rotation.z += dt * (3.5 + k * 6);
-        this.kamuiTunnelMats.forEach((m) => {
-          m.uniforms.uTime.value = this.clockT;
-          m.uniforms.uSpin.value = this.kamuiTunnel.rotation.z;
-          m.uniforms.uOpacity.value = Math.sin(k * Math.PI) * 0.85;
-        });
-      } else if (this.kamuiTunnel.visible) this.kamuiTunnel.visible = false;
-      /* the bend itself — the web whirls around the destination */
-      const R = 22000 + t * 70000;
-      this.webVortexMats.forEach((m) => {
-        (m.uniforms.uVortexC.value as THREE.Vector3).copy(w.center);
-        m.uniforms.uVortexR.value = R;
-        m.uniforms.uVortexS.value = 1;
-        m.uniforms.uVortexT.value = this.clockT;
-      });
-      const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-      this.rig.setZoomTarget(THREE.MathUtils.lerp(w.fromDial, w.toDial, ease));
-      if (t >= 1) {
-        this.galaxyWarp = null;
-        this.kamuiWarpFx = 0;
-        this.galaxyWarpDrift = 0;
-        this.webVortexMats.forEach((m) => { m.uniforms.uVortexS.value = 0; });
-        if (this.kamuiTunnel.visible) this.kamuiTunnel.visible = false;
-        this.galaxyInnerFocus = w.endInner;
-        if (!w.endInner && w.toDial <= 0.3) this.galaxyFocusId = null; /* arrived inside the home system */
-        this.prevDialTarget = this.rig.tZoomT;
-      }
-    } else if (this.kamuiPulse !== null) {
-      /* KAMUI PULSE — the jutsu fired in place. The same four beats as the
-         macro warp (TEAR → SUCK → TUNNEL → SETTLE) with no stage change:
-         reality bends around the Astral Core and the dial returns home. */
-      this.kamuiPulse = Math.min(1, this.kamuiPulse + dt / 2.4);
-      const t = this.kamuiPulse;
-      this.rig.killZoomMomentum();
-      this.kamuiWarpFx = Math.sin(Math.min(t, 0.92) / 0.92 * Math.PI);
-      const tw0 = 0.3, tw1 = 0.68;
-      if (t > tw0 && t < tw1) {
-        const k = (t - tw0) / (tw1 - tw0);
-        this.kamuiTunnel.visible = true;
-        this.kamuiTunnel.position.z = THREE.MathUtils.lerp(-1600000, 1600000, k);
-        this.kamuiTunnel.rotation.z += dt * (3.5 + k * 6);
-        this.kamuiTunnelMats.forEach((m) => {
-          m.uniforms.uTime.value = this.clockT;
-          m.uniforms.uSpin.value = this.kamuiTunnel.rotation.z;
-          m.uniforms.uOpacity.value = Math.sin(k * Math.PI) * 0.85;
-        });
-      } else if (this.kamuiTunnel.visible) this.kamuiTunnel.visible = false;
-      /* the bend — the web whirls around the Astral Core */
-      const R = 22000 + t * 70000;
-      this.webVortexMats.forEach((m) => {
-        (m.uniforms.uVortexC.value as THREE.Vector3).set(0, 0, 0);
-        m.uniforms.uVortexR.value = R;
-        m.uniforms.uVortexS.value = 1;
-        m.uniforms.uVortexT.value = this.clockT;
-      });
-      /* the suck and the settle — the dial dives a breath toward the tear,
-         then eases back to exactly where it started */
-      this.rig.setZoomTarget(this.kamuiPulseFromZoom + Math.sin(t * Math.PI) * 0.05);
-      if (t >= 1) {
-        this.kamuiPulse = null;
-        this.kamuiWarpFx = 0;
-        this.webVortexMats.forEach((m) => { m.uniforms.uVortexS.value = 0; });
-        if (this.kamuiTunnel.visible) this.kamuiTunnel.visible = false;
-        this.rig.setZoomTarget(this.kamuiPulseFromZoom);
-        this.prevDialTarget = this.rig.tZoomT;
-      }
-    } else if (this.bootIntro) {
+    }
+
+    if (this.bootIntro) {
       /* THE QUIET OPENING — no eruption. The home page already sits fully
          formed behind the opaque veil; this finalize runs once on the first
          frame so nothing boot-related can linger (sleeping meteors, hidden
@@ -5461,21 +4707,22 @@ void main(){
       this.rig.setOrbit(null, 1.12);
       this.bootIntro = false;
     } else {
-      /* stage edges — the dial can never cross between the stages */
-      if (this.cosmicStage === 'web' && this.rig.tZoomT > WEB_CEILING) this.rig.setZoomTarget(WEB_CEILING);
-      /* the web's edge — pulling beyond it is what tears reality open */
-      if (
-        this.cosmicStage === 'web' && this.rig.tZoomT >= WEB_EDGE_TRIGGER && this.rig.zoomVelocity > WARP_ZOOM_VEL
-        && this.grabCooldown <= 0 && !this.dragging && this.portal.phase === 'idle'
-        && !this.focusId && !this.coreActive && this.activeReality
-      ) {
-        /* the tear begins */
-        this.realityFocused = false;
-        this.warpDir = 'toMultiverse';
-        this.kamuiFlight = 0;
-        this.kamuiFromZoom = this.rig.zoomT;
-        this.arrivalZoom = this.activeReality ? CameraRig.zoomTOf(this.activeReality.bubbleSize * 5.5) : 0.787;
-        this.grabCooldown = 1.2;
+      /* stage edges — the dial carries you across between the two stages */
+      if (this.cosmicStage === 'web') {
+        if (this.rig.tZoomT > WEB_CEILING) this.rig.setZoomTarget(WEB_CEILING);
+        /* the web's edge — pulling beyond it crosses over into the multiverse */
+        if (
+          this.rig.tZoomT >= WEB_EDGE_TRIGGER && this.rig.zoomVelocity > WARP_ZOOM_VEL
+          && this.grabCooldown <= 0 && !this.dragging && this.portal.phase === 'idle'
+          && !this.focusId && !this.coreActive && this.activeReality
+        ) {
+          this.realityFocused = true;
+          this.cosmicStage = 'multiverse';
+          this.arrivalZoom = this.activeReality ? CameraRig.zoomTOf(this.activeReality.bubbleSize * 5.5) : 0.787;
+          this.rig.setZoomTarget(this.arrivalZoom);
+          this.rig.killZoomMomentum();
+          this.grabCooldown = 1.2;
+        }
       }
       if (this.cosmicStage === 'multiverse') {
         if (this.realityFocused && this.rig.tZoomT < REALITY_FLOOR) this.rig.setZoomTarget(REALITY_FLOOR);
@@ -5484,32 +4731,31 @@ void main(){
           this.grabCooldown = 0.6;
         }
         if (this.rig.tZoomT < MULTIVERSE_FLOOR_CLAMP) this.rig.setZoomTarget(MULTIVERSE_FLOOR_CLAMP);
-        /* the return tear — pushed through the multiverse's floor */
+        /* pushed through the multiverse's floor — the dial carries you back
+           out into the web */
         if (
           this.rig.tZoomT <= MULTIVERSE_FLOOR_RETURN && this.rig.zoomVelocity < RETURN_ZOOM_VEL && this.grabCooldown <= 0
           && !this.dragging && this.portal.phase === 'idle'
         ) {
           this.realityFocused = false;
-          this.warpDir = 'toWeb';
-          this.kamuiFlight = 0;
-          this.kamuiFromZoom = this.rig.zoomT;
+          this.cosmicStage = 'web';
+          this.rig.setZoomTarget(0.72);
+          this.rig.killZoomMomentum();
           this.grabCooldown = 1.2;
         }
       }
       /* galaxy focus releases, in a ladder:
-         inner system → zoom out → back to that galaxy’s frame (in front of
+         inner system → zoom out → back to that galaxy's frame (in front of
          the specific galaxy you visited); galaxy frame → zoom out → the open
          field; zooming INTO a home-galaxy frame dives THROUGH it into the
-         anchor star system. A live portal keeps the framing frozen — the
-         restore on close expects the armed focus state to still be here. */
+         anchor star system. */
       if (this.cosmicStage === 'web' && this.portal.phase === 'idle' && this.galaxyFocusId && this.rig.atFocusMax && this.rig.zoomTrend > 0) {
         if (this.innerFocusBodyId) {
           this.releaseInnerWorld(); /* world → system frame */
           this.grabCooldown = 0.35;
         } else if (this.galaxyInnerFocus) {
           this.galaxyInnerFocus = false;
-          this.rig.setZoomTarget(GALAXY_DIAL); /* back in front of that galaxy */
-          this.prevDialTarget = GALAXY_DIAL;
+          this.rig.setZoomTarget(0.668); /* back in front of that galaxy */
           this.grabCooldown = 0.6;
         } else {
           this.galaxyFocusId = null;
@@ -5523,53 +4769,6 @@ void main(){
           this.grabCooldown = 0.35;
         }
       }
-      /* GALAXY WARP TRIGGERS — the band’s edges are folds in space. A
-         crossing blocked by grab-cooldown (e.g. a body-focus release) is
-         latched and fires the moment you’re free — the return bend must
-         never be silently skipped. */
-      const dialNow = this.rig.tZoomT;
-      const dialPrev = this.prevDialTarget;
-      const warpFree = this.galaxyWarp === null && this.kamuiFlight === null
-        && this.portal.phase === 'idle' && !this.dragging && !this.bootIntro;
-      const arriveCross = dialPrev >= GALAXY_BAND_UPPER && dialNow < GALAXY_ARRIVE_CROSS && dialNow >= GALAXY_BAND_LOWER;
-      const downCross = dialPrev >= GALAXY_ASCEND_ENTER && dialPrev <= GALAXY_BAND_UPPER && dialNow < GALAXY_DESCEND_CROSS;
-      const upCross = dialPrev <= GALAXY_DESCEND_CROSS && dialNow > GALAXY_ASCEND_CROSS;
-      const canFire = warpFree && this.grabCooldown <= 0 && this.cosmicStage === 'web';
-      if (canFire) {
-        if (arriveCross) {
-          this.beginGalaxyWarp('arrive', GALAXY_DIAL, null);
-        } else if (downCross) {
-          /* a dive through the band WITHOUT clicking a specific galaxy
-             always folds down into the HOME galaxy's anchor system */
-          this.beginGalaxyWarp('descend', Math.max(0.15, dialNow), null, false);
-        } else if (upCross) {
-          this.fireAscend();
-        }
-      } else if (warpFree && this.grabCooldown > 0) {
-        /* latch the crossing — replay the bend as soon as the cooldown ends */
-        if (arriveCross) this.bandLatch = { dir: 'arrive', at: this.clockT };
-        else if (downCross) this.bandLatch = { dir: 'down', at: this.clockT };
-        else if (upCross) this.bandLatch = { dir: 'up', at: this.clockT };
-      }
-      /* resolve a latched crossing */
-      if (this.bandLatch) {
-        if (this.clockT - this.bandLatch.at > BAND_LATCH_TTL) {
-          this.bandLatch = null; /* stale */
-        } else if (warpFree && this.grabCooldown <= 0 && this.cosmicStage === 'web') {
-          if (this.bandLatch.dir === 'arrive' && dialNow < GALAXY_ARRIVE_CROSS && dialNow >= GALAXY_BAND_LOWER) {
-            this.beginGalaxyWarp('arrive', GALAXY_DIAL, null);
-            this.bandLatch = null;
-          } else if (this.bandLatch.dir === 'up' && dialNow > GALAXY_ASCEND_ENTER && dialNow < GALAXY_ARRIVE_CROSS) {
-            this.fireAscend();
-            this.bandLatch = null;
-          } else if (this.bandLatch.dir === 'down' && dialNow < 0.585) {
-            /* no specific galaxy clicked — the dive opens the HOME galaxy */
-            this.beginGalaxyWarp('descend', Math.max(0.15, dialNow), null, false);
-            this.bandLatch = null;
-          }
-        }
-      }
-      this.prevDialTarget = dialNow;
     }
 
     /* auto engage — ONLY while actively zooming in AND only onto the body the
@@ -5595,13 +4794,8 @@ void main(){
     let focusRadiusParam = activeFb ? activeFb.data.radius : (this.activeReality ? this.activeReality.bubbleSize * 2.6 : 6);
     let galaxyFocusActive = false;
     if (this.realityFocused && this.activeReality) {
-      /* orbit the active reality's marble — framed just outside its glass.
-         During the eject the focus sweeps along -z, dragging the camera out
-         of the marble with it (the throw of the jutsu). */
+      /* orbit the active reality's marble — framed just outside its glass */
       this._vFocusScratch.set(...this.activeReality.bubblePos);
-      if (this.kamuiEjectK > 0.001 && this.kamuiEjectK < 1) {
-        this._vFocusScratch.z -= this.activeReality.bubbleSize * 2.0 * (1 - this.kamuiEjectK);
-      }
       focusMin = this.activeReality.bubbleSize * 3.1;  /* just outside the glass */
       focusMax = 520000;                               /* release point on zoom-out */
     } else if (activeFb) {
@@ -5629,12 +4823,11 @@ void main(){
             /* orbit the clicked world itself */
             focusedWorld.group.getWorldPosition(this._vFocusScratch);
             focusMin = Math.max(2.2, focusedWorld.data.radius * 1.9);
-            focusMax = this.galaxyWarp ? 90000 : 4200;
+            focusMax = 4200;
             focusRadiusParam = focusedWorld.data.radius;
           } else {
             focusMin = 12;            /* planet-orbit depth */
-            /* while a warp owns the dial its ride must glide unclamped */
-            focusMax = this.galaxyWarp ? 90000 : 7000;
+            focusMax = 7000;
             focusRadiusParam = 30;    /* the system star */
           }
           galaxyFocusActive = true;
@@ -5647,12 +4840,8 @@ void main(){
       }
       /* stage not built yet (reality switch in flight) → keep drifting to origin until it is */
     } else {
-      /* during the suck the focus drifts along +z into the vortex */
-      this._vFocusScratch.set(0, 0, this.kamuiSuckDrift);
+      this._vFocusScratch.set(0, 0, 0);
     }
-    /* the galaxy warp's fold — the focus is pulled along +z mid-bend and the
-       −z counter-fold brings the destination back into view */
-    if (this.galaxyWarp) this._vFocusScratch.z += this.galaxyWarpDrift;
     /* NOTE: no holdFocus while a planet/vault portal is live — pinning the
        focus to the target body used to glide the camera hundreds of units
        sideways (the "pendulum" sweep). The portal is a local surface event;
@@ -5661,9 +4850,6 @@ void main(){
       focus: this._vFocusScratch,
       focused: !!activeFb || this.realityFocused || galaxyFocusActive,
       focusRadius: focusRadiusParam,
-      /* no distance squeeze for planet portals — the 45% dolly-in and its
-         release on close was the zoom-in/zoom-out pulse */
-      portalEase: 0,
       focusMin,
       focusMax,
     });
@@ -5674,9 +4860,6 @@ void main(){
     this.updateAurora(dt);
     this.updatePulses(performance.now());
     this.updateLevels(dt);
-    this.updatePortalGravity();
-    this.updatePortalSingularity();
-    this.updatePortalPointsVortex();
     this.updateSurface(dt);
     this.updateCore(dt);
     this.updateHover();
@@ -5693,22 +4876,25 @@ void main(){
     const holeOnStage = this.raymarchOnStage();
     this.applyAdaptiveResolution(holeOnStage, dt);
     for (const visual of this.blackHoles) {
-      if (visual.geodesic) updateRaymarchUniforms(visual, this.camera, this.clockT, holeOnStage);
+      if (visual.geodesic) updateRaymarchUniforms(visual, this.camera, this.clockT);
     }
 
-    /* ROUND 56 — capture the REAL background for the lens: the scene, holes
-       hidden, the R52 sky lens zeroed (no double-bending, no capture disc).
-       The march then bends THIS buffer around itself — the actual universe,
-       not any painted sky. Half resolution: the background is soft and the
-       deflection magnifies it anyway. */
-    if (this.rendering && holeOnStage && this.bgRT) {
+    /* ROUND 56c — capture the REAL sky into the cubemap: the scene, holes
+       hidden, the R52 sky lens zeroed (no double-bending, no capture disc),
+       rendered from the camera into 6×512² faces. Every 6th frame — the sky
+       is quasi-static, so the amortized cost is a fraction of one scene
+       pass — and immediately whenever a hole (re)attaches. The march then
+       bends THIS sky around itself, by direction, at any distance. */
+    const holesVisible = this.blackHoles.some((v) => v.geodesic);
+    if (this.rendering && holesVisible && this.cubeCam && this.bgCube
+        && (this.bgCubeDirty || this.bgCubeFrame++ % 6 === 0)) {
+      this.bgCubeDirty = false;
       for (const visual of this.blackHoles) visual.group.visible = false;
       const savedBend = this.surfaceManager.lensUniforms.uLensBend.value;
       this.surfaceManager.lensUniforms.uLensBend.value = 0;
       this.scene.updateMatrixWorld();
-      this.renderer.setRenderTarget(this.bgRT);
-      this.renderer.render(this.scene, this.camera);
-      this.renderer.setRenderTarget(null);
+      this.cubeCam.position.copy(this.camera.position);
+      this.cubeCam.update(this.renderer, this.scene);
       this.surfaceManager.lensUniforms.uLensBend.value = savedBend;
       for (const visual of this.blackHoles) visual.group.visible = true;
     }
@@ -5725,122 +4911,6 @@ void main(){
     if (frameStarted) recordFrame(performance.now() - frameStarted);
   };
   private clock = new THREE.Clock();
-
-  /**
-   * World-space gravitational vortex for Planet/Vault Kamui.
-   * Unlike the compositor pass, this operates on the actual neighboring
-   * bodies after their normal orbital positions are rebuilt each frame.
-   */
-  private applyPortalGravityUniforms(material: THREE.ShaderMaterial) {
-    const u = material.uniforms;
-    if (!u.uGravityCenter) return;
-    (u.uGravityCenter.value as THREE.Vector3).copy(this.portalGravityUniforms.center);
-    u.uGravityRadius.value = this.portalGravityUniforms.radius;
-    u.uGravityStrength.value = this.portalGravityUniforms.strength;
-    u.uGravityTime.value = this.portalGravityUniforms.time;
-    if (u.uReverse) u.uReverse.value = this.portalReverse;
-  }
-
-  /** Portal gravity center expressed in a specific mesh's local space — the
-      vertex shaders displace real geometry, so they need the core position
-      in the coordinates of the exact mesh being bent. */
-  private setPortalLocalCenter(material: THREE.ShaderMaterial, mesh: THREE.Object3D | null | undefined) {
-    if (!mesh || !material.uniforms.uGravityLocalCenter) return;
-    this._vScratch4.copy(this.portalGravityUniforms.center);
-    mesh.worldToLocal(this._vScratch4);
-    (material.uniforms.uGravityLocalCenter.value as THREE.Vector3).copy(this._vScratch4);
-  }
-
-  /** Nearest-first suction for every point cloud in the scene (star shells,
-      dust, halos): while a Planet/Vault Kamui is active, the field bends,
-      spins and draws nearby points into the core — visual only, no transform
-      of any object is ever modified. */
-  private updatePortalPointsVortex() {
-    if (this.kamuiFlight !== null || this.galaxyEntryFlight !== null) return;
-    const active = this.portal.phase !== 'idle' && this.portalVisualT > 0.001;
-    for (const { points, mat } of this.portalPointSets) {
-      if (!active) {
-        if (mat.uniforms.uVortexS.value !== 0) {
-          mat.uniforms.uVortexS.value = 0;
-          mat.uniforms.uVortexR.value = 0;
-          mat.uniforms.uVortexPull.value = 0;
-        }
-        continue;
-      }
-      /* each cloud lives in its own local frame — reframe the core per cloud
-         so the suction converges on the same world-space point everywhere */
-      this._vScratch4.copy(this.portalGravityUniforms.center);
-      points.worldToLocal(this._vScratch4);
-      (mat.uniforms.uVortexC.value as THREE.Vector3).copy(this._vScratch4);
-      mat.uniforms.uVortexR.value = this.portalGravityUniforms.radius;
-      mat.uniforms.uVortexS.value = this.portalVisualT * 0.85;
-      mat.uniforms.uVortexT.value = this.clockT * 1.6;
-      if (mat.uniforms.uVortexRev) mat.uniforms.uVortexRev.value = this.portalReverse;
-      if (mat.uniforms.uVortexPull) {
-        /* ejection pushes matter back out of the closing aperture */
-        mat.uniforms.uVortexPull.value = this.portalEject > 0.001
-          ? -this.portalEject * 1.1
-          : 0.25 + this.portalVisualT * 0.6;
-      }
-    }
-  }
-
-  private updatePortalGravity() {
-    if (this.portal.phase === 'idle' || this.portalVisualT <= 0.001) {
-      this.portalGravityUniforms.strength = 0;
-      this.portalGravityUniforms.radius = 0;
-      this.portalBodyRadius = 0;
-      return;
-    }
-
-    const center = this.portalLocalCenter;
-    let targetRadius = 2;
-    let targetHomeId: string | null = null;
-    let targetNode: (typeof this.galaxyStageNodes)[number] | null = null;
-    let targetInner: InnerPlanet | null = null;
-
-    if (this.portalTargetInnerId) {
-      for (const node of this.galaxyStageNodes) {
-        const inner = node.innerSys?.planets.find((p) => p.data.id === this.portalTargetInnerId);
-        if (!inner) continue;
-        targetNode = node;
-        targetInner = inner;
-        inner.group.getWorldPosition(center);
-        targetRadius = inner.data.radius;
-        break;
-      }
-    } else {
-      const target = this.bodies.find((b) => b.data.id === this.portal.bodyId);
-      if (target) {
-        targetHomeId = target.data.id;
-        target.group.getWorldPosition(center);
-        targetRadius = target.data.radius;
-      }
-    }
-    if (!targetInner && !targetHomeId) return;
-
-    /* Localized field radius: strictly bounded to the target planet's immediate atmosphere */
-    const fieldRadius = Math.max(6, targetRadius * 3.2);
-    /* Keep the body's own deformation bounded separately from the broad field
-       uniforms. The surrounding field can be large, but the planet surface
-       must never collapse out of view. */
-    const strength = THREE.MathUtils.clamp(this.portalVisualT, 0, 1.0);
-    /* This is consumed by world-space surface/particle shaders. It changes
-       the appearance of the reality surface around the core without changing
-       any object's transform, orbit, star position, or camera orientation. */
-    this.portalGravityUniforms.center.copy(center);
-    this.portalGravityUniforms.radius = fieldRadius;
-    this.portalGravityUniforms.strength = strength;
-    this.portalGravityUniforms.time = this.clockT;
-
-    /* No scene graph objects are moved here. The selected planet's own
-       material receives the strong local tear; the existing reality/cosmic
-       shaders receive only the field parameters and distort their rendered
-       surface in place. The anchor star and all orbital coordinates remain
-       untouched. */
-    void targetNode;
-    void targetHomeId;
-  }
 
   private updateBodies(dt: number) {
     const sysW = 1 - smoothstep(430, 860, this.currentDist());
@@ -5888,17 +4958,12 @@ void main(){
 
       /* hover channel ONLY — the orbit line must never be pinned by a click */
       b.hoverT += ((this.hoveredId === b.data.id ? 1 : 0) - b.hoverT) * Math.min(1, dt * 8);
-      const portalTear = !this.portalTargetInnerId && this.portal.bodyId === b.data.id ? this.portalVisualT : 0;
 
       if (b.mat) {
         if (b.mat.uniforms.uSunDir) (b.mat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vScratch1);
         if (b.mat.uniforms.uTime) b.mat.uniforms.uTime.value = this.clockT;
         if (b.mat.uniforms.uGhost) b.mat.uniforms.uGhost.value = b.ghost;
         if (b.mat.uniforms.uFade) b.mat.uniforms.uFade.value = b.fade * sysW;
-        if (b.mat.uniforms.uTear) b.mat.uniforms.uTear.value = portalTear;
-        if (b.mat.uniforms.uTearTime) b.mat.uniforms.uTearTime.value = this.clockT;
-        this.applyPortalGravityUniforms(b.mat);
-        this.setPortalLocalCenter(b.mat, b.spinMesh);
         if (b.mat.uniforms.uCamLocalP && b.data.kind === 'nebula') {
           this._vScratch3.copy(this.camera.position);
           b.group.worldToLocal(this._vScratch3);
@@ -5913,10 +4978,6 @@ void main(){
 
       if (b.cloudMat) {
         b.cloudMat.uniforms.uTime.value = this.clockT;
-        if (b.cloudMat.uniforms.uTear) b.cloudMat.uniforms.uTear.value = portalTear;
-        if (b.cloudMat.uniforms.uTearTime) b.cloudMat.uniforms.uTearTime.value = this.clockT;
-        this.applyPortalGravityUniforms(b.cloudMat);
-        this.setPortalLocalCenter(b.cloudMat, b.cloudMesh);
         (b.cloudMat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vScratch1);
         b.cloudMat.uniforms.uFade.value = b.fade * sysW * (1 - b.ghost);
         b.cloudMat.visible = b.cloudMat.uniforms.uFade.value > 0.02;
@@ -5924,17 +4985,11 @@ void main(){
       if (b.atmo) {
         const atmoMat = b.atmo.material as THREE.ShaderMaterial;
         (atmoMat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vScratch1);
-        if (atmoMat.uniforms.uTear) atmoMat.uniforms.uTear.value = portalTear;
-        if (atmoMat.uniforms.uTearTime) atmoMat.uniforms.uTearTime.value = this.clockT;
-        this.applyPortalGravityUniforms(atmoMat);
-        this.setPortalLocalCenter(atmoMat, b.atmo);
         b.atmo.visible = b.fade * sysW * (1 - b.ghost) > 0.05;
       }
       if (b.ringMat) {
         b.ringMesh!.getWorldQuaternion(this._qScratch).invert();
         (b.ringMat.uniforms.uSunLocal.value as THREE.Vector3).copy(this._vScratch1).applyQuaternion(this._qScratch);
-        this.applyPortalGravityUniforms(b.ringMat);
-        this.setPortalLocalCenter(b.ringMat, b.ringMesh);
         b.ringMesh!.visible = b.fade * sysW * (1 - b.ghost * 0.85) > 0.05;
       }
 
@@ -5989,7 +5044,7 @@ void main(){
        major world tugs the star with amplitude ∝ m_p/a, each tug advancing at
        that world's own orbital rate — quasi-periodic drift, not a loop. */
     this.anchorGroup.rotation.y += dt * 0.08; /* Axial rotation around polar axis */
-    if (!this.coreActive && !this.kamuiPulse && !this.portalLocalCenter.lengthSq()) {
+    if (!this.coreActive) {
       let wobbleX = 0, wobbleY = 0, wobbleZ = 0;
       for (let i = 0; i < this.bodies.length; i++) {
         const wb = this.bodies[i];
@@ -6121,19 +5176,8 @@ void main(){
       wins.galaxy *= 1 - pureK;
       wins.neighborhood *= 1 - pureK;
     }
-    /* the jutsu owns the view during the suck — the web stays pure while the
-       vortex consumes the rest (the scripted dial must never let the inner
-       layers pop back in mid-jutsu) */
-    if (this.kamuiFlight !== null && this.warpDir === 'toMultiverse' && this.kamuiFlight < 0.4) {
-      wins.web = Math.max(wins.web, 1);
-      const dissolve = 1 - this.kamuiErase;
-      wins.supercluster *= dissolve;
-      wins.cluster *= dissolve;
-      wins.galaxy *= dissolve;
-      wins.neighborhood *= dissolve;
-    }
 
-    /* the two stages never share the screen — the warp swaps them wholesale */
+    /* the two stages never share the screen — the dial swaps them wholesale */
     if (this.cosmicStage === 'multiverse') {
       wins.neighborhood = 0; wins.galaxy = 0; wins.cluster = 0;
       wins.supercluster = 0; wins.web = 0; wins.multiverse = 1;
@@ -6150,7 +5194,7 @@ void main(){
     this.gMultiverse.visible = wins.multiverse > 0.01;
     /* the marble hold — one glass marble alone in the darkness (boot intro):
        the whole multiverse shell stays hidden until the fall begins */
-    if (this.bootIntro && this.kamuiFlight === null && this.clockT < 2.2) {
+    if (this.bootIntro && this.clockT < 2.2) {
       this.gMultiverse.visible = false;
     }
     const isMultiverseMode = wins.multiverse > 0.01;
@@ -6161,22 +5205,13 @@ void main(){
         }
       });
     }
-    const kamuiTear = Math.sin(this.kamuiErase * Math.PI) * 1.35;
-    const portalTear = this.portal.phase !== 'idle' ? Math.sin(this.portal.t * Math.PI) * 1.5 : 0;
-    const baseTear = Math.max(kamuiTear, portalTear);
 
     this.multiverseMats.forEach((m) => {
       m.uniforms.uTime.value = this.clockT;
-      const isHover = this.hoveredId && this.hoveredId.startsWith('reality:');
-      const tVal = Math.max(baseTear, isHover ? 0.35 + 0.15 * Math.sin(this.clockT * 3.5) : 0);
-      if (m.uniforms.uTearStrength) m.uniforms.uTearStrength.value = tVal;
     });
     if (this.demonCoreMat) {
       this.demonCoreMat.uniforms.uTime.value = this.clockT;
       this.demonCoreMat.uniforms.uHover.value = (this.hoveredId === 'demon-core' ? 1.0 : 0.0);
-      const isCoreHover = this.hoveredId === 'demon-core';
-      const cTVal = Math.max(baseTear, isCoreHover ? 0.65 + 0.25 * Math.sin(this.clockT * 4.0) : 0);
-      if (this.demonCoreMat.uniforms.uTearStrength) this.demonCoreMat.uniforms.uTearStrength.value = cTVal;
     }
     if (this.demonCoreGroup) {
       this.demonCoreGroup.rotation.y += 0.005;
@@ -6343,23 +5378,6 @@ void main(){
       }
     }
 
-    // Kamui Spacetime Singularity Vortex — the jutsu's signature. It engulfs
-    // the camera while the reality bends and swirls (black-hole pull), holds
-    // through the teleport, then releases at the ejection. Roaming either
-    // stage never replays it — only the flight drives it.
-    let targetKamui = 0;
-    if (this.kamuiFlight !== null) {
-      const t = this.kamuiFlight;
-      targetKamui = t < 0.35 ? t / 0.35 : t < 0.72 ? 1 : Math.max(0, 1 - (t - 0.72) / 0.28);
-    } else if (this.galaxyEntryFlight !== null) {
-      /* a galaxy entry is a local, high-energy tear rather than the broad
-         stage-crossing bend */
-      targetKamui = Math.sin(Math.min(this.galaxyEntryFlight.t, 1) * Math.PI) * 1.15;
-    } else if (this.galaxyWarp !== null) {
-      /* the band bend — a slightly softer engulfment, same grammar */
-      targetKamui = Math.sin(Math.min(this.galaxyWarp.t, 1) * Math.PI) * 0.85;
-    }
-    this.kamuiErase = THREE.MathUtils.damp(this.kamuiErase, targetKamui, 6, Math.max(dt, 0.001));
 
     this.camera.getWorldDirection(this._vDirScratch);
     const skyVisible = this.cosmicStage !== 'multiverse';
@@ -6367,19 +5385,12 @@ void main(){
       dt,
       clockT: this.clockT,
       camera: this.camera,
-      kamuiErase: this.kamuiErase,
-      vortexDir: this._vDirScratch,
       skyVisible,
       neighborhoodVisibility: wins.neighborhood,
     });
 
     if (this.giantMultiverseBoundaryMat) {
       this.giantMultiverseBoundaryMat.uniforms.uTime.value = this.clockT;
-      /* the reality surface itself bends and swirls with the warp — the
-         flight's engulfment drives the boundary vortex at full strength */
-      const boundaryKamui = Math.max(this.kamuiErase, wins.multiverse > 0.01 ? (1.0 - wins.multiverse) * 0.5 : 0);
-      this.giantMultiverseBoundaryMat.uniforms.uKamuiErase.value = boundaryKamui;
-      (this.giantMultiverseBoundaryMat.uniforms.uVortexDir.value as THREE.Vector3).copy(this._vDirScratch);
     }
 
     this.clouds.forEach((c) => {
@@ -6701,7 +5712,7 @@ void main(){
     this.disposeObject3D(this.scene);
     this.scene.clear();
     this.composer.dispose();
-    this.bgRT?.dispose();
+    this.bgCube?.dispose();
     this.renderer.dispose();
     window.removeEventListener(QUALITY_CHANGE_EVENT, this.onQualityChange);
     window.removeEventListener(RAYMARCH_OVERRIDE_EVENT, this.onTierOverride);

@@ -51,8 +51,6 @@ export interface RigFrame {
   focused: boolean;
   /** radius of the focused body */
   focusRadius: number;
-  /** 0..1 portal distortion — squeezes the rendered distance while warping */
-  portalEase: number;
   /** when focused: closest allowed orbit distance (defaults sized for planets) */
   focusMin?: number;
   /** when focused: farthest allowed orbit distance before focus releases */
@@ -98,12 +96,6 @@ export class CameraRig {
   private panKeys: Record<string, boolean> = {};
   private dragging = false;
   private panning = false;
-  /* while a portal traversal owns the screen the traveler keeps FULL camera
-     freedom (orbit / pan / zoom) — the Kamui is watched from any angle now.
-     Only the zoom dial is bounded: a wheel fury mid-portal used to race it
-     six decades outward and the close then hard-cut it back — the "unstable
-     zoom" slam. The clamp keeps that slam bounded to the window. */
-  private dialLock: { ref: number; window: number } | null = null;
   /* exponential moving average of drag velocity (px/s) for the release fling */
   private dragVX = 0;
   private dragVY = 0;
@@ -228,33 +220,12 @@ export class CameraRig {
 
   setZoomTarget(z: number) { this.tZoomT = clamp(z, 0, 1); }
   nudgeZoom(delta: number) { this.tZoomT = clamp(this.tZoomT + delta, 0, 1); }
-  /** zero the wheel/pinch velocity — the engine uses this when a warp lock
-      lands so the momentum it absorbed can't push the dial back out */
+  /** zero the wheel/pinch velocity — the engine uses this when a stage
+      transition lands so the momentum it absorbed can't push the dial back */
   killZoomMomentum() { this.zoomVel = 0; }
 
-  /** Traversal lock for a scripted sequence that owns the screen (the
-      Planet/Vault Kamui). The traveler keeps every camera control — orbit,
-      pan, keys, zoom — but when `dialWindow` > 0 the zoom dial is clamped
-      to that window around the framing captured at lock time, so a wheel
-      fury mid-portal can't race the dial six decades out and slam the
-      close's hard restore. Momentum absorbed before the lock dies here so
-      it can't seep out the moment the lock lifts. */
-  lockInput(v: boolean, dialWindow = 0) {
-    if (v) {
-      this.zoomVel = 0;
-      this.orbitVX = 0; this.orbitVY = 0;
-      this.panVel.set(0, 0, 0);
-      this.dragVX = 0; this.dragVY = 0;
-      this.dragging = false;
-      this.panning = false;
-      this.dialLock = dialWindow > 0 ? { ref: this.tZoomT, window: dialWindow } : null;
-    } else {
-      this.dialLock = null;
-    }
-  }
-
   /** live wheel velocity (zoomT/s) — the engine reads it to detect the user
-      pulling at a stage's edge, which is what fires the Kamui warp */
+      pulling at a stage's edge, which is what carries the dial across */
   get zoomVelocity(): number { return this.zoomVel; }
   setOrbit(theta: number | null, phi: number | null) {
     if (theta !== null) this.tTheta = theta;
@@ -361,11 +332,6 @@ export class CameraRig {
       this.tZoomT = clamp(this.tZoomT + this.zoomVel * dt, 0, 1);
       this.zoomVel *= Math.exp(-ZOOM_FRICTION * dt);
     }
-    /* traversal dial clamp — holds the dial near the framing the lock was
-        armed at, whatever the input channel (wheel, pinch, scripted) */
-    if (this.dialLock) {
-      this.tZoomT = clamp(this.tZoomT, this.dialLock.ref - this.dialLock.window, this.dialLock.ref + this.dialLock.window);
-    }
 
     /* keyboard pan — arrows / WASD, speed proportional to altitude */
     const pk = this.panKeys;
@@ -397,7 +363,7 @@ export class CameraRig {
     this.focusMin = s.focusMin ?? this.focusRadius * 1.35;
     this.focusMax = s.focusMax ?? 3500;
     this.renderCenter.copy(this.focus).add(this.panOffset);
-    const dist = Math.max(0.5, this.dist() * (1 - s.portalEase * 0.45));
+    const dist = Math.max(0.5, this.dist());
     const sp = Math.sin(this.phi), cp = Math.cos(this.phi);
     this.camera.position.set(
       this.renderCenter.x + dist * sp * Math.cos(this.theta),

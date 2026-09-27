@@ -8,38 +8,25 @@ import { BLACKHOLE_CHANGE_EVENT, getBlackHoleParams, type BlackHoleParams } from
  * (blackhole.ts: baked disk textures, painted photon ring, fake lensed
  * halos, the spacetime funnel) is deleted; this module is the whole hole.
  * It is the corrected port of https://github.com/dgreenheck/webgpu-black-hole
- * (Copyright (c) 2025 Daniel Greenheck, MIT License) — and Round 54 closes
- * the one gap Round 20 left open on purpose: his BACKGROUND.
+ * (Copyright (c) 2025 Daniel Greenheck, MIT License) — and Round 56 goes
+ * beyond his demo: the bending acts on YOUR real universe.
  *
- *   • HIS BACKGROUND, VERBATIM: escaped rays sample his procedural sky —
- *     hashed-grid stars (core + glow, bluish↔warm) and two FBM nebula
- *     layers — with the FINAL BENT ray direction. That is what smears the
- *     sky into streaks around the shadow: spacetime bending you can see
- *     beyond the disk. His shipped config: density 0.1, size 1.2,
- *     brightness 0.1, near-black navies (#071f44 @ 0.01, #010615 @ 0.21).
- *   • THE SEAM LAW: the quad is finite, so his sky is weighted by the
- *     ray's impact parameter b (full bent sky inside uBgInner ≈ 16 shader
- *     units ≈ 20 rs — shadow, photon ring, streaking zone, whole disk —
- *     fading to fully transparent by uBgOuter ≈ 22, inside the quad's
- *     inscribed 24). Beyond the fade OUR universe shows, still bent by the
- *     R52 sky lens. Both skies are near-black in the band, so the handoff
- *     is seamless.
- *   • THE EARLY-OUT: bending only pulls rays inward, so a ray with
- *     b > uBgInner can never cross the disk (outer radius 14.5) — it skips
- *     the march entirely. The outer half of the quad renders
- *     background-only and is CHEAPER than the R20 version, paying for the
- *     background sampling.
+ *   • ROUND 56c — THE BACKGROUND IS OURS, BY DIRECTION: escaped rays look the
+ *     sky up in a CUBEMAP of the real captured scene (the engine renders the
+ *     universe — holes hidden, R52 lens zeroed — into a 512² cube from the
+ *     camera every 6th frame) using the FINAL BENT ray direction. A direction
+ *     lookup has no screen-position dependence: the bending works at ANY
+ *     distance, and rays wrapping the hole sample the opposite sky — the
+ *     multiple-image Einstein ring emerges naturally. At the quad's edge the
+ *     deflection is ~0, so the cube lookup meets the undisplaced sky
+ *     pixel-for-pixel — seamless, near or far.
+ *   • THE EARLY-OUT: bending only pulls rays inward, so a ray with b beyond
+ *     the disk outer edge (+ margin) can never cross the disk — it skips the
+ *     march entirely and stays transparent (the real scene shows; the
+ *     deflection there is ~0 anyway).
  *   • NO GLOW SPRITE: the R20 sprite fatted the halo into a blob and washed
  *     the arch out. The reference's blaze comes from bloom — the engine now
  *     damps the project bloom toward his 0.68 while a hole is on stage.
- *   • ROUND 56 — THE BACKGROUND IS OURS: his procedural starfield/nebula are
- *     gone. The engine captures the REAL scene into an offscreen buffer each
- *     frame and this shader samples it through the camera with the FINAL
- *     BENT ray direction — your nebula and your stars, displaced and
- *     streaked around the shadow. No seam: at the quad's edge the
- *     deflection is ~0, so the bent background meets the undisplaced one
- *     pixel-for-pixel. Rays whose deflection throws them behind the camera
- *     or out of frame fade out (that zone is shadow/disk dominated).
  *
  * Physics (unchanged since R20.4): his bend per step −(rs/r²)·step·lensing,
  * capture 1.01·rs, escape 100, every disk-plane crossing painted front-to-
@@ -54,8 +41,8 @@ export interface BlackHoleVisual {
   update(time: number, camQuat?: THREE.Quaternion, portal?: number): void;
   /** show/hide the geodesic renderer (fallback paths) */
   setGeodesic(on: boolean): void;
-  /** point the escaped-ray sampler at the engine's captured-scene buffer */
-  setBgTexture(tex: THREE.Texture | null): void;
+  /** point the escaped-ray sampler at the engine's captured sky cubemap */
+  setBgCube(tex: THREE.Texture | null): void;
   dispose(): void;
 }
 
@@ -106,13 +93,12 @@ uniform float uSoftOuter;    /* 0.5 */
 uniform float uLensing;      /* his gravitationalLensing — bend per unit path
                                 = uRs × uLensing, step-size independent */
 
-/* ---- ROUND 56 — the REAL background: the engine captures the scene (holes
-   hidden, R52 lens zeroed) into uBgTexture each frame; escaped rays sample
-   it through the camera with the FINAL BENT direction ---- */
-uniform sampler2D uBgTexture;
-uniform mat4 uProjMatrix;    /* camera projection */
-uniform mat4 uViewMatrix;    /* camera world inverse */
-uniform float uBgActive;     /* 1 while the capture is fresh (hole on stage) */
+/* ---- ROUND 56c — the REAL background, by DIRECTION: the engine captures
+   the scene into a cubemap (holes hidden, R52 lens zeroed) from the camera;
+   escaped rays look the sky up with the FINAL BENT direction. A direction
+   lookup has no screen-position dependence — the bending works at ANY
+   distance, and rays wrapping the hole sample the opposite sky. ---- */
+uniform samplerCube uBgCube;
 
 /* ROUND 56b — step 0.38 (was 0.3): the bend-per-unit-path is step-size
    independent (his invariant), so the trajectory is preserved while the
@@ -289,23 +275,17 @@ void main() {
 
   /* OUTPUT: his gamma step applies to the DISK light only (his LUT colors
      are display-referred; the step pushes the white-hot band past the bloom
-     threshold). The background sample is scene-LINEAR — the same space as
-     the buffer it came from — so it must NOT be gamma-encoded here; the
-     composer's OutputPass (ACES + sRGB) finishes it exactly like every
-     other scene pixel, which is what makes the bent background seamless
-     with the undisplaced background outside the quad. Captured rays stay
+     threshold). The background sample comes from the cubemap in scene-linear
+     space — the same space as the capture — so it is NOT gamma-encoded here;
+     the composer's OutputPass (ACES + sRGB) finishes it exactly like every
+     other scene pixel. Every escaped ray gets the sky along its FINAL BENT
+     direction — valid at any distance, any deflection. Captured rays stay
      fully opaque. */
   color *= uIntensity;
   color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
-  if (!captured && uBgActive > 0.5) {
-    vec4 clip = uProjMatrix * uViewMatrix * vec4(uCamPos + v * 1000.0, 1.0);
-    vec2 bgUv = clip.xy / clip.w * 0.5 + 0.5;
-    float inFront = step(0.0, clip.w);
-    float edge = smoothstep(0.0, 0.02, bgUv.x) * smoothstep(0.0, 0.02, 1.0 - bgUv.x)
-               * smoothstep(0.0, 0.02, bgUv.y) * smoothstep(0.0, 0.02, 1.0 - bgUv.y);
-    float wa = inFront * edge * (1.0 - alpha);
-    color += texture2D(uBgTexture, bgUv).rgb * wa;
-    alpha += wa;
+  if (!captured) {
+    color += textureCube(uBgCube, v).rgb * (1.0 - alpha);
+    alpha = 1.0;
   }
   gl_FragColor = vec4(color, captured ? 1.0 : clamp(alpha, 0.0, 1.0));
 }
@@ -468,13 +448,8 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
       uSoftInner: { value: 0.18 },
       uSoftOuter: { value: 0.5 },
       uLensing: { value: params.lensing },
-      /* ROUND 56 — the REAL background: the engine captures the scene into
-         this buffer (holes hidden, R52 lens zeroed) and escaped rays sample
-         it through the camera with the final bent direction */
-      uBgTexture: { value: null as THREE.Texture | null },
-      uProjMatrix: { value: new THREE.Matrix4() },
-      uViewMatrix: { value: new THREE.Matrix4() },
-      uBgActive: { value: 0 },
+      /* ROUND 56c — the REAL background cubemap */
+      uBgCube: { value: null as THREE.Texture | null },
     },
   });
 
@@ -524,8 +499,8 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
       visual.geodesic = on;
       quad.visible = on;
     },
-    setBgTexture(tex: THREE.Texture | null) {
-      material.uniforms.uBgTexture.value = tex;
+    setBgCube(tex: THREE.Texture | null) {
+      material.uniforms.uBgCube.value = tex;
     },
     dispose() {
       window.removeEventListener(BLACKHOLE_CHANGE_EVENT, onParams);
@@ -554,7 +529,6 @@ export function updateRaymarchUniforms(
   visual: BlackHoleVisual,
   camera: THREE.Camera,
   time: number,
-  bgActive = false,
 ): void {
   const quad = visual.group.children[0] as THREE.Mesh | undefined;
   const mat = quad?.material as THREE.ShaderMaterial | undefined;
@@ -569,9 +543,4 @@ export function updateRaymarchUniforms(
   mat.uniforms.uTime.value = time;
   const base = (visual.group.userData.baseIntensity as number | undefined) ?? 1.35;
   mat.uniforms.uIntensity.value = base;
-  /* ROUND 56 — the escaped-ray background sampler needs the camera's
-     projection + view to convert a bent direction into a screen UV */
-  mat.uniforms.uProjMatrix.value.copy(camera.projectionMatrix);
-  mat.uniforms.uViewMatrix.value.copy(camera.matrixWorldInverse);
-  mat.uniforms.uBgActive.value = bgActive ? 1 : 0;
 }

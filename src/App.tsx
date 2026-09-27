@@ -134,7 +134,6 @@ export default function App() {
   });
   const [showMultiverseBar, setShowMultiverseBar] = useState(false);
   const [showCosmicHud, setShowCosmicHud] = useState(false);
-  const [kamuiKey, setKamuiKey] = useState(0);
   /* THE COSMIC ECHO — the memory meteor under the pointer (for the card) */
   const [echoHover, setEchoHover] = useState<{ entryId: string; planetId: string; title: string; x: number; y: number } | null>(null);
   const [echoFlash, setEchoFlash] = useState<string | null>(null);
@@ -338,10 +337,8 @@ export default function App() {
         toast('✦ Multiverse Core Console online');
       },
       onSelectDemonCore: () => {
-        engineRef.current?.triggerKamui();
-        setKamuiKey((k) => k + 1);
         setShowMultiverseBar(true);
-        toast('✦ Kamui: Core Activated');
+        toast('✦ Core Activated');
         chime(960);
       },
     });
@@ -349,7 +346,7 @@ export default function App() {
       /* The engine is loaded asynchronously, so the one-time reality-sync
          effect may have already run before engineRef was assigned. Initialize
          the active reality here as well; this builds the galaxy-stage roster
-         and gives Kamui a valid reality target on the first interaction. */
+         and a valid reality target on the first interaction. */
       const initialState = getState();
       engine.setReality(getReality(initialState.activeRealityId || 'sol-prime', initialState.customRealityDescriptions));
       /* Sky Studio: pull this reality's photo sky (its own folder) once the
@@ -962,12 +959,6 @@ export default function App() {
               },
               onZoomStage: (i) => { engineRef.current?.zoomToHierarchy(i); chime(720); },
               onFrameCore: () => { engineRef.current?.zoomToCore(); chime(720); },
-              onKamui: () => {
-                engineRef.current?.triggerKamui();
-                setKamuiKey((k) => k + 1);
-                toast('✦ Kamui: Core Activated');
-                chime(960);
-              },
             }}
           />
         </Suspense>
@@ -1068,13 +1059,12 @@ export default function App() {
           onCloseBar={() => {
             setShowMultiverseBar(false);
           }}
-          kamuiKey={kamuiKey}
         />
       )}
 
       {/* Hover HUD for the Astral Core — the multiverse's living center */}
       {hoverId === 'multiverse-core' && mode === 'space' && label.includes('MULTIVERSE') && !coreConsoleOpen && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-auto bg-slate-950/85 backdrop-blur-2xl border border-cyan-400/50 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(6,182,212,0.35)] text-slate-100 max-w-md w-[92vw] sm:w-105 kamui-demon-badge">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-auto bg-slate-950/85 backdrop-blur-2xl border border-cyan-400/50 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(6,182,212,0.35)] text-slate-100 max-w-md w-[92vw] sm:w-105 demon-badge">
           <div className="flex items-center justify-between border-b border-cyan-400/30 pb-2 mb-2.5">
             <div className="flex items-center gap-2">
               <span className="demon-eye-spin inline-block w-3.5 h-3.5 rounded-full bg-linear-to-br from-cyan-300 to-violet-500 shadow-[0_0_10px_#00f5d4] ring-1 ring-white/70" />
@@ -1282,14 +1272,7 @@ export default function App() {
             engineRef.current?.zoomToCore();
             chime(720);
           }}
-          onTriggerKamui={() => {
-            engineRef.current?.triggerKamui();
-            setKamuiKey((k) => k + 1);
-            toast('✦ Kamui warp — reality bent and released');
-            chime(960);
-          }}
           onShowToolbar={() => {
-            setKamuiKey((k) => k + 1);
             setShowMultiverseBar(true);
             setCoreConsoleOpen(false);
             toast('✦ Hierarchy toolbar summoned');
