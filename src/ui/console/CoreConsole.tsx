@@ -4,8 +4,9 @@ import {
   X, Zap, Globe, Sparkles, Orbit, Trash2, ChevronDown, ChevronRight,
   Plus, ShieldCheck, Crosshair, Wind, Compass, Search,
   Edit2, Palette, Check, Layers, Disc, Sun, Radio, ExternalLink,
-  Cpu, Database
+  Cpu, Database, Wallpaper
 } from 'lucide-react';
+import { useConsoleBackdrop } from './backdropStore';
 import { REALITIES, getReality, createNewRealityConfig, RealityConfig } from '../../realities';
 import { actions, useUniverse } from '../../state';
 import type { DiskSyncState } from '../../domain/universe';
@@ -788,6 +789,15 @@ export const CoreConsole: React.FC<Props> = ({
   const [showCreate, setShowCreate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'anchored' | 'custom' | 'dense'>('all');
+  const backdrop = useConsoleBackdrop();
+  const [studioOpen, setStudioOpen] = useState(false);
+
+  /* Backdrop Studio — hang the user's own image / GIF / muted video on the wall */
+  const handleBackdropFile = async (file: File) => {
+    const err = await backdrop.set(file);
+    if (err) toast(`✗ ${err}`);
+    else toast(`Backdrop hung — ${file.name} is the night now`);
+  };
 
   const activeRealityId = state.activeRealityId || 'sol-prime';
   const realities: RealityConfig[] = REALITIES;
@@ -832,13 +842,22 @@ export const CoreConsole: React.FC<Props> = ({
       className="cc-root fixed inset-0 z-[130] overlay-in select-none text-slate-100"
       data-accent={tab}
       onClick={onClose}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        const f = e.dataTransfer.files?.[0];
+        if (f) void handleBackdropFile(f);
+      }}
       style={{ background: FALLBACK_NIGHT }}
     >
       {/* THE CRIMSON WATCH — a lonely Obito night behind everything; no plate,
           no border, no blur: the scene itself is the interface. The overlay
           itself paints the night (opaque), so the cosmos can never bleed
           through — full screen regardless of page content. */}
-      <ScenicBackdrop />
+      <ScenicBackdrop
+        media={backdrop.kind !== 'shader' && backdrop.url ? { kind: backdrop.kind, url: backdrop.url } : null}
+        dim={backdrop.kind !== 'shader' ? backdrop.dim : 0}
+      />
 
       {/* readability breath — a hint of dark behind the floating top bar */}
       <div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-black/45 to-transparent pointer-events-none" />
@@ -967,6 +986,70 @@ export const CoreConsole: React.FC<Props> = ({
               ))}
             </div>
 
+            {/* BACKDROP STUDIO — the user's own night: image, GIF or muted video */}
+            <span className="relative inline-flex">
+              <ThinkingCloudTooltip
+                onClick={() => setStudioOpen((v) => !v)}
+                icon={<Wallpaper className="w-4 h-4" />}
+                label="Backdrop Studio"
+                subtitle="Hang your own picture, GIF or muted video"
+                hint={backdrop.kind === 'shader' ? 'Open' : 'Your night is up'}
+                position="bottom"
+                size="sm"
+                id="cc-backdrop-btn"
+              />
+              {studioOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStudioOpen(false);
+                    }}
+                  />
+                  <div
+                    className="cc-cloud-rise absolute right-0 top-full z-50 mt-3 w-64 rounded-2xl bg-[#0a0d16]/95 border border-white/15 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.6)]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400 mb-3">Backdrop Studio</div>
+                    <label className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400">
+                      <span>Night veil</span>
+                      <span className="text-slate-200">{Math.round(backdrop.dim * 100)}%</span>
+                    </label>
+                    <input
+                      type="range" min={0} max={0.7} step={0.05} value={backdrop.dim}
+                      onChange={(e) => backdrop.setDim(Number(e.target.value))}
+                      className="w-full accent-cyan-400 mt-1 mb-3 cursor-pointer"
+                    />
+                    <label className="cc-btn-glass block text-center rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-200 cursor-pointer hover:text-white transition-colors">
+                      Choose image / GIF
+                      <input
+                        type="file" accept="image/*" className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleBackdropFile(f); e.target.value = ''; }}
+                      />
+                    </label>
+                    <label className="cc-btn-glass mt-2 block text-center rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-200 cursor-pointer hover:text-white transition-colors">
+                      Choose video (muted)
+                      <input
+                        type="file" accept="video/*" className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleBackdropFile(f); e.target.value = ''; }}
+                      />
+                    </label>
+                    {backdrop.kind !== 'shader' && (
+                      <button
+                        onClick={() => { backdrop.clear(); toast('The Crimson Watch returns — shader night restored'); setStudioOpen(false); }}
+                        className="w-full mt-2 rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-rose-200 border border-rose-400/30 hover:bg-rose-500/10 cursor-pointer transition-colors"
+                      >
+                        Reset to Crimson Night
+                      </button>
+                    )}
+                    <p className="font-mono text-[8px] text-slate-500 mt-3 leading-relaxed">
+                      Stored offline in this browser only — or drop a file anywhere on the deck.
+                    </p>
+                  </div>
+                </>
+              )}
+            </span>
             <ThinkingCloudTooltip
               onClick={() => setShowCreate(true)}
               label="Forge Reality Continuum"
