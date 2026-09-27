@@ -309,20 +309,21 @@ function inv(d: [number, number, number]): [number, number] {
   const oldGone = !existsSync(new URL('../src/engine/blackhole.ts', import.meta.url));
   check('R54: the flat composite black hole (blackhole.ts) is deleted', oldGone, `${oldGone}`);
 
-  /* HIS BACKGROUND — the piece R20 dropped: stars + nebula sampled with the
-     FINAL bent ray direction. That is the streaking around the shadow. */
-  const bg = /vec3 starField\(vec3 rd\)/.test(rmSrc) && /vec3 nebulaField\(vec3 rd\)/.test(rmSrc)
-    && /starField\(v\) \+ nebulaField\(v\)/.test(rmSrc)
-    && /uStarDensity/.test(rmSrc) && /uStarBright/.test(rmSrc);
-  check('R54: his starfield + nebula ride the escaped bent rays (shipped config)', bg, `${bg}`);
+  /* ROUND 56 — THE BACKGROUND IS OURS: his procedural sky is gone; escaped
+     rays sample the engine's captured real scene through the camera with
+     the FINAL BENT direction — the actual nebula and stars bend. */
+  const rtLens = !/starField|nebulaField|uStarDensity/.test(rmSrc)
+    && /uProjMatrix \* uViewMatrix \* vec4\(uCamPos \+ v \* 1000\.0, 1\.0\)/.test(rmSrc)
+    && /texture2D\(uBgTexture, bgUv\)/.test(rmSrc)
+    && /uBgActive/.test(rmSrc);
+  check('R56: escaped rays sample the captured REAL scene with the bent ray (no procedural sky)', rtLens, `${rtLens}`);
 
-  /* THE SEAM LAW — his sky is weighted by the ray's impact parameter: full
-     bent sky near the hole, our universe beyond the fade; far rays skip the
-     march entirely (bending cannot pull them onto the disk). */
-  const seam = /length\(cross\(p, v\)\)/.test(rmSrc)
-    && /1\.0 - smoothstep\(uBgInner, uBgOuter, b\)/.test(rmSrc)
-    && /if \(b <= uBgInner\) \{/.test(rmSrc);
-  check('R54: bent sky weighted by impact parameter; far rays skip the march', seam, `${seam}`);
+  /* the engine captures it half-res, holes hidden, R52 lens zeroed */
+  const capture = /WebGLRenderTarget/.test(engSrc) && /getDrawingBufferSize/.test(engSrc)
+    && /uLensBend\.value = 0;/.test(engSrc)
+    && /this\.renderer\.setRenderTarget\(this\.bgRT\);/.test(engSrc)
+    && /for \(const visual of this\.blackHoles\) visual\.group\.visible = false;/.test(engSrc);
+  check('R56: capture pass — half-res RT, holes hidden, R52 lens zeroed, restored after', capture, `${capture}`);
 
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
      the blaze now comes from the damped project bloom. */

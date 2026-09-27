@@ -405,6 +405,10 @@ export class UniverseEngine {
   /* every black hole in the universe — one object each, so a disarm can
      hide them all at once (Round 55: there is no fallback renderer) */
   private blackHoles: BlackHoleVisual[] = [];
+  /* ROUND 56 — the real-background buffer: the scene (holes hidden, R52
+     lens zeroed) is captured here each frame at half resolution, and the
+     geodesic lens samples it with the bent rays — the actual universe bends */
+  private bgRT: THREE.WebGLRenderTarget | null = null;
   private raymarchDisabled = false;
   private onQualityChange: () => void = () => {};
   private onTierOverride: () => void = () => {};
@@ -414,12 +418,29 @@ export class UniverseEngine {
      ever stands in. The 'on' override forces past the tier gate (a saved 'low'
      quality setting must not silently win over the user's explicit switch) but
      never past a software rasterizer, and never past a shader-failure disarm. */
+  /* ROUND 56 — the real-background buffer, created lazily at half the
+     drawing-buffer resolution */
+  private ensureBgRT(): THREE.WebGLRenderTarget {
+    if (!this.bgRT) {
+      const size = new THREE.Vector2();
+      this.renderer.getDrawingBufferSize(size);
+      this.bgRT = new THREE.WebGLRenderTarget(
+        Math.max(1, Math.floor(size.x / 2)), Math.max(1, Math.floor(size.y / 2)),
+        { depthBuffer: true },
+      );
+      this.bgRT.texture.minFilter = THREE.LinearFilter;
+      this.bgRT.texture.magFilter = THREE.LinearFilter;
+    }
+    return this.bgRT;
+  }
+
   private attachBlackHole(R: number, container: THREE.Object3D): BlackHoleVisual {
     const override = getRaymarchOverride();
     const capable = !this.raymarchDisabled
       && (canUseRaymarchBlackHole() || (override === 'on' && !isSoftwareRasterizer()));
     const geodesic = override !== 'off' && capable;
     const visual = createBlackHole(R, { geodesic });
+    visual.setBgTexture(this.ensureBgRT().texture);
     container.add(visual.group);
     this.blackHoles.push(visual);
     if (geodesic) setRaymarchStatus(override === 'on' ? 'forced' : 'active', 'attached');
@@ -5102,6 +5123,11 @@ void main(){
     this.composer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    if (this.bgRT) {
+      const size = new THREE.Vector2();
+      this.renderer.getDrawingBufferSize(size);
+      this.bgRT.setSize(Math.max(1, Math.floor(size.x / 2)), Math.max(1, Math.floor(size.y / 2)));
+    }
   };
 
   private tick = () => {
@@ -5634,8 +5660,28 @@ void main(){
        refreshes the matrix chain from the CURRENT locals, so the hole
        center, the camera offset and the billboard are exact for THIS
        frame's render. */
+    this.camera.updateMatrixWorld();
+    this.camera.matrixWorldInverse.copy(this.camera.matrixWorld).invert();
+    const holeOnStage = this.raymarchOnStage();
     for (const visual of this.blackHoles) {
-      if (visual.geodesic) updateRaymarchUniforms(visual, this.camera, this.clockT);
+      if (visual.geodesic) updateRaymarchUniforms(visual, this.camera, this.clockT, holeOnStage);
+    }
+
+    /* ROUND 56 — capture the REAL background for the lens: the scene, holes
+       hidden, the R52 sky lens zeroed (no double-bending, no capture disc).
+       The march then bends THIS buffer around itself — the actual universe,
+       not any painted sky. Half resolution: the background is soft and the
+       deflection magnifies it anyway. */
+    if (this.rendering && holeOnStage && this.bgRT) {
+      for (const visual of this.blackHoles) visual.group.visible = false;
+      const savedBend = this.surfaceManager.lensUniforms.uLensBend.value;
+      this.surfaceManager.lensUniforms.uLensBend.value = 0;
+      this.scene.updateMatrixWorld();
+      this.renderer.setRenderTarget(this.bgRT);
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setRenderTarget(null);
+      this.surfaceManager.lensUniforms.uLensBend.value = savedBend;
+      for (const visual of this.blackHoles) visual.group.visible = true;
     }
 
     if (this.rendering) {
@@ -6626,6 +6672,7 @@ void main(){
     this.disposeObject3D(this.scene);
     this.scene.clear();
     this.composer.dispose();
+    this.bgRT?.dispose();
     this.renderer.dispose();
     window.removeEventListener(QUALITY_CHANGE_EVENT, this.onQualityChange);
     window.removeEventListener(RAYMARCH_OVERRIDE_EVENT, this.onTierOverride);

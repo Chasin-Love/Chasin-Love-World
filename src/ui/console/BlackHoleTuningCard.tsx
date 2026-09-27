@@ -172,7 +172,8 @@ export const BlackHoleTuningCard: React.FC = () => {
 
       <p className="text-[10px] text-slate-500">
         Mass sets the Schwarzschild radius (rs = 2 × mass); lensing bends light per rs — the pair
-        reproduces the original demo's physics, and the starfield behind the hole bends with it.
+        reproduces the original demo's physics, and the real background — your nebula and stars —
+        bends with it.
         Peak temp 49.78 kK, falloff 5.22, turbulence 1.81 / 0.75 / 7.4 and softness 0.18 / 0.5
         stay at the reference values. Focusing the hole lands at the reference camera (25.8 rs,
         14° below the disk plane) where the lensed arcs wrap over and under the shadow.

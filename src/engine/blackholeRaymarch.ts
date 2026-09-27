@@ -32,9 +32,14 @@ import { BLACKHOLE_CHANGE_EVENT, getBlackHoleParams, type BlackHoleParams } from
  *   • NO GLOW SPRITE: the R20 sprite fatted the halo into a blob and washed
  *     the arch out. The reference's blaze comes from bloom — the engine now
  *     damps the project bloom toward his 0.68 while a hole is on stage.
- *   • NO FALLBACK RENDERER: `setGeodesic(false)` hides the hole entirely.
- *     There is no stand-in sphere and no painted fallback anywhere — the
- *     R52 sky lens keeps bending the sky where the hole stands.
+ *   • ROUND 56 — THE BACKGROUND IS OURS: his procedural starfield/nebula are
+ *     gone. The engine captures the REAL scene into an offscreen buffer each
+ *     frame and this shader samples it through the camera with the FINAL
+ *     BENT ray direction — your nebula and your stars, displaced and
+ *     streaked around the shadow. No seam: at the quad's edge the
+ *     deflection is ~0, so the bent background meets the undisplaced one
+ *     pixel-for-pixel. Rays whose deflection throws them behind the camera
+ *     or out of frame fade out (that zone is shadow/disk dominated).
  *
  * Physics (unchanged since R20.4): his bend per step −(rs/r²)·step·lensing,
  * capture 1.01·rs, escape 100, every disk-plane crossing painted front-to-
@@ -49,6 +54,8 @@ export interface BlackHoleVisual {
   update(time: number, camQuat?: THREE.Quaternion, portal?: number): void;
   /** show/hide the geodesic renderer (fallback paths) */
   setGeodesic(on: boolean): void;
+  /** point the escaped-ray sampler at the engine's captured-scene buffer */
+  setBgTexture(tex: THREE.Texture | null): void;
   dispose(): void;
 }
 
@@ -99,12 +106,13 @@ uniform float uSoftOuter;    /* 0.5 */
 uniform float uLensing;      /* his gravitationalLensing — bend per unit path
                                 = uRs × uLensing, step-size independent */
 
-/* ---- HIS BACKGROUND (Round 54) — his shipped starfield/nebula config ---- */
-uniform float uStarDensity;  /* 0.1 */
-uniform float uStarSize;     /* 1.2 */
-uniform float uStarBright;   /* 0.1 */
-uniform float uBgInner;      /* 16.0 — full bent sky inside (≥ disk outer) */
-uniform float uBgOuter;      /* 22.0 — our universe beyond, inside the quad */
+/* ---- ROUND 56 — the REAL background: the engine captures the scene (holes
+   hidden, R52 lens zeroed) into uBgTexture each frame; escaped rays sample
+   it through the camera with the FINAL BENT direction ---- */
+uniform sampler2D uBgTexture;
+uniform mat4 uProjMatrix;    /* camera projection */
+uniform mat4 uViewMatrix;    /* camera world inverse */
+uniform float uBgActive;     /* 1 while the capture is fresh (hole on stage) */
 
 #define MARCH_STEP 0.3
 
@@ -124,11 +132,6 @@ vec3 blackbody(float tempK) {
 /* ---- his hash / value-noise / 4-octave FBM ---- */
 float hash31(vec3 p) {
   return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-}
-vec2 hash22(vec2 p) {
-  float px = fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-  float py = fract(sin(dot(p, vec2(269.5, 183.3))) * 43758.5453);
-  return vec2(px, py);
 }
 float noise3(vec3 p) {
   vec3 i = floor(p);
@@ -155,40 +158,6 @@ float fbm(vec3 p, float lac, float pers) {
   v += noise3(p) * a; p *= lac; a *= pers;
   v += noise3(p) * a;
   return v;
-}
-
-/* ---- HIS STAR FIELD — createStarField, verbatim: hashed grid on the ray's
-   (theta, phi), one star per cell by density, core + 0.3 glow, bluish↔warm
-   by cell hash. Sampled with the FINAL BENT direction — a ray skimming the
-   shadow sweeps many cells as it bends, which is the streaking. ---- */
-vec3 starField(vec3 rd) {
-  float theta = atan(rd.z, rd.x);
-  float phi = asin(clamp(rd.y, -1.0, 1.0));
-  float gridScale = 60.0 / uStarSize;
-  vec2 scaled = vec2(theta, phi) * gridScale;
-  vec2 cell = floor(scaled);
-  vec2 cellUV = fract(scaled);
-  float cellHash = hash31(vec3(cell, 0.0));
-  float starProb = step(1.0 - uStarDensity, cellHash);
-  vec2 starPos = hash22(cell + 42.0) * 0.8 + 0.1;
-  float distToStar = length(cellUV - starPos);
-  float starSize = (hash31(vec3(cell + 100.0, 0.0)) * 0.03 + 0.01) * uStarSize;
-  float starCore = smoothstep(starSize, 0.0, distToStar);
-  float starGlow = smoothstep(starSize * 3.0, 0.0, distToStar) * 0.3;
-  float intensity = (starCore + starGlow) * starProb;
-  float colorTemp = hash31(vec3(cell + 200.0, 0.0));
-  vec3 col = mix(vec3(0.8, 0.9, 1.0), vec3(1.0, 0.95, 0.8), colorTemp);
-  return col * intensity * uStarBright;
-}
-
-/* ---- HIS NEBULA — createNebulaField, verbatim: two FBM layers on the ray
-   direction, his shipped near-black navies (#071f44 @ 0.01, #010615 @ 0.21). ---- */
-vec3 nebulaField(vec3 rd) {
-  float n1 = fbm(rd * 2.0, 2.0, 0.5) * 2.0 - 1.0;
-  vec3 c1 = vec3(0.0275, 0.1216, 0.2667) * clamp(n1 + 0.5, 0.0, 1.0) * 0.01;
-  float n2 = fbm(rd * 5.5, 2.0, 0.5) * 2.0 - 1.0;
-  vec3 c2 = vec3(0.0039, 0.0235, 0.0824) * clamp(n2 + 0.05, 0.0, 1.0) * 0.21;
-  return c1 + c2;
 }
 
 /* ---- accretion disk color at a plane crossing — HIS createAccretionDiskColor,
@@ -233,17 +202,17 @@ void main() {
   vec3 v = normalize(vWorld.xyz - uCamPos);
 
   /* Round 54 — impact parameter of the UNBENT ray (its line's distance from
-     the hole). Bending only pulls rays inward, so b > uBgInner (16 ≳ disk
-     outer 14.5 + bending margin) can never cross the disk: those rays skip
-     both march loops and render background-only. */
+     the hole). Bending only pulls rays inward, so a ray with b beyond the
+     disk outer edge (+ bending margin) can never cross the disk: those rays
+     skip both march loops — the outer half of the quad stays fully
+     transparent (the real scene shows, deflection there is ~0 anyway). */
   float b = length(cross(p, v));
-  float w = 1.0 - smoothstep(uBgInner, uBgOuter, b);
 
   vec3 color = vec3(0.0);
   float alpha = 0.0;
   bool captured = false;
 
-  if (b <= uBgInner) {
+  if (b <= uDiskOuter + 2.5) {
     /* COARSE APPROACH — the one adaptation his fullscreen demo never needed:
        our camera can be hundreds of units out. Walk the ray straight down to
        the r=16 march sphere in a few long steps (bending is ∝ 1/r² — out there
@@ -315,21 +284,26 @@ void main() {
     }
   }
 
-  /* OUTPUT: the disk's intensity boost does not touch the background (his
-     demo has no intensity knob). Escaped rays sample his sky with the FINAL
-     bent direction — the streaking around the shadow — weighted by w so our
-     real universe shows beyond the fade. Captured rays stay fully opaque
-     (the shadow is black because nothing accumulated; disk light in FRONT
-     of the shadow survives). His gamma step is kept: material → bloom →
-     OutputPass, exactly his pipeline's shape. */
+  /* OUTPUT: his gamma step applies to the DISK light only (his LUT colors
+     are display-referred; the step pushes the white-hot band past the bloom
+     threshold). The background sample is scene-LINEAR — the same space as
+     the buffer it came from — so it must NOT be gamma-encoded here; the
+     composer's OutputPass (ACES + sRGB) finishes it exactly like every
+     other scene pixel, which is what makes the bent background seamless
+     with the undisplaced background outside the quad. Captured rays stay
+     fully opaque. */
   color *= uIntensity;
-  if (!captured && w > 0.001) {
-    vec3 bg = starField(v) + nebulaField(v);
-    float wa = w * (1.0 - alpha);
-    color += bg * wa;
+  color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
+  if (!captured && uBgActive > 0.5) {
+    vec4 clip = uProjMatrix * uViewMatrix * vec4(uCamPos + v * 1000.0, 1.0);
+    vec2 bgUv = clip.xy / clip.w * 0.5 + 0.5;
+    float inFront = step(0.0, clip.w);
+    float edge = smoothstep(0.0, 0.02, bgUv.x) * smoothstep(0.0, 0.02, 1.0 - bgUv.x)
+               * smoothstep(0.0, 0.02, bgUv.y) * smoothstep(0.0, 0.02, 1.0 - bgUv.y);
+    float wa = inFront * edge * (1.0 - alpha);
+    color += texture2D(uBgTexture, bgUv).rgb * wa;
     alpha += wa;
   }
-  color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
   gl_FragColor = vec4(color, captured ? 1.0 : clamp(alpha, 0.0, 1.0));
 }
 `;
@@ -491,17 +465,18 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
       uSoftInner: { value: 0.18 },
       uSoftOuter: { value: 0.5 },
       uLensing: { value: params.lensing },
-      /* his background (Round 54) */
-      uStarDensity: { value: 0.1 },
-      uStarSize: { value: 1.2 },
-      uStarBright: { value: 0.1 },
-      uBgInner: { value: 16.0 },
-      uBgOuter: { value: 22.0 },
+      /* ROUND 56 — the REAL background: the engine captures the scene into
+         this buffer (holes hidden, R52 lens zeroed) and escaped rays sample
+         it through the camera with the final bent direction */
+      uBgTexture: { value: null as THREE.Texture | null },
+      uProjMatrix: { value: new THREE.Matrix4() },
+      uViewMatrix: { value: new THREE.Matrix4() },
+      uBgActive: { value: 0 },
     },
   });
 
   /* quad frames the disk (14.5 u ≈ 18 rs at the default mass) plus the
-     lensed wrap and the background fade (uBgOuter = 22 u) */
+     lensed wrap and the bent background */
   const quadSize = rs * 60;
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(quadSize, quadSize), material);
   quad.renderOrder = 12;
@@ -546,6 +521,9 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
       visual.geodesic = on;
       quad.visible = on;
     },
+    setBgTexture(tex: THREE.Texture | null) {
+      material.uniforms.uBgTexture.value = tex;
+    },
     dispose() {
       window.removeEventListener(BLACKHOLE_CHANGE_EVENT, onParams);
       quad.geometry.dispose();
@@ -573,7 +551,7 @@ export function updateRaymarchUniforms(
   visual: BlackHoleVisual,
   camera: THREE.Camera,
   time: number,
-  _portal?: number,
+  bgActive = false,
 ): void {
   const quad = visual.group.children[0] as THREE.Mesh | undefined;
   const mat = quad?.material as THREE.ShaderMaterial | undefined;
@@ -588,4 +566,9 @@ export function updateRaymarchUniforms(
   mat.uniforms.uTime.value = time;
   const base = (visual.group.userData.baseIntensity as number | undefined) ?? 1.35;
   mat.uniforms.uIntensity.value = base;
+  /* ROUND 56 — the escaped-ray background sampler needs the camera's
+     projection + view to convert a bent direction into a screen UV */
+  mat.uniforms.uProjMatrix.value.copy(camera.projectionMatrix);
+  mat.uniforms.uViewMatrix.value.copy(camera.matrixWorldInverse);
+  mat.uniforms.uBgActive.value = bgActive ? 1 : 0;
 }
