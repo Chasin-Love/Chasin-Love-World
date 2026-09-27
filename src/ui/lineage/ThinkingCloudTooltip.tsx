@@ -10,6 +10,13 @@ interface ThinkingCloudTooltipProps {
   iconType?: 'forge' | 'star' | 'singularity' | 'plus';
   position?: 'bottom' | 'top' | 'left' | 'right';
   id?: string;
+  /* custom glyph — renders any icon in a neutral square seat (icon-first
+     chrome); when omitted the built-in iconType seals behave as before */
+  icon?: React.ReactNode;
+  /* accent state for custom-icon triggers (reads the deck's --cc) */
+  active?: boolean;
+  /* footer micro-copy inside the thought card */
+  hint?: string;
 }
 
 /* THE FORGE SIGIL — a precision SVG instrument, not a gradient blob.
@@ -85,6 +92,9 @@ export const ThinkingCloudTooltip: React.FC<ThinkingCloudTooltipProps> = ({
   iconType = 'forge',
   position = 'bottom',
   id = 'thinking-cloud-forge',
+  icon,
+  active = false,
+  hint = 'Click to initiate',
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -140,15 +150,24 @@ export const ThinkingCloudTooltip: React.FC<ThinkingCloudTooltipProps> = ({
       onFocus={raise}
       onBlur={() => setIsHovered(false)}
     >
-      {/* THE FORGE SEAL — machined rings + glass seat; no native title tooltip
-          (the designed cloud IS the tooltip — a native one double-tooltips) */}
+      {/* THE SEAL — custom-icon triggers wear a neutral solid square seat
+          (no blur); the built-in iconTypes keep their glass round seat */}
       <button
         type="button"
         onClick={onClick}
         aria-label={label}
-        className={`forge-seal group relative flex items-center justify-center rounded-full bg-white/6 backdrop-blur-md border border-white/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_0_18px_rgb(34_211_238/0.18)] hover:border-cyan-300/70 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_0_30px_rgb(34_211_238/0.4)] active:scale-95 transition-all duration-300 cursor-pointer text-cyan-300 hover:text-cyan-100 ${sizeClasses}`}
+        className={
+          icon !== undefined
+            ? `group relative flex items-center justify-center rounded-xl bg-black/45 border shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_6px_16px_rgba(0,0,0,0.30)] hover:bg-black/65 hover:border-white/30 active:scale-95 transition-all duration-300 cursor-pointer text-slate-300 hover:text-white ${
+                active ? 'border-[rgb(var(--cc))]' : 'border-white/12'
+              } ${sizeClasses}`
+            : `forge-seal group relative flex items-center justify-center rounded-full bg-white/6 backdrop-blur-md border border-white/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_0_18px_rgb(34_211_238/0.18)] hover:border-cyan-300/70 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_0_30px_rgb(34_211_238/0.4)] active:scale-95 transition-all duration-300 cursor-pointer text-cyan-300 hover:text-cyan-100 ${sizeClasses}`
+        }
+        style={icon !== undefined && active ? { color: 'rgb(var(--cc))' } : undefined}
       >
-        {iconType === 'forge' ? (
+        {icon !== undefined ? (
+          <span className="relative flex items-center justify-center">{icon}</span>
+        ) : iconType === 'forge' ? (
           <ForgeSeal active={isHovered} size={px} />
         ) : (
           <span className="relative flex items-center justify-center">
@@ -203,9 +222,9 @@ export const ThinkingCloudTooltip: React.FC<ThinkingCloudTooltipProps> = ({
             </div>
           )}
 
-          {/* THE CARD — pure rectangular glass; precision corner accents */}
+          {/* THE CARD — solid smoked pane (no blur), precision corner accents */}
           <div
-            className={`cc-cloud-rise relative min-w-[250px] max-w-[320px] rounded-2xl bg-abyss/65 backdrop-blur-2xl saturate-150 border border-cyan-300/45 shadow-[0_18px_44px_rgba(0,0,0,0.55),0_0_34px_rgba(6,182,212,0.2),inset_0_1px_0_rgba(255,255,255,0.28)] text-left ${
+            className={`cc-cloud-rise relative min-w-[250px] max-w-[320px] rounded-2xl bg-[#0a0d16]/95 border border-cyan-300/45 shadow-[0_18px_44px_rgba(0,0,0,0.55),0_0_34px_rgba(6,182,212,0.2),inset_0_1px_0_rgba(255,255,255,0.28)] text-left ${
               flipX === 'right' ? 'ml-auto' : flipX === 'left' ? 'mr-auto' : ''
             }`}
           >
@@ -234,7 +253,7 @@ export const ThinkingCloudTooltip: React.FC<ThinkingCloudTooltipProps> = ({
                 )}
                 <div className="mt-1.5 flex items-center gap-1 font-mono text-[8px] text-cyan-300/90 uppercase tracking-widest">
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 animate-ping inline-block" />
-                  <span>Click to initiate</span>
+                  <span>{hint}</span>
                 </div>
               </div>
             </div>

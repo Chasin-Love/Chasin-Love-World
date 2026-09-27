@@ -18,9 +18,9 @@ import {
 import { smoothstep, makeGlowTexture } from './math';
 import { UniverseSurfaceManager } from './surface';
 import { LENS_UNIFORMS_GLSL, LENS_WARP_GLSL, LENS_POINT_GLSL } from './surface/surfaceShaders';
-import { createBlackHole, type BlackHoleVisual } from './blackhole';
-import { createRaymarchBlackHole, updateRaymarchUniforms } from './blackholeRaymarch';
-import { canUseRaymarchBlackHole, probeCapability, pixelRatioFor, getQualityTier, QUALITY_CHANGE_EVENT } from './capability';
+import { createBlackHole, updateRaymarchUniforms, type BlackHoleVisual } from './blackholeRaymarch';
+import { canUseRaymarchBlackHole, isSoftwareRasterizer, probeCapability, pixelRatioFor, getQualityTier, QUALITY_CHANGE_EVENT } from './capability';
+import { getRaymarchOverride, setRaymarchStatus, RAYMARCH_OVERRIDE_EVENT, type RaymarchStatus } from './blackholeTier';
 import { CameraRig } from './cameraRig';
 import type { CosmicBody, DiaryEntry } from '../domain/universe';
 import { REALITIES, RealityConfig, GalaxyClusterData, GalaxyData } from '../realities';
@@ -163,8 +163,7 @@ interface InnerPlanet {
   data: CosmicBody;
   group: THREE.Group;
   mat?: THREE.ShaderMaterial;
-  blackHole?: BlackHoleVisual;
-  blackHoleRaymarch?: BlackHoleVisual;
+  hole?: BlackHoleVisual;
   cloudMat?: THREE.ShaderMaterial;
   cloudMesh?: THREE.Mesh;
   atmo?: THREE.Mesh;
@@ -367,7 +366,6 @@ export class UniverseEngine {
   private skipNextCompile = true;
   private _vScratch4 = new THREE.Vector3();
   private dragging = false; private lastPX = 0; private lastPY = 0; private downX = 0; private downY = 0; private downT = 0;
-  private vaultPulse = 0; /* spikes when the Vault stores/runs something — the black hole reacts */
   private lastClickT = 0; private lastClickId: string | null = null; private clickTimer: ReturnType<typeof setTimeout> | null = null;
   private starUniforms: Record<string, THREE.IUniform> = {};
   private connectionLines!: THREE.LineSegments;
@@ -404,63 +402,68 @@ export class UniverseEngine {
   } = { simDays: NaN, xyz: new Float64Array(0), valid: false, inflight: false };
   private keplerFrame = 0;
   private keplerEcc = new Map<string, number>();
-  /* cinematic tier: raymarched overlays live here so a shader failure can
-     disarm them all at once (the composite always remains) */
-  private raymarchHoles: BlackHoleVisual[] = [];
+  /* every black hole in the universe — one object each, so a disarm can
+     hide them all at once (Round 55: there is no fallback renderer) */
+  private blackHoles: BlackHoleVisual[] = [];
   private raymarchDisabled = false;
   private onQualityChange: () => void = () => {};
+  private onTierOverride: () => void = () => {};
 
-  private attachRaymarchHole(R: number, container: THREE.Object3D): BlackHoleVisual | null {
-    if (this.raymarchDisabled || !canUseRaymarchBlackHole()) return null;
-    try {
-      const overlay = createRaymarchBlackHole(R);
-      container.add(overlay.group);
-      this.raymarchHoles.push(overlay);
-      return overlay;
-    } catch {
-      return null; /* creation failure can never take down the composite */
-    }
+  /* Round 54/55 — ONE attach path. Every hole gets the geodesic renderer when
+     the GPU allows it; when it cannot, the hole hides itself — nothing painted
+     ever stands in. The 'on' override forces past the tier gate (a saved 'low'
+     quality setting must not silently win over the user's explicit switch) but
+     never past a software rasterizer, and never past a shader-failure disarm. */
+  private attachBlackHole(R: number, container: THREE.Object3D): BlackHoleVisual {
+    const override = getRaymarchOverride();
+    const capable = !this.raymarchDisabled
+      && (canUseRaymarchBlackHole() || (override === 'on' && !isSoftwareRasterizer()));
+    const geodesic = override !== 'off' && capable;
+    const visual = createBlackHole(R, { geodesic });
+    container.add(visual.group);
+    this.blackHoles.push(visual);
+    if (geodesic) setRaymarchStatus(override === 'on' ? 'forced' : 'active', 'attached');
+    else setRaymarchStatus('off', override === 'off' ? 'override-off' : 'tier-low');
+    return visual;
   }
 
-  private disableAllRaymarchHoles(): void {
-    for (const overlay of this.raymarchHoles) {
-      overlay.group.visible = false;
-    }
-    /* Round 20 — a disarmed geodesic tier must restore the WHOLE composite:
-       setCinematic(true) hid the baked disk, core shadow and funnel, and the
-       vault's lattice torii. Without this restore a shader failure left a
-       half-dressed hole (the R19 latent bug). */
-    for (const b of this.bodies) {
-      if (b.group.userData.bhRaymarch) this.setCinematicHole(b.group, false);
-    }
-  }
-
-  /** Round 20 — one switch for the hole's full presentation: the composite
-   *  steps aside for the geodesic renderer (and its lattice torii with it),
-   *  or everything comes back for the fallback. */
-  private setCinematicHole(g: THREE.Object3D, on: boolean): void {
-    const bh = g.userData.bh as { setCinematic?(on: boolean): void } | undefined;
-    bh?.setCinematic?.(on);
-    const spin = g.userData.spin as { r1?: THREE.Mesh; r2?: THREE.Mesh } | undefined;
-    if (spin?.r1) spin.r1.visible = !on;
-    if (spin?.r2) spin.r2.visible = !on;
+  /* One switch for every hole: the geodesic marcher renders it, or the hole
+     hides itself (frame-budget breaker, shader failure, quality tier,
+     Studio switch). Round 55 — nothing stands in for it anymore. */
+  private setAllGeodesic(on: boolean): void {
+    for (const visual of this.blackHoles) visual.setGeodesic(on);
   }
 
   /* Round 20 — frame-budget guard for the geodesic tier. On by default now,
-     so instead of a quality toggle the safety net is automatic: if the march
-     drags the average frame past ~55 ms (an 18 fps floor, measured ~47 ms on
-     Intel UHD at close focus) for ~3 s while a hole is actually on stage, it
-     stands down for the session (one-way — no flapping). */
+     so instead of a quality toggle the safety net is automatic. ROUND 53 —
+     the breaker is RECOVERABLE: exceeding the budget stands the tier down
+     for the current visit (the hole hides itself), and flying away from
+     the hole re-arms it for the next approach — up to three stand-downs per
+     session, then permanent, exactly like the old one-way breaker. The old
+     design blamed one slow stretch forever: on the reference iGPU a single
+     heavy minute at close focus cost the lensed look for the rest of the
+     session, with no signal and no way back. The 'on' override in
+     blackholeTier skips the breaker entirely. */
   private _rmGuardFrames = 0;
   private _rmGuardAccum = 0;
+  private raymarchStoodDown = false;
+  private raymarchFlaps = 0;
+  private _rmAwayFrames = 0;
+  /* Round 54 — the reference's blaze: his demo runs bloom ≈ 0.68 while the
+     project baseline stays gentle for the planets. While a geodesic hole is
+     on stage the bloom strength damps toward the reference value. */
+  private bloomHoleBoost = 0;
 
-  /** True when a raymarched hole is near enough for its march to plausibly
-   *  drive frame cost (within ~120 rs — beyond that the quad is tiny). */
-  private raymarchOnStage(): boolean {
+  /** True when a geodesic hole is near enough for its march to plausibly
+   *  drive frame cost (within ~120 rs — beyond that the quad is tiny).
+   *  ignoreVisibility: while stood down the marcher is swapped out but the
+   *  camera may still be sitting at the hole — the re-arm watcher needs to
+   *  see that position regardless. */
+  private raymarchOnStage(ignoreVisibility = false): boolean {
     for (const b of this.bodies) {
       if (b.data.kind !== 'hole' && b.data.kind !== 'vault') continue;
-      const rm = b.group.userData.bhRaymarch as BlackHoleVisual | undefined;
-      if (!rm || !rm.group.visible) continue;
+      const rm = b.group.userData.bh as BlackHoleVisual | undefined;
+      if (!rm || (!ignoreVisibility && !rm.geodesic)) continue;
       /* world position — body groups ride inside orbit pivots, so .position
          alone is local (and reads as origin) */
       b.group.getWorldPosition(this._vScratch1);
@@ -471,22 +474,52 @@ export class UniverseEngine {
   }
 
   private guardRaymarch(dt: number): void {
-    if (this.raymarchDisabled || this.raymarchHoles.length === 0) return;
+    if (this.raymarchDisabled || this.blackHoles.length === 0) return;
+    const override = getRaymarchOverride();
+    if (override === 'off') return;
+    if (override === 'on') return; /* forced: the breaker never stands it down */
     /* Round 20.1 — portal dives (vault entry, reality work) have their own
        heavy frame moments; they must never be blamed on the geodesic tier
        and stand it down permanently */
     if (this.portal.phase !== 'idle') { this._rmGuardFrames = 0; this._rmGuardAccum = 0; return; }
-    if (!this.raymarchOnStage()) { this._rmGuardFrames = 0; this._rmGuardAccum = 0; return; }
-    this._rmGuardAccum += dt;
-    this._rmGuardFrames++;
-    if (this._rmGuardFrames < 180) return;
-    const avg = this._rmGuardAccum / this._rmGuardFrames;
-    this._rmGuardFrames = 0;
-    this._rmGuardAccum = 0;
-    if (avg > 0.055) {
-      console.warn('[universe] geodesic black hole exceeded the frame budget — the composite takes over for this session');
-      this.raymarchDisabled = true;
-      this.disableAllRaymarchHoles();
+
+    if (!this.raymarchStoodDown) {
+      if (!this.raymarchOnStage()) { this._rmGuardFrames = 0; this._rmGuardAccum = 0; return; }
+      this._rmGuardAccum += dt;
+      this._rmGuardFrames++;
+      if (this._rmGuardFrames < 180) return;
+      const avg = this._rmGuardAccum / this._rmGuardFrames;
+      this._rmGuardFrames = 0;
+      this._rmGuardAccum = 0;
+      if (avg > 0.055) {
+        this.raymarchFlaps++;
+        if (this.raymarchFlaps >= 3) {
+          console.warn('[universe] geodesic black hole exceeded the frame budget three times — the hole hides itself for this session');
+          this.raymarchDisabled = true;
+          this.setAllGeodesic(false);
+          setRaymarchStatus('fallback', 'frame-budget-3-strikes');
+        } else {
+          console.warn(`[universe] geodesic black hole exceeded the frame budget — standing down for this visit (fly away and return to retry; ${3 - this.raymarchFlaps} retries left)`);
+          this.raymarchStoodDown = true;
+          this.setAllGeodesic(false);
+          setRaymarchStatus('fallback', 'frame-budget');
+        }
+      }
+      return;
+    }
+
+    /* stood down: wait until the camera is well clear of the hole (~5 s),
+       then give the tier a fresh chance on the next approach */
+    if (!this.raymarchOnStage(true)) {
+      this._rmAwayFrames++;
+      if (this._rmAwayFrames > 300) {
+        this._rmAwayFrames = 0;
+        this.raymarchStoodDown = false;
+        this.setAllGeodesic(true);
+        setRaymarchStatus(getRaymarchOverride() === 'on' ? 'forced' : 'active', 're-armed');
+      }
+    } else {
+      this._rmAwayFrames = 0;
     }
   }
   /* Pocket Cosmos Marbles — every reality bubble is a glass universe */
@@ -649,11 +682,6 @@ export class UniverseEngine {
   /* constellation pulse registry — atmosphere strength envelopes */
   private pulses: { mat: THREE.ShaderMaterial; base: number; until: number }[] = [];
 
-  private onVaultPulse = (event: Event) => {
-    const detail = (event as CustomEvent<{ intensity?: number }>).detail;
-    this.vaultPulse = Math.min(1.5, this.vaultPulse + (detail?.intensity ?? 1));
-  };
-
   private onContextLost = (event: Event) => {
     event.preventDefault();
   };
@@ -689,10 +717,42 @@ export class UniverseEngine {
       const next = pixelRatioFor(getQualityTier(), 99);
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, next));
       this.composer?.setPixelRatio(Math.min(window.devicePixelRatio, next));
-      if (getQualityTier() !== 'cinematic') this.disableAllRaymarchHoles();
+      /* Round 53 — stand the geodesic tier down only when the NEW tier
+         genuinely cannot run it (low / software GL). The old
+         `!== 'cinematic'` test was a Version-3 leftover: at medium — the
+         DEFAULT tier — merely touching the quality dial tore the lensed
+         renderer down for the session, contradicting the documented
+         on-at-medium+ policy. A round-trip back to a capable tier re-arms
+         it (unless the shader failed or the breaker holds it down). */
+      if (!canUseRaymarchBlackHole()) {
+        this.setAllGeodesic(false);
+        setRaymarchStatus('off', 'tier-low');
+      } else if (!this.raymarchDisabled && !this.raymarchStoodDown && this.blackHoles.length > 0) {
+        this.setAllGeodesic(true);
+        setRaymarchStatus(getRaymarchOverride() === 'on' ? 'forced' : 'active', 'quality-restore');
+      }
       if (getQualityTier() === 'cinematic' && this.exoPlates.length === 0) this.buildExoplanetPlates();
     };
     window.addEventListener(QUALITY_CHANGE_EVENT, this.onQualityChange);
+    /* Round 53 — the Studio card's tier switch lands here (blackholeTier) */
+    this.onTierOverride = () => {
+      const v = getRaymarchOverride();
+      if (v === 'off') {
+        this.setAllGeodesic(false);
+        setRaymarchStatus('off', 'override-off');
+      } else if (v === 'on') {
+        if (this.raymarchDisabled) { setRaymarchStatus('fallback', 'shader-error'); return; }
+        this.raymarchStoodDown = false;
+        this.setAllGeodesic(true);
+        setRaymarchStatus('forced', 'override-on');
+      } else if (!this.raymarchDisabled && !this.raymarchStoodDown) {
+        this.setAllGeodesic(true);
+        setRaymarchStatus('active', 'auto');
+      } else {
+        setRaymarchStatus('fallback', this.raymarchDisabled ? 'shader-error' : 'frame-budget');
+      }
+    };
+    window.addEventListener(RAYMARCH_OVERRIDE_EVENT, this.onTierOverride);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
@@ -769,14 +829,13 @@ export class UniverseEngine {
                      (fsLog ? `--- FRAGMENT SHADER ---\n${fsSource}` : '');
       console.error('[universe] shader compile failure:', log || 'unknown shader error', '\nSource:\n', source.slice(0, 4000));
       window.dispatchEvent(new CustomEvent('eventide-shader-error', { detail: { source: source.slice(0, 4000), log: log || 'unknown shader error' } }));
-      /* any shader failure permanently disarms the raymarched tier this
-         session — the composite alone keeps the hole alive */
+      /* any shader failure permanently disarms the geodesic tier this
+         session — the hole hides itself (Round 55: no stand-in exists) */
       this.raymarchDisabled = true;
-      this.disableAllRaymarchHoles();
+      this.raymarchStoodDown = false;
+      this.setAllGeodesic(false);
+      setRaymarchStatus('fallback', 'shader-error');
     };
-
-    /* the Vault black hole feeds on activity — store/extract/run events pulse it */
-    window.addEventListener('eventide-vault-pulse', this.onVaultPulse);
 
     /* Precompile EVERY shader program now, during the boot fade — without
        this, WebGL compiles lazily on first visibility and each new stage
@@ -1136,52 +1195,20 @@ export class UniverseEngine {
       );
       g.add(dustCloud3D);
     } else if (data.kind === 'hole') {
-      /* Round 16 — a black hole IS a black hole: the legacy primitive
-         (black sphere + flat gradient disc) is retired. Any hole anywhere is
-         now the same Gargantua-class composite the vault uses — true shadow,
-         Shakura–Sunyaev disk with Doppler beaming, photon ring, lensed arcs,
-         Einstein-ring star streams — plus the cinematic raymarched tier
-         where the GPU allows, and the exact Schwarzschild bend on the
-         universe surface (lensStrong is set for kind 'hole' too). */
+      /* Round 54/55 — ONE renderer, no stand-ins: the geodesic black hole,
+         physics-colored (blackbody + Doppler) exactly like the reference,
+         with his bent starfield behind it. On GPUs that cannot run it, the
+         hole hides itself; the exact Schwarzschild bend rides the universe
+         surface too (lensStrong is set for kind 'hole'). */
       const R = data.radius;
-      /* Round 17 — the composite is born with its reality's palette, so the
-         spacetime funnel's grid is native to this universe from frame one */
-      const bh = createBlackHole(R, this.activeReality?.colorA ?? '#38bdf8', this.activeReality?.colorB ?? '#7c3aed');
-      g.add(bh.group);
-      const rm = this.attachRaymarchHole(R, g);
-      if (rm) {
-        g.userData.bhRaymarch = rm;
-        /* Round 19 — the geodesic renderer owns the disk now */
-        bh.setCinematic?.(true);
-      }
+      const bh = this.attachBlackHole(R, g);
       rb.mat = undefined;
       g.userData.bh = bh;
     } else if (data.kind === 'vault') {
-      /* the Universal Vault — Gargantua: composite black hole (baked
-         blackbody disk, photon ring, lensed arcs) built from driver-proof
-         primitives; the ray-march shader variant is retired */
+      /* the Universal Vault — Gargantua: the geodesic black hole, nothing
+         else (Round 55 erased the old lattice-ring fallback look) */
       const R = data.radius;
-      const bh = createBlackHole(R, this.activeReality?.colorA ?? '#38bdf8', this.activeReality?.colorB ?? '#7c3aed');
-      g.add(bh.group);
-      /* cinematic overlay: true geodesic lensing above the composite (safe by
-         construction — composite stays underneath and owns the shadow) */
-      const rm = this.attachRaymarchHole(R, g);
-      if (rm) {
-        g.userData.bhRaymarch = rm;
-        bh.setCinematic?.(true);
-      }
-
-      /* slim lattice torii kept as the Vault activity pulse feedback */
-      const latticeMat = new THREE.MeshStandardMaterial({ color: 0x0c1418, emissive: new THREE.Color('#6fc2b4'), emissiveIntensity: 1.8, metalness: 0.7, roughness: 0.35 });
-      const r1 = new THREE.Mesh(new THREE.TorusGeometry(R * 1.9, 0.04, 8, 110), latticeMat);
-      const r2 = new THREE.Mesh(new THREE.TorusGeometry(R * 2.4, 0.026, 8, 110), latticeMat.clone());
-      r1.rotation.x = 1.1; r2.rotation.x = -0.7; r2.rotation.y = 0.6;
-      g.add(r1, r2);
-
-      g.userData.spin = { r1, r2 };
-      /* Round 20 — while the geodesic tier owns the hole, the lattice steps
-         aside too (it would cut dark torii silhouettes through the disk glow) */
-      if (rm) { r1.visible = false; r2.visible = false; }
+      const bh = this.attachBlackHole(R, g);
       g.userData.bh = bh;
     }
 
@@ -2978,37 +3005,15 @@ void main(){
       const p = data.palette;
       const col = (h: string) => new THREE.Color(h);
       const g = new THREE.Group();
-      let ipRaymarch: BlackHoleVisual | null = null;
 
-      /* ---- an isolated Eventide Vault keeps the same composite black-hole
-             grammar as the home galaxy: horizon, accretion disk, photon ring,
-             lensed arcs and the activity lattice. It must not fall through the
-             ordinary planet builder just because it lives in another galaxy. */
+      /* ---- an isolated Eventide Vault keeps the black-hole grammar of the
+             home galaxy: the geodesic renderer, nothing else. It must not
+             fall through the ordinary planet builder just because it lives
+             in another galaxy. ---- */
       if (data.kind === 'vault') {
-        const bh = createBlackHole(data.radius, this.activeReality?.colorA ?? '#38bdf8', this.activeReality?.colorB ?? '#7c3aed');
-        g.add(bh.group);
-        const rm = this.attachRaymarchHole(data.radius, g);
-        if (rm) {
-          ipRaymarch = rm;
-          bh.setCinematic?.(true);
-        }
-        const latticeMat = new THREE.MeshStandardMaterial({
-          color: 0x0c1418,
-          emissive: new THREE.Color('#6fc2b4'),
-          emissiveIntensity: 1.8,
-          metalness: 0.7,
-          roughness: 0.35,
-        });
-        const r1 = new THREE.Mesh(new THREE.TorusGeometry(data.radius * 1.9, 0.04, 8, 110), latticeMat);
-        const r2 = new THREE.Mesh(new THREE.TorusGeometry(data.radius * 2.4, 0.026, 8, 110), latticeMat.clone());
-        r1.rotation.x = 1.1;
-        r2.rotation.x = -0.7;
-        r2.rotation.y = 0.6;
-        g.add(r1, r2);
-        g.userData.spin = { r1, r2 };
-        /* Round 20 — cinematic vault: the lattice steps aside with the composite */
-        if (ipRaymarch) { r1.visible = false; r2.visible = false; }
-        const ip: InnerPlanet = { data, group: g, blackHole: bh, blackHoleRaymarch: ipRaymarch ?? undefined, moons: [], hoverT: 0 };
+        const bh = this.attachBlackHole(data.radius, g);
+        g.userData.bh = bh;
+        const ip: InnerPlanet = { data, group: g, hole: bh, moons: [], hoverT: 0 };
         this.addInnerColliderAndOrbit(ip, root, rnd);
         root.add(g);
         sys.planets.push(ip);
@@ -3338,26 +3343,8 @@ void main(){
       this._vScratch1.copy(this._vScratch2).sub(this._vScratch3).normalize().multiplyScalar(-1);
       this._vDirScratch.copy(this._vScratch1).applyQuaternion(this._qScratch);
       const portalTear = this.portalTargetInnerId === p.data.id ? this.portalVisualT : 0;
-      if (p.blackHole) {
-        /* The isolated system inherits its galaxy's tilt. Convert the camera
-           quaternion into this vault's local frame so the lensed arcs remain
-           true billboards instead of inheriting that tilt. */
-        p.group.getWorldQuaternion(this._qScratch2).invert().multiply(this.camera.quaternion);
-        p.group.getWorldPosition(this._vScratch1);
-        this._vScratch1.sub(this.camera.position);
-        p.blackHole.update(this.clockT, this._qScratch2, portalTear, this.lensCur, this._vScratch1.length());
-        if (p.blackHoleRaymarch && p.blackHoleRaymarch.group.visible) {
-          updateRaymarchUniforms(p.blackHoleRaymarch, this.camera, this.clockT, portalTear);
-        }
-        const spin = p.group.userData.spin as { r1: THREE.Mesh; r2: THREE.Mesh } | undefined;
-        if (spin) {
-          spin.r1.rotation.z += dt * 0.3;
-          spin.r2.rotation.x += dt * 0.22;
-          const pulse = 1 + Math.sin(this.clockT * 2.2) * 0.018;
-          spin.r1.scale.setScalar(pulse);
-          spin.r2.scale.setScalar(pulse);
-        }
-      }
+      /* Round 54/55 — geodesic uniforms ride the late-tick pass (see tick);
+         the old lattice-ring spin is erased with the rings themselves */
       if (p.mat) {
         if (p.mat.uniforms.uSunDir) (p.mat.uniforms.uSunDir.value as THREE.Vector3).copy(this._vDirScratch);
         p.mat.uniforms.uTime.value = this.clockT;
@@ -4268,15 +4255,22 @@ void main(){
     this.realityFocused = false;
     if (this.cosmicStage === 'multiverse') { this.beginKamui('toWeb', 0.16); return; }
     this.rig.clearPan();
-    /* Round 20.2 — cinematic hole framing: focusing a geodesic hole lands
-       the camera at the reference composition — ≈13° above the disk plane,
-       the band filling the frame — instead of whatever angle the previous
-       view happened to leave. Orbiting away is still free after the focus. */
+    /* Round 53 — cinematic hole framing: focus lands the camera at the
+       REFERENCE'S OWN camera (dgreenheck demo: position (0, −5, 20) → 25.8 rs
+       from the hole, 13.9° BELOW the disk plane). Round 20.2 framed it 13°
+       above at ~45 rs (zoom 0.235) — the lensed wrap was physically present
+       but compressed into a soft halo hugging the shadow, and the spacetime
+       bending read as missing (verified side-by-side against his demo
+       screenshot: at the reference geometry the far-side disk wraps over and
+       under the shadow unmistakably). zoomT: dist = 3 · 800000^z, 25.8 rs =
+       41.6 world units at the default mass → z = ln(41.6/3)/ln(800000) ≈
+       0.1934. Orbiting away is still free after the focus. */
     const target = this.bodies.find((x) => x.data.id === id);
-    const geodesicHole = !!target && (target.data.kind === 'hole' || target.data.kind === 'vault') && !!target.group.userData.bhRaymarch;
+    const geodesicHole = !!target && (target.data.kind === 'hole' || target.data.kind === 'vault')
+      && !!(target.group.userData.bh as BlackHoleVisual | undefined)?.geodesic;
     if (geodesicHole) {
-      this.rig.tPhi = 1.36;
-      this.rig.setZoomTarget(0.235);
+      this.rig.tPhi = 1.814;
+      this.rig.setZoomTarget(0.1934);
       this.prevDialTarget = this.rig.tZoomT;
       return;
     }
@@ -4336,6 +4330,8 @@ void main(){
     const { parent, visual } = this.portalSingularity;
     parent.remove(visual.group);
     visual.dispose();
+    const i = this.blackHoles.indexOf(visual);
+    if (i >= 0) this.blackHoles.splice(i, 1);
     this.portalSingularity = null;
   }
 
@@ -4355,20 +4351,21 @@ void main(){
       }
     }
     if (!parent) return;
-    const visual = createBlackHole(Math.max(0.2, data.radius * 0.14));
+    /* Round 55 — the tear's singularity is the geodesic renderer itself
+       (hidden on GPUs that cannot run it). It rides the late-tick driver
+       like every other hole and is popped on clear. */
+    const override = getRaymarchOverride();
+    const capable = !this.raymarchDisabled
+      && (canUseRaymarchBlackHole() || (override === 'on' && !isSoftwareRasterizer()));
+    const visual = createBlackHole(Math.max(0.2, data.radius * 0.14), { geodesic: override !== 'off' && capable });
     parent.add(visual.group);
+    this.blackHoles.push(visual);
     this.portalSingularity = { parent, visual };
   }
 
   private updatePortalSingularity() {
     if (!this.portalSingularity) return;
-    if (this.portal.phase === 'idle') {
-      this.clearPortalSingularity();
-      return;
-    }
-    const { parent, visual } = this.portalSingularity;
-    parent.getWorldQuaternion(this._qScratch2).invert().multiply(this.camera.quaternion);
-    visual.update(this.clockT, this._qScratch2, this.portalVisualT);
+    if (this.portal.phase === 'idle') this.clearPortalSingularity();
   }
 
   beginPortal(b: { data: CosmicBody }) {
@@ -4682,19 +4679,9 @@ void main(){
     // the photo dome crossfades while the rest of the reality builds)
     void this.applyActiveSky();
 
-    /* Round 17 — every composite hole's spacetime funnel re-tints to the
-       active reality's palette, so the membrane stays native to its universe */
-    const funnelA = new THREE.Color(reality.colorA);
-    const funnelB = new THREE.Color(reality.colorB);
-    for (const b of this.bodies) {
-      if (b.data.kind !== 'hole' && b.data.kind !== 'vault') continue;
-      (b.group.userData.bh as { setTint?: (a: THREE.Color, c: THREE.Color) => void } | undefined)?.setTint?.(funnelA, funnelB);
-    }
-    for (const sys of this.galaxyStageNodes) {
-      for (const p of sys.innerSys?.planets ?? []) {
-        (p.group.userData.bh as { setTint?: (a: THREE.Color, c: THREE.Color) => void } | undefined)?.setTint?.(funnelA, funnelB);
-      }
-    }
+    /* Round 54 — the funnel palette retint is gone with the funnel: the
+       geodesic disk is physics-colored (blackbody + Doppler), exactly like
+       the reference, and the silhouette is pure black. */
 
     // 1. Update Anchor Star shader uniforms & corona palette
     const colA = new THREE.Color(reality.colorA);
@@ -5569,8 +5556,8 @@ void main(){
          inside the disk's inner edge (~5.1 rs): clamp the orbit to his own
          demo's minimum approach (~6 rs, here 7 rs for framing headroom) */
       if (activeFb.data.kind === 'hole' || activeFb.data.kind === 'vault') {
-        const rm = activeFb.group.userData.bhRaymarch as BlackHoleVisual | undefined;
-        if (rm && rm.group.visible) {
+        const rm = activeFb.group.userData.bh as BlackHoleVisual | undefined;
+        if (rm && rm.geodesic) {
           focusMin = Math.max(activeFb.data.radius * 1.35, activeFb.data.radius * 0.62 * 7);
         }
       }
@@ -5639,6 +5626,17 @@ void main(){
     this.updateSurface(dt);
     this.updateCore(dt);
     this.updateHover();
+
+    /* Round 54 — drive the geodesic uniforms LAST, after every position
+       writer has had its say: the vault ephemeris re-places bodies after
+       the main loop's Kepler pass, so a mid-update read landed seconds
+       stale and the march ran against a phantom hole. The driver force-
+       refreshes the matrix chain from the CURRENT locals, so the hole
+       center, the camera offset and the billboard are exact for THIS
+       frame's render. */
+    for (const visual of this.blackHoles) {
+      if (visual.geodesic) updateRaymarchUniforms(visual, this.camera, this.clockT);
+    }
 
     if (this.rendering) {
       this.composer.render();
@@ -5906,46 +5904,9 @@ void main(){
         b.streakRing.visible = mat.opacity > 0.02 && b.fade * sysW > 0.03;
       }
 
-      /* Round 17 — EVERY composite black hole (vault + kind 'hole') gets its
-         per-frame update: the billboarded rings/arcs face the viewer and the
-         spacetime funnel pours with the damped lens toggle. (The kind-'hole'
-         composites were silently never updated before — fixed here.) */
-      if (b.data.kind === 'vault' || b.data.kind === 'hole') {
-        const bh = b.group.userData.bh as {
-          update(t: number, camQuat?: THREE.Quaternion, portal?: number, funnelStrength?: number, camDist?: number): void;
-        } | undefined;
-        if (bh) {
-          /* camera distance feeds the funnel's proximity melt — the mouth
-             dissolves as the viewer nears, so no camera ever flies into it */
-          this._vScratch1.copy(b.group.position).sub(this.camera.position);
-          bh.update(this.clockT, this.camera.quaternion, portalTear, this.lensCur, this._vScratch1.length());
-        }
-        const rm = b.group.userData.bhRaymarch as BlackHoleVisual | undefined;
-        if (rm && rm.group.visible) {
-          updateRaymarchUniforms(rm, this.camera, this.clockT, portalTear);
-        }
-      }
-
-      if (b.data.kind === 'vault' && b.group.userData.spin) {
-        const s = b.group.userData.spin as { r1: THREE.Mesh; r2: THREE.Mesh };
-        s.r1.rotation.z += dt * 0.3; s.r2.rotation.x += dt * 0.22;
-
-        /* feed the void — recent Vault activity (store/extract/run) brightens
-           and shudders the lattice rings, then relaxes back to baseline */
-        const m1 = s.r1.material as THREE.MeshStandardMaterial;
-        const m2 = s.r2.material as THREE.MeshStandardMaterial;
-        if (this.vaultPulse > 0) {
-          this.vaultPulse = Math.max(0, this.vaultPulse - dt * 0.5);
-          const shudder = 1 + Math.sin(this.clockT * 12) * 0.015 * this.vaultPulse;
-          s.r1.scale.setScalar(shudder); s.r2.scale.setScalar(shudder);
-          if (m1?.emissiveIntensity !== undefined) m1.emissiveIntensity = 1.8 + this.vaultPulse * 2.2;
-          if (m2?.emissiveIntensity !== undefined) m2.emissiveIntensity = 1.8 + this.vaultPulse * 2.2;
-        } else {
-          s.r1.scale.setScalar(1); s.r2.scale.setScalar(1);
-          if (m1) m1.emissiveIntensity += (1.8 - m1.emissiveIntensity) * Math.min(1, dt * 2);
-          if (m2) m2.emissiveIntensity += (1.8 - m2.emissiveIntensity) * Math.min(1, dt * 2);
-        }
-      }
+      /* Round 54 — the geodesic uniforms are driven by the late-tick pass
+         (see tick): the vault ephemeris re-places bodies after this loop,
+         so a per-body call here read a matrix seconds stale. */
     }
 
     /* anchor — axial spin, then GRAVITY MADE VISIBLE: the star's barycentric
@@ -5976,7 +5937,13 @@ void main(){
     this.starUniforms.uTime.value = this.clockT;
     const boostTarget = 1 - this.coreT * 0.42;
     this.starUniforms.uBoost.value += (boostTarget - this.starUniforms.uBoost.value) * Math.min(1, dt * 3);
-    this.bloomPass.strength = 0.18 - this.coreT * 0.08;
+    /* Round 54 — the reference's blaze: his demo runs bloom ≈ 0.68, the
+       project baseline (0.18) stays gentle for the planets. While a geodesic
+       hole is on stage the strength damps toward the reference value and
+       relaxes when you fly away. */
+    const holeBoostTarget = this.raymarchOnStage() ? 0.42 : 0;
+    this.bloomHoleBoost += (holeBoostTarget - this.bloomHoleBoost) * Math.min(1, dt * 3);
+    this.bloomPass.strength = 0.18 - this.coreT * 0.08 + this.bloomHoleBoost;
 
     const haloA = this.anchorGroup.userData.haloA as THREE.Points;
     const haloB = this.anchorGroup.userData.haloB as THREE.Points;
@@ -6642,7 +6609,6 @@ void main(){
     this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
     this.renderer.domElement.removeEventListener('webglcontextrestored', this.onContextRestored);
     window.removeEventListener('resize', this.resize);
-    window.removeEventListener('eventide-vault-pulse', this.onVaultPulse);
     if (this.echoGroup) {
       this.scene.remove(this.echoGroup);
       this.echoGroup.traverse((o) => {
@@ -6662,5 +6628,6 @@ void main(){
     this.composer.dispose();
     this.renderer.dispose();
     window.removeEventListener(QUALITY_CHANGE_EVENT, this.onQualityChange);
+    window.removeEventListener(RAYMARCH_OVERRIDE_EVENT, this.onTierOverride);
   }
 }

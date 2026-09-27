@@ -214,7 +214,7 @@ export const CppNativeEngineCard: React.FC = () => {
         </div>
         <p className="text-[10px] text-slate-500">
           CINEMATIC unlocks the raymarched black hole (true gravitational lensing)
-          and 2× pixel ratio — desktop-class GPUs only; the composite hole always remains as fallback.
+          and 2× pixel ratio — desktop-class GPUs only; where the renderer cannot run, the hole hides itself.
         </p>
       </div>
 

@@ -105,6 +105,12 @@ export function setQualityTier(tier: QualityTier): void {
   window.dispatchEvent(new CustomEvent(QUALITY_CHANGE_EVENT, { detail: tier }));
 }
 
+/** True when the probe's GL renderer string is a software rasterizer. */
+export function isSoftwareRasterizer(): boolean {
+  const cap = probeCapability();
+  return SW_RASTERIZERS.some((s) => cap.renderer.toLowerCase().includes(s));
+}
+
 /** True when the raymarched black hole may be created at all.
  *  Round 20 — the geodesic hole is ON BY DEFAULT at medium tier and up,
  *  independent of the Cinematic toggle: it is a bounded overlay on a small
@@ -117,7 +123,7 @@ export function canUseRaymarchBlackHole(): boolean {
   const cap = probeCapability();
   if (cap.tier === 'low') return false;
   if (!cap.webgl2 && cap.maxTextureSize < 4096) return false;
-  return !SW_RASTERIZERS.some((s) => cap.renderer.toLowerCase().includes(s));
+  return !isSoftwareRasterizer();
 }
 
 /** Converts a Three renderer's pixel ratio policy to the tier's policy. */
