@@ -431,6 +431,10 @@ fn reality_daemon_status() -> Result<serde_json::Value, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Auto-update: check/apply signed releases (frontend: ui/UpdaterCard);
+        // process gives the relaunch after an update installs.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             cosmos_status,
             cosmos_kepler_batch,

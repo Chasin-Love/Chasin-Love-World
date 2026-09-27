@@ -54,10 +54,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev libxdo-dev libssl-dev
 
+      # Auto-update signing: when the TAURI_SIGNING_PRIVATE_KEY secret exists,
+      # the build also produces .sig updater artifacts; without it the build
+      # stays green and simply ships unsigned (updater dormant).
+      - name: Detect updater signing key
+        id: signing
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        shell: bash
+        run: echo "present=$(if [ -n "$KEY" ]; then echo true; else echo false; fi)" >> "$GITHUB_OUTPUT"
+
       # The C++ core is compiled into the Tauri binary by build.rs (cc crate);
       # MSVC is preinstalled on windows-latest, GCC on ubuntu-latest.
-      - name: Build desktop app (includes vite build + C++ core)
-        run: npm run desktop:build -- ${{ matrix.targets }}
+      - name: Build desktop app signed (updater artifacts included)
+        if: steps.signing.outputs.present == 'true'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run desktop:build -- ${{ matrix.targets }} --config src-tauri/tauri.updater.conf.json
+
+      - name: Build desktop app unsigned (no signing secret yet)
+        if: steps.signing.outputs.present != 'true'
+        run: echo "No TAURI_SIGNING_PRIVATE_KEY secret — building unsigned; the auto-updater stays dormant until the secret is added." && npm run desktop:build -- ${{ matrix.targets }}
 
       # The dist the desktop bundles must also boot as a plain prod page —
       # the v15.0.0 black screen was a prod-only chunk-order TDZ that every
@@ -72,8 +90,10 @@ jobs:
           name: my-universe-${{ matrix.label }}
           path: |
             src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.exe.sig
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/appimage/*.AppImage.sig
           if-no-files-found: error
 
   # Publishes the built installers as a GitHub Release when a v* tag is pushed.
@@ -95,13 +115,26 @@ jobs:
       - name: List collected installers
         run: ls -R release-assets
 
+      # latest.json is what every installed app polls to discover updates.
+      # Signed builds ship .sig files; the generator folds them into the
+      # manifest. Unsigned builds have none — it skips and the updater
+      # simply stays dormant until the signing secret exists.
+      - name: Generate updater manifest (latest.json)
+        run: node scripts/make-latest-json.mjs release-assets "${{ github.ref_name }}"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: MY UNIVERSE ${{ github.ref_name }}
           files: |
             release-assets/**/*.exe
+            release-assets/**/*.exe.sig
             release-assets/**/*.deb
             release-assets/**/*.AppImage
+            release-assets/**/*.AppImage.sig
+            release-assets/latest.json
           generate_release_notes: true
-          fail_on_unmatched_files: true
+          # unmatched patterns are expected on unsigned builds (no .sig /
+          # latest.json); the "did installers even build" safety lives in
+          # make-latest-json.mjs, which exits 1 when none are present.
+          fail_on_unmatched_files: false

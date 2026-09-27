@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-27T04:26:36.176Z",
-  "fileCount": 127,
+  "generatedAt": "2026-09-27T05:26:00.523Z",
+  "fileCount": 129,
   "deadExports": [
     {
       "symbol": "getSnapshot",
@@ -243,6 +243,7 @@
     "src/ui/CoreMode.tsx": 1,
     "src/ui/FileManager.tsx": 10,
     "src/ui/PhysicsHUD.tsx": 1,
+    "src/ui/UpdaterCard.tsx": 1,
     "src/ui/VaultBits.tsx": 11,
     "src/ui/VaultUI.tsx": 1,
     "src/ui/bits.tsx": 16,
@@ -329,6 +330,7 @@
     "src/App.tsx → src/state/index.ts",
     "src/App.tsx → src/ui/CoreMode.tsx",
     "src/App.tsx → src/ui/PhysicsHUD.tsx",
+    "src/App.tsx → src/ui/UpdaterCard.tsx",
     "src/App.tsx → src/ui/VaultUI.tsx",
     "src/App.tsx → src/ui/bits.tsx",
     "src/App.tsx → src/ui/console/CommandPalette.tsx",
@@ -740,6 +742,7 @@
     "scripts/audit-architecture.ts": 277,
     "scripts/generate-architecture-diagram.ts": 207,
     "scripts/make-icons.mjs": 101,
+    "scripts/make-latest-json.mjs": 80,
     "scripts/prod-smoke.ts": 87,
     "scripts/round16-gauntlet.ts": 103,
     "scripts/round17-gauntlet.ts": 363,
@@ -751,7 +754,7 @@
     "server/routes/realities.ts": 316,
     "server/routes/sky.ts": 94,
     "server/skyStore.ts": 251,
-    "src/App.tsx": 1373,
+    "src/App.tsx": 1379,
     "src/domain/universe.ts": 164,
     "src/domain/vault.ts": 176,
     "src/engine/blackhole.ts": 717,
@@ -806,6 +809,7 @@
     "src/ui/CoreMode.tsx": 921,
     "src/ui/FileManager.tsx": 1280,
     "src/ui/PhysicsHUD.tsx": 485,
+    "src/ui/UpdaterCard.tsx": 97,
     "src/ui/VaultBits.tsx": 133,
     "src/ui/VaultUI.tsx": 546,
     "src/ui/bits.tsx": 144,
@@ -888,7 +892,7 @@
     ],
     [
       "src/App.tsx",
-      1373
+      1379
     ],
     [
       "src/ui/FileManager.tsx",

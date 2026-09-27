@@ -1,6 +1,8 @@
 [package]
 name = "my-universe"
-version = "2.0.0"
+# App version drives the installer filename AND the updater check — keep it
+# aligned with the git tag (v15.0.2 → 15.0.2) on every release.
+version = "15.0.2"
 description = "MY UNIVERSE — a living 3D cosmos, diary and vault (desktop shell)"
 authors = ["Chasin-Love"]
 edition = "2021"
@@ -19,6 +21,8 @@ cc = "1"
 # devtools in RELEASE builds too: the installed app must always be inspectable
 # (right-click → Inspect) — an un-debuggable black screen cost us v15.0.0.
 tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

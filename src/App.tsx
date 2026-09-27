@@ -25,6 +25,7 @@ const CosmicLineageModal = lazy(() => import('./ui/lineage/CosmicLineageModal').
 const CoreConsole = lazy(() => import('./ui/console/CoreConsole').then((module) => ({ default: module.CoreConsole })));
 const RealityAdvancedModal = lazy(() => import('./ui/reality/RealityAdvancedModal').then((module) => ({ default: module.RealityAdvancedModal })));
 const CommandPalette = lazy(() => import('./ui/console/CommandPalette').then((module) => ({ default: module.CommandPalette })));
+const UpdaterCard = lazy(() => import('./ui/UpdaterCard'));
 import { GalaxyHoverCard } from './ui/hud/GalaxyHoverCard';
 import { getReality, type RealityConfig, type GalaxyClusterData, type GalaxyData } from './realities';
 
@@ -1331,6 +1332,11 @@ export default function App() {
           />
         </Suspense>
       )}
+
+      {/* the desktop app keeps itself current — web never mounts this */}
+      <Suspense fallback={null}>
+        <UpdaterCard />
+      </Suspense>
 
       <ToastHost />
     </div>
