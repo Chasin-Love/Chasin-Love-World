@@ -193,22 +193,26 @@ function inv(d: [number, number, number]): [number, number] {
     && !/Math\.abs\(portal\) \* 1\.2/.test(rmSrc);
   check('R20.1: raymarch keeps full glory through portals (no fade)', noPortalFade, `${noPortalFade}`);
 
-  /* ==== ROUND 53 — the reference camera (supersedes the R20.2 constants):
-     focus lands 25.8 rs out, 13.9° BELOW the plane — the geometry that
-     reproduces his demo screenshot's wrapped arcs. ==== */
+  /* ==== ROUND 60 — the user's found composition (supersedes the R53
+     reference camera): focus lands ~31° ABOVE the plane at ~56 rs — the disk
+     reads as a tilted ellipse and the stellar belt sweeps around the hole,
+     the composition the user photographed and approved. ==== */
   const hotIntensity = /opts\.intensity \?\? 1\.35/.test(rmSrc);
-  const cinematicFrame = /geodesicHole/.test(engSrc) && /this\.rig\.tPhi = 1\.814;/.test(engSrc)
-    && /this\.rig\.setZoomTarget\(0\.1934\)/.test(engSrc);
+  const cinematicFrame = /geodesicHole/.test(engSrc) && /this\.rig\.tPhi = 1\.05;/.test(engSrc)
+    && /this\.rig\.setZoomTarget\(0\.25\)/.test(engSrc);
   check('R20.2: default intensity 1.35 (band feeds the bloom threshold)', hotIntensity, `${hotIntensity}`);
-  check('R53: focusing a hole frames the reference camera (25.8 rs, 14° below plane)', cinematicFrame, `${cinematicFrame}`);
+  check('R60: focusing a hole lands the user found composition (56 rs, 31° above plane)', cinematicFrame, `${cinematicFrame}`);
 
   /* ==== ROUND 20.4 — reference restore + live tuning panel ==== */
-  const proportions = /uRs: \{ value: params\.mass \* 2 \}/.test(rmSrc) && /const quadSize = rs \* 60;/.test(rmSrc);
-  check('R20.4: live uRs (mass × 2) + 60 rs quad (disk stays framed)', proportions, `${proportions}`);
+  /* ROUND 57/58 — the quad spans the strong field only (80·rs: shadow + disk
+     + the near-hole wrap); the gradual far field lives in the sky layers'
+     own lens (the R58 law) — no giant quad, no foreground in any capture */
+  const proportions = /uRs: \{ value: params\.mass \* 2 \}/.test(rmSrc) && /const quadSize = rs \* 64;/.test(rmSrc);
+  check('R58: live uRs (mass × 2) + 80·rs quad (the strong field stays framed)', proportions, `${proportions}`);
   const liveTuning = /window\.addEventListener\(BLACKHOLE_CHANGE_EVENT, onParams\)/.test(rmSrc)
-    && /quad\.scale\.setScalar\(Math\.max\(1, 34 \/ \(60 \* shaderRs\)\)\)/.test(rmSrc)
+    && /material\.uniforms\.uLensing\.value = p\.lensing;/.test(rmSrc)
     && /window\.removeEventListener\(BLACKHOLE_CHANGE_EVENT, onParams\)/.test(rmSrc);
-  check('R20.4: panel events apply live (uniforms + quad rescale, dispose-safe)', liveTuning, `${liveTuning}`);
+  check('R20.4: panel events apply live (uniforms, dispose-safe)', liveTuning, `${liveTuning}`);
 }
 
 /* ==== 5. ROUND 52 — spacetime bending of the BACKGROUND (the star clouds) ==== */
@@ -311,19 +315,32 @@ function inv(d: [number, number, number]): [number, number] {
 
   /* ROUND 56 — THE BACKGROUND IS OURS: his procedural sky is gone; escaped
      rays sample the engine's captured real scene through the camera with
-     the FINAL BENT direction — the actual nebula and stars bend. */
+     the FINAL BENT direction — the actual nebula and stars bend. R56c —
+     the capture is a 512² CUBEMAP sampled by direction (textureCube). */
   const rtLens = !/starField|nebulaField|uStarDensity/.test(rmSrc)
-    && /uProjMatrix \* uViewMatrix \* vec4\(uCamPos \+ v \* 1000\.0, 1\.0\)/.test(rmSrc)
-    && /texture2D\(uBgTexture, bgUv\)/.test(rmSrc)
-    && /uBgActive/.test(rmSrc);
-  check('R56: escaped rays sample the captured REAL scene with the bent ray (no procedural sky)', rtLens, `${rtLens}`);
+    && /vec3 v = normalize\(vWorld\.xyz - uCamPos\);/.test(rmSrc)
+    && /captured \? 1\.0 : clamp\(alpha/.test(rmSrc)
+    && !/textureCube/.test(rmSrc);
+  /* R58 — the march's escaped rays exit TRANSPARENT: the live sky shows
+     through, already bent by its own 1/θ lens (exactly continuous with the
+     integrated deflection). Captured rays stay fully opaque: the shadow. */
+  check('R56: escaped rays exit transparent — the live bent sky shows through (no procedural sky)', rtLens, `${rtLens}`);
 
-  /* the engine captures it half-res, holes hidden, R52 lens zeroed */
-  const capture = /WebGLRenderTarget/.test(engSrc) && /getDrawingBufferSize/.test(engSrc)
-    && /uLensBend\.value = 0;/.test(engSrc)
-    && /this\.renderer\.setRenderTarget\(this\.bgRT\);/.test(engSrc)
-    && /for \(const visual of this\.blackHoles\) visual\.group\.visible = false;/.test(engSrc);
-  check('R56: capture pass — half-res RT, holes hidden, R52 lens zeroed, restored after', capture, `${capture}`);
+  /* ROUND 59 — NO CAPTURES, NO LAYERS: the sky layers bend themselves (the
+     surface manager's 1/θ law), so no second image of the sky exists
+     anywhere in the pipeline — no square, no layers, at any distance. */
+  const noCapture = !/WebGLCubeRenderTarget|new THREE\.CubeCamera|bgCube|setBgCube|bgScreenRT/.test(engSrc)
+    && !/textureCube|uBgCube|uBgScreen|uProjMatrix/.test(rmSrc);
+  check('R59: no background captures of any kind — no cubemap, no screen buffer, no layers', noCapture, `${noCapture}`);
+
+  /* ROUND 58 — the sky lens law: the gradual 1/θ decay with NO artificial
+     cutoff, scaled by the march's lensing factor (exact continuity with the
+     geodesic quad at its edge). Lives in the surface shaders only. */
+  const ssSrc = readFileSync(new URL('../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
+  const skyLens = ssSrc.includes('uniform float uLensScale;')
+    && !/smoothstep\(m \* 0\.62, m, ang \/ rim\)/.test(ssSrc)
+    && /\) \* uLensScale \* uLensBend;/.test(ssSrc);
+  check('R58: the sky lens law — gradual 1/θ decay, no cutoff, scaled by the march lensing', skyLens, `${skyLens}`);
 
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
      the blaze now comes from the damped project bloom. */
@@ -343,12 +360,13 @@ function inv(d: [number, number, number]): [number, number] {
     && /private setAllGeodesic\(on: boolean\): void \{/.test(engSrc);
   check('R55: setGeodesic hides the hole itself (one renderer, one switch)', hidden, `${hidden}`);
 
-  /* the portal tear's singularity is the geodesic renderer too, driven by
-     the late-tick pass like every other hole and popped on clear */
-  const portal = /geodesic: override !== 'off' && capable/.test(engSrc)
-    && /this\.blackHoles\.push\(visual\);/.test(engSrc)
-    && /this\.blackHoles\.splice\(i, 1\);/.test(engSrc);
-  check('R55: the portal tear singularity is the geodesic renderer, driven like every hole', portal, `${portal}`);
+  /* the portal is a plain camera zoom — the camera dives in toward the world
+     and the overlay opens on arrival; the old tear singularity machinery is
+     gone entirely */
+  const portal = /phase: 'entering', t: 0, fired: false,/.test(engSrc)
+    && /this\.cb\.onPortalPeak\(this\.portal\.kind, this\.portal\.bodyId\);/.test(engSrc)
+    && !/portalSingularity/.test(engSrc);
+  check('R55: the portal is a plain zoom (no tear singularity machinery)', portal, `${portal}`);
 }
 
 /* ================================ verdict ================================ */

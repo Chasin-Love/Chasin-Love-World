@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Globe, Sun, Orbit, Search, Layers, Database, Cpu, Zap, Crosshair,
-  Compass, Radio, Sparkles, CircleDot, BookOpen, Star,
-} from 'lucide-react';
+import {Globe, Sun, Orbit, Search, Layers, Database, Cpu, Zap, Crosshair,
+  Compass, Radio, Sparkles, CircleDot, BookOpen, Star } from 'lucide-react';
 import { REALITIES } from '../../realities';
 import { HIERARCHY_STAGES } from '../../realities/hierarchyStages';
 import { useUniverse } from '../../state';
@@ -21,11 +19,11 @@ export interface PaletteApi {
   onEnterGalaxy: (realityId: string, galaxyId: string) => void;
   onFocusBody: (bodyId: string) => void;
   onDiveBody: (bodyId: string) => void;
+  onJumpTo: (targetId: string) => void;
   onOpenVault: () => void;
   onOpenConsole: () => void;
   onZoomStage: (stageIndex: number) => void;
   onFrameCore: () => void;
-  onKamui: () => void;
   onOpenMemory: (entryId: string, planetId: string) => void;
   onConstellate: (bodyIds: string[]) => void;
 }
@@ -111,6 +109,34 @@ export const CommandPalette: React.FC<{ onClose: () => void; api: PaletteApi }> 
       });
     }
 
+    /* KAMUI JUMPS — long-range teleportation; distance is irrelevant */
+    for (const b of state.bodies) {
+      if (b.kind === 'star') continue;
+      out.push({
+        id: `jump:${b.id}`,
+        label: `Kamui jump: ${b.name}`,
+        hint: 'tear space — arrive instantly',
+        keywords: `kamui jump teleport warp ${b.name} ${b.kind}`,
+        icon: <Zap className="w-3.5 h-3.5" />,
+        section: 'Kamui Jumps',
+        accent: '#ec4899',
+        run: () => api.onJumpTo(b.id),
+      });
+    }
+    for (const g of active?.galaxies ?? []) {
+      if (g.isHomeGalaxy) continue;
+      out.push({
+        id: `jump-gal:${g.id}`,
+        label: `Kamui jump: ${g.name}`,
+        hint: 'tear space — arrive at its rim',
+        keywords: `kamui jump teleport galaxy ${g.name}`,
+        icon: <Zap className="w-3.5 h-3.5" />,
+        section: 'Kamui Jumps',
+        accent: '#ec4899',
+        run: () => api.onJumpTo(g.id),
+      });
+    }
+
     /* the 11-stage ladder */
     HIERARCHY_STAGES.forEach((s: { label: string; short: string; desc: string }, i: number) => {
       out.push({
@@ -191,16 +217,6 @@ export const CommandPalette: React.FC<{ onClose: () => void; api: PaletteApi }> 
         section: 'Powers',
         accent: '#22d3ee',
         run: api.onFrameCore,
-      },
-      {
-        id: 'kamui',
-        label: 'Kamui Warp',
-        hint: 'bend reality in place',
-        keywords: 'kamui warp jutsu swirl teleport',
-        icon: <Zap className="w-3.5 h-3.5" />,
-        section: 'Powers',
-        accent: '#fb7185',
-        run: api.onKamui,
       },
       {
         id: 'survey',

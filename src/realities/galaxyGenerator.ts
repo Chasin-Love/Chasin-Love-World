@@ -378,7 +378,7 @@ export function generateStellarSystemForGalaxy(gal: GalaxyData): CosmicBody[] {
 
   /* every isolated galaxy carries its own Eventide vault. It is a real
      destination, not just a home-galaxy convenience, so the inner system
-     can use the same black-hole Kamui grammar everywhere. */
+     can use the same vault grammar everywhere. */
   bodies.push({
     id: `${gal.id}-vault-blackhole`,
     name: `${sys.starName.split(' ')[0]} Eventide Black Hole`,

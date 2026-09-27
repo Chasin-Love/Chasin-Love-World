@@ -16,8 +16,6 @@ uniform float uLensRim[16]; /* each mass's own apparent silhouette angle (rad) *
 uniform float uLensStrong[16]; /* 1.0 = black hole: exact Schwarzschild optics */
 uniform int uLensCount;
 uniform float uLensBend;
-uniform float uLensScale;   /* ROUND 58 — the march's lensing factor (2.4): the
-                               sky's bend is exactly continuous with the quad's */
 `;
 
 export const LENS_WARP_GLSL = /* glsl */ `
@@ -88,13 +86,9 @@ vec3 applyLensBend(vec3 d){
          the lens is released, no capture occurs and the sky heals whole) */
       if (ang < bc && uLensBend > 0.02) return LENS_CAPTURE;
       float thE2 = 2.0 * rsA;                     /* Einstein area of the point-mass lens */
-      /* ROUND 58 — the TRUE gradual law, with NO artificial cutoff: the
-         deflection decays as 1/θ forever (gravity never stops) and is scaled
-         by the march's lensing factor (uLensScale = the panel's Grav.
-         Lensing) so the sky's bend is EXACTLY continuous with the geodesic
-         quad at its edge — both are 2·L·rs/b in their own units. The old
-         hard cutoff at m·rim was the "square"/"layers" the user saw. */
-      float disp = (thE2 / ang + 2.9452431 * rsA * rsA / (ang * ang)) * uLensScale * uLensBend;
+      float disp = thE2 / ang + 2.9452431 * rsA * rsA / (ang * ang);  /* 15π/16 second order */
+      float fade = 1.0 - smoothstep(m * 0.62, m, ang / rim);          /* melts into weak sky */
+      disp *= fade * uLensBend;
       if (disp < 1e-6) continue;
       float ang2 = max(ang - disp, 0.0);          /* β — monotone, fold-proof by the math above */
       d = lensReconstruct(L, d, cosA, ang2);
@@ -279,19 +273,6 @@ void main(){
      its silhouette, and the rest of the sky holds still. */
   d = applyLensBend(d);
 
-  /* ROUND 60 — THE DEPRESSION GRADIENT: the sky darkens gradually as it
-     approaches the hole's silhouette (the embedding-diagram well) — no hard
-     edge; the capture disc itself stays pure black. Foreground bodies are
-     never darkened (they are not sky). */
-  float wellDarken = 0.0;
-  for (int i = 0; i < uLensCount; i++) {
-    if (uLensStrong[i] < 0.5) continue;
-    float rsAw = 0.62 * uLensRim[i];
-    float bcW = 2.5980762 * rsAw;
-    float angH = acos(clamp(dot(rawD, uLenses[i].xyz), -1.0, 1.0));
-    wellDarken = max(wellDarken, 1.0 - smoothstep(bcW, bcW * 2.2, angH));
-  }
-
   /* Round 16 — CAPTURED rays paint the TRUE SHADOW: inside b_c = (3√3/2)·rs
      no image of the background exists, so the sky is genuinely absent — pure
      black, not darkened. This thin ring just outside the composite's own
@@ -375,7 +356,6 @@ void main(){
   }
 
   float alpha = edgeAlpha * (1.0 - smoothstep(0.88, 0.998, k));
-  col *= 1.0 - wellDarken;
   gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
 }
 `;

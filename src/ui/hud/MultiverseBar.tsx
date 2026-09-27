@@ -22,7 +22,6 @@ interface MultiverseBarProps {
   onEditRealityLore?: (reality: RealityConfig) => void;
   onInspectLineage?: (cluster: GalaxyClusterData) => void;
   onCloseBar?: () => void;
-  kamuiKey?: number;
 }
 
 export const MultiverseBar: React.FC<MultiverseBarProps> = ({
@@ -40,7 +39,6 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
   onEditRealityLore,
   onInspectLineage,
   onCloseBar,
-  kamuiKey = 0,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showHierarchyBar, setShowHierarchyBar] = useState(true);
@@ -98,17 +96,16 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
         onCreate={handleCreateReality}
       />
 
-      {/* Floating Multiverse HUD Controls at Top Center with Kamui Animation */}
+      {/* Floating Multiverse HUD Controls at Top Center */}
       <div 
-        key={kamuiKey}
-        className="kamui-appear fixed top-4 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 select-none pointer-events-none"
+        className="rise-in fixed top-4 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 select-none pointer-events-none"
       >
         {/* Top Control Bar */}
         <div className="pointer-events-auto flex items-center gap-2 bg-slate-950/15 hover:bg-slate-950/25 backdrop-blur-md border border-cyan-400/25 hover:border-cyan-400/40 rounded-full px-4 py-1.5 text-xs shadow-[0_4px_24px_rgba(0,0,0,0.35)] transition-all">
           {/* Core Controller Badge — opens the Multiverse Core Console */}
           <button
             onClick={() => onOpenCoreConsole?.()}
-            className="kamui-demon-badge flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-950/35 hover:bg-red-900/50 border border-red-500/50 hover:border-red-400 text-red-300 hover:text-white transition-all font-mono text-[11px] font-bold shadow-[0_0_10px_rgba(255,23,68,0.35)] cursor-pointer backdrop-blur-sm"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-950/35 hover:bg-red-900/50 border border-red-500/50 hover:border-red-400 text-red-300 hover:text-white transition-all font-mono text-[11px] font-bold shadow-[0_0_10px_rgba(255,23,68,0.35)] cursor-pointer backdrop-blur-sm"
             title="The Astral Core at (0,0,0) — click to open the Multiverse Core Console (create, rename & collapse realities, forge galaxies)"
           >
             <span className="demon-eye-spin inline-block w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_#ff1744] ring-1 ring-white/80" />
@@ -252,7 +249,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
             <button
               onClick={onCloseBar}
               className="flex items-center justify-center w-6 h-6 text-slate-300 hover:text-red-300 bg-white/[0.04] hover:bg-red-500/20 border border-white/10 hover:border-red-400/40 rounded-full transition-all ml-0.5 cursor-pointer backdrop-blur-sm"
-              title="Retract Toolbar (Click Core at Multiverse center anytime to summon back via Kamui)"
+              title="Retract Toolbar (Click Core at Multiverse center anytime to summon back via the Core Console)"
             >
               <X className="w-3 h-3" />
             </button>

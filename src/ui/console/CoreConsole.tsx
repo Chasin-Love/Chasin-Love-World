@@ -27,7 +27,6 @@ interface Props {
   onClose: () => void;
   onWarpReality: (realityId: string) => void;
   onZoomToCore: () => void;
-  onTriggerKamui: () => void;
   onEnterGalaxy: (realityId: string, galaxyId: string) => void;
   onShowToolbar?: () => void;
   /* Round 14 — physics laws (spacetime lensing + living gravity) */
@@ -765,7 +764,6 @@ export const CoreConsole: React.FC<Props> = ({
   onClose,
   onWarpReality,
   onZoomToCore,
-  onTriggerKamui,
   onEnterGalaxy,
   onShowToolbar,
   lensOn,
@@ -1194,16 +1192,6 @@ export const CoreConsole: React.FC<Props> = ({
                     position="bottom"
                     size="sm"
                     id="pod-frame-core"
-                  />
-                  <ThinkingCloudTooltip
-                    onClick={() => { onClose(); onTriggerKamui(); }}
-                    icon={<Zap className="w-4 h-4" />}
-                    label="Kamui Warp"
-                    subtitle="Bend space, release — the signature warp"
-                    hint="Warp"
-                    position="bottom"
-                    size="sm"
-                    id="pod-kamui-warp"
                   />
                   {onShowToolbar && (
                     <ThinkingCloudTooltip
