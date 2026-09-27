@@ -45,3 +45,22 @@ round makes the lens act on **our real universe**.
   with no seam circle; frame timing ≈ 43 ms avg at 1280×720 close focus (breaker
   held); override Off/Auto round-trip unchanged.
 - Evidence: `scripts/verify/r56-focused.png`.
+
+## 56b — "why can't I see the bending?" — two answers found live
+
+1. **The far view.** After boot the camera sits ~189 rs from the hole — far
+   beyond the 120 rs activity gate (`bgActive: 0`) and far enough that the
+   geometric bending is genuinely tiny. The bending is dramatic at the FOCUS
+   framing (press V / focus the hole → 26 rs, 14° below the plane). The user's
+   screenshot was the far view.
+2. **The resolution wall.** At 1920×1080 the focused hole ran **147 ms/frame
+   (7 fps)** — the lens is pixel-bound (the quad covers the frame). The
+   frame-budget breaker would hide the hole ~27 s after focusing. Fix:
+   - **Adaptive resolution** — while a hole is on stage the composer drops to
+     0.5× pixel ratio (damped, applied in 0.1 steps to avoid per-frame target
+     reallocation) and restores on departure;
+   - **March trim** — MARCH_STEP 0.3 → 0.42 (the bend-per-unit-path invariant
+     keeps the trajectory) and uSteps 96 → 80.
+   Result at 1920×1080 close focus: **147 → 35.5 ms avg** (breaker never trips);
+   quality verified at full 1080p (`scripts/verify/diag-focused-1080p.png`) —
+   bloom hides the upscale.

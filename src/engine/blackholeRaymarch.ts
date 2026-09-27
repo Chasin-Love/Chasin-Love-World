@@ -114,7 +114,10 @@ uniform mat4 uProjMatrix;    /* camera projection */
 uniform mat4 uViewMatrix;    /* camera world inverse */
 uniform float uBgActive;     /* 1 while the capture is fresh (hole on stage) */
 
-#define MARCH_STEP 0.3
+/* ROUND 56b — step 0.38 (was 0.3): the bend-per-unit-path is step-size
+   independent (his invariant), so the trajectory is preserved while the
+   close-focus march costs ~20% less — the lens is pixel-bound at 1080p+. */
+#define MARCH_STEP 0.42
 
 /* ---- Mitchell Charity blackbody colors (CIE 1931), via dgreenheck's LUT ----
    121 texels: 1000K..10000K in 100K steps, then 11000K..40000K in 1KK steps —
@@ -444,7 +447,7 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
       uScale: { value: rs / (params.mass * 2) },  /* world per shader unit */
       uTime: { value: 0 },
       uIntensity: { value: intensity },
-      uSteps: { value: Math.max(48, Math.min(96, opts.steps ?? 96)) },
+      uSteps: { value: Math.max(48, Math.min(88, opts.steps ?? 80)) },
       uDiskBasis: { value: buildDiskBasis() },
       uBlackbody: { value: buildBlackbodyLut() },
       /* dgreenheck's runtime config — panel-tunable via blackholeParams (R20.4) */

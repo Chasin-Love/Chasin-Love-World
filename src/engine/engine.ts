@@ -470,6 +470,30 @@ export class UniverseEngine {
   private raymarchStoodDown = false;
   private raymarchFlaps = 0;
   private _rmAwayFrames = 0;
+  /* ROUND 56b — adaptive resolution: the geodesic lens is pixel-bound (the
+     quad covers the frame at close focus — 147 ms at 1080p full res), so
+     while a hole is on stage the whole composer drops to 0.6× pixel ratio
+     and restores when you fly away. Applied in 0.1 steps — every apply
+     reallocates the render targets, so we never churn per frame. */
+  private pixelRatioBase = 1;
+  private pixelRatioApplied = -1;
+  private holePixelRatioDamp = 1;
+
+  private applyAdaptiveResolution(holeOnStage: boolean, dt: number): void {
+    const target = holeOnStage ? Math.max(0.5, this.pixelRatioBase * 0.5) : this.pixelRatioBase;
+    this.holePixelRatioDamp += (target - this.holePixelRatioDamp) * Math.min(1, dt * 4);
+    if (Math.abs(this.holePixelRatioDamp - this.pixelRatioApplied) >= 0.1) {
+      this.pixelRatioApplied = this.holePixelRatioDamp;
+      const r = Math.max(0.5, Math.round(this.pixelRatioApplied * 10) / 10);
+      this.renderer.setPixelRatio(r);
+      this.composer.setPixelRatio(r);
+      if (this.bgRT) {
+        const size = new THREE.Vector2();
+        this.renderer.getDrawingBufferSize(size);
+        this.bgRT.setSize(Math.max(1, Math.floor(size.x / 2)), Math.max(1, Math.floor(size.y / 2)));
+      }
+    }
+  }
   /* Round 54 — the reference's blaze: his demo runs bloom ≈ 0.68 while the
      project baseline stays gentle for the planets. While a geodesic hole is
      on stage the bloom strength damps toward the reference value. */
@@ -733,9 +757,13 @@ export class UniverseEngine {
     const maxPixelRatio = lowPowerDevice || cap.tier === 'low' ? 1 : pixelRatioFor(cap.tier, 99);
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPowerDevice, powerPreference: lowPowerDevice ? 'default' : 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
+    this.pixelRatioBase = this.renderer.getPixelRatio();
+    this.pixelRatioApplied = this.pixelRatioBase;
+    this.holePixelRatioDamp = this.pixelRatioBase;
     /* tier changes (settings UI) re-apply the pixel ratio live */
     this.onQualityChange = () => {
       const next = pixelRatioFor(getQualityTier(), 99);
+      this.pixelRatioBase = Math.min(window.devicePixelRatio, next);
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, next));
       this.composer?.setPixelRatio(Math.min(window.devicePixelRatio, next));
       /* Round 53 — stand the geodesic tier down only when the NEW tier
@@ -5663,6 +5691,7 @@ void main(){
     this.camera.updateMatrixWorld();
     this.camera.matrixWorldInverse.copy(this.camera.matrixWorld).invert();
     const holeOnStage = this.raymarchOnStage();
+    this.applyAdaptiveResolution(holeOnStage, dt);
     for (const visual of this.blackHoles) {
       if (visual.geodesic) updateRaymarchUniforms(visual, this.camera, this.clockT, holeOnStage);
     }
