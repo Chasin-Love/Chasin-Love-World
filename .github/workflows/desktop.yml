@@ -62,7 +62,13 @@ jobs:
         env:
           KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         shell: bash
-        run: echo "present=$(if [ -n "$KEY" ]; then echo true; else echo false; fi)" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ -n "$KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY secret not found on this repo — building UNSIGNED; the auto-updater stays dormant until the repository secret exists."
+          fi
 
       # The C++ core is compiled into the Tauri binary by build.rs (cc crate);
       # MSVC is preinstalled on windows-latest, GCC on ubuntu-latest.
