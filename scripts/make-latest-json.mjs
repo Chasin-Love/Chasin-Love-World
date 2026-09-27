@@ -34,13 +34,19 @@ const find = (suffix) => files.find((f) => f.endsWith(suffix));
 
 const platforms = {};
 
+/* GitHub normalizes release asset names (spaces → dots): the bundle on disk
+   is "MY UNIVERSE_15.0.2_x64-setup.exe" but the stored asset is
+   "MY.UNIVERSE_15.0.2_x64-setup.exe". The URL must use the STORED name or
+   the updater's download 404s. */
+const ghAsset = (p) => `${base}/${path.basename(p).replace(/\s/g, '.')}`;
+
 const exe = find('_x64-setup.exe') || find('.exe');
 if (exe) {
   const sig = `${exe}.sig`;
   if (existsSync(sig)) {
     platforms['windows-x86_64'] = {
       signature: readFileSync(sig, 'utf8').trim(),
-      url: `${base}/${path.basename(exe)}`,
+      url: ghAsset(exe),
     };
   }
 }
@@ -51,7 +57,7 @@ if (appimage) {
   if (existsSync(sig)) {
     platforms['linux-x86_64'] = {
       signature: readFileSync(sig, 'utf8').trim(),
-      url: `${base}/${path.basename(appimage)}`,
+      url: ghAsset(appimage),
     };
   }
 }
