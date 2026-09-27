@@ -365,6 +365,25 @@ export default function App() {
 
       boot = () => { initAudio(); if (boot) window.removeEventListener('pointerdown', boot); };
       window.addEventListener('pointerdown', boot);
+    }).catch((err) => {
+      /* A silent boot death is the worst failure mode this app has — v15.0.0
+         shipped a black screen because a prod-only chunk-order error died in
+         this chain unseen. The veil comes OFF and the reason goes ON the glass. */
+      console.error('[boot] the universe engine failed to ignite:', err);
+      document.querySelector('.intro-veil')?.remove();
+      const veil = document.createElement('div');
+      veil.setAttribute('style', 'position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:rgba(4,6,12,0.97);color:#e8e2d4;font-family:ui-monospace,SFMono-Regular,monospace;text-align:center;padding:24px');
+      const kind = document.createElement('p');
+      kind.textContent = '✦ IGNITION FAILURE';
+      kind.setAttribute('style', 'font-size:10px;letter-spacing:0.34em;text-transform:uppercase;color:#f2c178;margin:0 0 10px');
+      const what = document.createElement('p');
+      what.textContent = String((err as Error)?.message ?? err);
+      what.setAttribute('style', 'font-size:13px;line-height:1.6;margin:0;max-width:640px;word-break:break-word');
+      const hint = document.createElement('p');
+      hint.textContent = 'The cosmos could not start. Your universe and data are untouched. Right-click → Inspect (devtools build) or relaunch; if it repeats, install the latest release.';
+      hint.setAttribute('style', 'font-size:11px;opacity:0.7;margin:14px 0 0');
+      veil.append(kind, what, hint);
+      document.body.appendChild(veil);
     });
     return () => {
       cancelled = true;

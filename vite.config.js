@@ -46,21 +46,19 @@ export default defineConfig({
        ELSE appearing above the floor is real fat: remove it, don't raise
        this. The committed docs/verify/bundle-baseline.txt is the regression
        gate — refresh it in the same commit and eyeball the delta. */
-    chunkSizeWarningLimit: 2900,
+    chunkSizeWarningLimit: 4500,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
           const p = id.replace(/\\/g, "/").split("node_modules/").pop();
-          if (p.startsWith("monaco-editor/")) {
-            /* three parallel slices instead of one 4 MB wall — the editor
-               core and the language layer load simultaneously */
-            const rest = p.slice("monaco-editor/".length);
-            if (/^esm\/vs\/(languages|language)\//.test(rest)) return "monaco-lang";
-            if (/^esm\/vs\/(base|platform)\//.test(rest)) return "monaco-core";
-            return "monaco-editor"; /* editor/ + features/ (contributions, services) */
-          }
-          if (p.startsWith("@monaco-editor/react")) return "monaco-editor";
+          /* Monaco is deliberately NOT manual-chunked: its esm layers
+             (base/platform ↔ editor ↔ languages) reference each other, and
+             forcing them into hand-made chunks evaluates their bindings in a
+             cross-chunk order Rollup cannot hoist — a TDZ ReferenceError at
+             boot that black-screened the whole installed app (v15.0.0).
+             Rollup's own placement is order-safe; Monaco rides the lazy
+             vault chunk it is imported from. */
           const pkg = p.startsWith("@") ? p.split("/").slice(0, 2).join("/") : p.split("/")[0];
           if (pkg === "three") return "three";
           if (pkg === "react" || pkg === "react-dom" || pkg === "scheduler" || pkg === "framer-motion") return "react";

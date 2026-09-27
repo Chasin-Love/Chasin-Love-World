@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-26T19:55:24.217Z",
-  "fileCount": 126,
+  "generatedAt": "2026-09-27T04:26:36.176Z",
+  "fileCount": 127,
   "deadExports": [
     {
       "symbol": "getSnapshot",
@@ -245,7 +245,7 @@
     "src/ui/PhysicsHUD.tsx": 1,
     "src/ui/VaultBits.tsx": 11,
     "src/ui/VaultUI.tsx": 1,
-    "src/ui/bits.tsx": 15,
+    "src/ui/bits.tsx": 16,
     "src/ui/console/BlackHoleTuningCard.tsx": 1,
     "src/ui/console/CommandPalette.tsx": 1,
     "src/ui/console/CoreConsole.tsx": 1,
@@ -387,6 +387,7 @@
     "src/engine/surface/surfaceShaders.ts → src/engine/shaders.ts",
     "src/main.tsx → src/App.tsx",
     "src/main.tsx → src/platform/performance.ts",
+    "src/main.tsx → src/ui/bits.tsx",
     "src/physics/nbody.ts → src/domain/universe.ts",
     "src/physics/nbody.ts → src/physics/physicsEngine.ts",
     "src/physics/physicsEngine.ts → src/domain/universe.ts",
@@ -739,6 +740,7 @@
     "scripts/audit-architecture.ts": 277,
     "scripts/generate-architecture-diagram.ts": 207,
     "scripts/make-icons.mjs": 101,
+    "scripts/prod-smoke.ts": 87,
     "scripts/round16-gauntlet.ts": 103,
     "scripts/round17-gauntlet.ts": 363,
     "scripts/smoke.ts": 233,
@@ -749,7 +751,7 @@
     "server/routes/realities.ts": 316,
     "server/routes/sky.ts": 94,
     "server/skyStore.ts": 251,
-    "src/App.tsx": 1354,
+    "src/App.tsx": 1373,
     "src/domain/universe.ts": 164,
     "src/domain/vault.ts": 176,
     "src/engine/blackhole.ts": 717,
@@ -769,7 +771,7 @@
     "src/engine/systems/levelSystem.ts": 42,
     "src/engine/systems/portalPhases.ts": 52,
     "src/engine/systems/stageThresholds.ts": 50,
-    "src/main.tsx": 10,
+    "src/main.tsx": 17,
     "src/physics/nbody.ts": 319,
     "src/physics/physicsEngine.ts": 407,
     "src/platform/audio.ts": 195,
@@ -886,7 +888,7 @@
     ],
     [
       "src/App.tsx",
-      1354
+      1373
     ],
     [
       "src/ui/FileManager.tsx",

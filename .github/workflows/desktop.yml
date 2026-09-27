@@ -59,6 +59,13 @@ jobs:
       - name: Build desktop app (includes vite build + C++ core)
         run: npm run desktop:build -- ${{ matrix.targets }}
 
+      # The dist the desktop bundles must also boot as a plain prod page —
+      # the v15.0.0 black screen was a prod-only chunk-order TDZ that every
+      # dev-mode gate missed.
+      - name: Production web smoke (bundled dist must boot)
+        if: runner.os == 'Linux'
+        run: npx playwright install --with-deps chromium && npm run prod:smoke
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

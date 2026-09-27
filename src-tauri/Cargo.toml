@@ -16,7 +16,9 @@ tauri-build = { version = "2", features = [] }
 cc = "1"
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# devtools in RELEASE builds too: the installed app must always be inspectable
+# (right-click → Inspect) — an un-debuggable black screen cost us v15.0.0.
+tauri = { version = "2", features = ["devtools"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
