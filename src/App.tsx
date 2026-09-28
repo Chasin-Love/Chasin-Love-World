@@ -29,7 +29,7 @@ const UpdaterCard = lazy(() => import('./ui/UpdaterCard'));
 import { GalaxyHoverCard } from './ui/hud/GalaxyHoverCard';
 import { getReality, type RealityConfig, type GalaxyClusterData, type GalaxyData } from './realities';
 
-interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean; maximized?: boolean }
+interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean; maximized?: boolean; closing?: boolean }
 
 /* when maximized, the diary fills the viewport edge-to-edge (with a slim margin) */
 const MAX_RECT = (): WinRect => ({ x: 12, y: 12, w: window.innerWidth - 24, h: window.innerHeight - 24 });
@@ -112,6 +112,8 @@ export default function App() {
   const [showPalette, setShowPalette] = useState(false);
   const [idle, setIdle] = useState(false);
   const [wins, setWins] = useState<Win[]>([]);
+  /* the vault stays mounted for the kamui-suck swallow on close */
+  const [vaultClosing, setVaultClosing] = useState(false);
   const [zTop, setZTop] = useState(0);
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [entered, setEntered] = useState<string | null>(null);
@@ -635,24 +637,34 @@ export default function App() {
     setAudioMode('space');
   }, []);
 
+  const vaultClosingRef = useRef(false);
   const closeVault = useCallback(() => {
-    setMode('space');
-    setAudioMode('space');
-    /* Let the engine show the reverse gravitational release before it
-       returns the camera to the stellar-system frame. */
+    if (vaultClosingRef.current) return; /* already being swallowed (Escape / double-close) */
+    vaultClosingRef.current = true;
+    /* THE RETURN TEAR — the reverse vortex fires NOW, at full strength,
+       and the vault stays mounted just long enough to be sucked into it. */
+    setVaultClosing(true);
     engineRef.current?.leavePortal();
+    setAudioMode('space');
+    setTimeout(() => { setMode('space'); setVaultClosing(false); vaultClosingRef.current = false; }, 700);
   }, []);
 
   const closeWin = (key: string) => {
-    setWins((cur) => {
-      const next = cur.filter((w) => w.key !== key);
-      if (next.length === 0) {
-        engineRef.current?.leavePortal();
-        setAudioMode('space');
-        setEntered(null);
-      }
-      return next;
-    });
+    const target = wins.find((w) => w.key === key);
+    if (!target || target.closing) return;
+    const remaining = wins.filter((w) => w.key !== key && !w.closing);
+    if (remaining.length === 0) {
+      /* THE RETURN TEAR — the reverse vortex fires NOW, at full strength,
+         and the diary stays mounted just long enough to be sucked into it
+         (kamui-suck) before it unmounts. Side effects stay out of the
+         state updaters. */
+      engineRef.current?.leavePortal();
+      setAudioMode('space');
+      setEntered(null);
+      setWins((cur) => cur.map((w) => (w.key === key ? { ...w, closing: true } : w)));
+      return;
+    }
+    setWins((cur) => cur.filter((w) => w.key !== key));
   };
 
   const minimizeWin = (key: string) => setWins((cur) => cur.map((w) => (w.key === key ? { ...w, minimized: true } : w)));
@@ -661,6 +673,14 @@ export default function App() {
     setFocusKey(key);
   };
   const maximizeWin = (key: string) => setWins((cur) => cur.map((w) => (w.key === key ? { ...w, maximized: !w.maximized } : w)));
+
+  /* kamui-suck closing windows unmount after the swallow animation ends */
+  useEffect(() => {
+    if (!wins.some((w) => w.closing)) return;
+    const t = setTimeout(() => setWins((cur) => cur.filter((w) => !w.closing)), 700);
+    return () => clearTimeout(t);
+  }, [wins]);
+
 
   /* open (or raise) a diary window for a world — used by constellation links */
   /* openDiaryFor lives in a ref so the engine boot effect can call the
@@ -871,7 +891,7 @@ export default function App() {
         const planet = state.bodies.find((b) => b.id === w.planetId) ?? engineRef.current?.getInnerBody(w.planetId) ?? null;
         if (!planet) return null;
         return (
-          <DiaryWindowFrame key={w.key} z={zTop + i} focused={focusKey === w.key}>
+          <DiaryWindowFrame key={w.key} z={zTop + i} focused={focusKey === w.key} closing={!!w.closing}>
             <Suspense fallback={null}>
               <ErrorBoundary label="THE DIARY">
                 <DiaryWindow
@@ -920,10 +940,10 @@ export default function App() {
       )}
 
       {/* vault */}
-      {mode === 'vault' && (
+      {(mode === 'vault' || vaultClosing) && (
         <Suspense fallback={<AsyncOverlay label="OPENING VAULT" />}>
           <ErrorBoundary label="THE VAULT">
-            <VaultUI onClose={closeVault} />
+            <VaultUI onClose={closeVault} closing={vaultClosing} />
           </ErrorBoundary>
         </Suspense>
       )}
@@ -1348,8 +1368,14 @@ export default function App() {
 /* wrapper that controls stacking without fighting the spring transform.
    pointer-events pass straight through — the window root re-enables them —
    so the universe stays clickable while diaries are open. */
-function DiaryWindowFrame({ children, z }: { children: ReactNode; z: number; focused: boolean }) {
-  return <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 + (z % 50) }}>{children}</div>;
+function DiaryWindowFrame({ children, z, focused, closing }: { children: ReactNode; z: number; focused: boolean; closing?: boolean }) {
+  return (
+    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 + (z % 50) }}>
+      {/* the swallow wrapper — the frame carries it so the keyframe never
+          fights the diary spring's imperative transform writes */}
+      <div className={`absolute inset-0 ${closing ? 'kamui-suck' : ''}`}>{children}</div>
+    </div>
+  );
 }
 
 function RenameRow({ body, onDone }: { body: CosmicBody; onDone: () => void }) {

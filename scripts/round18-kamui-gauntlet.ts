@@ -46,7 +46,9 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 {
   const trigger = /triggerKamui\(targetUv\?: THREE\.Vector2, reverse = false\) \{[\s\S]*?this\.kamuiTimer = KAMUI_TRIGGER_DURATION;[\s\S]*?\n  \}/.test(engSrc);
   const envelope = /this\.kamuiTimer = Math\.max\(0, this\.kamuiTimer - dt\);/.test(engSrc)
-    && /const kEase = Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI\);/.test(engSrc)
+    && /const kEase = this\.portalPass\.uniforms\.uDir\.value < 0/.test(engSrc)
+    && /Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI \* 0\.5\)/.test(engSrc)
+    && /: Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI\);/.test(engSrc)
     && /kEase \* 1\.15/.test(engSrc)
     && /this\.kamuiEase \*= Math\.max\(0, 1 - dt \* 6\);/.test(engSrc);
   check('R18: triggerKamui fires the 5.5s timer; the tick relaxes it through the slow sin envelope (×1.15 peak)', trigger && envelope, `${trigger}/${envelope}`);
@@ -57,12 +59,18 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
   const reverse = /uDir: \{ value: 1 \},/.test(engSrc)
     && /this\.portalPass\.uniforms\.uDir\.value = reverse \? -1 : 1;/.test(engSrc)
+    && /Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI \* 0\.5\)/.test(engSrc)
     && /uniform float uDir;/.test(shSrc)
     && /s \* 6\.5 \* fall \* uDir/.test(shSrc)
     && /pullDir \* \(s \* 0\.28 \+ vac \* 0\.9\) \* fall \* uDir/.test(shSrc)
     && /this\.triggerKamui\(undefined, true\);/.test(engSrc)
-    && /this\.triggerKamui\(undefined, dir === 'toWeb'\);/.test(engSrc);
-  check('R18: the jutsu has two faces — closes and returns replay the vortex reversed (uDir eject)', reverse, 'reverse wiring missing');
+    && /this\.triggerKamui\(undefined, dir === 'toWeb'\);/.test(engSrc)
+    && /kamuiSuck/.test(cssSrc)
+    && /\.kamui-suck \{/.test(cssSrc)
+    && /kamui-suck/.test(appSrc)
+    && /closing: true/.test(appSrc)
+    && /vaultClosing/.test(appSrc);
+  check('R18: the eject bursts at full strength instantly and swallows the open overlay (kamui-suck)', reverse, 'reverse wiring missing');
 
   const vacuum = /uVac: \{ value: 0 \},/.test(engSrc)
     && /uniform float uDir; uniform float uVac;/.test(shSrc)

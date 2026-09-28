@@ -46,7 +46,7 @@ import { AudioPlayer, AdvancedVideoPlayer, CodeDocStudio, OtherView, Viewer } fr
 import { CATEGORIES, CAT_COLORS, HISTORY_CAP, TRASH_TTL_DAYS, WORDS, pwScore, pwTier, genKey, genPassphrase, ageDays, withHistory, HISTORY_LABELS, PulsarCode, NovaGlyph, GravityWellModal, parseCardExpiry, EXPIRY_KEY, sentinelIssues, SentinelPanel, KeyGenerator, b64url, b64urlDecode, copyScrubbed, prfDerive, StargateModal, StellarWillModal, CourierModal, ReceiveModal, RotateKeyModal, PasswordVault } from './vault/keyring';
 import { IdentityEditor, LockModal, UnlockPrompt, Telemetry, ALLOC, VaultHome, VaultTerminal, DeepScan, SECTIONS } from './vault/shell';
 
-export default function VaultUI({ onClose }: { onClose: () => void }) {
+export default function VaultUI({ onClose, closing }: { onClose: () => void; closing?: boolean }) {
   const state = useUniverse();
   const [user, setUser] = useState<VaultUser | null>(null);
   const [masterPass, setMasterPass] = useState('');
@@ -223,7 +223,7 @@ export default function VaultUI({ onClose }: { onClose: () => void }) {
   }, [onClose, viewer, lockModal, unlocking, showTerminal, showScan]);
 
   return (
-    <div className="vault-scope fixed inset-0 z-110 overlay-in overflow-hidden" style={{ background: 'rgba(3,5,11,0.34)' }}>
+    <div className={`vault-scope fixed inset-0 z-110 overlay-in overflow-hidden ${closing ? 'kamui-suck' : ''}`} style={{ background: 'rgba(3,5,11,0.34)' }}>
       <VaultBackdrop />
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 100% at 50% 0%, rgba(8,13,24,0.12), rgba(3,5,11,0.3))' }} />
       <div

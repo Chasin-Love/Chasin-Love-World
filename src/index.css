@@ -1733,6 +1733,33 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   transform-origin: center center;
 }
 
+/* THE SWALLOW — an open overlay (diary window, vault) being taken by the
+   reverse vortex: it spins down into the tear's middle and is gone. */
+@keyframes kamuiSuck {
+  0% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    filter: blur(0px) brightness(1);
+  }
+  60% {
+    opacity: 0.9;
+    filter: blur(4px) brightness(1.7) contrast(130%);
+    box-shadow: 0 0 90px rgba(255, 23, 68, 0.7), 0 0 45px rgba(139, 92, 246, 0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.03) rotate(-300deg);
+    filter: blur(16px) brightness(2.4);
+    box-shadow: 0 0 130px rgba(255, 23, 68, 1);
+  }
+}
+
+.kamui-suck {
+  animation: kamuiSuck 0.6s cubic-bezier(0.7, 0, 0.84, 0) both;
+  transform-origin: center center;
+  pointer-events: none;
+}
+
 @keyframes demonPulse {
   0%, 100% {
     box-shadow: 0 0 15px rgba(255, 23, 68, 0.4), inset 0 0 10px rgba(255, 23, 68, 0.2);

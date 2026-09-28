@@ -5026,10 +5026,15 @@ void main(){
     }
 
     /* KAMUI (v1) — the red vortex breathes: one slow sin envelope across
-       KAMUI_TRIGGER_DURATION seconds (rise → crest → fall) */
+       KAMUI_TRIGGER_DURATION seconds (rise → crest → fall). The eject is
+       the mirror face: it bursts at FULL strength the instant it fires and
+       decays — a close must never show the naked pull-back while the tear
+       is still forming. */
     if (this.kamuiTimer > 0) {
       this.kamuiTimer = Math.max(0, this.kamuiTimer - dt);
-      const kEase = Math.sin((this.kamuiTimer / KAMUI_TRIGGER_DURATION) * Math.PI);
+      const kEase = this.portalPass.uniforms.uDir.value < 0
+        ? Math.sin((this.kamuiTimer / KAMUI_TRIGGER_DURATION) * Math.PI * 0.5)
+        : Math.sin((this.kamuiTimer / KAMUI_TRIGGER_DURATION) * Math.PI);
       this.kamuiEase = Math.max(this.kamuiEase, kEase * 1.15);
     }
 
