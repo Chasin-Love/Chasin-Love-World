@@ -571,6 +571,31 @@ export class UniverseEngine {
     return false;
   }
 
+  /* ROUND 65 — THE BLAZE LEARNS DISTANCE: the on-stage bloom boost was a
+     boolean (the full 0.68 the moment any hole was within 120 rs), so wide
+     views of the system drowned in the hole's blaze — too much light for
+     the user's eyes. The glow now scales continuously with the encounter:
+     full reference glory inside ~40 rs of the nearest hole, easing to the
+     project's calm baseline by 120 rs. The hole stays a quiet side
+     character in the sky until you actually walk up to it — then it
+     blazes. */
+  private holeGlowProximity(): number {
+    let proximity = 0;
+    for (const b of this.bodies) {
+      if (b.data.kind !== 'hole' && b.data.kind !== 'vault') continue;
+      const rm = b.group.userData.bh as BlackHoleVisual | undefined;
+      if (!rm || !rm.geodesic) continue;
+      /* world position — body groups ride inside orbit pivots, so .position
+         alone is local (and reads as origin) */
+      b.group.getWorldPosition(this._vScratch1);
+      this._vScratch1.sub(this.camera.position);
+      const rs = this._vScratch1.length() / (b.data.radius * 0.62);
+      proximity = Math.max(proximity, 1 - Math.min(1, Math.max(0, (rs - 40) / 80)));
+      if (proximity >= 1) break;
+    }
+    return proximity;
+  }
+
   private guardRaymarch(dt: number): void {
     if (this.raymarchDisabled || this.blackHoles.length === 0) return;
     const override = getRaymarchOverride();
@@ -5520,16 +5545,17 @@ this.updateBodies(dt);
        project baseline (0.18) stays gentle for the planets. While a geodesic
        hole is on stage the strength damps toward the reference value and
        relaxes when you fly away. */
-    /* ROUND 64 — HIS BLOOM: strength 0.68 (baseline 0.18 + boost 0.50) and
-       radius 0.2 port verbatim while a geodesic hole is on stage, relaxing
-       when you fly away. His THRESHOLD does not: it is scene-dependent, not
-       pipeline-dependent — the port's pipeline matches his exactly (spec §3),
-       but his scene is a hole on black while ours is a hole in a living
-       universe (sky, belt, coronas all feed the high-pass). MEASURED TWICE
-       on the GPU probe: his 0.4 floods our void to 0.58–0.65 luminance with
-       the reference's own interior at 0.33; the calibrated 0.90 lands the
-       interior at 0.33 — a dead match. The threshold stays 0.90. */
-    const holeBoostTarget = this.raymarchOnStage() ? 0.5 : 0;
+    /* ROUND 64/65 — HIS BLOOM, distance-aware: strength 0.68 (baseline 0.18
+       + boost 0.50) and radius 0.2 at the CLOSE encounter (his values,
+       eased on as the hole nears), relaxing to the project's gentle baseline
+       in wide views — the blaze is for the meeting, not for the whole sky
+       (the R65 eye-comfort fix). His THRESHOLD does not port: it is
+       scene-dependent — his scene is a hole on black; ours is a hole in a
+       living universe. MEASURED TWICE on the GPU probe: his 0.4 floods our
+       void to 0.58–0.65 luminance with the reference's own interior at
+       0.33; the calibrated 0.90 lands the interior at 0.33 — a dead match.
+       The threshold stays 0.90. */
+    const holeBoostTarget = this.holeGlowProximity() * 0.5;
     this.bloomHoleBoost += (holeBoostTarget - this.bloomHoleBoost) * Math.min(1, dt * 3);
     this.bloomPass.strength = 0.18 - this.coreT * 0.08 + this.bloomHoleBoost;
     const holeMix = Math.min(1, this.bloomHoleBoost / 0.5);

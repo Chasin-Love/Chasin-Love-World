@@ -378,10 +378,10 @@ function inv(d: [number, number, number]): [number, number] {
   check('R58: the sky lens law — gradual 1/θ decay, no cutoff, scaled by the march lensing', skyLens, `${skyLens}`);
 
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
-     the blaze now comes from the damped project bloom (R63: his 0.68 via the
-     on-stage boost). */
+     the blaze now comes from the damped project bloom (R65: distance-aware —
+     his 0.68 at the close encounter, calm baseline in wide views). */
   const noGlow = !/buildGlowTexture/.test(rmSrc) && !/AdditiveBlending/.test(rmSrc)
-    && /bloomHoleBoost/.test(engSrc) && /this\.raymarchOnStage\(\) \? 0\.5 : 0/.test(engSrc);
+    && /bloomHoleBoost/.test(engSrc) && /const holeBoostTarget = this\.holeGlowProximity\(\) \* 0\.5;/.test(engSrc);
   check('R54: glow sprite gone; bloom damps toward the reference while a hole is on stage', noGlow, `${noGlow}`);
 
   /* ROUND 55 — THE FULL ERASE: the geodesic renderer is the only black hole
