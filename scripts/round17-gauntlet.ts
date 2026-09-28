@@ -368,14 +368,16 @@ function inv(d: [number, number, number]): [number, number] {
     && !/textureCube|uBgCube|uBgScreen|uProjMatrix/.test(rmSrc);
   check('R59: no background captures of any kind — no cubemap, no screen buffer, no layers', noCapture, `${noCapture}`);
 
-  /* ROUND 58 — the sky lens law: the gradual 1/θ decay with NO artificial
-     cutoff, scaled by the march's lensing factor (exact continuity with the
-     geodesic quad at its edge). Lives in the surface shaders only. */
+  /* ROUND 58/66 — the sky lens law: the gradual 1/θ decay scaled by the
+     march's lensing factor, and — the user's R66 verdict — LOCAL: unity
+     through the quad's coverage, exactly zero at 6·b_c (the vast whole-sky
+     arcs are gone; the whirlpool hugs the hole). */
   const ssSrc = readFileSync(new URL('../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
   const skyLens = ssSrc.includes('uniform float uLensScale;')
     && !/smoothstep\(m \* 0\.62, m, ang \/ rim\)/.test(ssSrc)
-    && /\) \* uLensScale \* uLensBend;/.test(ssSrc);
-  check('R58: the sky lens law — gradual 1/θ decay, no cutoff, scaled by the march lensing', skyLens, `${skyLens}`);
+    && /\) \* uLensScale \* uLensBend \* confine;/.test(ssSrc)
+    && /1\.0 - smoothstep\(4\.0, 6\.0, ang \/ bc\)/.test(ssSrc);
+  check('R58/66: the sky lens law — gradual 1/θ decay, confined to hug the hole', skyLens, `${skyLens}`);
 
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
      the blaze now comes from the damped project bloom (R65: distance-aware —

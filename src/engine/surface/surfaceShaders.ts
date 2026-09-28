@@ -88,13 +88,19 @@ vec3 applyLensBend(vec3 d){
          the lens is released, no capture occurs and the sky heals whole) */
       if (ang < bc && uLensBend > 0.02) return LENS_CAPTURE;
       float thE2 = 2.0 * rsA;                     /* Einstein area of the point-mass lens */
-      /* ROUND 58 — the TRUE gradual law, with NO artificial cutoff: the
-         deflection decays as 1/θ forever (gravity never stops) and is scaled
-         by the march's lensing factor (uLensScale = the panel's Grav.
-         Lensing) so the sky's bend is EXACTLY continuous with the geodesic
-         quad at its edge — both are 2·L·rs/b in their own units. The old
-         hard cutoff at m·rim was the "square"/"layers" the user saw. */
-      float disp = (thE2 / ang + 2.9452431 * rsA * rsA / (ang * ang)) * uLensScale * uLensBend;
+      /* ROUND 58 — the TRUE gradual law, scaled by the march's lensing
+         factor (uLensScale = the panel's Grav. Lensing) so the sky's bend is
+         EXACTLY continuous with the geodesic quad at its edge — both are
+         2·L·rs/b in their own units.
+         ROUND 66 — THE LENS IS LOCAL: the user's verdict on the 1/θ-forever
+         tail is in — a hole in the sky must bend the sky AROUND ITSELF, not
+         paint vast arcs across the whole universe. The deflection stays at
+         full strength through the quad's own coverage (the march owns every
+         ray inside ~3.8·b_c, so the handoff is untouched) and then melts to
+         EXACTLY zero at 6·b_c — one C¹ smoothstep, no band, no layer, no
+         edge: the whirlpool hugs the hole. */
+      float confine = 1.0 - smoothstep(4.0, 6.0, ang / bc);
+      float disp = (thE2 / ang + 2.9452431 * rsA * rsA / (ang * ang)) * uLensScale * uLensBend * confine;
       if (disp < 1e-6) continue;
       float ang2 = max(ang - disp, 0.0);          /* β — monotone, fold-proof by the math above */
       d = lensReconstruct(L, d, cosA, ang2);
