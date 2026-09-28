@@ -77,11 +77,11 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
     && !/bloomPass\.threshold =/.test(engSrc);
   check('R63: bloom eases to his strength 0.68 / radius 0.2 on stage; threshold stays 0.90 (calibrated)', bloom, 'bloom easing wrong');
 
-  /* the on-stage resolution floor: 0.5× pixel ratio rendered the disk as a
-     blocky pixelated wash and broke the arcs into dots — 0.8 keeps the flow
-     continuous (the R53 breaker stays as the safety net) */
-  const resFloor = /const target = holeOnStage \? Math\.max\(0\.8, this\.pixelRatioBase \* 0\.8\) : this\.pixelRatioBase;/.test(engSrc);
-  check('R63: on-stage resolution floor is 0.8 (no more blocky disk)', resFloor, 'floor not raised');
+  /* the on-stage resolution tightening (R64): at base ratio ≤ 1 there is NO
+     drop — the blocky disk was the leak; only HiDPI eases, never below 0.7
+     of base (the 55 ms breaker stays as the safety net) */
+  const resFloor = /const target = holeOnStage && this\.pixelRatioBase > 1\s*\n\s*\? Math\.max\(this\.pixelRatioBase \* 0\.7, 1\)\s*\n\s*: this\.pixelRatioBase;/.test(engSrc);
+  check('R64: no resolution drop at base ≤ 1 (the blocky-disk leak is sealed)', resFloor, 'tightening missing');
 
   /* the user's selected panel knobs: his appearance trio (Inner/Outer
      Softness, Sharpness) is live — store, ranges (his ui.js verbatim),
