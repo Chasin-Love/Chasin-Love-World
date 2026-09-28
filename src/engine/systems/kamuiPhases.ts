@@ -25,9 +25,20 @@ export const KAMUI_PHASE_WEIGHTS: Record<PortalPhase, number> = {
 
 /** The v1 vortex envelope: one slow sin breath over KAMUI_TRIGGER_DURATION
     seconds (rise → crest → fall), so the summon can actually be watched. */
-export const KAMUI_TRIGGER_DURATION = 7; /* seconds */
+export const KAMUI_TRIGGER_DURATION = 5.5; /* seconds */
 
 export const KAMUI_RAMP: string[] = ['#ff1744', '#8b5cf6', '#f2c178'];
+
+/**
+ * THE VACUUM GULP — the tear's final stage.
+ *
+ * In the last KAMUI_VACUUM_WINDOW seconds of a forward summon the throat
+ * completes: the pull, spin and void all surge with rising acceleration
+ * (shader uVac), the swallowed subject's own size drains, and the frame
+ * rumbles — the universe briefly unstable at the instant the tunnel
+ * finishes, like a vacuum ripping its subject in.
+ */
+export const KAMUI_VACUUM_WINDOW = 1.5; /* seconds */
 
 /**
  * CAMERA STABILITY — the summon hold.
@@ -41,7 +52,7 @@ export const KAMUI_RAMP: string[] = ['#ff1744', '#8b5cf6', '#f2c178'];
  * long, and only then hands the focus and the dive to the rig — through the
  * crest, into the fall, so the arrival still feels like falling through it.
  */
-export const KAMUI_ENTRY_HOLD = 4.2; /* seconds */
+export const KAMUI_ENTRY_HOLD = 4; /* seconds — ends exactly where the vacuum gulp begins */
 
 /** The arrival framing, as a multiple of the body's radius. The old 3.2 put
     the camera almost on the surface by the time the overlay opened; 4.2 keeps

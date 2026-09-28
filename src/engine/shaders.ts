@@ -160,11 +160,13 @@ void main(){
    rift energy rings. Driven by triggerKamui() in engine.ts via uCenter/
    uStrength/uColor; at uStrength 0 it is a single texture fetch passthrough.
    uDir mirrors the jutsu: +1 is the summon (implode), -1 is the eject — the
-   same vortex spun the other way, pushing space back out on every close. */
+   same vortex spun the other way, pushing space back out on every close.
+   uVac is the final-stage vacuum gulp (0..1): the pull, spin and void surge
+   with rising acceleration while the throat swallows its subject. */
 export const portalFrag = /* glsl */ `
 uniform sampler2D tDiffuse; uniform vec2 uCenter; uniform float uStrength;
 uniform float uTime; uniform vec3 uColor; uniform float uAspect;
-uniform float uDir;
+uniform float uDir; uniform float uVac;
 varying vec2 vUv;
 void main(){
   vec2 uv = vUv;
@@ -173,11 +175,12 @@ void main(){
   float r = length(d);
   float s = uStrength;
   if (s < 0.001) { gl_FragColor = texture2D(tDiffuse, uv); return; }
+  float vac = uVac * uVac; /* the gulp accelerates as it completes */
 
   // Kamui Space-Time Vortex Distortion
   float fall = exp(-r * 3.8);
   // High-frequency spiral twisting effect (reversed spin on the eject)
-  float spiralTwist = s * 6.5 * fall * uDir;
+  float spiralTwist = s * 6.5 * fall * uDir + vac * 2.4 * fall;
   float ripple = sin(r * 32.0 - uTime * 6.0) * s * 0.18 * fall;
   float ang = spiralTwist + ripple;
 
@@ -186,7 +189,7 @@ void main(){
 
   // Gravitational implosion pull towards portal center (outward ejection when reversed)
   vec2 pullDir = normalize(o + vec2(1e-6));
-  vec2 suv = uCenter + vec2(d.x / uAspect, d.y) - pullDir * s * 0.28 * fall * uDir;
+  vec2 suv = uCenter + vec2(d.x / uAspect, d.y) - pullDir * (s * 0.28 + vac * 0.9) * fall * uDir;
 
   // Chromatic dispersion (RGB separation caused by extreme spatial warping)
   float ab = s * 0.025 * fall + 0.0002;

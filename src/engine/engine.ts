@@ -42,7 +42,7 @@ import {
   MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,
 } from './systems/stageThresholds';
 import { SCALE_BANDS, highScaleLabel } from './systems/levelSystem';
-import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING, KAMUI_TRIGGER_DURATION } from './systems/kamuiPhases';
+import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING, KAMUI_TRIGGER_DURATION, KAMUI_VACUUM_WINDOW } from './systems/kamuiPhases';
 
 /* Round 52 — SPACETIME BENDING OF THE BACKGROUND, composed once.
 
@@ -298,6 +298,13 @@ export class UniverseEngine {
   /* the direction spacetime drags — a fixed reference now that the v2
      sightline chase is retired (the surface manager still consumes it) */
   private readonly kamuiVortexDir = new THREE.Vector3(0, 1, 0);
+  /* THE VACUUM GULP — the tear's final stage: the throat swallows its
+     subject (uVac surge + size drain) and the frame rumbles. The swallow
+     factor always eases back to exactly 1, so no world stays deformed. */
+  private kamuiVacuumActive = false;
+  private kamuiSwallowGroup: THREE.Object3D | null = null;
+  private kamuiSwallowFactor = 1;
+  private kamuiShakeT = 0;
   private cb: EngineCallbacks;
   private bodies: RuntimeBody[] = [];
   private colliderList: THREE.Mesh[] = [];
@@ -811,6 +818,7 @@ export class UniverseEngine {
         tDiffuse: { value: null }, uCenter: { value: new THREE.Vector2(0.5, 0.5) },
         uStrength: { value: 0 }, uTime: { value: 0 }, uAspect: { value: 1 },
         uColor: { value: new THREE.Color('#f2c178') }, uDir: { value: 1 },
+        uVac: { value: 0 },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: portalFrag,
@@ -3502,7 +3510,7 @@ void main(){
       /* hover pulse — the pointer's world swells gently, like home */
       const hoverTarget = this.hoveredId === `inner:${p.data.id}` ? 1 : 0;
       p.hoverT += (hoverTarget - p.hoverT) * Math.min(1, dt * 8);
-      p.group.scale.setScalar(1 + p.hoverT * 0.045);
+      p.group.scale.setScalar((1 + p.hoverT * 0.045) * this.kamuiSwallowFactorFor(p.group));
 
       /* sun direction — world vector from the planet back to its star */
       p.group.getWorldPosition(this._vScratch2);
@@ -5361,6 +5369,25 @@ this.updateBodies(dt);
     return false;
   }
 
+  /** The scene-graph group of the current kamui source (home body, inner
+     world, or diving galaxy) — the subject the vacuum gulp drains. */
+  private resolveKamuiGroup(): THREE.Object3D | null {
+    if (this.kamuiTearBodyId) {
+      const home = this.bodies.find((b) => b.data.id === this.kamuiTearBodyId);
+      if (home) return home.group;
+      for (const node of this.galaxyStageNodes) {
+        const inner = node.innerSys?.planets.find((pl) => pl.data.id === this.kamuiTearBodyId);
+        if (inner) return inner.group;
+      }
+    }
+    if (this.galaxyDive) {
+      const diveId = this.galaxyDive.galaxyId;
+      const node = this.galaxyStageNodes.find((n) => n.data.id === diveId);
+      if (node) return node.group;
+    }
+    return null;
+  }
+
   /** Field radius for the reverse traversal — re-derived from the target
      body (the portal contract stores only the id). */
   private portalBodyRadiusForReverse(): number {
@@ -5393,6 +5420,13 @@ this.updateBodies(dt);
     (material.uniforms.uGravityLocalCenter.value as THREE.Vector3).set(0, 0, 0);
   }
 
+  /** The vacuum gulp's size factor for a group — 1 unless it is the swallow
+      target, then the accelerating drain (or its eased restore). Composed
+      into every per-frame scale writer, so the drain can never fight them. */
+  private kamuiSwallowFactorFor(g: THREE.Object3D): number {
+    return g === this.kamuiSwallowGroup ? this.kamuiSwallowFactor : 1;
+  }
+
   /** Per-frame application of the v1 vortex: the full-screen pass gets
       the eased strength, the clock, and the reality's own hue; while the
       pulse is live the center re-projects the live kamui source (the clicked
@@ -5414,6 +5448,45 @@ this.updateBodies(dt);
     if (this.demonCoreMat?.uniforms?.uTearStrength) {
       this.demonCoreMat.uniforms.uTearStrength.value = this.kamuiEase * 0.9;
     }
+
+    /* THE VACUUM GULP — the tear's final stage: in the last
+       KAMUI_VACUUM_WINDOW of a forward summon the throat completes. The
+       shader's pull, spin and void surge with rising acceleration (uVac),
+       the subject's own size drains, and the frame rumbles — the universe
+       briefly unstable at the instant the tunnel finishes. The swallow
+       factor then eases back to exactly 1, so nothing stays deformed. */
+    const inVacuum = this.kamuiTimer > 0 && this.kamuiTimer <= KAMUI_VACUUM_WINDOW
+      && pu.uDir.value > 0 && this.portal.phase !== 'leaving';
+    if (inVacuum && !this.kamuiVacuumActive) {
+      this.kamuiVacuumActive = true;
+      this.kamuiShakeT = 1;
+      this.kamuiSwallowGroup = this.resolveKamuiGroup();
+      this.kamuiSwallowFactor = 1;
+    }
+    if (!inVacuum) this.kamuiVacuumActive = false;
+    if (this.kamuiVacuumActive) {
+      const t = 1 - Math.min(1, Math.max(0, this.kamuiTimer / KAMUI_VACUUM_WINDOW));
+      pu.uVac.value = t;
+      this.kamuiSwallowFactor = 1 - 0.94 * t * t * t; /* accelerating drain */
+    } else {
+      pu.uVac.value = 0;
+      if (this.kamuiSwallowGroup) {
+        this.kamuiSwallowFactor += (1 - this.kamuiSwallowFactor) * Math.min(1, dt * 9);
+        if (Math.abs(1 - this.kamuiSwallowFactor) < 0.002) {
+          this.kamuiSwallowFactor = 1;
+          this.kamuiSwallowGroup = null;
+        }
+      }
+    }
+    /* the instability — a decaying rumble on the camera itself (applied
+       after the rig's own write, so the shake rides the final transform) */
+    if (this.kamuiShakeT > 0) {
+      this.kamuiShakeT = Math.max(0, this.kamuiShakeT - dt / 0.8);
+      const amp = this.rig.dist() * 0.006 * this.kamuiShakeT * this.kamuiShakeT;
+      this.camera.position.x += (Math.random() - 0.5) * 2 * amp;
+      this.camera.position.y += (Math.random() - 0.5) * 2 * amp;
+      this.camera.position.z += (Math.random() - 0.5) * 2 * amp;
+    }
   }
 
   /** KAMUI (v1) — Space-Time Vortex Distortion: the red demonic vortex tears
@@ -5423,6 +5496,7 @@ this.updateBodies(dt);
       instead of imploding — the close/return face of the jutsu. */
   triggerKamui(targetUv?: THREE.Vector2, reverse = false) {
     this.portalPass.uniforms.uDir.value = reverse ? -1 : 1;
+    if (reverse) this.kamuiShakeT = 1; /* the eject burst shocks the frame */
     if (targetUv) {
       (this.portalPass.uniforms.uCenter.value as THREE.Vector2).copy(targetUv);
     } else if (this.resolveKamuiSource(this._vScratch4)) {
@@ -5556,7 +5630,7 @@ this.updateBodies(dt);
 
       const selected = this.selectedId === b.data.id ? 1 : 0;
       const pulse = selected ? 1 + 0.025 * Math.sin(this.clockT * 3.2) : 1;
-      b.group.scale.setScalar((1 + Math.max(b.hoverT, selected * 0.5) * 0.035) * pulse * (1 - b.ghost * 0.35));
+      b.group.scale.setScalar((1 + Math.max(b.hoverT, selected * 0.5) * 0.035) * pulse * (1 - b.ghost * 0.35) * this.kamuiSwallowFactorFor(b.group));
       b.group.visible = b.fade * sysW > 0.03;
 
       if (b.streakRing) {
@@ -5903,7 +5977,7 @@ this.updateBodies(dt);
       node.spiralGroup.rotation.y += 0.005;
 
       const isHovered = this.hoveredId === `galaxy:${node.galaxyData.id}:${node.realityId}`;
-      node.group.scale.setScalar(isHovered ? 1.5 : 1.0);
+      node.group.scale.setScalar((isHovered ? 1.5 : 1.0) * this.kamuiSwallowFactorFor(node.group));
       const lineMat = node.orbitLine.material as THREE.LineBasicMaterial;
       const targetOp = isHovered ? 0.6 : node.galaxyData.isHomeGalaxy ? 0.36 : 0.2;
       lineMat.opacity += (targetOp - lineMat.opacity) * Math.min(1, dt * 8);
