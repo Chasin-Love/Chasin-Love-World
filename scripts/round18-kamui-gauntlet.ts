@@ -98,7 +98,7 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
   const stages = /beginStageWarp\(dir: 'toMultiverse' \| 'toWeb'/.test(engSrc)
     && (engSrc.match(/this\.triggerKamui\(\);/g)?.length ?? 0) === 4
     && /kamuiTearBodyId: string \| null = null;/.test(engSrc);
-  check('R18: stage warps and portals play the tear and keep their zooms (theater-only Kamui)', stages, 'stage wiring changed');
+  check('R18: stage warps and portals play the tear while the stage folds and the dial carries the travel', stages, 'stage wiring changed');
 }
 
 /* ==== 5. the phases module ==== */

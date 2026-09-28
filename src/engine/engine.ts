@@ -4183,14 +4183,17 @@ void main(){
 
 
 
-  /** KAMUI SUMMON — the red space-time tear plays around the Demon Core
-      while the camera folds to (or from) the multiverse stage. Theater only:
-      the stage thresholds and the camera dial do the actual travel. */
+  /** KAMUI SUMMON — the red space-time tear plays while the stage folds:
+      the tear owns the screen, the stage flips behind it, and the dial eases
+      to the arrival framing so the traveler lands in the other stage. */
   private beginStageWarp(dir: 'toMultiverse' | 'toWeb', arrivalDial: number, _after?: () => void): void {
-    void dir; void _after;
     this.grabCooldown = 1.4;
     this.rig.killZoomMomentum();
     this.triggerKamui();
+    this.cosmicStage = dir === 'toMultiverse' ? 'multiverse' : 'web';
+    if (dir === 'toWeb') this.realityFocused = false;
+    this.rig.setZoomTarget(arrivalDial);
+    if (_after) _after();
   }
 
 
@@ -4225,6 +4228,7 @@ void main(){
     this.activeGalaxyName = null;
     this.galaxyFocusId = null;
     if (this.cosmicStage === 'web') {
+      this.realityFocused = true;
       this.beginStageWarp('toMultiverse', this.activeReality ? CameraRig.zoomTOf(this.activeReality.bubbleSize * 5.5) : REALITY_FLOOR, () => {
         this.rig.setOrbit(null, 1.05);
       });
@@ -4261,6 +4265,7 @@ void main(){
     if (stageIndex === 0) { this.zoomToMultiverse(); return; }
     if (stageIndex === 1) { // Reality / Universe — multiverse side
       if (this.cosmicStage === 'web') {
+        this.realityFocused = false;
         this.beginStageWarp('toMultiverse', 0.88, () => {
           this.rig.setOrbit(null, 1.05);
         });
@@ -5145,6 +5150,17 @@ void main(){
         if (this.rig.tZoomT > WEB_CEILING) this.rig.setZoomTarget(WEB_CEILING);
         const pushing = this.rig.tZoomT > WEB_CEILING - 0.004 && this.rig.zoomVelocity > 0.02;
         this.membraneShimmer += ((pushing ? 0.16 : 0) - this.membraneShimmer) * Math.min(1, dt * 5);
+        /* pushed through the web's ceiling — the crossing IS a Kamui: the
+           tear opens at the center of the cosmic web and the fold carries
+           you out to the multiverse sphere (the mirror of the floor-return
+           in the multiverse branch below). */
+        if (
+          pushing && this.kamuiTimer <= 0 && this.grabCooldown <= 0
+          && !this.dragging && this.portal.phase === 'idle'
+        ) {
+          this.realityFocused = true;
+          this.beginStageWarp('toMultiverse', this.activeReality ? CameraRig.zoomTOf(this.activeReality.bubbleSize * 5.5) : REALITY_FLOOR);
+        }
       } else {
         this.membraneShimmer += (0 - this.membraneShimmer) * Math.min(1, dt * 5);
       }
