@@ -52,6 +52,10 @@ export class UniverseSurfaceManager {
        Schwarzschild optics (image equation + capture shadow) instead of the
        weak-field law the stars and worlds use. */
     uLensStrong: { value: new Array(16).fill(0) },
+    /* ROUND 66 — THE LIVING LENS: xyz = the hole's measured world velocity
+       (units/s), w = the disk's spin sign — the sky near a moving hole is
+       dragged and swirled (the water-around-the-cone law). */
+    uLensVel: { value: Array.from({ length: 16 }, () => new THREE.Vector4()) },
     uLensCount: { value: 0 },
     uLensBend: { value: 1 },
     /* ROUND 58 — the sky lens scales with the panel's Grav. Lensing so the
@@ -471,14 +475,16 @@ export class UniverseSurfaceManager {
       body's own silhouette angle (rims) and — Round 16 — whether it is a
       BLACK HOLE (strong = exact Schwarzschild optics with a capture shadow).
       bend = damped global strength (0 when off). */
-  public setLenses(lenses: THREE.Vector4[], rims: number[], strong: number[], count: number, bend: number): void {
+  public setLenses(lenses: THREE.Vector4[], rims: number[], strong: number[], vels: THREE.Vector4[], count: number, bend: number): void {
     const arr = this.lensUniforms.uLenses.value as THREE.Vector4[];
     const rimArr = this.lensUniforms.uLensRim.value as number[];
     const strongArr = this.lensUniforms.uLensStrong.value as number[];
+    const velArr = this.lensUniforms.uLensVel.value as THREE.Vector4[];
     for (let i = 0; i < count && i < arr.length; i++) {
       arr[i].copy(lenses[i]);
       rimArr[i] = rims[i];
       strongArr[i] = strong[i];
+      velArr[i].copy(vels[i]);
     }
     this.lensUniforms.uLensCount.value = count;
     this.lensUniforms.uLensBend.value = bend;

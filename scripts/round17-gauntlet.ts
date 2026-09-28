@@ -379,6 +379,18 @@ function inv(d: [number, number, number]): [number, number] {
     && /1\.0 - smoothstep\(4\.0, 6\.0, ang \/ bc\)/.test(ssSrc);
   check('R58/66: the sky lens law — gradual 1/θ decay, confined to hug the hole', skyLens, `${skyLens}`);
 
+  /* ROUND 66 — THE LIVING LENS: the sky is DRAGGED along the hole's real
+     measured velocity and SWIRLED around its sightline (signed with the
+     disk's spin) — motion in the lens, never a static flat ring. The
+     velocity flows engine (tracked, smoothed) → uniform → shader. */
+  const livingLens = /uniform vec4 uLensVel\[16\];/.test(ssSrc)
+    && /float drag = min\(0\.16, speed \* 0\.012\) \* fall \* uLensBend;/.test(ssSrc)
+    && /float swirl = lvel\.w \* 0\.16 \* fall \* uLensBend \* tl;/.test(ssSrc)
+    && /private trackLensVelocity\(/.test(engSrc)
+    && /this\.trackLensVelocity\(b\.data\.id, b\.group\.position, dt, n, swirlSign\);/.test(engSrc)
+    && /this\.lensVels\[n\]\.set\(0, 0, 0, 0\);/.test(engSrc);
+  check('R66: the living lens — drag + swirl from measured velocity, engine → uniform → shader', livingLens, `${livingLens}`);
+
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
      the blaze now comes from the damped project bloom (R65: distance-aware —
      his 0.68 at the close encounter, calm baseline in wide views). */

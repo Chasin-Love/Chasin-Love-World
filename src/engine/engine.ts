@@ -21,6 +21,7 @@ import { smoothstep, makeGlowTexture } from './math';
 import { UniverseSurfaceManager } from './surface';
 import { LENS_UNIFORMS_GLSL, LENS_WARP_GLSL, LENS_POINT_GLSL } from './surface/surfaceShaders';
 import { createBlackHole, updateRaymarchUniforms, type BlackHoleVisual } from './blackholeRaymarch';
+import { getBlackHoleParams } from './blackholeParams';
 import { canUseRaymarchBlackHole, isSoftwareRasterizer, probeCapability, pixelRatioFor, getQualityTier, QUALITY_CHANGE_EVENT } from './capability';
 import { getRaymarchOverride, setRaymarchStatus, RAYMARCH_OVERRIDE_EVENT, type RaymarchStatus } from './blackholeTier';
 import { CameraRig } from './cameraRig';
@@ -353,6 +354,13 @@ export class UniverseEngine {
   private lensRims: number[] = new Array(16).fill(0);
   /* Round 16 — 1.0 = black hole (exact Schwarzschild optics + capture shadow) */
   private lensStrong: number[] = new Array(16).fill(0);
+  /* ROUND 66 — THE LIVING LENS: per-hole world velocity for the sky's
+     drag-and-swirl (the water-around-the-cone law). Velocities are MEASURED
+     from the real per-frame displacement and smoothed (orbital motion is
+     steady) — no hardcoded speed anywhere. w carries the disk's spin sign. */
+  private lensVels: THREE.Vector4[] = Array.from({ length: 16 }, () => new THREE.Vector4());
+  private lensVelPrev = new Map<string, { p: THREE.Vector3; v: THREE.Vector3 }>();
+  private _lensVelInst = new THREE.Vector3();
   private _lensDir = new THREE.Vector3();
   private _lensFwd = new THREE.Vector3();
   private _lensPos = new THREE.Vector3();  /* ROUND 61 — world pos of inner-system holes */
@@ -1713,11 +1721,15 @@ export class UniverseEngine {
     this.lensCur += (this.lensTarget - this.lensCur) * Math.min(1, dt * 4);
     this.camera.getWorldDirection(this._lensFwd);
     const cap = this.lensVecs.length;
+    /* ROUND 66 — the living lens: the swirl follows the disk's own spin */
+    const swirlSign = Math.sign(getBlackHoleParams().rotSpeed) || 1;
     let n = 0;
-    /* 1 — every hole and vault, anywhere in the scene, first. */
+    /* 1 — every hole and vault, anywhere in the scene, first — measured with
+       its real velocity so the sky can be dragged by the motion. */
     for (const b of this.bodies) {
       if (b.data.kind !== 'hole' && b.data.kind !== 'vault') continue;
       if (n >= cap) break;
+      this.trackLensVelocity(b.data.id, b.group.position, dt, n, swirlSign);
       n = this.pushSurfaceLens(n, b.group.position, b.data.radius, b.lensHalo ?? lensHaloFor(b.data.kind), 1);
     }
     if (n < cap) {
@@ -1728,21 +1740,45 @@ export class UniverseEngine {
           if (p.data.kind !== 'hole' && p.data.kind !== 'vault') continue;
           if (n >= cap) break;
           p.group.getWorldPosition(this._lensPos);
+          this.trackLensVelocity(p.data.id, this._lensPos, dt, n, swirlSign);
           n = this.pushSurfaceLens(n, this._lensPos, p.data.radius, lensHaloFor(p.data.kind), 1);
         }
         if (n >= cap) break;
       }
     }
     /* 2 — the ordinary masses: stars and worlds bending gently around
-       their own silhouettes, exactly as before. */
+       their own silhouettes, exactly as before (no drag — near-field motion
+       is a hole thing). */
     for (const b of this.bodies) {
       if (b.data.kind === 'hole' || b.data.kind === 'vault') continue;
       if (n >= cap) break;
       const halo = b.lensHalo ?? 0;
       if (halo <= 0) continue;
+      this.lensVels[n].set(0, 0, 0, 0);
       n = this.pushSurfaceLens(n, b.group.position, b.data.radius, halo, 0);
     }
-    this.surfaceManager.setLenses(this.lensVecs, this.lensRims, this.lensStrong, n, this.lensCur);
+    this.surfaceManager.setLenses(this.lensVecs, this.lensRims, this.lensStrong, this.lensVels, n, this.lensCur);
+  }
+
+  /* ROUND 66 — measure one hole's real world velocity (smoothed; orbital
+     motion is steady, so the measurement eases instead of jitering) and
+     stage its vec4 slot: xyz = velocity in world units/s, w = the disk's
+     spin sign. Called even when the lens is culled behind the view, so the
+     measurement stays alive while the hole is out of sight. */
+  private trackLensVelocity(key: string, worldPos: THREE.Vector3, dt: number, slot: number, swirlSign: number): void {
+    let rec = this.lensVelPrev.get(key);
+    if (!rec) {
+      rec = { p: worldPos.clone(), v: new THREE.Vector3() };
+      this.lensVelPrev.set(key, rec);
+      this.lensVels[slot].set(0, 0, 0, swirlSign);
+      return;
+    }
+    if (dt > 1e-4) {
+      this._lensVelInst.copy(worldPos).sub(rec.p).divideScalar(dt);
+      rec.v.lerp(this._lensVelInst, 0.12);
+    }
+    rec.p.copy(worldPos);
+    this.lensVels[slot].set(rec.v.x, rec.v.y, rec.v.z, swirlSign);
   }
 
   /** ONE surface-lens slot writer — the single law every lens obeys,

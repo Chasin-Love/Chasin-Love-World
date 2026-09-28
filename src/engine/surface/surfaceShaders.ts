@@ -14,6 +14,10 @@ export const LENS_UNIFORMS_GLSL = /* glsl */ `
 uniform vec4 uLenses[16];   /* xyz = direction to the mass, w = halo angle (rad) */
 uniform float uLensRim[16]; /* each mass's own apparent silhouette angle (rad) */
 uniform float uLensStrong[16]; /* 1.0 = black hole: exact Schwarzschild optics */
+/* ROUND 66 — THE LIVING LENS: xyz = the hole's measured world velocity
+   (units/s), w = the disk's spin sign — the sky near a moving, spinning
+   hole is dragged and swirled (the water-around-the-cone law). */
+uniform vec4 uLensVel[16];
 uniform int uLensCount;
 uniform float uLensBend;
 uniform float uLensScale;   /* ROUND 58 — the march's lensing factor (2.4): the
@@ -104,6 +108,35 @@ vec3 applyLensBend(vec3 d){
       if (disp < 1e-6) continue;
       float ang2 = max(ang - disp, 0.0);          /* β — monotone, fold-proof by the math above */
       d = lensReconstruct(L, d, cosA, ang2);
+      /* ROUND 66 — THE LIVING LENS: the water-around-the-cone law. The hole
+         moves (translation) and spins (rotation), and the sky near it is
+         DRAGGED — never a static flat ring of bending. Two near-field
+         motions, both inside the same confinement as the radial bend and
+         both scaled by the hole's REAL measured velocity, so a faster hole
+         stirs harder and a stationary one stirs nothing:
+         DRAG — the sampled sky streams along the hole's motion: the wake,
+           space compressing ahead and stretching behind the moving hole;
+         SWIRL — the sampled sky rotates around the hole's sightline: the
+           vortex the spin winds up, signed with the disk's own rotation
+           (sin(ang) lever — no swirl on the sightline itself). */
+      vec4 lvel = uLensVel[i];
+      float speed = length(lvel.xyz);
+      float near = confine * confine;
+      if (speed > 1e-4) {
+        float fall = near / (1.0 + 3.0 * (ang / bc) * (ang / bc));
+        float drag = min(0.16, speed * 0.012) * fall * uLensBend;
+        if (drag > 1e-4) d = normalize(d + (lvel.xyz / speed) * drag);
+      }
+      if (abs(lvel.w) > 0.01) {
+        float fall = near / (1.0 + 3.0 * (ang / bc) * (ang / bc));
+        float cosL = clamp(dot(d, L), -1.0, 1.0);
+        vec3 tang = d - L * cosL;
+        float tl = length(tang);
+        if (tl > 1e-4) {
+          float swirl = lvel.w * 0.16 * fall * uLensBend * tl;
+          d = normalize(d + (cross(L, d) / tl) * swirl);
+        }
+      }
     } else {
       /* ---- weak mode: the Round 14 law ---- */
       float x = ang / rim;
