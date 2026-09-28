@@ -1720,6 +1720,8 @@ export class UniverseEngine {
   private updateSpacetimeLens(dt: number) {
     this.lensCur += (this.lensTarget - this.lensCur) * Math.min(1, dt * 4);
     this.camera.getWorldDirection(this._lensFwd);
+    /* ROUND 66b — the vortex clock: the sky's swirl is driven by sim time */
+    this.surfaceManager.lensUniforms.uLensTime.value = this.clockT;
     const cap = this.lensVecs.length;
     /* ROUND 66 — the living lens: the swirl follows the disk's own spin */
     const swirlSign = Math.sign(getBlackHoleParams().rotSpeed) || 1;

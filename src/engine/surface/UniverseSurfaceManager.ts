@@ -56,6 +56,8 @@ export class UniverseSurfaceManager {
        (units/s), w = the disk's spin sign — the sky near a moving hole is
        dragged and swirled (the water-around-the-cone law). */
     uLensVel: { value: Array.from({ length: 16 }, () => new THREE.Vector4()) },
+    /* ROUND 66b — the vortex ROTATES with time (differential spin) */
+    uLensTime: { value: 0 },
     uLensCount: { value: 0 },
     uLensBend: { value: 1 },
     /* ROUND 58 — the sky lens scales with the panel's Grav. Lensing so the
