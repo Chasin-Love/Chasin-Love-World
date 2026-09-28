@@ -465,11 +465,11 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
       uCycleTime: { value: 5.0 },
       uTurbScale: { value: 1.81 },
       uTurbStretch: { value: 0.75 },
-      uTurbSharp: { value: 7.4 },
+      uTurbSharp: { value: params.arcSharpness },
       uTurbLac: { value: 3.0 },
       uTurbPers: { value: 0.8 },
-      uSoftInner: { value: 0.18 },
-      uSoftOuter: { value: 0.5 },
+      uSoftInner: { value: params.softInner },
+      uSoftOuter: { value: params.softOuter },
       uLensing: { value: params.lensing },
       uCriticalB: { value: 0 },
     },
@@ -512,6 +512,10 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
     material.uniforms.uDoppler.value = p.doppler;
     material.uniforms.uRotSpeed.value = p.rotSpeed;
     material.uniforms.uLensing.value = p.lensing;
+    /* ROUND 63 — the appearance knobs (his Inner/Outer Softness, Sharpness) */
+    material.uniforms.uSoftInner.value = p.softInner;
+    material.uniforms.uSoftOuter.value = p.softOuter;
+    material.uniforms.uTurbSharp.value = p.arcSharpness;
     /* ROUND 57 — the quad spans the whole gradual bend at every mass (the
        disk is always deep inside it), so no rescale is needed anymore */
     };

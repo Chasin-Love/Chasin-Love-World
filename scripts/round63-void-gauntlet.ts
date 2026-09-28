@@ -119,6 +119,20 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
      continuous (the R53 breaker stays as the safety net) */
   const resFloor = /const target = holeOnStage \? Math\.max\(0\.8, this\.pixelRatioBase \* 0\.8\) : this\.pixelRatioBase;/.test(engSrc);
   check('R63: on-stage resolution floor is 0.8 (no more blocky disk)', resFloor, 'floor not raised');
+
+  /* the user's selected panel knobs: his appearance trio (Inner/Outer
+     Softness, Sharpness) is live — store, ranges (his ui.js verbatim),
+     uniforms and panel sliders all wired */
+  const pSrc = readFileSync(new URL('../src/engine/blackholeParams.ts', import.meta.url), 'utf8');
+  const cardSrc = readFileSync(new URL('../src/ui/console/BlackHoleTuningCard.tsx', import.meta.url), 'utf8');
+  const knobs = /softInner: number;/.test(pSrc) && /softOuter: number;/.test(pSrc) && /arcSharpness: number;/.test(pSrc)
+    && /softInner: \{ min: 0\.0, max: 0\.5, step: 0\.01 \}/.test(pSrc)
+    && /arcSharpness: \{ min: 0\.1, max: 10\.0, step: 0\.1 \}/.test(pSrc)
+    && /uSoftInner\.value = p\.softInner;/.test(marchSrc)
+    && /uTurbSharp\.value = p\.arcSharpness;/.test(marchSrc)
+    && /key: 'softInner', label: 'Inner Softness'/.test(cardSrc)
+    && /key: 'arcSharpness', label: 'Arc Sharpness'/.test(cardSrc);
+  check('R63: the appearance trio (softness inner/outer, arc sharpness) is wired store → uniforms → panel', knobs, 'knob wiring broken');
 }
 
 /* ==== 5. the gate runs in npm run verify ==== */

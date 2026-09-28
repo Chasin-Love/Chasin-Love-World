@@ -19,8 +19,9 @@ import {
   type RaymarchStatus,
 } from '../../engine/blackholeTier';
 
-/** The seven live knobs — labels mirror dgreenheck's demo panel; ranges are
-    his ui.js ranges verbatim, so dragging feels like the original. */
+/** The ten live knobs — labels mirror dgreenheck's demo panel; ranges are
+    his ui.js verbatim. ROUND 63 adds his appearance trio (Inner/Outer
+    Softness, Sharpness) so the whole appearance folder is user-tunable. */
 const SLIDERS: Array<{ key: keyof BlackHoleParams; label: string }> = [
   { key: 'mass', label: 'Mass' },
   { key: 'lensing', label: 'Grav. Lensing' },
@@ -29,6 +30,9 @@ const SLIDERS: Array<{ key: keyof BlackHoleParams; label: string }> = [
   { key: 'diskOuter', label: 'Outer Radius' },
   { key: 'brightness', label: 'Brightness' },
   { key: 'rotSpeed', label: 'Rotation Speed' },
+  { key: 'softInner', label: 'Inner Softness' },
+  { key: 'softOuter', label: 'Outer Softness' },
+  { key: 'arcSharpness', label: 'Arc Sharpness' },
 ];
 
 const TIER_OPTIONS: Array<{ v: RaymarchOverride; label: string }> = [
@@ -154,7 +158,7 @@ export const BlackHoleTuningCard: React.FC = () => {
             <label key={key} className="block">
               <span className="flex items-center justify-between mb-1">
                 <span className="cc-label">{label}</span>
-                <span className="text-cyan-300 tabular-nums">{params[key].toFixed(1)}</span>
+                <span className="text-cyan-300 tabular-nums">{params[key].toFixed(range.step < 0.1 ? 2 : 1)}</span>
               </span>
               <input
                 type="range"
@@ -173,10 +177,11 @@ export const BlackHoleTuningCard: React.FC = () => {
       <p className="text-[10px] text-slate-500">
         Mass sets the Schwarzschild radius (rs = 2 × mass); lensing bends light per rs — the pair
         reproduces the original demo's physics, and the real background — your nebula and stars —
-        bends with it.
-        Peak temp 49.78 kK, falloff 5.22, turbulence 1.81 / 0.75 / 7.4 and softness 0.18 / 0.5
-        stay at the reference values. Focusing the hole lands at the reference camera (25.8 rs,
-        14° below the disk plane) where the lensed arcs wrap over and under the shadow.
+        bends with it. The softness pair shapes the disk's edge ramps and Arc Sharpness the flow's
+        grain, all his demo's own knobs (the softness trio defaults 0.18 / 0.5 / 7.4).
+        Peak temp 49.78 kK and falloff 5.22 stay at the reference values. Focusing the hole lands
+        at the reference camera (25.8 rs, 14° below the disk plane) where the lensed arcs wrap over
+        and under the shadow.
         Cinematic Lensing: Auto keeps the frame-budget safety net; Always On forces the geodesic
         renderer; Off hides the hole entirely — there is no stand-in renderer anymore.
       </p>

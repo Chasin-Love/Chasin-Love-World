@@ -29,6 +29,12 @@ export interface BlackHoleParams {
   brightness: number;
   /** demo diskRotationSpeed — the SIGN flips the Doppler beam side */
   rotSpeed: number;
+  /** demo diskEdgeSoftnessInner — the inner edge's softness ramp */
+  softInner: number;
+  /** demo diskEdgeSoftnessOuter — the outer edge's softness ramp */
+  softOuter: number;
+  /** demo turbulenceSharpness — the flow arcs' grain (his "Sharpness") */
+  arcSharpness: number;
 }
 
 /** The reference screenshot's values — dgreenheck's defaults (his panel
@@ -41,6 +47,9 @@ const BLACKHOLE_DEFAULTS: BlackHoleParams = {
   diskOuter: 14.5,
   brightness: 5.0,
   rotSpeed: -8.7,
+  softInner: 0.18,
+  softOuter: 0.5,
+  arcSharpness: 7.4,
 };
 
 /** His slider ranges (ui.js), verbatim — so the panel feels like the demo. */
@@ -52,6 +61,9 @@ export const BLACKHOLE_RANGES: Record<keyof BlackHoleParams, { min: number; max:
   diskOuter: { min: 6.0, max: 20.0, step: 0.5 },
   brightness: { min: 0.5, max: 5.0, step: 0.1 },
   rotSpeed: { min: -20.0, max: 20.0, step: 0.1 },
+  softInner: { min: 0.0, max: 0.5, step: 0.01 },
+  softOuter: { min: 0.0, max: 0.5, step: 0.01 },
+  arcSharpness: { min: 0.1, max: 10.0, step: 0.1 },
 };
 
 const STORAGE_KEY = STORAGE_KEYS.blackholeTuning;
