@@ -380,19 +380,16 @@ function inv(d: [number, number, number]): [number, number] {
   check('R58/66: the sky lens law — gradual 1/θ decay, confined to hug the hole', skyLens, `${skyLens}`);
 
   /* ROUND 66 — THE LIVING LENS: the sky is DRAGGED along the hole's real
-     measured velocity and ROTATES around its sightline with time — a
-     differential spin (inner band faster than outer) that winds sky
-     features into living spiral streaks, never a static flat ring. The
-     velocity and the vortex clock flow engine → uniform → shader. */
+     measured velocity and SWIRLED around its sightline (signed with the
+     disk's spin) — motion in the lens, never a static flat ring. The
+     velocity flows engine (tracked, smoothed) → uniform → shader. */
   const livingLens = /uniform vec4 uLensVel\[16\];/.test(ssSrc)
-    && /uniform float uLensTime;/.test(ssSrc)
     && /float drag = min\(0\.16, speed \* 0\.012\) \* fall \* uLensBend;/.test(ssSrc)
-    && /float rot = lvel\.w \* fall \* 1\.4 \* uLensTime \* uLensBend;/.test(ssSrc)
-    && /vec3 perpR = perp \* cos\(rot\) \+ axis \* \(tl \* sin\(rot\)\);/.test(ssSrc)
+    && /float swirl = lvel\.w \* 0\.16 \* fall \* uLensBend \* tl;/.test(ssSrc)
     && /private trackLensVelocity\(/.test(engSrc)
-    && /surfaceManager\.lensUniforms\.uLensTime\.value = this\.clockT;/.test(engSrc)
+    && /this\.trackLensVelocity\(b\.data\.id, b\.group\.position, dt, n, swirlSign\);/.test(engSrc)
     && /this\.lensVels\[n\]\.set\(0, 0, 0, 0\);/.test(engSrc);
-  check('R66: the living lens — measured velocity + a time-driven differential vortex', livingLens, `${livingLens}`);
+  check('R66: the living lens — drag + swirl from measured velocity, engine → uniform → shader', livingLens, `${livingLens}`);
 
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
      the blaze now comes from the damped project bloom (R65: distance-aware —
@@ -443,18 +440,16 @@ function inv(d: [number, number, number]): [number, number] {
 
   /* ONE WELL LAW — the shared C¹ gradient lives in the shared warp block
      and EVERY sky stage consumes it: the dome, the photo dome and all three
-     star shells. The old bespoke dome-only loop is gone (no second law).
-     R66b — the throat, not the platform: reach 3.4·b_c, depth 0.8 (the wide
-     dark disc read as a flat platform on smooth photo skies). */
+     star shells. The old bespoke dome-only loop is gone (no second law). */
   const oneWell = /float lensWellDarken\(vec3 dir\)/.test(ssSrc)
     && /1\.0 \/ \(x \* x\)/.test(ssSrc)
-    && /1\.0 - smoothstep\(2\.6, 3\.4, x\)/.test(ssSrc)
+    && /1\.0 - smoothstep\(3\.1, 4\.0, x\)/.test(ssSrc)
     && /lensWellDarken\(rawD\)/.test(ssSrc)
     && !/wellDarken = max\(wellDarken, 1\.0 - smoothstep\(bcW/.test(ssSrc)
     && /float well = 1\.0 - lensWellDarken\(normalize\(vDir\)\);/.test(pdSrc)
     && /lensWellFactor\(position\)/.test(usmSrc)
     && (usmSrc.match(/lensWellFactor\(position\)/g)?.length ?? 0) === 3;
-  check('R61/66: ONE well law — shared C¹ vortex throat (zero at 3.4·b_c) in dome + photo + all shells', oneWell, `${oneWell}`);
+  check('R61: ONE well law — shared C¹ gradient (zero at 4·b_c) consumed by dome + photo + all shells', oneWell, `${oneWell}`);
 }
 
 /* ==== ROUND 61 — the whole universe bends (lensing is not Sol-Prime-only) ==== */

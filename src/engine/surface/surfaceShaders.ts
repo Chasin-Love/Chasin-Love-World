@@ -18,9 +18,6 @@ uniform float uLensStrong[16]; /* 1.0 = black hole: exact Schwarzschild optics *
    (units/s), w = the disk's spin sign — the sky near a moving, spinning
    hole is dragged and swirled (the water-around-the-cone law). */
 uniform vec4 uLensVel[16];
-uniform float uLensTime;    /* ROUND 66 — seconds: the vortex ROTATES with time —
-                               the sky visibly circles the hole (differential
-                               spin: inner band faster than outer) */
 uniform int uLensCount;
 uniform float uLensBend;
 uniform float uLensScale;   /* ROUND 58 — the march's lensing factor (2.4): the
@@ -126,28 +123,18 @@ vec3 applyLensBend(vec3 d){
       float speed = length(lvel.xyz);
       float near = confine * confine;
       if (speed > 1e-4) {
-        /* DRAG — the wake: the sampled sky streams along the hole's motion */
         float fall = near / (1.0 + 3.0 * (ang / bc) * (ang / bc));
         float drag = min(0.16, speed * 0.012) * fall * uLensBend;
         if (drag > 1e-4) d = normalize(d + (lvel.xyz / speed) * drag);
       }
       if (abs(lvel.w) > 0.01) {
-        /* ROUND 66b — THE VORTEX ROTATES, with time. A static displacement
-           field reads as a flat painted ring (the user's verdict); a
-           DIFFERENTIAL SPIN reads as a living whirlpool: the inner band
-           circles visibly faster than the outer, so sky features and stars
-           wind around the hole into spiral streaks — cream stirred in
-           coffee — forever, without tearing (a rotation is a rigid map).
-           fall makes the spin die with distance: far sky stands still. */
         float fall = near / (1.0 + 3.0 * (ang / bc) * (ang / bc));
-        float rot = lvel.w * fall * 1.4 * uLensTime * uLensBend;
         float cosL = clamp(dot(d, L), -1.0, 1.0);
-        vec3 perp = d - L * cosL;
-        float tl = length(perp);
+        vec3 tang = d - L * cosL;
+        float tl = length(tang);
         if (tl > 1e-4) {
-          vec3 axis = cross(L, d) / tl;      /* rotation direction in the sky */
-          vec3 perpR = perp * cos(rot) + axis * (tl * sin(rot));
-          d = normalize(L * cosL + perpR);   /* d rotated around L by rot */
+          float swirl = lvel.w * 0.16 * fall * uLensBend * tl;
+          d = normalize(d + (cross(L, d) / tl) * swirl);
         }
       }
     } else {
@@ -191,15 +178,11 @@ float lensWellDarken(vec3 dir){
     float ang = acos(clamp(dot(dir, uLenses[i].xyz), -1.0, 1.0));
     float x = max(ang, bc * 0.25) / bc;
     float well = 1.0 / (x * x);                  /* the deflection's own shape */
-    /* ROUND 66b — the throat, not the platform: the reach tightens from
-       4·b_c to 3.4·b_c and the depth eases (0.95 → 0.8) — on smooth photo
-       skies the wide dark disc read as a flat platform around the hole;
-       now it is the vortex throat the swirling sky pours into. */
-    float reach = 1.0 - smoothstep(2.6, 3.4, x); /* melts to zero at 3.4·b_c */
+    float reach = 1.0 - smoothstep(3.1, 4.0, x); /* melts to zero at 4·b_c */
     if (reach < 0.001) continue;
     darken = max(darken, min(well, 1.0) * reach);
   }
-  return min(darken, 1.0) * 0.8 * uLensBend;
+  return min(darken, 1.0) * 0.95 * uLensBend;
 }
 `;
 
