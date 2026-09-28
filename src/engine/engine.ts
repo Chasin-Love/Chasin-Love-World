@@ -539,9 +539,11 @@ export class UniverseEngine {
       this.composer.setPixelRatio(r);
     }
   }
-  /* Round 54 — the reference's blaze: his demo runs bloom ≈ 0.68 while the
-     project baseline stays gentle for the planets. While a geodesic hole is
-     on stage the bloom strength damps toward the reference value. */
+  /* ROUND 63 — the reference's blaze, whole: his demo runs bloom strength
+     0.68 / radius 0.2 / threshold 0.4 (main.js config verbatim). While a
+     geodesic hole is on stage the composer eases to exactly those values —
+     strength via this boost (0.18 + 0.50), threshold and radius below in the
+     tick — and relaxes to the project baseline when you fly away. */
   private bloomHoleBoost = 0;
 
   /** True when a geodesic hole is near enough for its march to plausibly
@@ -5512,9 +5514,19 @@ this.updateBodies(dt);
        project baseline (0.18) stays gentle for the planets. While a geodesic
        hole is on stage the strength damps toward the reference value and
        relaxes when you fly away. */
-    const holeBoostTarget = this.raymarchOnStage() ? 0.42 : 0;
+    /* ROUND 63 — THE SOURCE'S OWN BLAZE: the reference demo's soft yellow-
+       white flow IS its post-processing — main.js bloomStrength 0.68,
+       bloomRadius 0.2, bloomThreshold 0.4 (a low threshold lets the whole
+       disk glow, a wide radius smears it soft). While a geodesic hole is on
+       stage the composer eases to exactly those values (strength: baseline
+       0.18 + boost 0.50 = 0.68) and relaxes to the project's gentle baseline
+       when you fly away — the planets keep the old look. */
+    const holeBoostTarget = this.raymarchOnStage() ? 0.5 : 0;
     this.bloomHoleBoost += (holeBoostTarget - this.bloomHoleBoost) * Math.min(1, dt * 3);
     this.bloomPass.strength = 0.18 - this.coreT * 0.08 + this.bloomHoleBoost;
+    const holeMix = Math.min(1, this.bloomHoleBoost / 0.5);
+    this.bloomPass.threshold = 0.90 + (0.40 - 0.90) * holeMix;
+    this.bloomPass.radius = 0.15 + (0.20 - 0.15) * holeMix;
 
     const haloA = this.anchorGroup.userData.haloA as THREE.Points;
     const haloB = this.anchorGroup.userData.haloB as THREE.Points;
