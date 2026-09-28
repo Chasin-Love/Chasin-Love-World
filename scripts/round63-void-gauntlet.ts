@@ -29,59 +29,20 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 
 /* ==== 1. the marcher's void is sealed at the source ==== */
 {
-  /* the ABSOLUTE VOID knee: captured pixels lose every sub-band light —
-     the turbulence film that the pipeline's double gamma lifted into a
-     blue wash — while the real foreground band passes untouched */
-  const knee = /if \(captured\) \{\s*\n\s*float lum = dot\(color, vec3\(0\.2126, 0\.7152, 0\.0722\)\);\s*\n\s*color \*= smoothstep\(0\.05, 0\.2, lum\);\s*\n\s*\}/.test(marchSrc);
-  check('R63: captured pixels carry the luminance knee (film dies, band survives)', knee, 'knee missing');
-
-  /* step-budget burnout is capture, never transparency — a whirl ray at
-     the rim must never reveal the live sky inside the shadow */
-  const budget = /budgetOut = true; break;/.test(marchSrc)
-    && /if \(budgetOut\) captured = true;/.test(marchSrc);
-  check('R63: step-budget burnout resolves to captured (black), not transparent', budget, 'budget capture missing');
-
-  /* the early-out gate covers the WHOLE captured set via uCriticalB */
-  const gate = /uniform float uCriticalB;/.test(marchSrc)
-    && /if \(b <= max\(uDiskOuter \+ 2\.5, uCriticalB \* 1\.02\)\)/.test(marchSrc);
-  check('R63: the early-out gate covers the whole captured set (uCriticalB)', gate, 'gate not on uCriticalB');
-
-  /* the per-frame driver feeds the gate with the mirrored integrator */
-  const driven = /uCriticalB\.value = criticalImpactParam\(/.test(marchSrc);
-  check('R63: updateRaymarchUniforms drives uCriticalB from the TS mirror each frame', driven, 'driver missing');
+  /* ROUND 64 stub state: the old renderer (knee, budget law, gate) is
+     DELETED — these pins return with the verbatim port commit. The stub
+     must only be the hidden-visual wiring contract. */
+  const stub = /THE OLD RENDERER IS DELETED/.test(marchSrc)
+    && !/ShaderMaterial/.test(marchSrc) && !/bool captured/.test(marchSrc);
+  check('R64: the renderer is deleted — the void-seal pins return with the port', stub, 'stub contract broken');
 }
 
 /* ==== 2. the TS integrator is the shader's own physics ==== */
 {
-  const bcDefaultLens1 = criticalImpactParam(0.8, 1.0);
-  const nearClassic = bcDefaultLens1 > 0.8 * 2.3 && bcDefaultLens1 < 0.8 * 2.9;
-  check('R63: b_c at lensing 1 lands in the classic 2.3–2.9·rs band (integrator sane)', nearClassic, bcDefaultLens1.toFixed(4));
-
-  const bcDefault = criticalImpactParam(0.8, 2.4);
-  const bcStrong = criticalImpactParam(0.8, 3.0);
-  check('R63: b_c grows with the lensing multiplier', bcDefault > bcDefaultLens1 && bcStrong > bcDefault, `${bcDefault.toFixed(3)} !> ${bcDefaultLens1.toFixed(3)} or ${bcStrong.toFixed(3)} !> ${bcDefault.toFixed(3)}`);
-
-  /* golden values — the integrator's captured set pinned at the panel's
-     corners. NOT scale-invariant in rs (the shader's march sphere is a fixed
-     r=16 in shader units while rs scales), so these exact numbers are the
-     contract: any drift means the march law itself changed and the early-out
-     gate + the composer's void mask must be consciously re-pinned with it. */
-  const GOLDENS: Array<[number, number, number]> = [
-    [0.8, 0.5, 1.2675], [0.8, 1.0, 2.0020], [0.8, 2.4, 4.5764], [0.8, 3.0, 5.5658],
-    [6.0, 1.0, 11.1936], [6.0, 2.4, 15.9455], [6.0, 3.0, 18.4561],
-  ];
-  const goldenOk = GOLDENS.every(([rs, l, v]) => Math.abs(criticalImpactParam(rs, l) - v) < v * 0.01);
-  check('R63: b_c golden values pinned at the panel corners (march law unchanged)', goldenOk,
-    GOLDENS.filter(([rs, l, v]) => Math.abs(criticalImpactParam(rs, l) - v) >= v * 0.01)
-      .map(([rs, l, v]) => `${rs}/${l}: got ${criticalImpactParam(rs, l).toFixed(4)} want ${v}`).join('; '));
-
-  /* THE REGRESSION: at the panel's reachable extremes the OLD gate
-     (diskOuter min 6.0 + 2.5) sat INSIDE the shadow — the outer annulus
-     never marched and the sky showed through the void. Document the leak
-     the new gate seals. */
-  const oldGateMin = 6.0 + 2.5;
-  const bcMax = criticalImpactParam(6.0, 3.0);
-  check('R63: the old disk-only gate provably sat inside the shadow at panel extremes', bcMax > oldGateMin, `b_c ${bcMax.toFixed(3)} <= old gate ${oldGateMin}`);
+  /* ROUND 64 stub state: criticalImpactParam reports 0 (no march — no
+     captured set); the golden-value pins return with the port commit. */
+  const stubBc = criticalImpactParam(0.8, 2.4) === 0 && criticalImpactParam(6.0, 3.0) === 0;
+  check('R64: criticalImpactParam is the stub zero (goldens return with the port)', stubBc, 'stub must report 0');
 }
 
 /* ==== 3. the blaze rides bloom — no post-process mask ever touches it ==== */
@@ -130,11 +91,9 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
   const knobs = /softInner: number;/.test(pSrc) && /softOuter: number;/.test(pSrc) && /arcSharpness: number;/.test(pSrc)
     && /softInner: \{ min: 0\.0, max: 0\.5, step: 0\.01 \}/.test(pSrc)
     && /arcSharpness: \{ min: 0\.1, max: 10\.0, step: 0\.1 \}/.test(pSrc)
-    && /uSoftInner\.value = p\.softInner;/.test(marchSrc)
-    && /uTurbSharp\.value = p\.arcSharpness;/.test(marchSrc)
     && /key: 'softInner', label: 'Inner Softness'/.test(cardSrc)
     && /key: 'arcSharpness', label: 'Arc Sharpness'/.test(cardSrc);
-  check('R63: the appearance trio (softness inner/outer, arc sharpness) is wired store → uniforms → panel', knobs, 'knob wiring broken');
+  check('R63: the appearance trio (softness inner/outer, arc sharpness) is wired store → panel', knobs, 'knob wiring broken');
 }
 
 /* ==== 5. the gate runs in npm run verify ==== */

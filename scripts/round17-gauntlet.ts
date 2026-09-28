@@ -100,17 +100,13 @@ function inv(d: [number, number, number]): [number, number] {
     warm[0] === 1 && warm[1] > 0.45 && warm[1] < 0.53 && warm[2] < 0.16 && red[1] < 0.05,
     `3000K rgb(${warm.map(v => v.toFixed(2)).join(',')}), 1000K rgb(${red.map(v => v.toFixed(2)).join(',')})`);
 
-  /* the shader must carry his exact physics and the multi-crossing halo */
+  /* ROUND 64 — the old renderer is DELETED: the module is the wiring stub
+     (hidden visual, no-op driver) until the verbatim source port lands
+     (docs/PORT-SPEC-webgpu-black-hole.md). The LUT above is data and stays;
+     the march checks return with the port commit. */
   const rmSrc = readFileSync(new URL('../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
-  const multiCrossing = /EVERY disk-plane crossing/.test(rmSrc) && /remaining = 1\.0 - alpha/.test(rmSrc);
-  const hisConstants = /r < uRs \* 1\.01\)/.test(rmSrc) && /r > 100\.0/.test(rmSrc)
-    && /pow\(uDiskInner \/ hitR, uTempFalloff\)/.test(rmSrc)
-    && /0\.3 \/ sqrt\(hitR \/ uDiskInner\)/.test(rmSrc)
-    && /pow\(1\.0 \/ \(1\.0 - beta \* cosA\), 3\.0 \* uDoppler\)/.test(rmSrc);
-  const localFrame = /uDiskBasis \* pPrev/.test(rmSrc) && /uDiskBasis \* p;/.test(rmSrc);
-  check('geodesic: multi-crossing halo + front-to-back compositing', multiCrossing, `${multiCrossing}`);
-  check('geodesic: his exact constants (1.01·rs capture, 100 escape, T∝(rin/r)^α, β=0.3/√(r/rin), D³)', hisConstants, `${hisConstants}`);
-  check('geodesic: disk crossings in the disk-LOCAL frame (uDiskBasis)', localFrame, `${localFrame}`);
+  const stub = /THE OLD RENDERER IS DELETED/.test(rmSrc) && /geodesic: false,/.test(rmSrc);
+  check('R64: the old renderer is deleted — the module is the hidden-visual stub', stub, `${stub}`);
 }
 
 /* ==== 4. ROUND 20/53 — the presentation fixes + the reference camera ==== */
@@ -120,53 +116,17 @@ function inv(d: [number, number, number]): [number, number] {
   const capSrc = readFileSync(new URL('../src/engine/capability.ts', import.meta.url), 'utf8');
   const bpSrc = readFileSync(new URL('../src/engine/blackholeParams.ts', import.meta.url), 'utf8');
 
-  /* SIN 1 — the quad must billboard EVERY frame, inside the per-frame
-     uniform updater the engine already calls (R19 never copied the camera
-     rotation → sheared window, straight-edge clipping, edge-on vanishing). */
-  const billboard = /updateRaymarchUniforms[\s\S]*?quad\.quaternion\.copy\(_parentQ\)/.test(rmSrc);
-  check('R20: quad billboards every frame (updateRaymarchUniforms)', billboard, `${billboard}`);
+  /* ROUND 64 stub state — the renderer-internal pins (billboard, lensing
+     form, gamma step, uniform wiring, quad proportions, panel events) return
+     with the port commit. The stub must only keep the wiring contract. */
+  const stubContract = !/ShaderMaterial/.test(rmSrc) && !/PlaneGeometry/.test(rmSrc) && !/uniforms: \{/.test(rmSrc);
+  check('R64: the stub carries no renderer (no material, no quad, no uniforms)', stubContract, `${stubContract}`);
 
-  /* SIN 3 — his TUNED bending, VERBATIM: his per-step bend is
-     (rs/r²)·stepSize·lensing — the SAME form as ours — so bend per unit
-     path = rs × lensing and the step size CANCELS. uLensing is therefore
-     his gravitationalLensing (2.4) directly, and capture rides uRs too.
-     (R20's 8.0 equated per-step products, forgot his step is 3.33× longer
-     and bent light 2.75× too hard — bloated shadow, donut disk. R19 paired
-     fallbacks → far too weak → flat band, no wrap.) */
-  const lensing = /uLensing: \{ value: params\.lensing \}/.test(rmSrc) && /stepLen \* uLensing/.test(rmSrc)
-    && /clamp\(r \* 0\.125, 1\.0, 4\.0\)/.test(rmSrc)
-    && /uRs \/ \(r \* r\)\) \* stepLen \* uLensing/.test(rmSrc) && /r < uRs \* 1\.01\)/.test(rmSrc);
-  check('R20.4: his lensing verbatim — bend/unit = uRs × uLensing, capture 1.01·uRs', lensing, `${lensing}`);
-
-  /* SIN 4 — his gamma step STAYS: his material encodes pow(1/2.2) BEFORE the
-     renderer's ACES + sRGB output — exactly our composer's structure. */
-  const hisGamma = /pow\(max\(color, vec3\(0\.0\)\), vec3\(1\.0 \/ 2\.2\)\)/.test(rmSrc);
-  check('R20: his pipeline gamma step kept (material → bloom → OutputPass)', hisGamma, `${hisGamma}`);
-
-  /* SIN 5 — his RUNTIME config (the demo reference look) now lives in the
-     blackholeParams store (defaults = his panel values) and feeds the
-     uniforms; the non-panel numbers stay baked. Plus his full LUT range
-     (R19 truncated at 10,000 K; his peak runs 49,780 K). */
-  const tuned = /uDiskInner: \{ value: params\.diskInner \}/.test(rmSrc) && /uDiskOuter: \{ value: params\.diskOuter \}/.test(rmSrc)
-    && /uDiskTemp: \{ value: 49\.78 \}/.test(rmSrc) && /uTempFalloff: \{ value: 5\.22 \}/.test(rmSrc)
-    && /uDiskBright: \{ value: params\.brightness \}/.test(rmSrc) && /uRotSpeed: \{ value: params\.rotSpeed \}/.test(rmSrc)
-    && /uTurbSharp: \{ value: 7\.4 \}/.test(rmSrc) && /uDoppler: \{ value: params\.doppler \}/.test(rmSrc);
+  /* his TUNED config still lives in the store — the port will read it back */
   const referenceDefaults = /mass: 0\.4,/.test(bpSrc) && /lensing: 2\.4,/.test(bpSrc)
     && /doppler: 1\.0,/.test(bpSrc) && /diskInner: 4\.1,/.test(bpSrc) && /diskOuter: 14\.5,/.test(bpSrc)
     && /brightness: 5\.0,/.test(bpSrc) && /rotSpeed: -8\.7,/.test(bpSrc);
-  const fullLut = /clamp\(tempK, 1000\.0, 40000\.0\)/.test(rmSrc) && /90\.0 \+ \(t - 10000\.0\) \* 0\.001/.test(rmSrc);
-  const rotSign = /sign\(uRotSpeed\)/.test(rmSrc);
-  check('R20.4: runtime config from the panel store (49.78/5.22/7.4 baked)', tuned, `${tuned}`);
   check('R20.4: store defaults = the reference config (0.4/2.4/1.0/4.1/14.5/5/−8.7)', referenceDefaults, `${referenceDefaults}`);
-  check('R20: LUT reaches 40,000 K (his two-segment table)', fullLut, `${fullLut}`);
-  check('R20: Doppler rotation-sign flip present (his disk spins negatively)', rotSign, `${rotSign}`);
-
-  /* unit convention — march in his convention via one scale uniform; R20.4
-     restored his mass 0.4 (rs 0.8) as the live uRs default, and uScale
-     tracks it so uScale·uRs = rs_world */
-  const hisUnits = /uScale: \{ value: rs \/ \(params\.mass \* 2\) \}/.test(rmSrc) && /\(uCamPos - uCenter\) \/ uScale/.test(rmSrc)
-    && /uRs: \{ value: params\.mass \* 2 \}/.test(rmSrc);
-  check('R20.4: unit convention uScale·uRs = rs_world (his mass 0.4 default)', hisUnits, `${hisUnits}`);
 
   /* SIN 6 — Round 55: the disarm swap HIDES the hole itself (one renderer,
      no stand-in; the lattice torii are erased with the old fallback look). */
@@ -184,35 +144,13 @@ function inv(d: [number, number, number]): [number, number] {
   check('R20: frame-budget circuit breaker wired into tick (portal frames exempt)', frameGuard, `${frameGuard}`);
   check('R20: focus clamp keeps the camera outside the disk inner edge', focusClamp, `${focusClamp}`);
 
-  /* ==== ROUND 20.1 — the disk lies flat (X-axis base) + dive keeps glory ==== */
-  const basisFrame = /setFromUnitVectors\(new THREE\.Vector3\(0, 1, 0\), DISK_NORMAL\)/.test(rmSrc)
-    && !/setFromUnitVectors\(new THREE\.Vector3\(0, 0, 1\), DISK_NORMAL\)/.test(rmSrc);
-  check('R20.1: disk basis maps local +Y to the normal (disk lies flat, X base)', basisFrame, `${basisFrame}`);
-
-  const noPortalFade = /mat\.uniforms\.uIntensity\.value = base;/.test(rmSrc)
-    && !/Math\.abs\(portal\) \* 1\.2/.test(rmSrc);
-  check('R20.1: raymarch keeps full glory through portals (no fade)', noPortalFade, `${noPortalFade}`);
-
   /* ==== ROUND 60 — the user's found composition (supersedes the R53
      reference camera): focus lands ~31° ABOVE the plane at ~56 rs — the disk
      reads as a tilted ellipse and the stellar belt sweeps around the hole,
      the composition the user photographed and approved. ==== */
-  const hotIntensity = /opts\.intensity \?\? 1\.35/.test(rmSrc);
   const cinematicFrame = /geodesicHole/.test(engSrc) && /this\.rig\.tPhi = 1\.05;/.test(engSrc)
     && /this\.rig\.setZoomTarget\(0\.25\)/.test(engSrc);
-  check('R20.2: default intensity 1.35 (band feeds the bloom threshold)', hotIntensity, `${hotIntensity}`);
   check('R60: focusing a hole lands the user found composition (56 rs, 31° above plane)', cinematicFrame, `${cinematicFrame}`);
-
-  /* ==== ROUND 20.4 — reference restore + live tuning panel ==== */
-  /* ROUND 57/58 — the quad spans the strong field only (80·rs: shadow + disk
-     + the near-hole wrap); the gradual far field lives in the sky layers'
-     own lens (the R58 law) — no giant quad, no foreground in any capture */
-  const proportions = /uRs: \{ value: params\.mass \* 2 \}/.test(rmSrc) && /const quadSize = rs \* 64;/.test(rmSrc);
-  check('R58: live uRs (mass × 2) + 80·rs quad (the strong field stays framed)', proportions, `${proportions}`);
-  const liveTuning = /window\.addEventListener\(BLACKHOLE_CHANGE_EVENT, onParams\)/.test(rmSrc)
-    && /material\.uniforms\.uLensing\.value = p\.lensing;/.test(rmSrc)
-    && /window\.removeEventListener\(BLACKHOLE_CHANGE_EVENT, onParams\)/.test(rmSrc);
-  check('R20.4: panel events apply live (uniforms, dispose-safe)', liveTuning, `${liveTuning}`);
 }
 
 /* ==== 5. ROUND 52 — spacetime bending of the BACKGROUND (the star clouds) ==== */
@@ -353,18 +291,14 @@ function inv(d: [number, number, number]): [number, number] {
   const oldGone = !existsSync(new URL('../src/engine/blackhole.ts', import.meta.url));
   check('R54: the flat composite black hole (blackhole.ts) is deleted', oldGone, `${oldGone}`);
 
-  /* ROUND 56 — THE BACKGROUND IS OURS: his procedural sky is gone; escaped
-     rays sample the engine's captured real scene through the camera with
-     the FINAL BENT direction — the actual nebula and stars bend. R56c —
-     the capture is a 512² CUBEMAP sampled by direction (textureCube). */
-  const rtLens = !/starField|nebulaField|uStarDensity/.test(rmSrc)
-    && /vec3 v = normalize\(vWorld\.xyz - uCamPos\);/.test(rmSrc)
-    && /captured \? 1\.0 : clamp\(alpha/.test(rmSrc)
-    && !/textureCube/.test(rmSrc);
-  /* R58 — the march's escaped rays exit TRANSPARENT: the live sky shows
+  /* ROUND 56/58/64 — escaped rays exit TRANSPARENT: the live sky shows
      through, already bent by its own 1/θ lens (exactly continuous with the
-     integrated deflection). Captured rays stay fully opaque: the shadow. */
-  check('R56: escaped rays exit transparent — the live bent sky shows through (no procedural sky)', rtLens, `${rtLens}`);
+     integrated deflection). Captured rays stay fully opaque: the shadow.
+     The stub state pins only the absence checks; the ray-gen pins return
+     with the port commit. */
+  const rtLens = !/starField|nebulaField|uStarDensity/.test(rmSrc)
+    && !/textureCube/.test(rmSrc);
+  check('R56: no procedural sky in the renderer — the live bent sky shows through', rtLens, `${rtLens}`);
 
   /* ROUND 59 — NO CAPTURES, NO LAYERS: the sky layers bend themselves (the
      surface manager's 1/θ law), so no second image of the sky exists
@@ -383,9 +317,10 @@ function inv(d: [number, number, number]): [number, number] {
   check('R58: the sky lens law — gradual 1/θ decay, no cutoff, scaled by the march lensing', skyLens, `${skyLens}`);
 
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
-     the blaze now comes from the damped project bloom. */
+     the blaze now comes from the damped project bloom (R63: his 0.68 via the
+     on-stage boost). */
   const noGlow = !/buildGlowTexture/.test(rmSrc) && !/AdditiveBlending/.test(rmSrc)
-    && /bloomHoleBoost/.test(engSrc) && /this\.raymarchOnStage\(\) \? 0\.42 : 0/.test(engSrc);
+    && /bloomHoleBoost/.test(engSrc) && /this\.raymarchOnStage\(\) \? 0\.5 : 0/.test(engSrc);
   check('R54: glow sprite gone; bloom damps toward the reference while a hole is on stage', noGlow, `${noGlow}`);
 
   /* ROUND 55 — THE FULL ERASE: the geodesic renderer is the only black hole
@@ -396,7 +331,7 @@ function inv(d: [number, number, number]): [number, number] {
     && !/vaultPulse/.test(engSrc) && !/eventide-vault-pulse/.test(engSrc);
   check('R55: full erase — no silhouette sphere, no lattice rings, no pulse machinery', noStandIn, `${noStandIn}`);
 
-  const hidden = /setGeodesic\(on: boolean\)/.test(rmSrc) && /quad\.visible = on;/.test(rmSrc)
+  const hidden = /setGeodesic\(on: boolean\)/.test(rmSrc) && /geodesic: false,/.test(rmSrc)
     && /private setAllGeodesic\(on: boolean\): void \{/.test(engSrc);
   check('R55: setGeodesic hides the hole itself (one renderer, one switch)', hidden, `${hidden}`);
 
@@ -420,9 +355,9 @@ function inv(d: [number, number, number]): [number, number] {
      -100/-99 and the sky shells at -98, before every stellar-system object
      at 0+), so from no camera angle can it ever appear in front of the
      system. The march itself is untouched (the render-order line is the
-     only change to the file's output stage). */
-  const surfaceOrder = /quad\.renderOrder = -80;/.test(rmSrc)
-    && !/quad\.renderOrder = 12;/.test(rmSrc)
+     only change to the file's output stage). R64 stub state: the sky-band
+     side is pinned; the quad's own renderOrder pin returns with the port. */
+  const surfaceOrder = !/renderOrder = 12;/.test(rmSrc)
     && /pts\.renderOrder = -98;/.test(usmSrc)
     && /far\.renderOrder = -98;/.test(usmSrc)
     && /near\.renderOrder = -98;/.test(usmSrc);
