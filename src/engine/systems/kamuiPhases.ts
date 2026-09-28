@@ -29,6 +29,28 @@ export const KAMUI_TRIGGER_DURATION = 5.5; /* seconds */
 
 export const KAMUI_RAMP: string[] = ['#ff1744', '#8b5cf6', '#f2c178'];
 
+/** THE CHOREOGRAPHY — the summon is a SEQUENCE of distinct beats, not one
+    stretched motion. The rip opens (the original start, kept), the middle
+    adds new frames — the twist winds up, the void flickers, the pull
+    deepens — and the throat finishes (the vacuum gulp, the original end,
+    kept). Every beat plays at full speed; the length comes from how many
+    there are, never from slowing the one motion down. */
+export interface KamuiBeat { kind: 'tear' | 'wind' | 'flicker' | 'deepen' | 'throat'; t0: number; t1: number; peak: number }
+
+export const KAMUI_BEATS: KamuiBeat[] = [
+  { kind: 'tear',    t0: 0.0,  t1: 0.55, peak: 1.0 },
+  { kind: 'wind',    t0: 0.55, t1: 1.75, peak: 0.55 },
+  { kind: 'flicker', t0: 1.75, t1: 2.75, peak: 0.45 },
+  { kind: 'deepen',  t0: 2.75, t1: 4.0,  peak: 0.75 },
+  { kind: 'throat',  t0: 4.0,  t1: 5.5,  peak: 0.9 },
+];
+
+/** A beat's envelope — one full-speed rise-and-fall inside its own span. */
+export function kamuiBeatEase(elapsed: number, beat: KamuiBeat): number {
+  if (elapsed < beat.t0 || elapsed > beat.t1) return 0;
+  return Math.sin(((elapsed - beat.t0) / (beat.t1 - beat.t0)) * Math.PI) * beat.peak;
+}
+
 /**
  * THE VACUUM GULP — the tear's final stage.
  *

@@ -162,11 +162,14 @@ void main(){
    uDir mirrors the jutsu: +1 is the summon (implode), -1 is the eject — the
    same vortex spun the other way, pushing space back out on every close.
    uVac is the final-stage vacuum gulp (0..1): the pull, spin and void surge
-   with rising acceleration while the throat swallows its subject. */
+   with rising acceleration while the throat swallows its subject.
+   uWind/uPulse are the middle beats: uWind winds the twist up and marches
+   the rings inward; uPulse strobes the void — new frames in the forming
+   middle, each at full speed (never a slowed single motion). */
 export const portalFrag = /* glsl */ `
 uniform sampler2D tDiffuse; uniform vec2 uCenter; uniform float uStrength;
 uniform float uTime; uniform vec3 uColor; uniform float uAspect;
-uniform float uDir; uniform float uVac;
+uniform float uDir; uniform float uVac; uniform float uWind; uniform float uPulse;
 varying vec2 vUv;
 void main(){
   vec2 uv = vUv;
@@ -179,8 +182,8 @@ void main(){
 
   // Kamui Space-Time Vortex Distortion
   float fall = exp(-r * 3.8);
-  // High-frequency spiral twisting effect (reversed spin on the eject)
-  float spiralTwist = s * 6.5 * fall * uDir + vac * 2.4 * fall;
+  // High-frequency spiral twisting effect (reversed spin on the eject, wound up in the middle beats)
+  float spiralTwist = s * 6.5 * fall * uDir + vac * 2.4 * fall + uWind * 5.0 * fall;
   float ripple = sin(r * 32.0 - uTime * 6.0) * s * 0.18 * fall;
   float ang = spiralTwist + ripple;
 
@@ -189,7 +192,7 @@ void main(){
 
   // Gravitational implosion pull towards portal center (outward ejection when reversed)
   vec2 pullDir = normalize(o + vec2(1e-6));
-  vec2 suv = uCenter + vec2(d.x / uAspect, d.y) - pullDir * (s * 0.28 + vac * 0.9) * fall * uDir;
+  vec2 suv = uCenter + vec2(d.x / uAspect, d.y) - pullDir * (s * 0.28 + vac * 0.9 + uWind * 0.22) * fall * uDir;
 
   // Chromatic dispersion (RGB separation caused by extreme spatial warping)
   float ab = s * 0.025 * fall + 0.0002;
@@ -198,14 +201,14 @@ void main(){
   col.g = texture2D(tDiffuse, suv).g;
   col.b = texture2D(tDiffuse, suv - vec2(ab, 0.0)).b;
 
-  // Central Kamui singularity void
-  float coreR = 0.22 * s;
+  // Central Kamui singularity void (strobing while the middle beats decide)
+  float coreR = 0.22 * s * (1.0 + 0.45 * uPulse * sin(uTime * 20.0));
   float core = smoothstep(coreR, coreR * 0.2, r);
   col *= 1.0 - core * 0.98;
 
-  // Concentric spatial rift energy rings
-  float ring = exp(-abs(r - (0.15 + 0.12 * s)) * 28.0);
-  float ring2 = exp(-abs(r - (0.06 + 0.24 * s)) * 45.0);
+  // Concentric spatial rift energy rings (marching inward as the twist winds up)
+  float ring = exp(-abs(r - (0.15 + 0.12 * s - 0.1 * uWind)) * 28.0);
+  float ring2 = exp(-abs(r - (0.06 + 0.24 * s - 0.16 * uWind)) * 45.0);
   float KamuiGlow = exp(-abs(r - 0.05) * 50.0) * s;
 
   vec3 portalHue = mix(uColor, vec3(0.3, 0.9, 1.0), sin(uTime * 4.0) * 0.3 + 0.3);

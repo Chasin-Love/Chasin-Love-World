@@ -46,12 +46,11 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 {
   const trigger = /triggerKamui\(targetUv\?: THREE\.Vector2, reverse = false\) \{[\s\S]*?this\.kamuiTimer = KAMUI_TRIGGER_DURATION;[\s\S]*?\n  \}/.test(engSrc);
   const envelope = /this\.kamuiTimer = Math\.max\(0, this\.kamuiTimer - dt\);/.test(engSrc)
-    && /const kEase = this\.portalPass\.uniforms\.uDir\.value < 0/.test(engSrc)
-    && /Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI \* 0\.5\)/.test(engSrc)
-    && /: Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI\);/.test(engSrc)
+    && /for \(const beat of KAMUI_BEATS\) kEase = Math\.max\(kEase, kamuiBeatEase\(elapsed, beat\)\);/.test(engSrc)
+    && /const kEase = Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI \* 0\.5\);/.test(engSrc)
     && /kEase \* 1\.15/.test(engSrc)
     && /this\.kamuiEase \*= Math\.max\(0, 1 - dt \* 6\);/.test(engSrc);
-  check('R18: triggerKamui fires the 5.5s timer; the tick relaxes it through the slow sin envelope (×1.15 peak)', trigger && envelope, `${trigger}/${envelope}`);
+  check('R18: triggerKamui fires the 5.5s timer; the summon plays as choreographed beats (rip → wind → flicker → deepen → throat), the eject bursts', trigger && envelope, `${trigger}/${envelope}`);
 
   const center = /uCenter\.value\.set\(this\._vScratch4\.x \* 0\.5 \+ 0\.5, this\._vScratch4\.y \* 0\.5 \+ 0\.5\)/.test(engSrc)
     && /\(this\.portalPass\.uniforms\.uColor\.value as THREE\.Color\)\.set\('#ff1744'\)/.test(engSrc);
@@ -59,10 +58,9 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
   const reverse = /uDir: \{ value: 1 \},/.test(engSrc)
     && /this\.portalPass\.uniforms\.uDir\.value = reverse \? -1 : 1;/.test(engSrc)
-    && /Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI \* 0\.5\)/.test(engSrc)
+    && /const kEase = Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI \* 0\.5\);/.test(engSrc)
     && /uniform float uDir;/.test(shSrc)
     && /s \* 6\.5 \* fall \* uDir/.test(shSrc)
-    && /pullDir \* \(s \* 0\.28 \+ vac \* 0\.9\) \* fall \* uDir/.test(shSrc)
     && /this\.triggerKamui\(undefined, true\);/.test(engSrc)
     && /this\.triggerKamui\(undefined, dir === 'toWeb'\);/.test(engSrc)
     && /kamuiSuck/.test(cssSrc)
@@ -72,12 +70,16 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
     && /vaultClosing/.test(appSrc);
   check('R18: the eject bursts at full strength instantly and swallows the open overlay (kamui-suck)', reverse, 'reverse wiring missing');
 
-  const vacuum = /uVac: \{ value: 0 \},/.test(engSrc)
-    && /uniform float uDir; uniform float uVac;/.test(shSrc)
+  const vacuum = /uVac: \{ value: 0 \}, uWind: \{ value: 0 \}, uPulse: \{ value: 0 \},/.test(engSrc)
+    && /uniform float uDir; uniform float uVac; uniform float uWind; uniform float uPulse;/.test(shSrc)
     && /float vac = uVac \* uVac;/.test(shSrc)
-    && /spiralTwist = s \* 6\.5 \* fall \* uDir \+ vac \* 2\.4 \* fall/.test(shSrc)
-    && /KAMUI_VACUUM_WINDOW/.test(engSrc)
+    && /spiralTwist = s \* 6\.5 \* fall \* uDir \+ vac \* 2\.4 \* fall \+ uWind \* 5\.0 \* fall/.test(shSrc)
+    && /pullDir \* \(s \* 0\.28 \+ vac \* 0\.9 \+ uWind \* 0\.22\) \* fall \* uDir/.test(shSrc)
+    && /coreR = 0\.22 \* s \* \(1\.0 \+ 0\.45 \* uPulse \* sin\(uTime \* 20\.0\)\)/.test(shSrc)
+    && /KAMUI_BEATS/.test(engSrc)
     && /pu\.uVac\.value = t;/.test(engSrc)
+    && /pu\.uWind\.value = forwardSummon/.test(engSrc)
+    && /pu\.uPulse\.value = forwardSummon/.test(engSrc)
     && /kamuiSwallowFactorFor\(/.test(engSrc)
     && /this\.camera\.position\.x \+= \(Math\.random\(\) - 0\.5\) \* 2 \* amp;/.test(engSrc);
   check('R18: the vacuum gulp — the tear finishes by swallowing its subject (surge, size drain, rumble)', vacuum, 'vacuum wiring missing');
@@ -134,9 +136,11 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
     && /KAMUI_PHASE_WEIGHTS/.test(phaseSrc)
     && /KAMUI_TRIGGER_DURATION = 5\.5/.test(phaseSrc)
     && /KAMUI_VACUUM_WINDOW = 1\.5/.test(phaseSrc)
+    && /KAMUI_BEATS: KamuiBeat\[\]/.test(phaseSrc)
+    && /export function kamuiBeatEase/.test(phaseSrc)
     && !/KamuiPhase/.test(phaseSrc)
     && !/'breach'/.test(phaseSrc);
-  check('R18: kamuiPhases.ts carries the v1 contract (portal phases, trigger decay — no 9-beat chain)', phases, 'phases module drifted');
+  check('R18: kamuiPhases.ts carries the v1 contract (portal phases, the beat choreography — no 9-beat chain)', phases, 'phases module drifted');
 }
 
 /* ==== 6. CAMERA STABILITY — the summon holds the frame ==== */

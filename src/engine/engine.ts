@@ -42,7 +42,7 @@ import {
   MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,
 } from './systems/stageThresholds';
 import { SCALE_BANDS, highScaleLabel } from './systems/levelSystem';
-import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING, KAMUI_TRIGGER_DURATION, KAMUI_VACUUM_WINDOW } from './systems/kamuiPhases';
+import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING, KAMUI_TRIGGER_DURATION, KAMUI_VACUUM_WINDOW, KAMUI_BEATS, kamuiBeatEase } from './systems/kamuiPhases';
 
 /* Round 52 — SPACETIME BENDING OF THE BACKGROUND, composed once.
 
@@ -818,7 +818,7 @@ export class UniverseEngine {
         tDiffuse: { value: null }, uCenter: { value: new THREE.Vector2(0.5, 0.5) },
         uStrength: { value: 0 }, uTime: { value: 0 }, uAspect: { value: 1 },
         uColor: { value: new THREE.Color('#f2c178') }, uDir: { value: 1 },
-        uVac: { value: 0 },
+        uVac: { value: 0 }, uWind: { value: 0 }, uPulse: { value: 0 },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: portalFrag,
@@ -5025,17 +5025,22 @@ void main(){
       this.cb.onSimDate(new Date(this.epoch + this.simDays * DAY).toISOString());
     }
 
-    /* KAMUI (v1) — the red vortex breathes: one slow sin envelope across
-       KAMUI_TRIGGER_DURATION seconds (rise → crest → fall). The eject is
-       the mirror face: it bursts at FULL strength the instant it fires and
-       decays — a close must never show the naked pull-back while the tear
-       is still forming. */
+    /* KAMUI (v1) — the summon plays as CHOREOGRAPHED BEATS: the rip (the
+       original start), then the new middle frames (wind-up, flicker,
+       deepening), then the throat (the vacuum gulp). Each beat is its own
+       full-speed envelope — the length comes from the sequence, never from
+       slowing one motion down. The eject keeps its instant full burst. */
     if (this.kamuiTimer > 0) {
       this.kamuiTimer = Math.max(0, this.kamuiTimer - dt);
-      const kEase = this.portalPass.uniforms.uDir.value < 0
-        ? Math.sin((this.kamuiTimer / KAMUI_TRIGGER_DURATION) * Math.PI * 0.5)
-        : Math.sin((this.kamuiTimer / KAMUI_TRIGGER_DURATION) * Math.PI);
-      this.kamuiEase = Math.max(this.kamuiEase, kEase * 1.15);
+      if (this.portalPass.uniforms.uDir.value < 0) {
+        const kEase = Math.sin((this.kamuiTimer / KAMUI_TRIGGER_DURATION) * Math.PI * 0.5);
+        this.kamuiEase = Math.max(this.kamuiEase, kEase * 1.15);
+      } else {
+        const elapsed = KAMUI_TRIGGER_DURATION - this.kamuiTimer;
+        let kEase = 0;
+        for (const beat of KAMUI_BEATS) kEase = Math.max(kEase, kamuiBeatEase(elapsed, beat));
+        this.kamuiEase = Math.max(this.kamuiEase, kEase * 1.15);
+      }
     }
 
 
@@ -5443,6 +5448,16 @@ this.updateBodies(dt);
     this.kamuiEase *= Math.max(0, 1 - dt * 6); /* relax toward the envelope */
     pu.uTime.value = this.clockT;
     pu.uStrength.value = this.kamuiEase;
+    /* the middle beats' channels — the wind-up and the flicker belong to the
+       forward summon only; the eject and idle stay clean */
+    const forwardSummon = pu.uDir.value > 0 && this.kamuiTimer > 0;
+    const beatElapsed = KAMUI_TRIGGER_DURATION - this.kamuiTimer;
+    pu.uWind.value = forwardSummon
+      ? THREE.MathUtils.smoothstep(beatElapsed, 0.55, 1.75) * (1 - THREE.MathUtils.smoothstep(beatElapsed, 4.0, 4.8))
+      : 0;
+    pu.uPulse.value = forwardSummon && beatElapsed >= 1.75 && beatElapsed <= 2.75
+      ? Math.abs(Math.sin(((beatElapsed - 1.75) / 1.0) * Math.PI * 2))
+      : 0;
     if (this.kamuiTimer > 0 && this.resolveKamuiSource(this._vScratch4)) {
       this._vScratch4.project(this.camera);
       if (this._vScratch4.z < 1) pu.uCenter.value.set(this._vScratch4.x * 0.5 + 0.5, this._vScratch4.y * 0.5 + 0.5);
