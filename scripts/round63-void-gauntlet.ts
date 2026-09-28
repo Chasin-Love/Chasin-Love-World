@@ -96,17 +96,19 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
   check('R63: no post-process void mask exists — the flow keeps its bloom blaze', noMask, 'mask machinery found');
 }
 
-/* ==== 4. the ring's blaze is the reference's own bloom config, verbatim ==== */
+/* ==== 4. the ring's blaze is the reference's own bloom config, calibrated ==== */
 {
-  /* the port's pipeline matches the source's exactly (spec §3), so his full
-     bloom config ports: strength 0.68, radius 0.2, threshold 0.4 — eased on
-     while a hole is on stage, relaxed to the project baseline when away */
+  /* his strength 0.68 and radius 0.2 port verbatim; his THRESHOLD is
+     scene-dependent (his scene = hole on black; ours = hole in a living
+     universe) — measured TWICE on the GPU probe: his 0.4 floods our void to
+     0.58–0.65 with the reference's own interior at 0.33; the calibrated 0.90
+     lands it at 0.33. It stays at the project's 0.90. */
   const bloom = /bloomHoleBoost \+= \(holeBoostTarget - this\.bloomHoleBoost\)/.test(engSrc)
     && /this\.bloomPass\.strength = 0\.18 - this\.coreT \* 0\.08 \+ this\.bloomHoleBoost;/.test(engSrc)
     && /const holeMix = Math\.min\(1, this\.bloomHoleBoost \/ 0\.5\);/.test(engSrc)
-    && /this\.bloomPass\.threshold = 0\.90 \+ \(0\.40 - 0\.90\) \* holeMix;/.test(engSrc)
-    && /this\.bloomPass\.radius = 0\.15 \+ \(0\.20 - 0\.15\) \* holeMix;/.test(engSrc);
-  check('R64: his bloom config ports verbatim (0.68 strength / 0.2 radius / 0.4 threshold) on stage', bloom, 'bloom easing wrong');
+    && /this\.bloomPass\.radius = 0\.15 \+ \(0\.20 - 0\.15\) \* holeMix;/.test(engSrc)
+    && !/bloomPass\.threshold =/.test(engSrc);
+  check('R64: his strength 0.68 / radius 0.2 port; threshold calibrated to 0.90 (measured twice)', bloom, 'bloom easing wrong');
 
   /* the on-stage resolution tightening (R64): at base ratio ≤ 1 there is NO
      drop — the blocky disk was the leak; only HiDPI eases, never below 0.7

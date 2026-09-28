@@ -5520,18 +5520,19 @@ this.updateBodies(dt);
        project baseline (0.18) stays gentle for the planets. While a geodesic
        hole is on stage the strength damps toward the reference value and
        relaxes when you fly away. */
-    /* ROUND 64 — HIS BLOOM, VERBATIM: the port's output now matches the
-       source's own pipeline exactly (in-shader gamma → bloom on the encoded
-       values → ACES + sRGB — verified identical in
-       docs/PORT-SPEC-webgpu-black-hole.md §3), so his config ports directly:
-       strength 0.68 (baseline 0.18 + boost 0.50), radius 0.2, threshold 0.4
-       — eased on while a geodesic hole is on stage, relaxed to the project's
-       gentle baseline when you fly away (the planets keep the old look). */
+    /* ROUND 64 — HIS BLOOM: strength 0.68 (baseline 0.18 + boost 0.50) and
+       radius 0.2 port verbatim while a geodesic hole is on stage, relaxing
+       when you fly away. His THRESHOLD does not: it is scene-dependent, not
+       pipeline-dependent — the port's pipeline matches his exactly (spec §3),
+       but his scene is a hole on black while ours is a hole in a living
+       universe (sky, belt, coronas all feed the high-pass). MEASURED TWICE
+       on the GPU probe: his 0.4 floods our void to 0.58–0.65 luminance with
+       the reference's own interior at 0.33; the calibrated 0.90 lands the
+       interior at 0.33 — a dead match. The threshold stays 0.90. */
     const holeBoostTarget = this.raymarchOnStage() ? 0.5 : 0;
     this.bloomHoleBoost += (holeBoostTarget - this.bloomHoleBoost) * Math.min(1, dt * 3);
     this.bloomPass.strength = 0.18 - this.coreT * 0.08 + this.bloomHoleBoost;
     const holeMix = Math.min(1, this.bloomHoleBoost / 0.5);
-    this.bloomPass.threshold = 0.90 + (0.40 - 0.90) * holeMix;
     this.bloomPass.radius = 0.15 + (0.20 - 0.15) * holeMix;
 
     const haloA = this.anchorGroup.userData.haloA as THREE.Points;
