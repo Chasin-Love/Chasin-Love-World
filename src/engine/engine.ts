@@ -42,7 +42,7 @@ import {
   MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,
 } from './systems/stageThresholds';
 import { SCALE_BANDS, highScaleLabel } from './systems/levelSystem';
-import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING } from './systems/kamuiPhases';
+import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING, KAMUI_TRIGGER_DURATION } from './systems/kamuiPhases';
 
 /* Round 52 — SPACETIME BENDING OF THE BACKGROUND, composed once.
 
@@ -810,7 +810,7 @@ export class UniverseEngine {
       uniforms: {
         tDiffuse: { value: null }, uCenter: { value: new THREE.Vector2(0.5, 0.5) },
         uStrength: { value: 0 }, uTime: { value: 0 }, uAspect: { value: 1 },
-        uColor: { value: new THREE.Color('#f2c178') },
+        uColor: { value: new THREE.Color('#f2c178') }, uDir: { value: 1 },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: portalFrag,
@@ -4189,7 +4189,7 @@ void main(){
   private beginStageWarp(dir: 'toMultiverse' | 'toWeb', arrivalDial: number, _after?: () => void): void {
     this.grabCooldown = 1.4;
     this.rig.killZoomMomentum();
-    this.triggerKamui();
+    this.triggerKamui(undefined, dir === 'toWeb'); /* out = summon, back = eject */
     this.cosmicStage = dir === 'toMultiverse' ? 'multiverse' : 'web';
     if (dir === 'toWeb') this.realityFocused = false;
     this.rig.setZoomTarget(arrivalDial);
@@ -4448,6 +4448,11 @@ void main(){
     this.portal.phase = 'leaving';
     this.portal.t = 0;
     this.portal.fired = false;
+    /* THE RETURN TEAR — closing the diary/vault replays the jutsu mirrored:
+       the vortex spins the other way and ejects the traveler back out while
+       the camera eases to the pre-open framing (kamuiTearBodyId is still
+       live, so the tear stays glued to the world being left). */
+    this.triggerKamui(undefined, true);
     /* a close before the hold expired must not leave a dive armed */
     this.portalHold = 0;
     this.portalFocusPending = false;
@@ -5012,10 +5017,11 @@ void main(){
       this.cb.onSimDate(new Date(this.epoch + this.simDays * DAY).toISOString());
     }
 
-    /* KAMUI (v1) — the red vortex breathes: sin-envelope over ~0.87s */
+    /* KAMUI (v1) — the red vortex breathes: one slow sin envelope across
+       KAMUI_TRIGGER_DURATION seconds (rise → crest → fall) */
     if (this.kamuiTimer > 0) {
-      this.kamuiTimer = Math.max(0, this.kamuiTimer - dt * 1.15);
-      const kEase = Math.sin(this.kamuiTimer * Math.PI);
+      this.kamuiTimer = Math.max(0, this.kamuiTimer - dt);
+      const kEase = Math.sin((this.kamuiTimer / KAMUI_TRIGGER_DURATION) * Math.PI);
       this.kamuiEase = Math.max(this.kamuiEase, kEase * 1.15);
     }
 
@@ -5412,8 +5418,11 @@ this.updateBodies(dt);
 
   /** KAMUI (v1) — Space-Time Vortex Distortion: the red demonic vortex tears
       the screen around the current kamui source — the clicked body's center,
-      the diving galaxy's disc, or the view center for stage warps and jumps. */
-  triggerKamui(targetUv?: THREE.Vector2) {
+      the diving galaxy's disc, or the view center for stage warps and jumps.
+      `reverse` spins the same vortex the other way and ejects space outward
+      instead of imploding — the close/return face of the jutsu. */
+  triggerKamui(targetUv?: THREE.Vector2, reverse = false) {
+    this.portalPass.uniforms.uDir.value = reverse ? -1 : 1;
     if (targetUv) {
       (this.portalPass.uniforms.uCenter.value as THREE.Vector2).copy(targetUv);
     } else if (this.resolveKamuiSource(this._vScratch4)) {
@@ -5427,7 +5436,7 @@ this.updateBodies(dt);
       (this.portalPass.uniforms.uCenter.value as THREE.Vector2).set(0.5, 0.5);
     }
     (this.portalPass.uniforms.uColor.value as THREE.Color).set('#ff1744');
-    this.kamuiTimer = 1.0;
+    this.kamuiTimer = KAMUI_TRIGGER_DURATION;
     this.cb.onKamuiTrigger?.();
   }
 

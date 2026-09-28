@@ -44,16 +44,25 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
 /* ==== 2. the trigger ==== */
 {
-  const trigger = /triggerKamui\(targetUv\?: THREE\.Vector2\) \{[\s\S]*?this\.kamuiTimer = 1\.0;[\s\S]*?\n  \}/.test(engSrc);
-  const envelope = /this\.kamuiTimer = Math\.max\(0, this\.kamuiTimer - dt \* 1\.15\);/.test(engSrc)
-    && /const kEase = Math\.sin\(this\.kamuiTimer \* Math\.PI\);/.test(engSrc)
+  const trigger = /triggerKamui\(targetUv\?: THREE\.Vector2, reverse = false\) \{[\s\S]*?this\.kamuiTimer = KAMUI_TRIGGER_DURATION;[\s\S]*?\n  \}/.test(engSrc);
+  const envelope = /this\.kamuiTimer = Math\.max\(0, this\.kamuiTimer - dt\);/.test(engSrc)
+    && /const kEase = Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI\);/.test(engSrc)
     && /kEase \* 1\.15/.test(engSrc)
     && /this\.kamuiEase \*= Math\.max\(0, 1 - dt \* 6\);/.test(engSrc);
-  check('R18: triggerKamui fires the 1s timer; the tick relaxes it through the sin envelope (×1.15 peak)', trigger && envelope, `${trigger}/${envelope}`);
+  check('R18: triggerKamui fires the 7s timer; the tick relaxes it through the slow sin envelope (×1.15 peak)', trigger && envelope, `${trigger}/${envelope}`);
 
   const center = /uCenter\.value\.set\(this\._vScratch4\.x \* 0\.5 \+ 0\.5, this\._vScratch4\.y \* 0\.5 \+ 0\.5\)/.test(engSrc)
     && /\(this\.portalPass\.uniforms\.uColor\.value as THREE\.Color\)\.set\('#ff1744'\)/.test(engSrc);
   check('R18: the tear centers on the kamui source (projected) and wears the demonic red', center, 'center/color missing');
+
+  const reverse = /uDir: \{ value: 1 \},/.test(engSrc)
+    && /this\.portalPass\.uniforms\.uDir\.value = reverse \? -1 : 1;/.test(engSrc)
+    && /uniform float uDir;/.test(shSrc)
+    && /s \* 6\.5 \* fall \* uDir/.test(shSrc)
+    && /pullDir \* s \* 0\.28 \* fall \* uDir/.test(shSrc)
+    && /this\.triggerKamui\(undefined, true\);/.test(engSrc)
+    && /this\.triggerKamui\(undefined, dir === 'toWeb'\);/.test(engSrc);
+  check('R18: the jutsu has two faces — closes and returns replay the vortex reversed (uDir eject)', reverse, 'reverse wiring missing');
 
   const events = /onKamuiTrigger\?: \(\) => void;/.test(engSrc)
     && /onKamuiTrigger\?\.\(\);/.test(engSrc)
@@ -96,7 +105,7 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
   check('R18: bodies bend no more — the geometry field is zeroed, the screen carries the jutsu', fieldRetired, 'field residue');
 
   const stages = /beginStageWarp\(dir: 'toMultiverse' \| 'toWeb'/.test(engSrc)
-    && (engSrc.match(/this\.triggerKamui\(\);/g)?.length ?? 0) === 4
+    && (engSrc.match(/this\.triggerKamui\(\);/g)?.length ?? 0) === 3
     && /kamuiTearBodyId: string \| null = null;/.test(engSrc);
   check('R18: stage warps and portals play the tear while the stage folds and the dial carries the travel', stages, 'stage wiring changed');
 }
@@ -105,7 +114,7 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 {
   const phases = /export type PortalPhase =/.test(phaseSrc)
     && /KAMUI_PHASE_WEIGHTS/.test(phaseSrc)
-    && /KAMUI_TRIGGER_DECAY = 1\.15/.test(phaseSrc)
+    && /KAMUI_TRIGGER_DURATION = 7/.test(phaseSrc)
     && !/KamuiPhase/.test(phaseSrc)
     && !/'breach'/.test(phaseSrc);
   check('R18: kamuiPhases.ts carries the v1 contract (portal phases, trigger decay — no 9-beat chain)', phases, 'phases module drifted');
@@ -113,7 +122,7 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
 /* ==== 6. CAMERA STABILITY — the summon holds the frame ==== */
 {
-  const armed = /export const KAMUI_ENTRY_HOLD = 0\.8;/.test(phaseSrc)
+  const armed = /export const KAMUI_ENTRY_HOLD = 4\.2;/.test(phaseSrc)
     && /export const KAMUI_ENTRY_FRAMING = 4\.2;/.test(phaseSrc)
     && /private portalHold = 0;/.test(engSrc)
     && /private portalFocusPending = false;/.test(engSrc)
