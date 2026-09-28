@@ -113,6 +113,12 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
     && /this\.bloomPass\.threshold = 0\.90 \+ \(0\.40 - 0\.90\) \* holeMix;/.test(engSrc)
     && /this\.bloomPass\.radius = 0\.15 \+ \(0\.20 - 0\.15\) \* holeMix;/.test(engSrc);
   check('R63: bloom eases to the source config (0.68 strength / 0.2 radius / 0.4 threshold) on stage', bloom, 'source bloom values missing');
+
+  /* the on-stage resolution floor: 0.5× pixel ratio rendered the disk as a
+     blocky pixelated wash and broke the arcs into dots — 0.8 keeps the flow
+     continuous (the R53 breaker stays as the safety net) */
+  const resFloor = /const target = holeOnStage \? Math\.max\(0\.8, this\.pixelRatioBase \* 0\.8\) : this\.pixelRatioBase;/.test(engSrc);
+  check('R63: on-stage resolution floor is 0.8 (no more blocky disk)', resFloor, 'floor not raised');
 }
 
 /* ==== 5. the gate runs in npm run verify ==== */

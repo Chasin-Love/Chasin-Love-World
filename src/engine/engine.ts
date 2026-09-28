@@ -521,16 +521,20 @@ export class UniverseEngine {
     this.checkpointCameraView(5);
   }
   /* ROUND 56b — adaptive resolution: the geodesic lens is pixel-bound (the
-     quad covers the frame at close focus — 147 ms at 1080p full res), so
-     while a hole is on stage the whole composer drops to 0.6× pixel ratio
-     and restores when you fly away. Applied in 0.1 steps — every apply
-     reallocates the render targets, so we never churn per frame. */
+     quad covers the frame at close focus), so while a hole is on stage the
+     composer drops its pixel ratio and restores when you fly away. Applied
+     in 0.1 steps — every apply reallocates the render targets, so we never
+     churn per frame.
+     ROUND 63 — the floor rises 0.5 → 0.8: at 0.5× the disk read as a blocky
+     pixelated wash (the user's screenshot) and the photon-ring arcs broke
+     into dots. 0.8 keeps the flow continuous; the R53 frame-budget breaker
+     remains the safety net for machines that cannot carry it. */
   private pixelRatioBase = 1;
   private pixelRatioApplied = -1;
   private holePixelRatioDamp = 1;
 
   private applyAdaptiveResolution(holeOnStage: boolean, dt: number): void {
-    const target = holeOnStage ? Math.max(0.5, this.pixelRatioBase * 0.5) : this.pixelRatioBase;
+    const target = holeOnStage ? Math.max(0.8, this.pixelRatioBase * 0.8) : this.pixelRatioBase;
     this.holePixelRatioDamp += (target - this.holePixelRatioDamp) * Math.min(1, dt * 4);
     if (Math.abs(this.holePixelRatioDamp - this.pixelRatioApplied) >= 0.1) {
       this.pixelRatioApplied = this.holePixelRatioDamp;
