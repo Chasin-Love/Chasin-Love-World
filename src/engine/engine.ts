@@ -5518,18 +5518,21 @@ this.updateBodies(dt);
        project baseline (0.18) stays gentle for the planets. While a geodesic
        hole is on stage the strength damps toward the reference value and
        relaxes when you fly away. */
-    /* ROUND 63 — THE SOURCE'S OWN BLAZE: the reference demo's soft yellow-
-       white flow IS its post-processing — main.js bloomStrength 0.68,
-       bloomRadius 0.2, bloomThreshold 0.4 (a low threshold lets the whole
-       disk glow, a wide radius smears it soft). While a geodesic hole is on
-       stage the composer eases to exactly those values (strength: baseline
-       0.18 + boost 0.50 = 0.68) and relaxes to the project's gentle baseline
-       when you fly away — the planets keep the old look. */
+    /* ROUND 63 — THE SOURCE'S OWN BLAZE, calibrated: the reference demo's
+       soft yellow-white flow IS its post-processing — main.js bloomStrength
+       0.68, bloomRadius 0.2. While a geodesic hole is on stage the composer
+       eases strength to 0.68 (baseline 0.18 + boost 0.50) and radius to 0.2,
+       relaxing when you fly away — the planets keep the old look.
+       His bloomThreshold 0.4 does NOT port: it presumes his linear pipeline,
+       while ours double-encodes (the quad's gamma step + the OutputPass),
+       lifting every mid-tone. Measured on the GPU probe — his 0.4 here
+       floods the void to 0.65 luminance (the shadow glows away), while our
+       0.90 admits the equivalent energy: interior 0.26 against the
+       reference's own 0.33. The threshold stays at 0.90. */
     const holeBoostTarget = this.raymarchOnStage() ? 0.5 : 0;
     this.bloomHoleBoost += (holeBoostTarget - this.bloomHoleBoost) * Math.min(1, dt * 3);
     this.bloomPass.strength = 0.18 - this.coreT * 0.08 + this.bloomHoleBoost;
     const holeMix = Math.min(1, this.bloomHoleBoost / 0.5);
-    this.bloomPass.threshold = 0.90 + (0.40 - 0.90) * holeMix;
     this.bloomPass.radius = 0.15 + (0.20 - 0.15) * holeMix;
 
     const haloA = this.anchorGroup.userData.haloA as THREE.Points;

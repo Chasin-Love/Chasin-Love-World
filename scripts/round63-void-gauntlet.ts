@@ -102,17 +102,19 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
   check('R63: no post-process void mask exists — the flow keeps its bloom blaze', noMask, 'mask machinery found');
 }
 
-/* ==== 4. the ring's blaze is the reference's own bloom config ==== */
+/* ==== 4. the ring's blaze is the reference's own bloom config, calibrated ==== */
 {
-  /* while a hole is on stage the composer eases to the source's exact bloom
-     values (main.js: strength 0.68, radius 0.2, threshold 0.4) and relaxes
-     to the project baseline when away */
+  /* while a hole is on stage the composer eases strength to his 0.68 and
+     radius to his 0.2. His threshold 0.4 does NOT port (our pipeline double-
+     encodes — his 0.4 measured flooding the void to 0.65; 0.90 admits the
+     equivalent energy: interior 0.26 vs the reference's own 0.33) — it stays
+     at the project's 0.90, and the gauntlet forbids the threshold easing. */
   const bloom = /bloomHoleBoost \+= \(holeBoostTarget - this\.bloomHoleBoost\)/.test(engSrc)
     && /this\.bloomPass\.strength = 0\.18 - this\.coreT \* 0\.08 \+ this\.bloomHoleBoost;/.test(engSrc)
     && /const holeMix = Math\.min\(1, this\.bloomHoleBoost \/ 0\.5\);/.test(engSrc)
-    && /this\.bloomPass\.threshold = 0\.90 \+ \(0\.40 - 0\.90\) \* holeMix;/.test(engSrc)
-    && /this\.bloomPass\.radius = 0\.15 \+ \(0\.20 - 0\.15\) \* holeMix;/.test(engSrc);
-  check('R63: bloom eases to the source config (0.68 strength / 0.2 radius / 0.4 threshold) on stage', bloom, 'source bloom values missing');
+    && /this\.bloomPass\.radius = 0\.15 \+ \(0\.20 - 0\.15\) \* holeMix;/.test(engSrc)
+    && !/bloomPass\.threshold =/.test(engSrc);
+  check('R63: bloom eases to his strength 0.68 / radius 0.2 on stage; threshold stays 0.90 (calibrated)', bloom, 'bloom easing wrong');
 
   /* the on-stage resolution floor: 0.5× pixel ratio rendered the disk as a
      blocky pixelated wash and broke the arcs into dots — 0.8 keeps the flow
