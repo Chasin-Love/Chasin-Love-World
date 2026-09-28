@@ -42,7 +42,7 @@ import {
   MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,
 } from './systems/stageThresholds';
 import { SCALE_BANDS, highScaleLabel } from './systems/levelSystem';
-import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING, KAMUI_TRIGGER_DURATION, KAMUI_VACUUM_WINDOW, KAMUI_BEATS, kamuiBeatEase } from './systems/kamuiPhases';
+import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING, KAMUI_TRIGGER_DURATION, KAMUI_REVERSE_DURATION, KAMUI_VACUUM_WINDOW, KAMUI_BEATS, kamuiBeatEase } from './systems/kamuiPhases';
 
 /* Round 52 — SPACETIME BENDING OF THE BACKGROUND, composed once.
 
@@ -102,8 +102,10 @@ export interface EngineCallbacks {
   /** KAMUI v2 — the energy pool readout (throttled ~5 Hz) and the rejection
       of an unaffordable/invalid traversal (the bounce-back pulse already
       played in-world; this is for the toast). */
-  /** fired whenever the red vortex tears (v1 summon) */
-  onKamuiTrigger?: () => void;
+  /** fired whenever the red vortex tears (v1 summon and eject alike) —
+      `reverse` is the close/return face; `vortexUv` is the tear's screen
+      position in CSS terms (0..1, y down) so the DOM swallow can aim at it */
+  onKamuiTrigger?: (reverse: boolean, vortexUv: { x: number; y: number }) => void;
   /* THE COSMIC ECHO — a memory meteor was clicked: reopen its diary page */
   onEchoOpen?: (entryId: string, planetId: string, title: string) => void;
   /* echo meteor hover — App shows a small memory card near the pointer */
@@ -5037,8 +5039,13 @@ void main(){
     if (this.kamuiTimer > 0) {
       this.kamuiTimer = Math.max(0, this.kamuiTimer - dt);
       if (this.portalPass.uniforms.uDir.value < 0) {
-        const kEase = Math.sin((this.kamuiTimer / KAMUI_TRIGGER_DURATION) * Math.PI * 0.5);
+        /* THE EJECT — a short burst that unwinds. Strength AND spin decay
+           together over KAMUI_REVERSE_DURATION, so the warped screen relaxes
+           smoothly back to the idle image and the shader's passthrough cut
+           at s < 0.001 is never visible (no frozen twist, no sudden drop). */
+        const kEase = Math.sin((this.kamuiTimer / KAMUI_REVERSE_DURATION) * Math.PI * 0.5);
         this.kamuiEase = Math.max(this.kamuiEase, kEase * 1.15);
+        this.kamuiTwist = kEase; /* the spin unwinds WITH the glow — no frozen tail */
       } else {
         const elapsed = KAMUI_TRIGGER_DURATION - this.kamuiTimer;
         let kEase = 0;
@@ -5539,8 +5546,11 @@ this.updateBodies(dt);
       (this.portalPass.uniforms.uCenter.value as THREE.Vector2).set(0.5, 0.5);
     }
     (this.portalPass.uniforms.uColor.value as THREE.Color).set('#ff1744');
-    this.kamuiTimer = KAMUI_TRIGGER_DURATION;
-    this.cb.onKamuiTrigger?.();
+    this.kamuiTimer = reverse ? KAMUI_REVERSE_DURATION : KAMUI_TRIGGER_DURATION;
+    /* the DOM swallow needs the tear's screen position — the CSS kamui-suck
+       collapses toward this exact point (GL y-up flipped to CSS y-down) */
+    const uv = this.portalPass.uniforms.uCenter.value as THREE.Vector2;
+    this.cb.onKamuiTrigger?.(reverse, { x: uv.x, y: 1 - uv.y });
   }
 
 

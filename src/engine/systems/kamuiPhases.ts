@@ -27,6 +27,13 @@ export const KAMUI_PHASE_WEIGHTS: Record<PortalPhase, number> = {
     seconds (rise → crest → fall), so the summon can actually be watched. */
 export const KAMUI_TRIGGER_DURATION = 5.5; /* seconds */
 
+/** THE EJECT (the reverse/return tear) has its own, shorter life: ~0.6s at
+    full burst while the open overlay is swallowed (kamui-suck), then the
+    spin and the glow UNWIND together over the rest — the warped screen
+    relaxes smoothly back to the idle image instead of freezing at full
+    twist and hard-cutting. */
+export const KAMUI_REVERSE_DURATION = 1.9; /* seconds */
+
 export const KAMUI_RAMP: string[] = ['#ff1744', '#8b5cf6', '#f2c178'];
 
 /** THE CHOREOGRAPHY — the summon is a SEQUENCE of distinct beats, not one

@@ -44,12 +44,12 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
 /* ==== 2. the trigger ==== */
 {
-  const trigger = /triggerKamui\(targetUv\?: THREE\.Vector2, reverse = false\) \{[\s\S]*?this\.kamuiTimer = KAMUI_TRIGGER_DURATION;[\s\S]*?\n  \}/.test(engSrc);
+  const trigger = /triggerKamui\(targetUv\?: THREE\.Vector2, reverse = false\) \{[\s\S]*?this\.kamuiTimer = reverse \? KAMUI_REVERSE_DURATION : KAMUI_TRIGGER_DURATION;[\s\S]*?\n  \}/.test(engSrc);
   const envelope = /this\.kamuiTimer = Math\.max\(0, this\.kamuiTimer - dt\);/.test(engSrc)
     && /for \(const beat of KAMUI_BEATS\) kEase = Math\.max\(kEase, kamuiBeatEase\(elapsed, beat\)\);/.test(engSrc)
     && /this\.kamuiTwist = Math\.max\(this\.kamuiTwist, kEase\); \/\* the spin NEVER unwinds \*\//.test(engSrc)
     && /this\.kamuiEase = Math\.max\(this\.kamuiEase, kEase \* 1\.15, this\.kamuiTwist \* 0\.6\);/.test(engSrc)
-    && /const kEase = Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI \* 0\.5\);/.test(engSrc)
+    && /const kEase = Math\.sin\(\(this\.kamuiTimer \/ KAMUI_REVERSE_DURATION\) \* Math\.PI \* 0\.5\);/.test(engSrc)
     && /this\.kamuiEase \*= Math\.max\(0, 1 - dt \* 6\);/.test(engSrc);
   check('R18: the summon plays as choreographed beats with a MONOTONIC spin (never backward), the eject bursts', trigger && envelope, `${trigger}/${envelope}`);
 
@@ -59,7 +59,8 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
   const reverse = /uDir: \{ value: 1 \},/.test(engSrc)
     && /this\.portalPass\.uniforms\.uDir\.value = reverse \? -1 : 1;/.test(engSrc)
-    && /const kEase = Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI \* 0\.5\);/.test(engSrc)
+    && /const kEase = Math\.sin\(\(this\.kamuiTimer \/ KAMUI_REVERSE_DURATION\) \* Math\.PI \* 0\.5\);/.test(engSrc)
+    && /this\.kamuiTwist = kEase;/.test(engSrc)
     && /uniform float uDir;/.test(shSrc)
     && /this\.triggerKamui\(undefined, true\);/.test(engSrc)
     && /this\.triggerKamui\(undefined, dir === 'toWeb'\);/.test(engSrc)
@@ -86,9 +87,13 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
     && /this\.camera\.position\.x \+= \(Math\.random\(\) - 0\.5\) \* 2 \* amp;/.test(engSrc);
   check('R18: the vacuum gulp — the tear finishes by swallowing its subject (surge, size drain, rumble)', vacuum, 'vacuum wiring missing');
 
-  const events = /onKamuiTrigger\?: \(\) => void;/.test(engSrc)
-    && /onKamuiTrigger\?\.\(\);/.test(engSrc)
-    && /onKamuiTrigger: \(\) => setKamuiKey\(\(k\) => k \+ 1\),/.test(appSrc);
+  const events = /onKamuiTrigger\?: \(reverse: boolean, vortexUv: \{ x: number; y: number \}\) => void;/.test(engSrc)
+    && /onKamuiTrigger\?\.\(reverse, \{ x: uv\.x, y: 1 - uv\.y \}\);/.test(engSrc)
+    && /onKamuiTrigger: \(_reverse, vortexUv\) => \{/.test(appSrc)
+    && /--kamui-vortex-x/.test(appSrc)
+    && /--kamui-vortex-y/.test(appSrc)
+    && /--kamui-vortex-x/.test(cssSrc)
+    && /--kamui-vortex-y/.test(cssSrc);
   check('R18: every tear re-keys the HUD through onKamuiTrigger (the vortex re-entry)', events, 'callback chain missing');
 }
 
@@ -137,6 +142,7 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
   const phases = /export type PortalPhase =/.test(phaseSrc)
     && /KAMUI_PHASE_WEIGHTS/.test(phaseSrc)
     && /KAMUI_TRIGGER_DURATION = 5\.5/.test(phaseSrc)
+    && /KAMUI_REVERSE_DURATION = 1\.9/.test(phaseSrc)
     && /KAMUI_VACUUM_WINDOW = 1\.5/.test(phaseSrc)
     && /KAMUI_BEATS: KamuiBeat\[\]/.test(phaseSrc)
     && /export function kamuiBeatEase/.test(phaseSrc)

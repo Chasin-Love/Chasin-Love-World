@@ -300,7 +300,14 @@ export default function App() {
       },
       onPortalDone: () => undefined,
       onContext: (id, x, y) => setMenu({ id, x, y }),
-      onKamuiTrigger: () => setKamuiKey((k) => k + 1),
+      onKamuiTrigger: (_reverse, vortexUv) => {
+        /* the DOM swallow (.kamui-suck) collapses toward the tear's screen
+           point — the engine reports it on every trigger */
+        const rootStyle = document.documentElement.style;
+        rootStyle.setProperty('--kamui-vortex-x', `${(vortexUv.x * 100).toFixed(2)}%`);
+        rootStyle.setProperty('--kamui-vortex-y', `${(vortexUv.y * 100).toFixed(2)}%`);
+        setKamuiKey((k) => k + 1);
+      },
       onFirstFrame: () => setEngineReady(true),
       onEchoOpen: (entryId, planetId, title) => {
         /* a memory meteor was caught — reopen the page it remembers */

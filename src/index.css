@@ -1734,29 +1734,45 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 }
 
 /* THE SWALLOW — an open overlay (diary window, vault) being taken by the
-   reverse vortex: it spins down into the tear's middle and is gone. */
+   reverse vortex. Two movements in one breath: first the BEND (perspective
+   tilt, skew, non-uniform squash — the rectangle genuinely loses its shape),
+   then the accelerating spiral down INTO the tear itself. transform-origin
+   rides the live tear position (--kamui-vortex-x/y, written by App on every
+   trigger), so the card is dragged into the vortex instead of shrunk at
+   screen center. */
 @keyframes kamuiSuck {
   0% {
     opacity: 1;
-    transform: scale(1) rotate(0deg);
+    transform: perspective(1800px) rotate(0deg) rotateX(0deg) rotateY(0deg) skewX(0deg) skewY(0deg) scale(1, 1);
     filter: blur(0px) brightness(1);
+    box-shadow: 0 0 0 rgba(255, 23, 68, 0), 0 0 0 rgba(139, 92, 246, 0);
+    animation-timing-function: cubic-bezier(0.22, 0.9, 0.36, 1); /* the bend snaps in fast */
   }
-  60% {
-    opacity: 0.9;
-    filter: blur(4px) brightness(1.7) contrast(130%);
+  35% {
+    /* maximum bend — the card is no longer a rectangle */
+    opacity: 1;
+    transform: perspective(1800px) rotate(-42deg) rotateX(9deg) rotateY(-14deg) skewX(15deg) skewY(-8deg) scale(0.86, 1.08);
+    filter: blur(1.5px) brightness(1.45) contrast(125%);
+    box-shadow: 0 0 45px rgba(255, 23, 68, 0.45), 0 0 22px rgba(139, 92, 246, 0.3);
+    animation-timing-function: cubic-bezier(0.7, 0, 0.84, 0); /* then the accelerating swallow */
+  }
+  70% {
+    opacity: 0.85;
+    transform: perspective(1800px) rotate(-170deg) rotateX(20deg) rotateY(-30deg) skewX(22deg) skewY(-11deg) scale(0.32, 0.52);
+    filter: blur(7px) brightness(1.9) contrast(140%);
     box-shadow: 0 0 90px rgba(255, 23, 68, 0.7), 0 0 45px rgba(139, 92, 246, 0.5);
   }
   100% {
     opacity: 0;
-    transform: scale(0.03) rotate(-300deg);
+    transform: perspective(1800px) rotate(-300deg) rotateX(30deg) rotateY(-44deg) skewX(26deg) skewY(-13deg) scale(0.03, 0.03);
     filter: blur(16px) brightness(2.4);
-    box-shadow: 0 0 130px rgba(255, 23, 68, 1);
+    box-shadow: 0 0 130px rgba(255, 23, 68, 1), 0 0 60px rgba(139, 92, 246, 0.6);
   }
 }
 
 .kamui-suck {
   animation: kamuiSuck 0.6s cubic-bezier(0.7, 0, 0.84, 0) both;
-  transform-origin: center center;
+  transform-origin: var(--kamui-vortex-x, 50%) var(--kamui-vortex-y, 50%);
   pointer-events: none;
 }
 
