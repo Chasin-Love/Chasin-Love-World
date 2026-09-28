@@ -53,7 +53,7 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
   const center = /uCenter\.value\.set\(this\._vScratch4\.x \* 0\.5 \+ 0\.5, this\._vScratch4\.y \* 0\.5 \+ 0\.5\)/.test(engSrc)
     && /\(this\.portalPass\.uniforms\.uColor\.value as THREE\.Color\)\.set\('#ff1744'\)/.test(engSrc);
-  check('R18: the tear centers on the Demon Core (projected) and wears the demonic red', center, 'center/color missing');
+  check('R18: the tear centers on the kamui source (projected) and wears the demonic red', center, 'center/color missing');
 
   const events = /onKamuiTrigger\?: \(\) => void;/.test(engSrc)
     && /onKamuiTrigger\?\.\(\);/.test(engSrc)

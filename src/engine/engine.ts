@@ -5319,15 +5319,22 @@ this.updateBodies(dt);
 
   /* ------------------------------ KAMUI ---------------------------------- */
 
-  /** Live world position of the current kamui target (home body or inner
-     world) — the tear must stay glued to a moving subject. */
+  /** Live world position of the current kamui target (home body, inner
+     world, or the galaxy disc being dived into) — the tear must stay glued
+     to a moving subject. */
   private resolveKamuiSource(out: THREE.Vector3): boolean {
-    if (!this.kamuiTearBodyId) return false;
-    const home = this.bodies.find((b) => b.data.id === this.kamuiTearBodyId);
-    if (home) { home.group.getWorldPosition(out); return true; }
-    for (const node of this.galaxyStageNodes) {
-      const inner = node.innerSys?.planets.find((pl) => pl.data.id === this.kamuiTearBodyId);
-      if (inner) { inner.group.getWorldPosition(out); return true; }
+    if (this.kamuiTearBodyId) {
+      const home = this.bodies.find((b) => b.data.id === this.kamuiTearBodyId);
+      if (home) { home.group.getWorldPosition(out); return true; }
+      for (const node of this.galaxyStageNodes) {
+        const inner = node.innerSys?.planets.find((pl) => pl.data.id === this.kamuiTearBodyId);
+        if (inner) { inner.group.getWorldPosition(out); return true; }
+      }
+    }
+    if (this.galaxyDive) {
+      const diveId = this.galaxyDive.galaxyId;
+      const node = this.galaxyStageNodes.find((n) => n.data.id === diveId);
+      if (node) { node.group.getWorldPosition(out); return true; }
     }
     return false;
   }
@@ -5365,20 +5372,20 @@ this.updateBodies(dt);
   }
 
   /** Per-frame application of the v1 vortex: the full-screen pass gets
-      the eased strength, the clock, the projected Demon-Core center, and the
-      reality's own hue; the Demon Core itself flares with the tear. */
+      the eased strength, the clock, and the reality's own hue; while the
+      pulse is live the center re-projects the live kamui source (the clicked
+      body or the diving galaxy), so the tear stays glued to its subject —
+      when nothing resolves it keeps the center the trigger chose. */
   private applyKamuiFrame(dt: number) {
     const pu = this.portalPass?.uniforms;
     if (!pu) return;
     this.kamuiEase *= Math.max(0, 1 - dt * 6); /* relax toward the envelope */
     pu.uTime.value = this.clockT;
     pu.uStrength.value = this.kamuiEase;
-    if (this.demonCoreGroup) {
-      this._vScratch4.setFromMatrixPosition(this.demonCoreGroup.matrixWorld).project(this.camera);
+    if (this.kamuiTimer > 0 && this.resolveKamuiSource(this._vScratch4)) {
+      this._vScratch4.project(this.camera);
       if (this._vScratch4.z < 1) pu.uCenter.value.set(this._vScratch4.x * 0.5 + 0.5, this._vScratch4.y * 0.5 + 0.5);
       else pu.uCenter.value.set(0.5, 0.5);
-    } else {
-      pu.uCenter.value.set(0.5, 0.5);
     }
     /* uColor belongs to the trigger (the demonic #ff1744) — it is NOT driven
        per frame, so the red owns the whole pulse (v1 behavior). */
@@ -5388,12 +5395,13 @@ this.updateBodies(dt);
   }
 
   /** KAMUI (v1) — Space-Time Vortex Distortion: the red demonic vortex tears
-      the screen around the Multiverse Core (or screen center). */
+      the screen around the current kamui source — the clicked body's center,
+      the diving galaxy's disc, or the view center for stage warps and jumps. */
   triggerKamui(targetUv?: THREE.Vector2) {
     if (targetUv) {
       (this.portalPass.uniforms.uCenter.value as THREE.Vector2).copy(targetUv);
-    } else if (this.demonCoreGroup) {
-      this._vScratch4.setFromMatrixPosition(this.demonCoreGroup.matrixWorld).project(this.camera);
+    } else if (this.resolveKamuiSource(this._vScratch4)) {
+      this._vScratch4.project(this.camera);
       if (this._vScratch4.z < 1) {
         (this.portalPass.uniforms.uCenter.value as THREE.Vector2).set(this._vScratch4.x * 0.5 + 0.5, this._vScratch4.y * 0.5 + 0.5);
       } else {
