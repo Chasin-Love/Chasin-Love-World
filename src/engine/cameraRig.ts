@@ -92,6 +92,8 @@ export class CameraRig {
   private focusRadius = 6;
   private focusMin = 1.35;
   private focusMax = 3500;
+  /* CAMERA STABILITY — the near clamp is a FLOOR, never a snap (see update). */
+  private minSmooth = 0;
 
   private panKeys: Record<string, boolean> = {};
   private dragging = false;
@@ -243,10 +245,11 @@ export class CameraRig {
     this.panVel.set(0, 0, 0);
   }
 
-  /** current camera distance from the focus point (before portal squeeze) */
+  /** the rendered camera distance from the focus point — the focus floor has
+      already been applied, so this is what the frame actually uses */
   dist(): number {
     const base = DIST_BASE * Math.pow(DIST_SPAN, this.zoomT);
-    if (this.focused) return Math.min(Math.max(base, this.focusMin), this.focusMax);
+    if (this.focused) return Math.min(Math.max(base, this.minSmooth), this.focusMax);
     return base;
   }
 
@@ -366,6 +369,26 @@ export class CameraRig {
     this.focusRadius = s.focusRadius;
     this.focusMin = s.focusMin ?? this.focusRadius * 1.35;
     this.focusMax = s.focusMax ?? 3500;
+    /* CAMERA STABILITY — the floor eases in. Engaging a focus whose near
+       clamp sits further out than the camera (a geodesic hole's 4.34·rs, a
+       reality marble's glass) used to TELEPORT the camera outward on the
+       exact frame the focus bound — the jerk that made a portal entry feel
+       unstable. The floor therefore rises from wherever the camera already
+       is at the focus's own λ, so the push-out is smooth (and invisible when
+       the camera is already outside it). Tightening stays instant, so the
+       floor can never hold the camera outside its own frame.
+
+       `atFocusMin`/`atFocusMax` still read the TARGET floor, so every
+       threshold the engine keys off is untouched. */
+    if (!this.focused) {
+      this.minSmooth = 0;
+    } else if (this.minSmooth <= 0) {
+      this.minSmooth = Math.min(this.focusMin, DIST_BASE * Math.pow(DIST_SPAN, this.zoomT));
+    } else if (this.minSmooth > this.focusMin) {
+      this.minSmooth = this.focusMin;
+    } else {
+      this.minSmooth = damp(this.minSmooth, this.focusMin, LAMBDA_FOCUS, dt);
+    }
     this.renderCenter.copy(this.focus).add(this.panOffset);
     const dist = Math.max(0.5, this.dist());
     const sp = Math.sin(this.phi), cp = Math.cos(this.phi);

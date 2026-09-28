@@ -111,6 +111,23 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
   check('R18: kamuiPhases.ts carries the v1 contract (portal phases, trigger decay — no 9-beat chain)', phases, 'phases module drifted');
 }
 
+/* ==== 6. CAMERA STABILITY — the summon holds the frame ==== */
+{
+  const armed = /export const KAMUI_ENTRY_HOLD = 0\.8;/.test(phaseSrc)
+    && /export const KAMUI_ENTRY_FRAMING = 4\.2;/.test(phaseSrc)
+    && /private portalHold = 0;/.test(engSrc)
+    && /private portalFocusPending = false;/.test(engSrc)
+    && /this\.portalHold = KAMUI_ENTRY_HOLD;/.test(engSrc)
+    && /this\.portalFocusPending = true;/.test(engSrc)
+    && /Math\.max\(0\.4, b\.data\.radius\) \* KAMUI_ENTRY_FRAMING/.test(engSrc);
+  check('R18: the entry arms a hold and withholds the focus (the dive can no longer start on the click)', armed, 'entry hold not armed');
+
+  const pinned = /if \(this\.portalHold > 0\) \{[\s\S]*?setZoomTarget\(this\.portalReturnDial\)[\s\S]*?killZoomMomentum\(\)[\s\S]*?this\.portalHold === 0[\s\S]*?this\.focusId = this\.portalPendingFocusId;[\s\S]*?setZoomTarget\(this\.portalEnterDial\)/
+    .test(engSrc)
+    && /this\.portalHold = 0;[\s\S]{0,200}this\.portalFocusPending = false;/.test(engSrc);
+  check('R18: while it holds, the dial is pinned and momentum killed; on expiry the body and the dive are released', pinned, 'hold resolution drifted');
+}
+
 /* ================================ verdict ================================ */
 console.log(failures === 0 ? '\n★ KAMUI GAUNTLET GREEN — the v1 vortex checks out' : `\n● ${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

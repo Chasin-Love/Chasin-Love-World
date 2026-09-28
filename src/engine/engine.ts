@@ -41,6 +41,7 @@ import {
   MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,
 } from './systems/stageThresholds';
 import { SCALE_BANDS, highScaleLabel } from './systems/levelSystem';
+import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING } from './systems/kamuiPhases';
 
 /* Round 52 — SPACETIME BENDING OF THE BACKGROUND, composed once.
 
@@ -57,7 +58,7 @@ import { SCALE_BANDS, highScaleLabel } from './systems/levelSystem';
    and vanish into the capture region exactly as the surface does. It needs
    the lens header ahead of it, so the three chunks are composed here once and
    every point material reuses the identical string (one program, not N). */
-const POINTS_VERT_LENSED = `${LENS_UNIFORMS_GLSL}\n${LENS_WARP_GLSL}\n${LENS_POINT_GLSL}\n${pointsVert}`;
+const POINTS_VERT_LENSED = `#define LENS_WORLD\n${LENS_UNIFORMS_GLSL}\n${LENS_WARP_GLSL}\n${LENS_POINT_GLSL}\n${pointsVert}`;
 
 interface ShootingMeteor {
   pos: THREE.Vector3;
@@ -323,6 +324,15 @@ export class UniverseEngine {
   /* The dial value the entry zoom lands at / eases back to. */
   private portalEnterDial = 0;
   private portalReturnDial = 0;
+  /* CAMERA STABILITY — the summon hold. Clicking a world fires the vortex and
+     the frame then stays ROCK STILL while it breathes; only after
+     KAMUI_ENTRY_HOLD does the camera take the body and glide in. Without it
+     the dive and the tear raced each other (the camera had already slammed
+     into the body by the time the vortex crested) and the instant focus
+     yanked the whole sky sideways. */
+  private portalHold = 0;
+  private portalFocusPending = false;
+  private portalPendingFocusId: string | null = null;
 
   /* KAMUI (v1) — the vortex does not own navigation; the plain-zoom portal
      and the stage thresholds keep doing the travel. The jutsu is pure
@@ -345,6 +355,7 @@ export class UniverseEngine {
   private lensStrong: number[] = new Array(16).fill(0);
   private _lensDir = new THREE.Vector3();
   private _lensFwd = new THREE.Vector3();
+  private _lensPos = new THREE.Vector3();  /* ROUND 61 — world pos of inner-system holes */
   /* Living Gravity: first-order N-body coupling in osculating elements (nbody.ts). */
   private livingField = new LivingGravityField();
   private livingGravityOn = true;     /* real mutual gravity — ON by default */
@@ -480,9 +491,17 @@ export class UniverseEngine {
     if (this._camMemTimer < 5) return;
     this._camMemTimer = 0;
     const snap = this.rig.snapshot();
+    /* ROUND 62 — the memory carries the FULL placement (current + target
+       channels) and WHAT the view orbits: a target-only record eases in
+       from the rig's constructor default (a huge distance) and the focus
+       auto-release (dist > 1200) drops the subject before the camera
+       arrives — the "the hole is nowhere" bug. */
     const next: Omit<CameraMemory, 'savedAt'> = {
-      zoomT: snap.tZoomT, theta: snap.tTheta, phi: snap.tPhi,
+      zoomT: snap.zoomT, tZoomT: snap.tZoomT,
+      theta: snap.theta, tTheta: snap.tTheta,
+      phi: snap.phi, tPhi: snap.tPhi,
       pan: snap.pan,
+      focusId: this.focusId,
     };
     const last = this._camMemLast;
     if (last && Math.abs(last.zoomT - next.zoomT) < 1e-5 && Math.abs(last.theta - next.theta) < 1e-5 && Math.abs(last.phi - next.phi) < 1e-5) {
@@ -723,8 +742,41 @@ export class UniverseEngine {
   };
 
   private onContextRestored = () => {
-    if (!this.disposed) this.renderer.compile(this.scene, this.camera);
+    /* AUDIT 2026-09-28 — the test was INVERTED: `if (!this.disposed)` compiled
+       the scene only while the engine was ALIVE, which is exactly when the
+       browser re-delivers a restored GL context — and did nothing after
+       dispose, which is the only time it could ever be harmful. A real
+       restore also invalidates the EffectComposer's render targets (they
+       belonged to the lost context), so they must be re-created too, or the
+       first frame after a GPU driver reset renders into dead buffers — the
+       "universe went permanently black after a driver hiccup" class of bug. */
+    if (this.disposed) return;
+    this.composer.dispose();
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.setPixelRatio(this.pixelRatioApplied);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+    this.buildComposerPasses();
+    this.renderer.compile(this.scene, this.camera);
   };
+
+  /** The composer pass chain, in its one canonical order — shared by the
+      constructor and the context-restored rebuild (they must never drift). */
+  private buildComposerPasses(): void {
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.12, 0.15, 0.90);
+    this.composer.addPass(this.bloomPass);
+    this.portalPass = new ShaderPass({
+      uniforms: {
+        tDiffuse: { value: null }, uCenter: { value: new THREE.Vector2(0.5, 0.5) },
+        uStrength: { value: 0 }, uTime: { value: 0 }, uAspect: { value: 1 },
+        uColor: { value: new THREE.Color('#f2c178') },
+      },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: portalFrag,
+    });
+    this.composer.addPass(this.portalPass);
+    this.composer.addPass(new OutputPass());
+  }
 
   /* Reusable scratchpad instances for zero-GC render frame updates */
   private _vScratch1 = new THREE.Vector3();
@@ -847,22 +899,11 @@ export class UniverseEngine {
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
-    this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.12, 0.15, 0.90);
-    this.composer.addPass(this.bloomPass);
     /* THE KAMUI pass (v1) — the red demonic vortex (shaders.ts portalFrag).
-       At uStrength 0 it is a single texture fetch; triggerKamui() pulses it. */
-    this.portalPass = new ShaderPass({
-      uniforms: {
-        tDiffuse: { value: null }, uCenter: { value: new THREE.Vector2(0.5, 0.5) },
-        uStrength: { value: 0 }, uTime: { value: 0 }, uAspect: { value: 1 },
-        uColor: { value: new THREE.Color('#f2c178') },
-      },
-      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: portalFrag,
-    });
-    this.composer.addPass(this.portalPass);
-    this.composer.addPass(new OutputPass());
+       At uStrength 0 it is a single texture fetch; triggerKamui() pulses it.
+       Pass order lives in buildComposerPasses so the context-restored
+       rebuild can never drift from the boot chain. */
+    this.buildComposerPasses();
 
     this.bindEvents();
     this.resize();
@@ -908,7 +949,13 @@ export class UniverseEngine {
 
   /* ----------------------------- construction ----------------------------- */
 
-  private pointsMaterial(px: number, twinkle: boolean): THREE.ShaderMaterial {
+  /** ROUND 62 — `lens` opts a cloud INTO the spacetime bend. Default is
+      RIGID: belts, star halos, nebula dust and every other system-local
+      cloud belong to a body, and a body's contents are never bent (the
+      belt-tear bug). Only cosmic sky clouds pass true — see the opt-ins at
+      the makePoints call sites (milky band, galaxy spirals, web, cluster
+      fields). */
+  private pointsMaterial(px: number, twinkle: boolean, lens = false): THREE.ShaderMaterial {
     const mat = new THREE.ShaderMaterial({
       uniforms: {
         uScale: { value: 1 }, uTime: { value: 0 }, uTwinkle: { value: twinkle ? 1 : 0 }, uOpacity: { value: 1 },
@@ -916,10 +963,10 @@ export class UniverseEngine {
         uVortexRev: { value: 1 },
         /* Round 52 — the SAME uniform objects the sky dome and the star shells
            use, so one setLenses() per frame bends the canvas, the shells and
-           every discrete star cloud together. Nothing else has to be synced. */
+           every lenized star cloud together. Nothing else has to be synced. */
         ...this.surfaceManager.lensUniforms,
       },
-      vertexShader: POINTS_VERT_LENSED, fragmentShader: pointsFrag,
+      vertexShader: lens ? POINTS_VERT_LENSED : pointsVert, fragmentShader: pointsFrag,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     });
     this.clouds.push({ mat, px });
@@ -945,7 +992,7 @@ export class UniverseEngine {
     this.levelPointMats = this.levelPointMats.filter((m) => m.userData.rebuildTag !== tag);
   }
 
-  private makePoints(count: number, posFn: (i: number, arr: Float32Array) => void, sizeFn: (i: number) => number, colFn: (i: number) => [number, number, number], alphaFn: (i: number) => number, px: number, twinkle: boolean): THREE.Points {
+  private makePoints(count: number, posFn: (i: number, arr: Float32Array) => void, sizeFn: (i: number) => number, colFn: (i: number) => [number, number, number], alphaFn: (i: number) => number, px: number, twinkle: boolean, lens = false): THREE.Points {
     const pos = new Float32Array(count * 3);
     const size = new Float32Array(count);
     const col = new Float32Array(count * 3);
@@ -960,7 +1007,7 @@ export class UniverseEngine {
     g.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
     g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
     g.setAttribute('aAlpha', new THREE.BufferAttribute(alp, 1));
-    return new THREE.Points(g, this.pointsMaterial(px, twinkle));
+    return new THREE.Points(g, this.pointsMaterial(px, twinkle, lens));
   }
 
   private buildBackdrop() {
@@ -976,7 +1023,7 @@ export class UniverseEngine {
       () => 0.4 + R() * 0.9,
       () => { const w = R(); return w > 0.75 ? [1, 0.82, 0.6] : [0.62, 0.7, 0.88]; },
       () => 0.16 + R() * 0.3,
-      1.5, true,
+      1.5, true, true,
     );
     band.rotation.z = 0.42; band.rotation.x = 0.22;
     this.gGalaxy.add(band);
@@ -1617,27 +1664,80 @@ export class UniverseEngine {
       black hole's disc is a hollow in the surface of reality, and only the
       surface in contact with it bends — so nothing can ever dwarf the
       universe at one distance and vanish at another. The bodies themselves
-      are never touched. */
+      are never touched.
+
+      ROUND 61 — THE WHOLE UNIVERSE BENDS, not just the home system. The
+      lens roster is the home anchor's bodies AND every real hole living in
+      another galaxy's isolated inner system (kind 'vault' carries the same
+      geodesic renderer there — it only vanished from the sky because it
+      was never in this.bodies). Gates and geometry follow the renderer
+      exactly: an inner-system hole lenses the sky only while its system is
+      visible (node.inner.visible — the same <1,600-unit dive gate the
+      marcher obeys), and its direction is measured in WORLD space through
+      the rotated galaxy node. Holes claim the 16 slots FIRST; ordinary
+      masses fill what remains. */
   private updateSpacetimeLens(dt: number) {
     this.lensCur += (this.lensTarget - this.lensCur) * Math.min(1, dt * 4);
     this.camera.getWorldDirection(this._lensFwd);
+    const cap = this.lensVecs.length;
     let n = 0;
+    /* 1 — every hole and vault, anywhere in the scene, first. */
     for (const b of this.bodies) {
-      if (n >= this.lensVecs.length) break;
+      if (b.data.kind !== 'hole' && b.data.kind !== 'vault') continue;
+      if (n >= cap) break;
+      n = this.pushSurfaceLens(n, b.group.position, b.data.radius, b.lensHalo ?? lensHaloFor(b.data.kind), 1);
+    }
+    if (n < cap) {
+      for (const node of this.galaxyStageNodes) {
+        const sys = node.innerSys;
+        if (!sys || !node.inner.visible) continue; /* hidden system → its hole holds no hollow yet */
+        for (const p of sys.planets) {
+          if (p.data.kind !== 'hole' && p.data.kind !== 'vault') continue;
+          if (n >= cap) break;
+          p.group.getWorldPosition(this._lensPos);
+          n = this.pushSurfaceLens(n, this._lensPos, p.data.radius, lensHaloFor(p.data.kind), 1);
+        }
+        if (n >= cap) break;
+      }
+    }
+    /* 2 — the ordinary masses: stars and worlds bending gently around
+       their own silhouettes, exactly as before. */
+    for (const b of this.bodies) {
+      if (b.data.kind === 'hole' || b.data.kind === 'vault') continue;
+      if (n >= cap) break;
       const halo = b.lensHalo ?? 0;
       if (halo <= 0) continue;
-      this._lensDir.copy(b.group.position).sub(this.camera.position);
-      const dist = this._lensDir.length();
-      if (dist < 1e-3) continue;
-      this._lensDir.divideScalar(dist);
-      if (this._lensDir.dot(this._lensFwd) < 0.05) continue; /* behind the view */
-      /* apparent silhouette half-angle from the body's real radius */
-      const rim = Math.asin(Math.min(1, b.data.radius / dist));
-      this.lensRims[n] = rim;
-      this.lensStrong[n] = (b.data.kind === 'hole' || b.data.kind === 'vault') ? 1 : 0;
-      this.lensVecs[n++].set(this._lensDir.x, this._lensDir.y, this._lensDir.z, halo * rim);
+      n = this.pushSurfaceLens(n, b.group.position, b.data.radius, halo, 0);
     }
     this.surfaceManager.setLenses(this.lensVecs, this.lensRims, this.lensStrong, n, this.lensCur);
+  }
+
+  /** ONE surface-lens slot writer — the single law every lens obeys,
+      home roster and inner systems alike: direction from the camera,
+      apparent silhouette half-angle rim = asin(R/d) from the body's real
+      radius, halo multiplier scaled on it. Returns the new slot count, or
+      n unchanged when the lens lies behind the view. `worldPos` must be
+      the lens's position in WORLD space (inner-system holes pass through
+      their rotated galaxy node, so a local position would bend the wrong
+      patch of sky). */
+  private pushSurfaceLens(n: number, worldPos: THREE.Vector3, radius: number, halo: number, strong: number): number {
+    this._lensDir.copy(worldPos).sub(this.camera.position);
+    const dist = this._lensDir.length();
+    /* AUDIT 2026-09-28 — NaN firewall: one bad body position (a physics
+       overflow, an uninitialized group) must poison one slot at most — a NaN
+       rim would smear not-a-number across every sky pixel that lens touches.
+       Guarded here, at the ONE writer every lens passes through. */
+    if (!Number.isFinite(dist) || dist < 1e-3) return n;
+    if (!Number.isFinite(radius) || !Number.isFinite(halo)) return n;
+    this._lensDir.divideScalar(dist);
+    if (this._lensDir.dot(this._lensFwd) < 0.05) return n; /* behind the view */
+    /* apparent silhouette half-angle from the body's real radius */
+    const rim = Math.asin(Math.min(1, radius / dist));
+    if (!Number.isFinite(rim)) return n;
+    this.lensRims[n] = rim;
+    this.lensStrong[n] = strong;
+    this.lensVecs[n].set(this._lensDir.x, this._lensDir.y, this._lensDir.z, halo * rim);
+    return n + 1;
   }
 
   /** Living Gravity — first-order N-body coupling in osculating elements
@@ -2005,7 +2105,7 @@ void main(){
             return [c.r, c.g, c.b];
           },
           () => 0.45 + rnd() * 0.45,
-          1.5, true,
+          1.5, true, true,
         );
         (galPts.material as THREE.ShaderMaterial).userData.pointMode = 'marble';
         spiralGroup.add(galPts);
@@ -2076,7 +2176,7 @@ void main(){
       },
       () => 1.2 + R() * 2.2,
       () => { const w = R(); return w > 0.85 ? [1, 0.72, 0.85] : w > 0.6 ? [0.45, 0.75, 1] : [0.75, 0.85, 1]; },
-      () => 0.35 + R() * 0.55, 2.2, true,
+      () => 0.35 + R() * 0.55, 2.2, true, true,
     );
     gal1.rotation.x = 0.8; gal1.rotation.z = -0.3;
     gPair.add(gal1);
@@ -2094,7 +2194,7 @@ void main(){
       },
       () => 1.0 + R() * 2.0,
       () => [1, 0.8, 0.6] as [number, number, number],
-      () => 0.4 + R() * 0.5, 2.0, true,
+      () => 0.4 + R() * 0.5, 2.0, true, true,
     );
     gPair.add(gal2);
     
@@ -2592,7 +2692,7 @@ void main(){
       },
       () => 0.35 + R() * 0.45,
       2.0,
-      true,
+      true, true,
     );
     this.gSupercluster.add(superPts);
 
@@ -2647,7 +2747,7 @@ void main(){
       },
       () => 0.5 + R() * 1.8,
       () => { const w = R(); return w > 0.85 ? [1, 0.88, 0.62] : w > 0.55 ? [0.38, 0.82, 0.95] : [0.58, 0.72, 0.95]; },
-      () => 0.22 + R() * 0.5, 1.8, true,
+      () => 0.22 + R() * 0.5, 1.8, true, true,
     );
     this.gWeb.add(webPts);
 
@@ -2657,7 +2757,7 @@ void main(){
       (i, a) => { a[i * 3] = nodes[i].x; a[i * 3 + 1] = nodes[i].y; a[i * 3 + 2] = nodes[i].z; },
       (i) => 2.0 + degree[i] * 0.55,
       (i) => { const c = nodeCol[i]; return [c.r, c.g, c.b] as [number, number, number]; },
-      () => 0.6 + R() * 0.4, 2.8, true,
+      () => 0.6 + R() * 0.4, 2.8, true, true,
     );
     this.gWeb.add(knot);
 
@@ -2707,7 +2807,7 @@ void main(){
       (idx) => { const warm = Math.floor(idx / 70) % 3 === 0; return warm ? [1, 0.9, 0.7] : [0.5, 0.85, 1]; },
       () => 0.55 + R() * 0.45,
       2.4,
-      true,
+      true, true,
     );
     this.gWeb.add(hubPts);
 
@@ -2860,7 +2960,7 @@ void main(){
           const b = 0.55 + rnd() * 0.4;
           return [b * 0.75, b * 0.84, b];
         },
-        () => 0.2 + rnd() * 0.55, 1.7, false,
+        () => 0.2 + rnd() * 0.55, 1.7, false, true,
       );
       pts.frustumCulled = true; /* big static clouds opt into culling — fill rate */
       group.add(pts);
@@ -3490,7 +3590,7 @@ void main(){
       () => [0.85, 0.9, 1],
       () => 0.2 + R() * 0.4,
       1.2,
-      false,
+      false, true,
     );
     this.gCluster.add(stars);
 
@@ -4250,15 +4350,22 @@ void main(){
     this.rig.killZoomMomentum();
     this.grabCooldown = 0.8;
     /* THE PLAIN ZOOM — the camera dives in toward the world (the focus keeps
-       it centered); the diary or vault opens when the zoom lands. */
-    this.focusId = innerTarget ? null : b.data.id;
-    this.portalEnterDial = CameraRig.zoomTOf(Math.max(0.4, b.data.radius) * 3.2);
+       it centered); the diary or vault opens when the zoom lands.
+
+       CAMERA STABILITY — the focus change and the dive are WITHHELD for the
+       length of the summon (portalHold, resolved in tick): the vortex plays
+       against a frame that has not moved a pixel, and only once it has
+       crested does the rig take the body and start the approach. The dial is
+       pinned back at the pre-open framing so nothing can drift meanwhile. */
+    this.portalFocusPending = true;
+    this.portalPendingFocusId = innerTarget ? null : b.data.id;
+    this.portalHold = KAMUI_ENTRY_HOLD;
+    this.portalEnterDial = CameraRig.zoomTOf(Math.max(0.4, b.data.radius) * KAMUI_ENTRY_FRAMING);
     this.portalReturnDial = this.portalSavedCam.rig.tZoomT;
-    this.rig.setZoomTarget(this.portalEnterDial);
-    /* KAMUI — fire the traversal: the field arms at the body, everything
-       nearby is drawn into the swirl, the throat opens, and the diary or
-       vault arrives on the white-hole ejection. The plain zoom continues
-       underneath; the overlay contract fires from onArrive. */
+    this.rig.setZoomTarget(this.portalReturnDial);
+    /* KAMUI — fire the v1 vortex: the red tear plays around the Demon Core
+       while the frame holds still (portalHold above); the dive then carries
+       the traveler in and the overlay contract fires from onPortalPeak. */
     this.kamuiTearBodyId = b.data.id;
     this.triggerKamui();
   }
@@ -4267,6 +4374,10 @@ void main(){
     this.portal.phase = 'leaving';
     this.portal.t = 0;
     this.portal.fired = false;
+    /* a close before the hold expired must not leave a dive armed */
+    this.portalHold = 0;
+    this.portalFocusPending = false;
+    this.portalPendingFocusId = null;
     /* ease the camera back out to the traveler's pre-open framing */
     const saved = this.portalSavedCam;
     if (saved) {
@@ -4777,6 +4888,27 @@ void main(){
 
   private tick = () => {
     if (this.disposed) return;
+    /* AUDIT 2026-09-28 — the frame-level fault shield. One exception in one
+       update pass (a NaN from physics, a transient GL hiccup) used to skip
+       composer.render() for EVERY later frame: the canvas froze black while
+       the loop spun and the intro veil never lifted. The shield keeps the
+       loop alive, reports the failure once (log spam in a per-frame handler
+       would drown the console), and retries rendering on the next frame —
+       a transient failure heals itself, a persistent one stays visible in
+       the console instead of becoming a silent black screen. */
+    try {
+      this.tickFrame();
+    } catch (err) {
+      if (!this.tickErrorLogged) {
+        this.tickErrorLogged = true;
+        console.error('[universe] a frame update failed — recovering on the next frame:', err);
+      }
+      try { this.clock.getDelta(); } catch { /* keep the clock sane */ }
+    }
+  };
+  private tickErrorLogged = false;
+
+  private tickFrame = () => {
     const frameStarted = isPerformanceEnabled() ? performance.now() : 0;
     /* Vault/Core overlays do not need a live scene update. Keeping the
        animation loop registered makes resume instant, while this guard avoids
@@ -4814,6 +4946,25 @@ void main(){
     }
 
 
+    /* CAMERA STABILITY — the summon hold. For KAMUI_ENTRY_HOLD after the
+       click the camera is pinned exactly where the traveler left it and all
+       zoom momentum is killed: the red vortex plays against a still frame.
+       The moment it expires we hand the body and the arrival dial to the
+       rig, so the approach begins as the tear fades — the traveler falls
+       through the vortex instead of being dragged past it. */
+    if (this.portalHold > 0) {
+      this.portalHold = Math.max(0, this.portalHold - dt);
+      this.rig.setZoomTarget(this.portalReturnDial);
+      this.rig.killZoomMomentum();
+      if (this.portalHold === 0) {
+        if (this.portalFocusPending) {
+          this.focusId = this.portalPendingFocusId;
+          this.portalFocusPending = false;
+          this.portalPendingFocusId = null;
+        }
+        this.rig.setZoomTarget(this.portalEnterDial);
+      }
+    }
     /* The portal — a plain camera zoom. Clicking a world dives the camera
        in toward it; when the zoom lands the destination overlay opens.
        Closing eases the camera back out to the pre-open framing. */
@@ -4891,9 +5042,26 @@ void main(){
          memory, so the default remains reachable on purpose. */
       const remembered = getCameraMemory();
       if (remembered) {
-        this.rig.setZoomTarget(remembered.zoomT);
-        this.rig.setOrbit(remembered.theta, remembered.phi);
-        this.rig.restorePan(remembered.pan);
+        /* ROUND 62 — HARD-CUT, not ease-in: the full snapshot (current +
+           target channels) puts the camera exactly at the saved view on the
+           first frame. The old target-only restore eases from the rig's
+           constructor default — a huge distance — and the focus auto-release
+           (dist > 1200) un-bound the saved focus before the camera arrived,
+           leaving the hole nowhere in frame. */
+        this.rig.restore({
+          zoomT: remembered.zoomT, tZoomT: remembered.tZoomT,
+          theta: remembered.theta, tTheta: remembered.tTheta,
+          phi: remembered.phi, tPhi: remembered.tPhi,
+          pan: remembered.pan,
+        });
+        /* restore WHAT the view was orbiting: the rig's focus is recomputed
+           from focusBody() every frame, so re-binding the id re-points the
+           view at the saved subject (the hole composition). A saved focus is
+           re-bound only if the body exists in this boot's roster — a stale
+           id (a deleted world) can never point the camera at nothing. */
+        if (remembered.focusId && this.bodies.some((b) => b.data.id === remembered.focusId)) {
+          this.focusId = remembered.focusId;
+        }
       } else {
         this.rig.setZoomTarget(0.15);
         this.rig.setOrbit(null, 1.12);

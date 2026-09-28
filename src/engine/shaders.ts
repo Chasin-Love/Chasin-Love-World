@@ -745,18 +745,21 @@ void main(){
       vAlpha *= (1.0 - infl * (0.6 + pullAmt * 0.3));
     }
   }
-  /* Round 52 — SPACETIME BENDING OF THE BACKGROUND. Every cloud built here is
-     part of the sky (stars, dust, gas, distant galaxies), so the masses'
-     curvature has to move IT — that is the observable signature of Einstein's
-     field equations, and until now only the procedural canvas and the sky
-     shells bent while these discrete stars stayed rigid, which is exactly why
-     the sky read as flat around the hole.
-     vp is still object space: lift to world, bend the direction from the
-     camera, then take the ordinary view transform. With no lens on stage
-     (uLensCount == 0) this is byte-identical to the previous path, because
-     viewMatrix · modelMatrix is what modelViewMatrix already was. */
+  /* ROUND 62 — SYSTEM OBJECTS NEVER BEND. makePoints builds two families:
+     the SKY (cosmic clouds — the milky band, distant galaxies, web
+     filaments) and the SYSTEM (belts, star halos, nebula dust, marble
+     spirals — foreground content with an owner). Only the sky family is
+     composed with the lens: POINTS_VERT_LENSED defines LENS_WORLD and the
+     call below compiles in. A system cloud is RIGID, because a belt of
+     dust bending toward the hole while its rocks stay put is not optics —
+     it is a tear (and the capture mirror would even paint ghost copies of
+     it on the far side of the camera). The bodies are never bent, and
+     neither is anything that belongs to one. With no define this is
+     exactly the old no-lens path: modelViewMatrix, byte for byte. */
   vec4 wp = modelMatrix * vec4(vp, 1.0);
+#ifdef LENS_WORLD
   if (uLensCount > 0) wp.xyz = lensBendWorld(wp.xyz);
+#endif
   vec4 mv = viewMatrix * wp;
   float pSize = aSize * uScale * (260.0 / max(-mv.z, 0.001));
   gl_PointSize = clamp(pSize, 1.5, 36.0);

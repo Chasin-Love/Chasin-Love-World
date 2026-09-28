@@ -237,20 +237,60 @@ function inv(d: [number, number, number]): [number, number] {
   check('R52: star lensing helper bends from the camera, preserves distance, clips capture', helper, String(helper));
 
   const starBend = shSrc.includes('vec4 wp = modelMatrix * vec4(vp, 1.0);')
+    && shSrc.includes('#ifdef LENS_WORLD')
     && shSrc.includes('if (uLensCount > 0) wp.xyz = lensBendWorld(wp.xyz);')
     && shSrc.includes('vec4 mv = viewMatrix * wp;');
   check('R52: every star cloud bends in world space (identity when no lens)', starBend, String(starBend));
 
   const wired = enSrc.includes('const POINTS_VERT_LENSED')
+    && enSrc.includes('#define LENS_WORLD')
     && enSrc.includes('LENS_POINT_GLSL')
     && enSrc.includes('this.surfaceManager.lensUniforms')
-    && enSrc.includes('vertexShader: POINTS_VERT_LENSED, fragmentShader: pointsFrag,');
+    && enSrc.includes('vertexShader: lens ? POINTS_VERT_LENSED : pointsVert, fragmentShader: pointsFrag,');
   check('R52: pointsMaterial receives the shared lens uniforms', wired, String(wired));
 
   const sharedLens = mgrSrc.includes('public lensUniforms')
     && mgrSrc.includes('uLensCount')
     && mgrSrc.includes('public setLenses');
   check('R52: the lens uniform set is shared across every sky layer', sharedLens, String(sharedLens));
+}
+
+/* ==== ROUND 62 — system objects never bend ==== */
+{
+  const enSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
+
+  /* THE RIGIDITY LAW — the belt-tear fix: point clouds default to the plain
+     vertex shader (no lens defines, no bend) and only the cosmic sky clouds
+     opt in with `lens = true`. The belt dust, the inner systems' belt dust,
+     the anchor star halos and the inner-star halos must all stay RIGID —
+     they are foreground content with an owner, and the capture mirror would
+     paint ghost copies of them on the far side of the camera. */
+  const rigidDefault = /private makePoints\([\s\S]*?twinkle: boolean, lens = false\)/.test(enSrc)
+    && /private pointsMaterial\([\s\S]*?twinkle: boolean, lens = false\)/.test(enSrc)
+    && (enSrc.match(/, lens = false/g)?.length ?? 0) === 2;
+  check('R62: point clouds default RIGID — lensing is an explicit sky opt-in', rigidDefault, `${rigidDefault}`);
+
+  /* exactly the ten cosmic sky clouds lenize: milky band, marble spiral,
+     galaxy disc sprays (both stages), colliding pair, supercluster streams,
+     web filaments, web knots, web hubs, cluster star field. The `twinkle,
+     lens` pair is always the last two args spelled `bool, bool,` (trailing
+     comma) — verified unique across the file; a plain count survives both
+     call styles (inline `px, twinkle, lens,` and the trailing-arg form). */
+  const optIns = (enSrc.match(/(?:true|false), (?:true|false),/g) ?? []).length;
+  check('R62: exactly 10 cosmic sky clouds opted into the lens', optIns === 10, `${optIns}`);
+
+  /* THE CAMERA MEMORY CARRIES ITS SUBJECT — the "the hole is nowhere" bug:
+     a saved orbit (theta/phi/zoom) restored around the ORIGIN while the view
+     was really orbiting the hole 250 units away. The record must persist the
+     focused body id, the boot restore must re-bind it (roster-checked), and
+     legacy records without a focus must be discarded, never replayed. */
+  const cmSrc = readFileSync(new URL('../src/engine/cameraMemory.ts', import.meta.url), 'utf8');
+  const focusMemory = /focusId\?: string \| null/.test(cmSrc)
+    && /if \(p\.focusId === undefined\) \{ clearCameraMemory\(\); return null; \}/.test(cmSrc)
+    && /focusId: this\.focusId,/.test(enSrc)
+    && /remembered\.focusId && this\.bodies\.some/.test(enSrc)
+    && /this\.focusId = remembered\.focusId;/.test(enSrc);
+  check('R62: the camera memory remembers WHAT it orbited (focus re-bound on boot, legacy records purged)', focusMemory, `${focusMemory}`);
 }
 
 /* ==== 6. ROUND 53 — the tier that STAYS: policy fixes + the user's switch ==== */
@@ -400,6 +440,32 @@ function inv(d: [number, number, number]): [number, number] {
     && /lensWellFactor\(position\)/.test(usmSrc)
     && (usmSrc.match(/lensWellFactor\(position\)/g)?.length ?? 0) === 3;
   check('R61: ONE well law — shared C¹ gradient (zero at 4·b_c) consumed by dome + photo + all shells', oneWell, `${oneWell}`);
+}
+
+/* ==== ROUND 61 — the whole universe bends (lensing is not Sol-Prime-only) ==== */
+{
+  const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
+
+  /* ONE LENS LAW — every lens (home roster and other galaxies alike) is
+     written through the single slot writer: same asin(R/d) rim, same halo
+     multiplier, same behind-view cull. The old inline per-body body is gone. */
+  const oneLensLaw = /private pushSurfaceLens\(/.test(engSrc)
+    && (engSrc.match(/pushSurfaceLens\(/g)?.length ?? 0) >= 4
+    && !/lensStrong\[n\] = \(b\.data\.kind/.test(engSrc);
+  check('R61: every surface lens obeys ONE slot law (pushSurfaceLens — rim, halo, cull)', oneLensLaw, `${oneLensLaw}`);
+
+  /* CROSS-GALAXY FEED — the lens roster is not just this.bodies: holes in
+     other galaxies' isolated inner systems (kind 'vault' with the geodesic
+     renderer, built by buildInnerStellarSystem) are fed FIRST (holes before
+     ordinary masses), gated by the same node.inner.visible dive gate the
+     renderer obeys, and measured in WORLD space through the rotated galaxy
+     node (getWorldPosition — a local position would bend the wrong sky). */
+  const crossGalaxy = /data\.kind !== 'hole' && b\.data\.kind !== 'vault'/.test(engSrc)
+    && /for \(const node of this\.galaxyStageNodes\)/.test(engSrc)
+    && /if \(!sys \|\| !node\.inner\.visible\) continue/.test(engSrc)
+    && /p\.group\.getWorldPosition\(this\._lensPos\)/.test(engSrc)
+    && /ROUND 61 — THE WHOLE UNIVERSE BENDS/.test(engSrc);
+  check('R61: inner-system holes of EVERY galaxy lens the sky (holes-first, dive-gated, world-space)', crossGalaxy, `${crossGalaxy}`);
 }
 
 /* ================================ verdict ================================ */

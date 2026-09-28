@@ -21,13 +21,25 @@ import { STORAGE_KEYS } from '../platform/storageKeys';
  */
 
 export interface CameraMemory {
-  /** the rig's zoom dial (dist = 3 · 800000^zoomT) */
+  /* ROUND 62 — the FULL rig placement: current AND target channels. Saving
+     only the targets forced the rig to ease in from its constructor default
+     (a huge distance), and the engine's auto-release (dist > 1200 lets go
+     of a focus) fired during that ease — the restored focus was dropped
+     before the camera ever arrived. A full snapshot starts the camera AT the
+     saved view, so nothing can un-bind it mid-flight. */
   zoomT: number;
-  /** orbit longitude/latitude, radians */
+  tZoomT: number;
   theta: number;
+  tTheta: number;
   phi: number;
+  tPhi: number;
   /** world-space pan offset */
   pan: [number, number, number];
+  /** WHAT the view was orbiting: the focused body's id, or null for the
+      origin. The orbit angles alone are meaningless without this — a hole
+      composition restored around the ORIGIN leaves the hole out of frame
+      entirely (the "the hole is nowhere" report). */
+  focusId?: string | null;
   /** wall-clock ms, for diagnostics only */
   savedAt: number;
 }
@@ -46,15 +58,34 @@ export function getCameraMemory(): CameraMemory | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const p = JSON.parse(raw) as Partial<CameraMemory>;
+    const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
     if (
-      typeof p.zoomT === 'number' && Number.isFinite(p.zoomT) &&
-      typeof p.theta === 'number' && Number.isFinite(p.theta) &&
-      typeof p.phi === 'number' && Number.isFinite(p.phi) &&
+      num(p.zoomT) && num(p.tZoomT) &&
+      num(p.theta) && num(p.tTheta) &&
+      num(p.phi) && num(p.tPhi) &&
       Array.isArray(p.pan) && p.pan.length === 3 && p.pan.every((n) => typeof n === 'number' && Number.isFinite(n))
     ) {
-      cached = { zoomT: p.zoomT, theta: p.theta, phi: p.phi, pan: p.pan as [number, number, number], savedAt: typeof p.savedAt === 'number' ? p.savedAt : 0 };
+      /* ROUND 62 — legacy records (targets only, or no focus at all) cannot
+         be restored safely — the target-only ones ease in from a huge
+         distance and lose their focus to the auto-release, the focus-less
+         ones describe a subject that was never recorded. They are purged
+         once; the next idle checkpoint writes a complete record. A
+         deliberate origin view of the NEW format saves focusId: null and
+         restores as one. */
+      if (p.focusId === undefined) { clearCameraMemory(); return null; }
+      cached = {
+        zoomT: p.zoomT, tZoomT: p.tZoomT,
+        theta: p.theta, tTheta: p.tTheta,
+        phi: p.phi, tPhi: p.tPhi,
+        pan: p.pan as [number, number, number],
+        focusId: typeof p.focusId === 'string' ? p.focusId : null,
+        savedAt: typeof p.savedAt === 'number' ? p.savedAt : 0,
+      };
       return { ...cached };
     }
+    /* any unreadable shape (legacy, corrupt, hand-edited) is purged — a
+       stale record must never survive to mis-point a future boot */
+    clearCameraMemory();
   } catch { /* private mode or corrupt JSON — no memory stands */ }
   return null;
 }
