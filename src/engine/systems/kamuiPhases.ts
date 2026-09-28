@@ -38,12 +38,17 @@ export const KAMUI_RAMP: string[] = ['#ff1744', '#8b5cf6', '#f2c178'];
 export interface KamuiBeat { kind: 'tear' | 'wind' | 'flicker' | 'deepen' | 'throat'; t0: number; t1: number; peak: number }
 
 export const KAMUI_BEATS: KamuiBeat[] = [
-  { kind: 'tear',    t0: 0.0,  t1: 0.55, peak: 1.0 },
-  { kind: 'wind',    t0: 0.55, t1: 1.75, peak: 0.55 },
-  { kind: 'flicker', t0: 1.75, t1: 2.75, peak: 0.45 },
-  { kind: 'deepen',  t0: 2.75, t1: 4.0,  peak: 0.75 },
-  { kind: 'throat',  t0: 4.0,  t1: 5.5,  peak: 0.9 },
+  { kind: 'tear',    t0: 0.0,  t1: 0.95, peak: 1.0 },
+  { kind: 'wind',    t0: 0.35, t1: 2.05, peak: 0.62 },
+  { kind: 'flicker', t0: 1.45, t1: 3.05, peak: 0.7 },
+  { kind: 'deepen',  t0: 2.55, t1: 4.35, peak: 0.85 },
+  { kind: 'throat',  t0: 3.7,  t1: 5.5,  peak: 1.0 },
 ];
+
+/* The spans OVERLAP on purpose: the max of neighboring bumps never dips to
+   zero, so the forming vortex never blinks or relaxes backward at a seam.
+   The spin itself is driven by the running maximum (uTwist) — it only ever
+   winds forward. */
 
 /** A beat's envelope — one full-speed rise-and-fall inside its own span. */
 export function kamuiBeatEase(elapsed: number, beat: KamuiBeat): number {
@@ -74,7 +79,7 @@ export const KAMUI_VACUUM_WINDOW = 1.5; /* seconds */
  * long, and only then hands the focus and the dive to the rig — through the
  * crest, into the fall, so the arrival still feels like falling through it.
  */
-export const KAMUI_ENTRY_HOLD = 4; /* seconds — ends exactly where the vacuum gulp begins */
+export const KAMUI_ENTRY_HOLD = 5.5; /* seconds — the whole choreography plays on a locked frame; the dive begins as the throat completes */
 
 /** The arrival framing, as a multiple of the body's radius. The old 3.2 put
     the camera almost on the surface by the time the overlay opened; 4.2 keeps

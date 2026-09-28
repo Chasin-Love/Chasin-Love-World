@@ -29,7 +29,7 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 {
   /* the v1 fragment shader is ported with its signature terms intact */
   const shaderOk = /Kamui Space-Time Vortex Distortion/.test(shSrc)
-    && /spiralTwist = s \* 6\.5 \* fall/.test(shSrc)
+    && /spiralTwist = uTwist \* 6\.5 \* fall/.test(shSrc)
     && /Central Kamui singularity void/.test(shSrc)
     && /KamuiGlow/.test(shSrc)
     && /if \(s < 0\.001\) \{ gl_FragColor = texture2D\(tDiffuse, uv\); return; \}/.test(shSrc);
@@ -47,10 +47,11 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
   const trigger = /triggerKamui\(targetUv\?: THREE\.Vector2, reverse = false\) \{[\s\S]*?this\.kamuiTimer = KAMUI_TRIGGER_DURATION;[\s\S]*?\n  \}/.test(engSrc);
   const envelope = /this\.kamuiTimer = Math\.max\(0, this\.kamuiTimer - dt\);/.test(engSrc)
     && /for \(const beat of KAMUI_BEATS\) kEase = Math\.max\(kEase, kamuiBeatEase\(elapsed, beat\)\);/.test(engSrc)
+    && /this\.kamuiTwist = Math\.max\(this\.kamuiTwist, kEase\); \/\* the spin NEVER unwinds \*\//.test(engSrc)
+    && /this\.kamuiEase = Math\.max\(this\.kamuiEase, kEase \* 1\.15, this\.kamuiTwist \* 0\.6\);/.test(engSrc)
     && /const kEase = Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI \* 0\.5\);/.test(engSrc)
-    && /kEase \* 1\.15/.test(engSrc)
     && /this\.kamuiEase \*= Math\.max\(0, 1 - dt \* 6\);/.test(engSrc);
-  check('R18: triggerKamui fires the 5.5s timer; the summon plays as choreographed beats (rip → wind → flicker → deepen → throat), the eject bursts', trigger && envelope, `${trigger}/${envelope}`);
+  check('R18: the summon plays as choreographed beats with a MONOTONIC spin (never backward), the eject bursts', trigger && envelope, `${trigger}/${envelope}`);
 
   const center = /uCenter\.value\.set\(this\._vScratch4\.x \* 0\.5 \+ 0\.5, this\._vScratch4\.y \* 0\.5 \+ 0\.5\)/.test(engSrc)
     && /\(this\.portalPass\.uniforms\.uColor\.value as THREE\.Color\)\.set\('#ff1744'\)/.test(engSrc);
@@ -60,7 +61,6 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
     && /this\.portalPass\.uniforms\.uDir\.value = reverse \? -1 : 1;/.test(engSrc)
     && /const kEase = Math\.sin\(\(this\.kamuiTimer \/ KAMUI_TRIGGER_DURATION\) \* Math\.PI \* 0\.5\);/.test(engSrc)
     && /uniform float uDir;/.test(shSrc)
-    && /s \* 6\.5 \* fall \* uDir/.test(shSrc)
     && /this\.triggerKamui\(undefined, true\);/.test(engSrc)
     && /this\.triggerKamui\(undefined, dir === 'toWeb'\);/.test(engSrc)
     && /kamuiSuck/.test(cssSrc)
@@ -70,14 +70,16 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
     && /vaultClosing/.test(appSrc);
   check('R18: the eject bursts at full strength instantly and swallows the open overlay (kamui-suck)', reverse, 'reverse wiring missing');
 
-  const vacuum = /uVac: \{ value: 0 \}, uWind: \{ value: 0 \}, uPulse: \{ value: 0 \},/.test(engSrc)
+  const vacuum = /uVac: \{ value: 0 \}, uWind: \{ value: 0 \}, uPulse: \{ value: 0 \}, uTwist: \{ value: 0 \},/.test(engSrc)
     && /uniform float uDir; uniform float uVac; uniform float uWind; uniform float uPulse;/.test(shSrc)
+    && /uniform float uTwist;/.test(shSrc)
     && /float vac = uVac \* uVac;/.test(shSrc)
-    && /spiralTwist = s \* 6\.5 \* fall \* uDir \+ vac \* 2\.4 \* fall \+ uWind \* 5\.0 \* fall/.test(shSrc)
-    && /pullDir \* \(s \* 0\.28 \+ vac \* 0\.9 \+ uWind \* 0\.22\) \* fall \* uDir/.test(shSrc)
+    && /spiralTwist = uTwist \* 6\.5 \* fall \* uDir \+ vac \* 2\.4 \* fall \+ uWind \* 3\.0 \* fall/.test(shSrc)
+    && /pullDir \* \(uTwist \* 0\.28 \+ uWind \* 0\.22 \+ vac \* 0\.9\) \* fall \* uDir/.test(shSrc)
     && /coreR = 0\.22 \* s \* \(1\.0 \+ 0\.45 \* uPulse \* sin\(uTime \* 20\.0\)\)/.test(shSrc)
     && /KAMUI_BEATS/.test(engSrc)
     && /pu\.uVac\.value = t;/.test(engSrc)
+    && /pu\.uTwist\.value = this\.kamuiTwist;/.test(engSrc)
     && /pu\.uWind\.value = forwardSummon/.test(engSrc)
     && /pu\.uPulse\.value = forwardSummon/.test(engSrc)
     && /kamuiSwallowFactorFor\(/.test(engSrc)
@@ -145,7 +147,7 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
 /* ==== 6. CAMERA STABILITY — the summon holds the frame ==== */
 {
-  const armed = /export const KAMUI_ENTRY_HOLD = 4;/.test(phaseSrc)
+  const armed = /export const KAMUI_ENTRY_HOLD = 5\.5;/.test(phaseSrc)
     && /export const KAMUI_ENTRY_FRAMING = 4\.2;/.test(phaseSrc)
     && /private portalHold = 0;/.test(engSrc)
     && /private portalFocusPending = false;/.test(engSrc)

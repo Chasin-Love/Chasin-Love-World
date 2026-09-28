@@ -305,6 +305,10 @@ export class UniverseEngine {
   private kamuiSwallowGroup: THREE.Object3D | null = null;
   private kamuiSwallowFactor = 1;
   private kamuiShakeT = 0;
+  /* THE SPIN DRIVER — the running maximum of the beat envelopes. It only
+     ever grows during a summon, so the swirl never relaxes backward at a
+     beat seam (the user's forward-backward-forward jank). */
+  private kamuiTwist = 0;
   private cb: EngineCallbacks;
   private bodies: RuntimeBody[] = [];
   private colliderList: THREE.Mesh[] = [];
@@ -818,7 +822,7 @@ export class UniverseEngine {
         tDiffuse: { value: null }, uCenter: { value: new THREE.Vector2(0.5, 0.5) },
         uStrength: { value: 0 }, uTime: { value: 0 }, uAspect: { value: 1 },
         uColor: { value: new THREE.Color('#f2c178') }, uDir: { value: 1 },
-        uVac: { value: 0 }, uWind: { value: 0 }, uPulse: { value: 0 },
+        uVac: { value: 0 }, uWind: { value: 0 }, uPulse: { value: 0 }, uTwist: { value: 0 },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: portalFrag,
@@ -5039,7 +5043,10 @@ void main(){
         const elapsed = KAMUI_TRIGGER_DURATION - this.kamuiTimer;
         let kEase = 0;
         for (const beat of KAMUI_BEATS) kEase = Math.max(kEase, kamuiBeatEase(elapsed, beat));
-        this.kamuiEase = Math.max(this.kamuiEase, kEase * 1.15);
+        this.kamuiTwist = Math.max(this.kamuiTwist, kEase); /* the spin NEVER unwinds */
+        /* the brightness breathes with the beats, but the floor (the twist
+           drive) keeps the vortex alive through every seam — no blinking */
+        this.kamuiEase = Math.max(this.kamuiEase, kEase * 1.15, this.kamuiTwist * 0.6);
       }
     }
 
@@ -5452,8 +5459,9 @@ this.updateBodies(dt);
        forward summon only; the eject and idle stay clean */
     const forwardSummon = pu.uDir.value > 0 && this.kamuiTimer > 0;
     const beatElapsed = KAMUI_TRIGGER_DURATION - this.kamuiTimer;
+    pu.uTwist.value = this.kamuiTwist;
     pu.uWind.value = forwardSummon
-      ? THREE.MathUtils.smoothstep(beatElapsed, 0.55, 1.75) * (1 - THREE.MathUtils.smoothstep(beatElapsed, 4.0, 4.8))
+      ? THREE.MathUtils.smoothstep(beatElapsed, 0.35, 2.55) /* winds up once and STAYS — no unwind */
       : 0;
     pu.uPulse.value = forwardSummon && beatElapsed >= 1.75 && beatElapsed <= 2.75
       ? Math.abs(Math.sin(((beatElapsed - 1.75) / 1.0) * Math.PI * 2))
@@ -5516,6 +5524,7 @@ this.updateBodies(dt);
       instead of imploding — the close/return face of the jutsu. */
   triggerKamui(targetUv?: THREE.Vector2, reverse = false) {
     this.portalPass.uniforms.uDir.value = reverse ? -1 : 1;
+    this.kamuiTwist = reverse ? 1 : 0; /* the eject bursts at full twist */
     if (reverse) this.kamuiShakeT = 1; /* the eject burst shocks the frame */
     if (targetUv) {
       (this.portalPass.uniforms.uCenter.value as THREE.Vector2).copy(targetUv);
