@@ -29,20 +29,53 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 
 /* ==== 1. the marcher's void is sealed at the source ==== */
 {
-  /* ROUND 64 stub state: the old renderer (knee, budget law, gate) is
-     DELETED — these pins return with the verbatim port commit. The stub
-     must only be the hidden-visual wiring contract. */
-  const stub = /THE OLD RENDERER IS DELETED/.test(marchSrc)
-    && !/ShaderMaterial/.test(marchSrc) && !/bool captured/.test(marchSrc);
-  check('R64: the renderer is deleted — the void-seal pins return with the port', stub, 'stub contract broken');
+  /* the R64 port keeps the structural seal and sheds the R63 crutch: the
+     gate covers the WHOLE captured set via uCriticalB (the sky can never
+     show through the shadow), while the luminance knee is GONE — the film
+     now matches the source's own, because the pipeline matches too */
+  const gate = /uniform float uCriticalB;/.test(marchSrc)
+    && /if \(b <= max\(uDiskOuter \+ 2\.5, uCriticalB \* 1\.02\)\)/.test(marchSrc);
+  const driven = /uCriticalB\.value = criticalImpactParam\(/.test(marchSrc);
+  check('R64: the gate covers the whole captured set, driven by the TS mirror', gate && driven, 'gate/driver missing');
+
+  const noKnee = !/smoothstep\(0\.05, 0\.2, lum\)/.test(marchSrc);
+  check('R64: the R63 knee is gone — his film, unmodified', noKnee, 'knee found');
+
+  /* his exhaustion semantics: an exhausted ray is ESCAPED (his own budget
+     also exhausts long before r=100) — no budgetOut capture machinery */
+  const hisExhaust = !/budgetOut/.test(marchSrc);
+  check('R64: step exhaustion = escaped, his semantics (no budget-capture crutch)', hisExhaust, 'budget capture found');
 }
 
 /* ==== 2. the TS integrator is the shader's own physics ==== */
 {
-  /* ROUND 64 stub state: criticalImpactParam reports 0 (no march — no
-     captured set); the golden-value pins return with the port commit. */
-  const stubBc = criticalImpactParam(0.8, 2.4) === 0 && criticalImpactParam(6.0, 3.0) === 0;
-  check('R64: criticalImpactParam is the stub zero (goldens return with the port)', stubBc, 'stub must report 0');
+  const bcDefaultLens1 = criticalImpactParam(0.8, 1.0);
+  const nearClassic = bcDefaultLens1 > 0.8 * 2.2 && bcDefaultLens1 < 0.8 * 2.9;
+  check('R64: b_c at lensing 1 lands in the classic 2.2–2.9·rs band (integrator sane)', nearClassic, bcDefaultLens1.toFixed(4));
+
+  const bcDefault = criticalImpactParam(0.8, 2.4);
+  const bcStrong = criticalImpactParam(0.8, 3.0);
+  check('R64: b_c grows with the lensing multiplier', bcDefault > bcDefaultLens1 && bcStrong > bcDefault, `${bcDefault.toFixed(3)} !> ${bcDefaultLens1.toFixed(3)} or ${bcStrong.toFixed(3)} !> ${bcDefault.toFixed(3)}`);
+
+  /* golden values — the fixed-step integrator's captured set pinned at the
+     panel's corners (default 64-step budget). NOT scale-invariant in rs (the
+     march sphere is a fixed r=16 in shader units while rs scales), so these
+     exact numbers are the contract: any drift means the march law changed
+     and the early-out gate must be consciously re-pinned with it. */
+  const GOLDENS: Array<[number, number, number]> = [
+    [0.8, 0.5, 1.1259], [0.8, 1.0, 1.8209], [0.8, 2.4, 4.4974], [0.8, 3.0, 5.5046],
+    [6.0, 1.0, 11.2215], [6.0, 2.4, 15.9346], [6.0, 3.0, 17.9564],
+  ];
+  const goldenOk = GOLDENS.every(([rs, l, v]) => Math.abs(criticalImpactParam(rs, l) - v) < v * 0.01);
+  check('R64: b_c golden values pinned at the panel corners (fixed-step march law)', goldenOk,
+    GOLDENS.filter(([rs, l, v]) => Math.abs(criticalImpactParam(rs, l) - v) >= v * 0.01)
+      .map(([rs, l, v]) => `${rs}/${l}: got ${criticalImpactParam(rs, l).toFixed(4)} want ${v}`).join('; '));
+
+  /* THE REGRESSION the gate seals: at the panel's reachable extremes the old
+     disk-only gate (diskOuter min 6.0 + 2.5) sat INSIDE the shadow */
+  const oldGateMin = 6.0 + 2.5;
+  const bcMax = criticalImpactParam(6.0, 3.0);
+  check('R64: the old disk-only gate provably sat inside the shadow at panel extremes', bcMax > oldGateMin, `b_c ${bcMax.toFixed(3)} <= old gate ${oldGateMin}`);
 }
 
 /* ==== 3. the blaze rides bloom — no post-process mask ever touches it ==== */
@@ -63,19 +96,17 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
   check('R63: no post-process void mask exists — the flow keeps its bloom blaze', noMask, 'mask machinery found');
 }
 
-/* ==== 4. the ring's blaze is the reference's own bloom config, calibrated ==== */
+/* ==== 4. the ring's blaze is the reference's own bloom config, verbatim ==== */
 {
-  /* while a hole is on stage the composer eases strength to his 0.68 and
-     radius to his 0.2. His threshold 0.4 does NOT port (our pipeline double-
-     encodes — his 0.4 measured flooding the void to 0.65; 0.90 admits the
-     equivalent energy: interior 0.26 vs the reference's own 0.33) — it stays
-     at the project's 0.90, and the gauntlet forbids the threshold easing. */
+  /* the port's pipeline matches the source's exactly (spec §3), so his full
+     bloom config ports: strength 0.68, radius 0.2, threshold 0.4 — eased on
+     while a hole is on stage, relaxed to the project baseline when away */
   const bloom = /bloomHoleBoost \+= \(holeBoostTarget - this\.bloomHoleBoost\)/.test(engSrc)
     && /this\.bloomPass\.strength = 0\.18 - this\.coreT \* 0\.08 \+ this\.bloomHoleBoost;/.test(engSrc)
     && /const holeMix = Math\.min\(1, this\.bloomHoleBoost \/ 0\.5\);/.test(engSrc)
-    && /this\.bloomPass\.radius = 0\.15 \+ \(0\.20 - 0\.15\) \* holeMix;/.test(engSrc)
-    && !/bloomPass\.threshold =/.test(engSrc);
-  check('R63: bloom eases to his strength 0.68 / radius 0.2 on stage; threshold stays 0.90 (calibrated)', bloom, 'bloom easing wrong');
+    && /this\.bloomPass\.threshold = 0\.90 \+ \(0\.40 - 0\.90\) \* holeMix;/.test(engSrc)
+    && /this\.bloomPass\.radius = 0\.15 \+ \(0\.20 - 0\.15\) \* holeMix;/.test(engSrc);
+  check('R64: his bloom config ports verbatim (0.68 strength / 0.2 radius / 0.4 threshold) on stage', bloom, 'bloom easing wrong');
 
   /* the on-stage resolution tightening (R64): at base ratio ≤ 1 there is NO
      drop — the blocky disk was the leak; only HiDPI eases, never below 0.7
@@ -89,11 +120,17 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
   const pSrc = readFileSync(new URL('../src/engine/blackholeParams.ts', import.meta.url), 'utf8');
   const cardSrc = readFileSync(new URL('../src/ui/console/BlackHoleTuningCard.tsx', import.meta.url), 'utf8');
   const knobs = /softInner: number;/.test(pSrc) && /softOuter: number;/.test(pSrc) && /arcSharpness: number;/.test(pSrc)
+    && /diskTemp: number;/.test(pSrc) && /tempFalloff: number;/.test(pSrc)
     && /softInner: \{ min: 0\.0, max: 0\.5, step: 0\.01 \}/.test(pSrc)
     && /arcSharpness: \{ min: 0\.1, max: 10\.0, step: 0\.1 \}/.test(pSrc)
+    && /diskTemp: \{ min: 1, max: 50, step: 1 \}/.test(pSrc)
+    && /uSoftInner\.value = p\.softInner;/.test(marchSrc)
+    && /uTurbSharp\.value = p\.arcSharpness;/.test(marchSrc)
+    && /uDiskTemp\.value = p\.diskTemp;/.test(marchSrc)
     && /key: 'softInner', label: 'Inner Softness'/.test(cardSrc)
-    && /key: 'arcSharpness', label: 'Arc Sharpness'/.test(cardSrc);
-  check('R63: the appearance trio (softness inner/outer, arc sharpness) is wired store → panel', knobs, 'knob wiring broken');
+    && /key: 'arcSharpness', label: 'Arc Sharpness'/.test(cardSrc)
+    && /key: 'diskTemp', label: 'Peak Temp \(kK\)'/.test(cardSrc);
+  check('R64: the appearance set (softness pair, sharpness, peak temp, falloff) is wired store → uniforms → panel', knobs, 'knob wiring broken');
 }
 
 /* ==== 5. the gate runs in npm run verify ==== */

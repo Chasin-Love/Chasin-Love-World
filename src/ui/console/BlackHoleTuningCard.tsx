@@ -19,9 +19,10 @@ import {
   type RaymarchStatus,
 } from '../../engine/blackholeTier';
 
-/** The ten live knobs — labels mirror dgreenheck's demo panel; ranges are
-    his ui.js verbatim. ROUND 63 adds his appearance trio (Inner/Outer
-    Softness, Sharpness) so the whole appearance folder is user-tunable. */
+/** The twelve live knobs — labels mirror dgreenheck's demo panel; ranges are
+    his ui.js verbatim. ROUND 64 completes his appearance set (Softness pair,
+    Sharpness, Peak Temp, Temp Falloff) so the whole demo panel is
+    user-tunable. */
 const SLIDERS: Array<{ key: keyof BlackHoleParams; label: string }> = [
   { key: 'mass', label: 'Mass' },
   { key: 'lensing', label: 'Grav. Lensing' },
@@ -33,6 +34,8 @@ const SLIDERS: Array<{ key: keyof BlackHoleParams; label: string }> = [
   { key: 'softInner', label: 'Inner Softness' },
   { key: 'softOuter', label: 'Outer Softness' },
   { key: 'arcSharpness', label: 'Arc Sharpness' },
+  { key: 'diskTemp', label: 'Peak Temp (kK)' },
+  { key: 'tempFalloff', label: 'Temp Falloff' },
 ];
 
 const TIER_OPTIONS: Array<{ v: RaymarchOverride; label: string }> = [

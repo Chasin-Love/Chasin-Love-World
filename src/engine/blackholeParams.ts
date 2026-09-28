@@ -35,6 +35,10 @@ export interface BlackHoleParams {
   softOuter: number;
   /** demo turbulenceSharpness — the flow arcs' grain (his "Sharpness") */
   arcSharpness: number;
+  /** demo diskTemperature — the peak temperature in thousands of K */
+  diskTemp: number;
+  /** demo temperatureFalloff — the T(r) exponent */
+  tempFalloff: number;
 }
 
 /** The reference screenshot's values — dgreenheck's defaults (his panel
@@ -50,6 +54,8 @@ const BLACKHOLE_DEFAULTS: BlackHoleParams = {
   softInner: 0.18,
   softOuter: 0.5,
   arcSharpness: 7.4,
+  diskTemp: 49.78,
+  tempFalloff: 5.22,
 };
 
 /** His slider ranges (ui.js), verbatim — so the panel feels like the demo. */
@@ -64,6 +70,8 @@ export const BLACKHOLE_RANGES: Record<keyof BlackHoleParams, { min: number; max:
   softInner: { min: 0.0, max: 0.5, step: 0.01 },
   softOuter: { min: 0.0, max: 0.5, step: 0.01 },
   arcSharpness: { min: 0.1, max: 10.0, step: 0.1 },
+  diskTemp: { min: 1, max: 50, step: 1 },
+  tempFalloff: { min: 0.25, max: 15.0, step: 0.01 },
 };
 
 const STORAGE_KEY = STORAGE_KEYS.blackholeTuning;
