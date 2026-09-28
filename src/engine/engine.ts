@@ -287,7 +287,7 @@ export class UniverseEngine {
   private scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
   private composer: EffectComposer;
-  private bloomPass: UnrealBloomPass;
+  private bloomPass!: UnrealBloomPass;
   /* KAMUI (v1) — the red demonic space-time vortex: a full-screen post-process
      driven by triggerKamui() (the shader lives in shaders.ts portalFrag). */
   private portalPass!: ShaderPass;

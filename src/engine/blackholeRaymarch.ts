@@ -19,6 +19,18 @@ import { BLACKHOLE_CHANGE_EVENT, getBlackHoleParams, type BlackHoleParams } from
  *     surface manager's 1/θ law in surfaceShaders, scaled to be exactly
  *     continuous with this march's integrated deflection: both = 2·L·rs/b).
  *     One bending law, one renderer of the sky — no boundary can exist.
+ *   • ROUND 63 — ABSOLUTE VOID (the user's law): the shadow is a hole torn
+ *     in the surface of the universe, and nothing inside it reaches the
+ *     eye. Three leaks sealed at the source: the early-out gate now covers
+ *     the WHOLE captured set (uCriticalB, the TS-mirrored critical impact
+ *     parameter) so no sky-annulus shows through; step-budget burnout is
+ *     capture, never transparency; and captured pixels lose every
+ *     sub-band light (the turbulence film) that the pipeline's double gamma
+ *     was lifting into a blue wash. The bloom spill from the ring and the
+ *     crossing band is the REFERENCE's own blaze (his threshold 0.4 look)
+ *     and is deliberately kept — no post-process mask ever touches the
+ *     frame (a pre-bloom restore disc tried that and washed the whole flow
+ *     out at close focus).
  *   • THE EARLY-OUT: bending only pulls rays inward, so a ray with b beyond
  *     the disk outer edge (+ margin) can never cross the disk — it skips
  *     the march entirely and stays transparent.
@@ -90,6 +102,11 @@ uniform float uSoftInner;    /* 0.18 */
 uniform float uSoftOuter;    /* 0.5 */
 uniform float uLensing;      /* his gravitationalLensing — bend per unit path
                                 = uRs × uLensing, step-size independent */
+uniform float uCriticalB;    /* ROUND 63 — the exact critical impact parameter
+                                of THIS integrator (TS mirror, bisection). The
+                                early-out gate must cover the whole captured
+                                set or the outer shadow annulus never marches
+                                and the sky shows through the void. */
 
 /* ROUND 56b — step 0.38 (was 0.3): the bend-per-unit-path is step-size
    independent (his invariant), so the trajectory is preserved while the
@@ -193,7 +210,7 @@ void main() {
   float alpha = 0.0;
   bool captured = false;
 
-  if (b <= uDiskOuter + 2.5) {
+  if (b <= max(uDiskOuter + 2.5, uCriticalB * 1.02)) {
     /* COARSE APPROACH — the one adaptation his fullscreen demo never needed:
        our camera can be hundreds of units out. Walk the ray straight down to
        the r=16 march sphere in a few long steps (bending is ∝ 1/r² — out there
@@ -230,8 +247,9 @@ void main() {
        a step of length step), so growing the step away from the hole keeps the
        exact same trajectory at ~3× fewer iterations — fine 0.3 where the
        photon-ring arcs live (r < 8), up to 1.2 out at the march sphere. */
+    bool budgetOut = false;
     for (int i = 0; i < 128; i++) {
-      if (i >= uSteps) break;
+      if (i >= uSteps) { budgetOut = true; break; }
       if (alpha > 0.99) break;
       float r = length(p);
       if (r < uRs * 1.01) { captured = true; break; }
@@ -263,6 +281,13 @@ void main() {
         }
       }
     }
+
+    /* ROUND 63 — ABSOLUTE VOID: a ray that burned its whole step budget is a
+       photon-sphere whirl ray at the rim of the shadow. It is captured (or
+       asymptotically orbiting — visually identical), never escaping: exiting
+       TRANSPARENT here pasted the live, bent sky inside the shadow — the
+       "mirror". Every non-escaped exit is now the void. */
+    if (budgetOut) captured = true;
   }
 
   /* OUTPUT: his gamma step applies to the DISK light only (his LUT colors
@@ -272,6 +297,18 @@ void main() {
      deflection: both = 2·L·rs/b). Captured rays stay fully opaque black:
      the shadow. The disk's light in front of the shadow survives. */
   color *= uIntensity;
+  /* ROUND 63 — ABSOLUTE VOID (the user's law: the shadow is a hole torn in
+     the surface of the universe; nothing inside it reaches the eye). A
+     captured ray keeps only light that crossed the disk IN FRONT of it, but
+     the turbulence film leaks ~0.6% opacity on every crossing — and this
+     pipeline gamma-encodes TWICE (the pow below + the composer OutputPass),
+     lifting that residue into a ~40%-bright blue wash that turned the void
+     into a mirror. Kill everything below band brightness; the real
+     foreground band (luminance ≫ 0.2) passes untouched. */
+  if (captured) {
+    float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    color *= smoothstep(0.05, 0.2, lum);
+  }
   color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
   gl_FragColor = vec4(color, captured ? 1.0 : clamp(alpha, 0.0, 1.0));
 }
@@ -434,6 +471,7 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
       uSoftInner: { value: 0.18 },
       uSoftOuter: { value: 0.5 },
       uLensing: { value: params.lensing },
+      uCriticalB: { value: 0 },
     },
   });
 
@@ -513,12 +551,65 @@ export function createBlackHole(R: number, opts: BlackHoleOptions = {}): BlackHo
 const _parentQ = new THREE.Quaternion();
 
 /**
+ * ROUND 63 — the TS mirror of the marcher's own integrator, bisected for the
+ * critical impact parameter b_c: the impact parameter where a photon is
+ * captured instead of escaping. The ABSOLUTE VOID machinery (the shader's
+ * early-out gate, and the composer's void mask in engine.ts) must match the
+ * shader's ACTUAL captured set — an analytic constant (2.6·rs) drifts with
+ * the panel's lensing multiplier, and the missing outer annulus let the live
+ * sky show through the shadow (the "mirror"). Probe rays integrate the exact
+ * shader law: bend = rs·lensing/r² per unit path (v renormalized), the same
+ * adaptive step, capture at 1.01·rs, escape at 100 — and budget burnout
+ * counts as captured, same as the shader's R63 rule.
+ */
+export function criticalImpactParam(shaderRs: number, lensing: number): number {
+  const bend = shaderRs * lensing;
+  const capturedAt = (b: number): boolean => {
+    /* probe start: on the r=16 march sphere for b ≤ 16 (the shader's
+       handoff), at periapsis for b > 16 (where the coarse straight leg
+       never reaches the sphere). Either way the inbound leg heads −x
+       across the line of closest approach b. */
+    let px = b < 16 ? Math.sqrt(Math.max(0, 256 - b * b)) : 0;
+    let py = b;
+    let vx = -1;
+    let vy = 0;
+    for (let i = 0; i < 4000; i++) {
+      const r = Math.hypot(px, py);
+      if (r < shaderRs * 1.01) return true;
+      if (r > 100 && px * vx + py * vy > 0) return false;
+      if (r > 400) return false;
+      const stepLen = 0.42 * Math.min(4, Math.max(1, r * 0.125));
+      const bendStep = bend * stepLen / (r * r * r);
+      vx += -px * bendStep;
+      vy += -py * bendStep;
+      const vl = Math.hypot(vx, vy);
+      vx /= vl;
+      vy /= vl;
+      px += vx * stepLen;
+      py += vy * stepLen;
+    }
+    return true; /* burned the budget — captured, exactly like the shader */
+  };
+  /* bisection: b=0 always captured; hi = 8·rs·max(1, L) always escapes
+     (its deflection ≈ 2·bend/hi ≈ 0.25 rad — a bent escape, not a capture) */
+  let lo = 0;
+  let hi = 8 * shaderRs * Math.max(1, lensing);
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) * 0.5;
+    if (capturedAt(mid)) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) * 0.5;
+}
+
+/**
  * Per-frame driver the engine calls with the live camera. Sets EVERYTHING
  * the shader needs: the billboard orientation (parent-aware — body groups
  * can ride inside tilted pivots, so the quad's WORLD orientation must equal
  * the camera's, not its local one), the true camera position for the
- * geodesic integration, the hole's world center, time, and the intensity.
- * The portal argument is accepted for interface compatibility but
+ * geodesic integration, the hole's world center, time, the intensity, and
+ * the R63 critical impact parameter the early-out gate covers the shadow
+ * with. The portal argument is accepted for interface compatibility but
  * deliberately IGNORED since Round 20.1.
  */
 export function updateRaymarchUniforms(
@@ -539,4 +630,8 @@ export function updateRaymarchUniforms(
   mat.uniforms.uTime.value = time;
   const base = (visual.group.userData.baseIntensity as number | undefined) ?? 1.35;
   mat.uniforms.uIntensity.value = base;
+  mat.uniforms.uCriticalB.value = criticalImpactParam(
+    mat.uniforms.uRs.value as number,
+    mat.uniforms.uLensing.value as number,
+  );
 }
