@@ -307,6 +307,13 @@ export class UniverseEngine {
   private kamuiSwallowGroup: THREE.Object3D | null = null;
   private kamuiSwallowFactor = 1;
   private kamuiShakeT = 0;
+  /* THE THROAT UNWIND (R67) — when the summon's timer expires, uVac no
+     longer snaps 1 → 0 in one frame (a hard stutter at the exact instant
+     the contents eject). It holds at 1 through the decay window and then
+     unwinds with the vortex's own fade, so the swallow relaxes instead of
+     cutting. A negative value means "expired, unwinding" and tracks the
+     remaining ease — the same clock the glow decays on. */
+  private kamuiVacuumTail = -1;
   /* THE SPIN DRIVER — the running maximum of the beat envelopes. It only
      ever grows during a summon, so the swirl never relaxes backward at a
      beat seam (the user's forward-backward-forward jank). */
@@ -5044,6 +5051,9 @@ void main(){
        slowing one motion down. The eject keeps its instant full burst. */
     if (this.kamuiTimer > 0) {
       this.kamuiTimer = Math.max(0, this.kamuiTimer - dt);
+      if (this.kamuiTimer === 0 && this.kamuiVacuumActive) {
+        this.kamuiVacuumTail = 1; /* R67: the throat UNWINDS with the glow — never a one-frame cut */
+      }
       if (this.portalPass.uniforms.uDir.value < 0) {
         /* THE EJECT — a short burst that unwinds. Strength AND spin decay
            together over KAMUI_REVERSE_DURATION, so the warped screen relaxes
@@ -5521,6 +5531,13 @@ this.updateBodies(dt);
       const t = 1 - Math.min(1, Math.max(0, this.kamuiTimer / KAMUI_VACUUM_WINDOW));
       pu.uVac.value = t;
       this.kamuiSwallowFactor = 1 - 0.94 * t * t * t; /* accelerating drain */
+      this.kamuiVacuumTail = -1; /* the live swallow owns the uniform */
+    } else if (pu.uDir.value > 0 && this.kamuiVacuumTail >= 0) {
+      /* the timer just expired at full throat — unwind uVac with the same
+         decay the glow is already riding (no single-frame cut) */
+      this.kamuiVacuumTail = Math.max(0, this.kamuiVacuumTail - dt);
+      pu.uVac.value = this.kamuiVacuumTail;
+      this.kamuiSwallowFactor += (1 - this.kamuiSwallowFactor) * Math.min(1, dt * 9);
     } else {
       pu.uVac.value = 0;
       if (this.kamuiSwallowGroup) {
@@ -5550,6 +5567,7 @@ this.updateBodies(dt);
   triggerKamui(targetUv?: THREE.Vector2, reverse = false) {
     this.portalPass.uniforms.uDir.value = reverse ? -1 : 1;
     this.kamuiTwist = reverse ? 1 : 0; /* the eject bursts at full twist */
+    this.kamuiVacuumTail = -1; /* a fresh tear owns the throat — no stale unwind */
     if (reverse) this.kamuiShakeT = 1; /* the eject burst shocks the frame */
     if (targetUv) {
       (this.portalPass.uniforms.uCenter.value as THREE.Vector2).copy(targetUv);
