@@ -314,6 +314,16 @@ export default function App() {
           playKamuiBend();
         }
         setKamuiKey((k) => k + 1);
+        /* THE SUMMON PREHEATS ITS DESTINATION (R67) — the tunnel takes 5.5s
+           to build; the first-ever open used to spend that time idle and
+           then pay the diary/vault chunk fetch DURING the handoff, a real
+           processing hitch the traveler read as part of the freeze. Warming
+           the code chunk behind the vortex makes the first open as instant
+           as every later one. */
+        if (!reverse) {
+          void import('./ui/diary/DiaryWindow');
+          void import('./ui/VaultUI');
+        }
       },
       onFirstFrame: () => setEngineReady(true),
       onEchoOpen: (entryId, planetId, title) => {
