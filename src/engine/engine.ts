@@ -360,6 +360,21 @@ export class UniverseEngine {
      theater: the red space-time tear that accompanies the summon. */
   private kamuiTearBodyId: string | null = null;
 
+  /* THE STAGED STAGE-WARP (R72) — a membrane crossing into the multiverse is
+     no longer a same-frame swap. The summon holds the traveler's stage and
+     dial while the tear builds, and the throat hands the other stage over
+     exactly as the summon expires: the destination materializes through the
+     dying vortex, the dial's own glide and the R67 unwind land the stop
+     gradually. The eject face keeps its instant burst — its decay IS the
+     arrival, so it never stages. Null = no warp in flight. */
+  private stageWarp: {
+    arrivalDial: number;
+    flipTo: 'multiverse' | 'web';
+    hold: number;
+    pinnedDial: number;
+    after?: () => void;
+  } | null = null;
+
   /* the web's edge membrane — pushing at the wall makes it shimmer */
   private membraneShimmer = 0;
 
@@ -4206,15 +4221,35 @@ void main(){
 
   /** KAMUI SUMMON — the red space-time tear plays while the stage folds:
       the tear owns the screen, the stage flips behind it, and the dial eases
-      to the arrival framing so the traveler lands in the other stage. */
+      to the arrival framing so the traveler lands in the other stage.
+
+      THE STAGED STAGE-WARP (R72) — the fold is no longer same-frame. A
+      summon (into the multiverse) keeps the traveler's own stage on screen
+      and pins the dial for the whole choreography; the handoff lives in
+      tick, the frame the summon's throat completes. An eject (back to the
+      web) bursts at full strength and hands over instantly — its own 1.9s
+      decay already IS the gradual stop, so it is left untouched. A warp
+      that is already playing (or any live vortex / portal) refuses a new
+      one — the old same-frame path would re-fire the tear mid-tear. */
   private beginStageWarp(dir: 'toMultiverse' | 'toWeb', arrivalDial: number, _after?: () => void): void {
+    if (this.stageWarp || this.kamuiTimer > 0 || this.portal.phase !== 'idle' || this.bootIntro) return;
     this.grabCooldown = 1.4;
     this.rig.killZoomMomentum();
     this.triggerKamui(undefined, dir === 'toWeb'); /* out = summon, back = eject */
-    this.cosmicStage = dir === 'toMultiverse' ? 'multiverse' : 'web';
-    if (dir === 'toWeb') this.realityFocused = false;
-    this.rig.setZoomTarget(arrivalDial);
-    if (_after) _after();
+    if (dir === 'toWeb') {
+      /* THE EJECT — the full burst on frame one masks the swap; the decay
+         carries the traveler the rest of the way in. */
+      this.cosmicStage = 'web';
+      this.realityFocused = false;
+      this.rig.setZoomTarget(arrivalDial);
+      if (_after) _after();
+      return;
+    }
+    /* THE SUMMON — the web stays on stage, the dial stays exactly where the
+       traveler left it, and the tear builds against a still frame. */
+    const pinnedDial = this.rig.tZoomT;
+    this.stageWarp = { arrivalDial, flipTo: 'multiverse', hold: KAMUI_ENTRY_HOLD, pinnedDial, after: _after };
+    this.rig.setZoomTarget(pinnedDial);
   }
 
 
@@ -5105,6 +5140,31 @@ void main(){
         }
       }
     }
+    /* THE STAGED STAGE-WARP (R72) — the summon's hold. The traveler's stage
+       and dial stay exactly where they were while the tear builds (the rig
+       is re-pinned every frame, all zoom momentum killed). The moment the
+       hold expires — the same frame the summon's throat completes — the
+       stage hands over: the multiverse materializes through the dying
+       vortex, the dial is released to the arrival framing, and the R67
+       unwind riding the glow + the rig's own exponential damp land the stop
+       gradually instead of in one frame. */
+    if (this.stageWarp) {
+      const warp = this.stageWarp;
+      if (warp.hold > 0) {
+        warp.hold = Math.max(0, warp.hold - dt);
+        this.rig.setZoomTarget(warp.pinnedDial);
+        this.rig.killZoomMomentum();
+      }
+      if (warp.hold === 0) {
+        /* THE THROAT HANDS THE STAGE OVER (R72) — the mirror of the portal's
+           own handoff: the destination arrives THROUGH the vortex, never
+           behind a finished one. */
+        this.cosmicStage = warp.flipTo;
+        this.rig.setZoomTarget(warp.arrivalDial);
+        this.stageWarp = null;
+        if (warp.after) warp.after();
+      }
+    }
     /* The portal — a plain camera zoom. Clicking a world dives the camera
        in toward it; when the zoom lands the destination overlay opens.
        Closing eases the camera back out to the pre-open framing. */
@@ -5221,7 +5281,7 @@ void main(){
            you out to the multiverse sphere (the mirror of the floor-return
            in the multiverse branch below). */
         if (
-          pushing && this.kamuiTimer <= 0 && this.grabCooldown <= 0
+          pushing && this.kamuiTimer <= 0 && this.grabCooldown <= 0 && !this.stageWarp
           && !this.dragging && this.portal.phase === 'idle'
         ) {
           this.realityFocused = true;
@@ -5240,7 +5300,7 @@ void main(){
         /* pushed through the multiverse's floor — the dial carries you back
            out into the web (this crossing IS a Kamui) */
         if (
-          this.rig.tZoomT <= MULTIVERSE_FLOOR_RETURN && this.rig.zoomVelocity < RETURN_ZOOM_VEL && this.grabCooldown <= 0
+          this.rig.tZoomT <= MULTIVERSE_FLOOR_RETURN && this.rig.zoomVelocity < RETURN_ZOOM_VEL && this.grabCooldown <= 0 && !this.stageWarp
           && !this.dragging && this.portal.phase === 'idle'
         ) {
           this.beginStageWarp('toWeb', 0.72);
@@ -5291,10 +5351,14 @@ void main(){
     }
 
     const activeFb = this.focusBody();
+    /* R72 — a staged stage-warp's summon hold keeps the traveler's framing
+       exactly where it was: the marble focus (and its sideways re-aim to the
+       bubble) engages only when the stage actually hands over. */
+    const realityFocusLive = this.realityFocused && !this.stageWarp;
     let focusMin: number | undefined, focusMax: number | undefined;
     let focusRadiusParam = activeFb ? activeFb.data.radius : (this.activeReality ? this.activeReality.bubbleSize * 2.6 : 6);
     let galaxyFocusActive = false;
-    if (this.realityFocused && this.activeReality) {
+    if (realityFocusLive && this.activeReality) {
       /* orbit the active reality's marble — framed just outside its glass */
       this._vFocusScratch.set(...this.activeReality.bubblePos);
       focusMin = this.activeReality.bubbleSize * 3.1;  /* just outside the glass */
@@ -5349,7 +5413,7 @@ void main(){
        the traveler's framing stays exactly where it was. */
     this.rig.update(dt, {
       focus: this._vFocusScratch,
-      focused: !!activeFb || this.realityFocused || galaxyFocusActive,
+      focused: !!activeFb || realityFocusLive || galaxyFocusActive,
       focusRadius: focusRadiusParam,
       focusMin,
       focusMax,
