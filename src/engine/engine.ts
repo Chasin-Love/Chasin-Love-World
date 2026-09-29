@@ -74,7 +74,12 @@ interface ShootingMeteor {
 }
 
 export interface EngineCallbacks {
-  onHover: (id: string | null, x?: number, y?: number) => void;
+  /** R74 — `disk` is THE HERALD'S DISK: the hovered object's projected screen
+      circle (center + radius, in CSS px), so the hover card can anchor
+      OUTSIDE the object instead of standing on it. Re-emitted ~8 Hz while
+      the hover lives — the orbit keeps moving the object under a still
+      pointer, and the card rides the disk's edge with it. */
+  onHover: (id: string | null, x?: number, y?: number, disk?: { cx: number; cy: number; r: number } | null) => void;
   onSelect: (id: string | null) => void;
   onActivate: (id: string) => void;
   onPortalPeak: (kind: 'diary' | 'vault', id: string) => void;
@@ -325,6 +330,11 @@ export class UniverseEngine {
   private pointer = new THREE.Vector2(-2, -2);
   private pointerMoved = false;
   private hoveredId: string | null = null;
+  /* THE HERALD'S DISK (R74) — the collider mesh behind the current hover
+     (its projected circle anchors the hover card outside the object) and
+     the ~8 Hz re-emit clock that lets the card ride an orbiting object. */
+  private hoverHit: THREE.Mesh | null = null;
+  private hoverAnchorT = 0;
   private selectedId: string | null = null;
   private focusId: string | null = null;
   private simDays = 0;
@@ -2033,7 +2043,10 @@ void main(){
         new THREE.MeshBasicMaterial({ visible: false })
       );
       bubbleCollider.position.copy(pos);
-      bubbleCollider.userData = { realityId: real.id, isRealityBubble: true };
+      /* R74 — the herald anchors OUTSIDE the glass: the marble's fresnel
+         shell spans 2.6× the bubble core, so the card must clear the whole
+         marble, not just the collider. */
+      bubbleCollider.userData = { realityId: real.id, isRealityBubble: true, anchorScale: 2.6 };
       realityGroup.add(bubbleCollider);
       this.multiverseColliders.push(bubbleCollider);
       
@@ -2233,8 +2246,10 @@ void main(){
         nodeGroup.add(glowSprite);
 
         // Interactive collider — hover / click / double-click target
+        // R74 — THE HONEST DISK: 0.12 hugs the visible glow (the old 0.18
+        // popped the card while the pointer was still outside the galaxy).
         const collider = new THREE.Mesh(
-          new THREE.SphereGeometry(size * 0.18, 10, 10),
+          new THREE.SphereGeometry(size * 0.12, 10, 10),
           new THREE.MeshBasicMaterial({ visible: false })
         );
         collider.userData = { isGalaxy: true, galaxyData: gal, galaxyId: gal.id, realityId: real.id };
@@ -3089,9 +3104,11 @@ void main(){
       const coreMat = core.material as THREE.SpriteMaterial;
 
 
-      /* hover / click / focus collider */
+      /* hover / click / focus collider — R74, THE HONEST DISK: the collider
+         IS the disc now. The old 1.35× sphere popped the herald card while
+         the pointer was still well outside the visible disc. */
       const collider = new THREE.Mesh(
-        new THREE.SphereGeometry(radius * 1.35, 12, 10),
+        new THREE.SphereGeometry(radius, 12, 10),
         new THREE.MeshBasicMaterial({ visible: false })
       );
       collider.userData = { isGalaxy: true, galaxyData: gal, galaxyId: gal.id, realityId: reality.id };
@@ -3983,6 +4000,7 @@ void main(){
 
   private pick(): string | null {
     this.raycaster.setFromCamera(this.pointer, this.camera);
+    this.hoverHit = null; /* THE HERALD'S DISK (R74) — re-stashed below for card-bearing hits */
     const d = this.currentDist();
 
     // Multiverse stage ONLY — the Astral Core, reality bubbles and their
@@ -4002,12 +4020,15 @@ void main(){
           return 'multiverse-core';
         }
         if (u.isGalaxy && u.galaxyData) {
+          this.hoverHit = hits[0].object as THREE.Mesh;
           return `galaxy:${u.galaxyData.id}:${u.realityId}`;
         }
         if (u.isGalaxyCluster && u.clusterData) {
+          this.hoverHit = hits[0].object as THREE.Mesh;
           return `cluster:${u.clusterData.id}:${u.realityId}`;
         }
         if (u.isRealityBubble && u.realityId) {
+          this.hoverHit = hits[0].object as THREE.Mesh;
           return `reality:${u.realityId}`;
         }
         if (coreHit) {
@@ -4054,6 +4075,7 @@ void main(){
       if (hits.length > 0) {
         const u = hits[0].object.userData;
         if (u.isGalaxy && u.galaxyData) {
+          this.hoverHit = hits[0].object as THREE.Mesh;
           return `galaxy:${u.galaxyData.id}:${u.realityId}`;
         }
       }
@@ -6386,25 +6408,70 @@ this.updateBodies(dt);
   }
 
   private updateHover() {
-    if (!this.pointerMoved && !this.dragging) return;
-    this.pointerMoved = false;
-    const id = this.pick();
-    /* echo hover: resolve to the memory's id so App can show its card */
-    this.echoHoverId = id && id.startsWith('echo:') ? id.slice(5) : null;
-    if (this.echoHoverId) {
-      this.lastEchoHover = true;
-      const echo = this.echoMeteors.find((m) => m.entryId === this.echoHoverId);
-      this.cb.onHoverEcho?.(echo ? { entryId: echo.entryId, planetId: echo.planetId, title: echo.title } : null, this.mouseScreenX, this.mouseScreenY);
-    } else if (this.lastEchoHover) {
-      this.cb.onHoverEcho?.(null);
-      this.lastEchoHover = false;
+    if (this.pointerMoved) {
+      this.pointerMoved = false;
+      const id = this.pick();
+      /* echo hover: resolve to the memory's id so App can show its card */
+      this.echoHoverId = id && id.startsWith('echo:') ? id.slice(5) : null;
+      if (this.echoHoverId) {
+        this.lastEchoHover = true;
+        const echo = this.echoMeteors.find((m) => m.entryId === this.echoHoverId);
+        this.cb.onHoverEcho?.(echo ? { entryId: echo.entryId, planetId: echo.planetId, title: echo.title } : null, this.mouseScreenX, this.mouseScreenY);
+      } else if (this.lastEchoHover) {
+        this.cb.onHoverEcho?.(null);
+        this.lastEchoHover = false;
+      }
+      if (id !== this.hoveredId) {
+        this.hoveredId = id;
+        this.hoverAnchorT = 0;
+        this.cb.onHover(id, this.mouseScreenX, this.mouseScreenY, id ? this.hoverDiskOf() : null);
+      }
+      const canvas = this.renderer.domElement;
+      canvas.style.cursor = id ? 'pointer' : this.dragging ? 'grabbing' : 'grab';
     }
-    if (id !== this.hoveredId) {
-      this.hoveredId = id;
-      this.cb.onHover(id, this.mouseScreenX, this.mouseScreenY);
+    /* THE HERALD'S DISK (R74) — the card follows the thing it heralds: a
+       card-bearing object rides its orbit even under a still pointer, so
+       its projected disk is re-emitted at ~8 Hz and the card rides the
+       disk's edge instead of freezing at the pointer's last position. */
+    if (
+      this.hoveredId && this.hoverHit
+      && (this.hoveredId.startsWith('galaxy:') || this.hoveredId.startsWith('reality:') || this.hoveredId.startsWith('cluster:'))
+      && this.clockT - this.hoverAnchorT > 0.12
+    ) {
+      this.hoverAnchorT = this.clockT;
+      const disk = this.hoverDiskOf();
+      if (disk) this.cb.onHover(this.hoveredId, this.mouseScreenX, this.mouseScreenY, disk);
     }
-    const canvas = this.renderer.domElement;
-    canvas.style.cursor = id ? 'pointer' : this.dragging ? 'grabbing' : 'grab';
+  }
+
+  /** THE HERALD'S DISK (R74) — the hovered object's projected screen circle:
+      its collider's center and radius in CSS pixels, so the hover card can
+      anchor just outside the visible object (a reality bubble's herald
+      clears its whole glass via userData.anchorScale). Null when nothing
+      card-bearing is hovered or the object is behind the camera. */
+  private hoverDiskOf(): { cx: number; cy: number; r: number } | null {
+    const obj = this.hoverHit;
+    if (!obj) return null;
+    const geo = obj.geometry as THREE.SphereGeometry | undefined;
+    const geoR = geo?.parameters?.radius;
+    if (!geoR) return null;
+    const anchorScale = (obj.userData.anchorScale as number | undefined) ?? 1;
+    obj.getWorldPosition(this._vScratch1);
+    const worldR = geoR * (obj.getWorldScale(this._vScratch2).x || 1) * anchorScale;
+    /* the rim: one world-radius along the camera's right axis, both points
+       projected to CSS px (y flipped — screen y runs down) */
+    this._vScratch2.setFromMatrixColumn(this.camera.matrixWorld, 0).multiplyScalar(worldR);
+    this._vScratch3.copy(this._vScratch1).add(this._vScratch2);
+    this._vScratch1.project(this.camera);
+    this._vScratch3.project(this.camera);
+    if (this._vScratch1.z > 1 || this._vScratch3.z > 1) return null;
+    const vw = this.renderer.domElement.clientWidth;
+    const vh = this.renderer.domElement.clientHeight;
+    const cx = (this._vScratch1.x * 0.5 + 0.5) * vw;
+    const cy = (1 - (this._vScratch1.y * 0.5 + 0.5)) * vh;
+    const rx = (this._vScratch3.x * 0.5 + 0.5) * vw;
+    const ry = (1 - (this._vScratch3.y * 0.5 + 0.5)) * vh;
+    return { cx, cy, r: Math.max(8, Math.hypot(rx - cx, ry - cy)) };
   }
 
   private disposeObject3D(

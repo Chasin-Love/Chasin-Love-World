@@ -92,6 +92,10 @@ export default function App() {
   const [hoverCluster, setHoverCluster] = useState<GalaxyClusterData | null>(null);
   const [hoverGalaxy, setHoverGalaxy] = useState<{ galaxy: GalaxyData; realityName: string } | null>(null);
   const [hoverScreenPos, setHoverScreenPos] = useState<{ x: number; y: number } | null>(null);
+  /* THE HERALD'S DISK (R74) — the hovered object's projected screen circle;
+     the hover cards anchor OUTSIDE it (never on the object) and ride its
+     orbit via the engine's ~8 Hz re-emit. */
+  const [hoverDisk, setHoverDisk] = useState<{ cx: number; cy: number; r: number } | null>(null);
   const [activeLineageCluster, setActiveLineageCluster] = useState<GalaxyClusterData | null>(null);
   const [lineageGalaxy, setLineageGalaxy] = useState<{ galaxy: GalaxyData; realityName: string } | null>(null);
   /* the advanced reality editor (double-click a reality ring) */
@@ -207,7 +211,9 @@ export default function App() {
     void import('./engine/engine').then(({ UniverseEngine }) => {
       if (cancelled || !canvasRef.current || engineRef.current) return;
       const engine = new UniverseEngine(canvasRef.current, getState().bodies, {
-      onHover: (id, x, y) => {
+      onHover: (id, x, y, disk) => {
+        /* THE HERALD'S DISK (R74) — the card anchors outside this circle */
+        setHoverDisk(disk ?? null);
         /* a fresh hover cancels any pending sticky-clear */
         if (id && hoverClearTimer.current) { clearTimeout(hoverClearTimer.current); hoverClearTimer.current = null; }
         setHoverId(id);
@@ -253,6 +259,7 @@ export default function App() {
             setHoverCluster(null);
             setHoverGalaxy(null);
             setHoverScreenPos(null);
+            setHoverDisk(null);
           }, 550);
         }
       },
@@ -1199,6 +1206,7 @@ export default function App() {
         <RealityHoverCard
           reality={getReality(hoverRealityId, state.customRealityDescriptions)}
           screenPos={hoverScreenPos}
+          disk={hoverDisk}
           onEditDescription={(r) => {
             setAdvancedReality({ realityId: r.id, focusGalaxyId: null });
           }}
@@ -1223,6 +1231,7 @@ export default function App() {
           galaxy={hoverGalaxy.galaxy}
           realityName={hoverGalaxy.realityName}
           screenPos={hoverScreenPos}
+          disk={hoverDisk}
           onEnter={(gid, rid) => {
             const r = getReality(rid, state.customRealityDescriptions);
             const gal = r.galaxies?.find((g) => g.id === gid);
@@ -1253,6 +1262,7 @@ export default function App() {
           cluster={hoverCluster}
           realityName={getReality(hoverCluster.realityId, state.customRealityDescriptions).name}
           screenPos={hoverScreenPos}
+          disk={hoverDisk}
           onInspectLineage={(cluster) => {
             setActiveLineageCluster(cluster);
             chime(720);
