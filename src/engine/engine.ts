@@ -5538,6 +5538,10 @@ this.updateBodies(dt);
       this.kamuiVacuumTail = Math.max(0, this.kamuiVacuumTail - dt);
       pu.uVac.value = this.kamuiVacuumTail;
       this.kamuiSwallowFactor += (1 - this.kamuiSwallowFactor) * Math.min(1, dt * 9);
+      if (Math.abs(1 - this.kamuiSwallowFactor) < 0.002) {
+        this.kamuiSwallowFactor = 1;
+        this.kamuiSwallowGroup = null;
+      }
     } else {
       pu.uVac.value = 0;
       if (this.kamuiSwallowGroup) {
