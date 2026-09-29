@@ -23,7 +23,9 @@ export const WARP_ZOOM_VEL = 0.05;
 export const MULTIVERSE_FLOOR_CLAMP = 0.8;
 /** Crossing below this while pushing inward carries the dial back to the web. */
 export const MULTIVERSE_FLOOR_RETURN = 0.802;
-/** Inward zoom velocity (dial/s) required to cross back. */
-export const RETURN_ZOOM_VEL = -0.05;
+/** Inward zoom velocity (dial/s) required to cross back. R72: matched to the
+    web-side push (0.02) — at -0.05 the way home asked twice the effort and
+    the reverse come read as if it did not exist. */
+export const RETURN_ZOOM_VEL = -0.02;
 /** Reality marble frame releases below this zoom. */
 export const REALITY_FLOOR = 0.787;
