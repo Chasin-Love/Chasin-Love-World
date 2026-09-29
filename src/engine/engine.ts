@@ -5486,11 +5486,18 @@ this.updateBodies(dt);
   }
 
   /** The scene-graph group of the current kamui source (home body, inner
-     world, or diving galaxy) — the subject the vacuum gulp drains. */
+      world, or diving galaxy) — the subject the vacuum gulp drains.
+      THE THROAT IS NOT SWALLOWED (R73): the black hole is the door itself —
+      draining a hole/vault body's group let the traveler watch Eventide
+      shrink to a quarter of itself and vanish whole in the last second
+      before the vault opened. Planets and galaxies keep the canon drain. */
   private resolveKamuiGroup(): THREE.Object3D | null {
     if (this.kamuiTearBodyId) {
       const home = this.bodies.find((b) => b.data.id === this.kamuiTearBodyId);
-      if (home) return home.group;
+      if (home) {
+        if (home.data.kind === 'hole' || home.data.kind === 'vault') return null;
+        return home.group;
+      }
       for (const node of this.galaxyStageNodes) {
         const inner = node.innerSys?.planets.find((pl) => pl.data.id === this.kamuiTearBodyId);
         if (inner) return inner.group;
