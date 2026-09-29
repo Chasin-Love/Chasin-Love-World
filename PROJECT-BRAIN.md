@@ -220,25 +220,39 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | Kamui reborn | R58–R66 tail | The 9-phase portal machine rebuilt through ~10 fix commits; `src/ui/kamuiBend.ts` per-pixel DOM bend for the reverse swallow; round18 gauntlet guards it |
 | The throat hands off | R67 | Overlay fires at the exact frame the summon's hold expires; the throat UNWINDS instead of snapping; post-swallow dive becomes a 60% arrival settle; destination code chunks preheat |
 | Explorer upgrade | R68–R69 *(on branch `r68-explorer-upgrade` / `r71-ten-slices`, NOT yet in main)* | Left-drag glide vs orbit grammar; cursor-anchored wheel dive; touch grammar (tap-inspect, tap-act, long-press menu); exploration margins; orbit restored everywhere; forward Kamui compressed 5.5 s → 3.5 s |
-| Ten Slices | R71 *(in progress)* | The zoom dial cut into ten ordered per-stage slices. Step 2 (the slice table, `stageSlices.ts`) is on **main**. Step 3 ("zoom never crosses" — explicit `crossSlice` Kamui) is in flight on branch `r71-ten-slices` |
+| Ten Slices | R71 *(on branch `r71-ten-slices`, NOT in main — verified 2026-09-29)* | The zoom dial cut into ten ordered per-stage slices (`stageSlices.ts` exists only on the branch; a stale brain once claimed it sat on `main`). Step 3 ("zoom never crosses" — explicit `crossSlice` Kamui doors) is also branch-only, in flight |
+| The stage arrival | R72 *(on main)* | The membrane Kamui STAGED: the summon holds the web still and the throat hands the multiverse over through the dying vortex (the R67 grammar carried to `beginStageWarp`); the eject untouched; the reverse come matched to the way out and always landing back in the cosmic web, never the home page |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-29)
+## 8. CURRENT STATE (as of 2026-09-29, after R72)
 
-- **`main` is the blessed reference.** Its tip is `dc68d0fd` — R67-final engine state plus the
-  R71 step 2 slice table (`src/engine/systems/stageSlices.ts`, 90 lines).
+- **`main` is the blessed reference.** Its tip is the R72 four-commit train (staged stage-warp →
+  matched reverse push → round72 gauntlet → this brain) on top of the R67-final engine state and
+  two docs-only commits (`7e6ae8fd`, `c4f3ba6b`). **Correction (verified this round):** the
+  earlier claim that R71 step 2's slice table sat on `main` was stale —
+  `src/engine/systems/stageSlices.ts` does NOT exist on `main`; the Ten Slices work lives only
+  on the branches below.
 - **In flight (branches, not final):** `r71-ten-slices` carries R68/R69 explorer-upgrade work
   (cameraRig orbit/glide grammar, touch grammar, 3.5 s summon, ROUND-68/69 docs) plus R71
   step 3 ("zoom never crosses"; changes in `engine.ts`, `stageThresholds.ts`, `kamuiPhases.ts`,
   `cameraRig.ts`, round18 gauntlet) and uncommitted step-3 transform scripts. Treat all of it
   as experimental until the author merges it.
-- **Verification status at last full report:** `tsc --noEmit` clean; round16/17/18/63 gauntlets
-  all green; `npm audit` 0 vulnerabilities; no failing gate, no data-loss path found.
-- **Known technical debt (conscious, ranked):** `engine.ts` size (~6.4k lines — decomposition
+- **R72 (this round):** the membrane Kamui arrival is STAGED — the summon holds the traveler's
+  stage and dial for the full choreography and the throat hands the multiverse over through the
+  dying vortex (the R67 grammar carried to `beginStageWarp`); the eject face is untouched (its
+  decay IS the arrival); a live warp/vortex/portal now refuses a second crossing. The reverse
+  come's push was matched to the way out (`RETURN_ZOOM_VEL` −0.05 → −0.02) and always lands
+  back in the cosmic web (dial 0.72), never the home stellar system — the author's explicit
+  law: no reverse Kamui at the home page, the galaxies stay choosable after returning.
+- **Verification status:** `npm run verify` ALL GREEN (typecheck; round16/17/18/63/**72**
+  gauntlets; smoke + prod-smoke, zero console errors); `npm audit` 0 vulnerabilities;
+  `audit:arch --check` exits 1 with findings identical to the pristine parent commit (the
+  pre-existing R52-baseline drift below — R72 added zero new findings).
+- **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); architecture-audit snapshot drift vs the frozen R52
-  baseline (re-snapshot consciously); 8 dead value exports + 46 dead type exports; stale
-  `BUILD` constant. Nothing red.
+  baseline (re-snapshot consciously); 8 dead value exports + 46 dead type exports (including
+  the never-imported `WEB_EDGE_TRIGGER`/`WARP_ZOOM_VEL` on main); stale `BUILD` constant.
 - **Experience baseline:** 8.3/10 overall (see `docs/EXPERIENCE-REPORT-2026-09-29.md` for the
   persona-by-persona audit). The gap to 9+ is *signage*, not capability.
 
@@ -246,15 +260,19 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ## 9. WHERE IT'S GOING
 
-1. **Finish R71 "Ten Slices"** — the slice system's consumers: the hierarchy stepper firing
+1. **R72 watch items (small, user-visible):** if the staged arrival's focus re-aim toward the
+   traveler's reality marble ever reads as a sideways sweep, apply the portal's `holdFocus`
+   discipline during the handoff; `beginGalaxyEntry`'s Kamui garnish still races its own zoom
+   (the same same-frame shape R72 fixed at the membrane) — its own round.
+2. **Finish R71 "Ten Slices"** — the slice system's consumers: the hierarchy stepper firing
    explicit cross-slice Kamui, edge membrane affordances, gauntlet pins for the new law.
-2. **The Signage Wave** (the recommended next theme, from the experience report):
+3. **The Signage Wave** (the recommended next theme, from the experience report):
    first-run guided onboarding (double-click a world → write an entry → see the moon → `?`),
    an in-app legend for click-gestures, a one-click whole-universe backup/restore file,
    a one-line Kamui narrative caption, cross-reality entry search in the palette.
-3. **Desktop as the storage answer** — Tauri file store lifts the web localStorage ~5 MB
+4. **Desktop as the storage answer** — Tauri file store lifts the web localStorage ~5 MB
    ceiling for heavy diarists.
-4. **Deferred (do as their own rounds, unasked):** `engine.ts` decomposition (gauntlets as
+5. **Deferred (do as their own rounds, unasked):** `engine.ts` decomposition (gauntlets as
    guardrails), architecture re-snapshot, dead-export sweep, optional React 19 / Vite 7
    evaluation, optional touch-first HUD pass.
 
