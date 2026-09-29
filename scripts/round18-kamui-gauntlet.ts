@@ -89,7 +89,9 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
   const events = /onKamuiTrigger\?: \(reverse: boolean, vortexUv: \{ x: number; y: number \}\) => void;/.test(engSrc)
     && /onKamuiTrigger\?\.\(reverse, \{ x: uv\.x, y: 1 - uv\.y \}\);/.test(engSrc)
-    && /onKamuiTrigger: \(_reverse, vortexUv\) => \{/.test(appSrc)
+    && /onKamuiTrigger: \(reverse, vortexUv\) => \{/.test(appSrc)
+    && /armKamuiBend\(/.test(appSrc)
+    && /playKamuiBend\(/.test(appSrc)
     && /--kamui-vortex-x/.test(appSrc)
     && /--kamui-vortex-y/.test(appSrc)
     && /--kamui-vortex-x/.test(cssSrc)

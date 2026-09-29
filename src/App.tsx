@@ -14,6 +14,7 @@ import { computeAurora, onThisDay } from './platform/sentiment/sentiment';
 import { perfMark } from './platform/performance';
 import { publishSimDate } from './platform/simClock';
 import { MultiverseBar } from './ui/hud/MultiverseBar';
+import { armKamuiBend, playKamuiBend } from './ui/kamuiBend';
 import { RealityHoverCard } from './ui/hud/RealityHoverCard';
 import { ClusterHoverCard } from './ui/hud/ClusterHoverCard';
 
@@ -300,12 +301,18 @@ export default function App() {
       },
       onPortalDone: () => undefined,
       onContext: (id, x, y) => setMenu({ id, x, y }),
-      onKamuiTrigger: (_reverse, vortexUv) => {
+      onKamuiTrigger: (reverse, vortexUv) => {
         /* the DOM swallow (.kamui-suck) collapses toward the tear's screen
-           point — the engine reports it on every trigger */
+           point — the engine reports it on every trigger; the reverse also
+           arms the pixel-bend filter so the card smears like the anchor
+           star does in the GLSL warp */
         const rootStyle = document.documentElement.style;
         rootStyle.setProperty('--kamui-vortex-x', `${(vortexUv.x * 100).toFixed(2)}%`);
         rootStyle.setProperty('--kamui-vortex-y', `${(vortexUv.y * 100).toFixed(2)}%`);
+        if (reverse) {
+          armKamuiBend({ x: vortexUv.x * window.innerWidth, y: vortexUv.y * window.innerHeight });
+          playKamuiBend();
+        }
         setKamuiKey((k) => k + 1);
       },
       onFirstFrame: () => setEngineReady(true),
@@ -738,6 +745,17 @@ export default function App() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-void">
+      {/* THE KAMUI BEND — the DOM twin of the vortex shader's tidal shear.
+          An empty frame: kamuiBend.ts fills the map and animates the
+          displacement scale while a swallowed overlay bends into the tear.
+          sRGB interpolation keeps the byte-encoded field intact. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <filter id="kamui-bend" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+          <feImage id="kamui-bend-map" preserveAspectRatio="none" result="map" />
+          <feDisplacementMap id="kamui-bend-displace" in="SourceGraphic" in2="map" scale="0" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ cursor: 'grab', touchAction: 'none' }} />
 
       {/* THE COSMIC ECHO — the memory meteor under the pointer */}
@@ -1377,7 +1395,10 @@ export default function App() {
    so the universe stays clickable while diaries are open. */
 function DiaryWindowFrame({ children, z, focused, closing }: { children: ReactNode; z: number; focused: boolean; closing?: boolean }) {
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 + (z % 50) }}>
+    /* the bend host — the SVG displacement filter lives on the PARENT of the
+       .kamui-suck wrapper, so the keyframe's blur/brightness animation and
+       the per-pixel vortex warp compose instead of fighting each other */
+    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 + (z % 50), filter: closing ? 'url(#kamui-bend)' : undefined }}>
       {/* the swallow wrapper — the frame carries it so the keyframe never
           fights the diary spring's imperative transform writes */}
       <div className={`absolute inset-0 ${closing ? 'kamui-suck' : ''}`}>{children}</div>

@@ -223,7 +223,12 @@ export default function VaultUI({ onClose, closing }: { onClose: () => void; clo
   }, [onClose, viewer, lockModal, unlocking, showTerminal, showScan]);
 
   return (
-    <div className={`vault-scope fixed inset-0 z-110 overlay-in overflow-hidden ${closing ? 'kamui-suck' : ''}`} style={{ background: 'rgba(3,5,11,0.34)' }}>
+    /* the bend host — the SVG displacement filter sits on the root while the
+       .kamui-suck keyframes live on the inner wrapper, so the per-pixel
+       vortex warp composes with the blur/brightness animation (same split as
+       DiaryWindowFrame) */
+    <div className="vault-scope fixed inset-0 z-110" style={{ filter: closing ? 'url(#kamui-bend)' : undefined }}>
+      <div className={`absolute inset-0 overlay-in overflow-hidden ${closing ? 'kamui-suck' : ''}`} style={{ background: 'rgba(3,5,11,0.34)' }}>
       <VaultBackdrop />
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 100% at 50% 0%, rgba(8,13,24,0.12), rgba(3,5,11,0.3))' }} />
       <div
@@ -539,6 +544,7 @@ export default function VaultUI({ onClose, closing }: { onClose: () => void; clo
           onClose={() => setUnlocking(null)}
         />
       )}
+      </div>
     </div>
   );
 }
