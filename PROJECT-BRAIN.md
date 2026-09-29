@@ -222,17 +222,18 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | Explorer upgrade | R68–R69 *(on branch `r68-explorer-upgrade` / `r71-ten-slices`, NOT yet in main)* | Left-drag glide vs orbit grammar; cursor-anchored wheel dive; touch grammar (tap-inspect, tap-act, long-press menu); exploration margins; orbit restored everywhere; forward Kamui compressed 5.5 s → 3.5 s |
 | Ten Slices | R71 *(on branch `r71-ten-slices`, NOT in main — verified 2026-09-29)* | The zoom dial cut into ten ordered per-stage slices (`stageSlices.ts` exists only on the branch; a stale brain once claimed it sat on `main`). Step 3 ("zoom never crosses" — explicit `crossSlice` Kamui doors) is also branch-only, in flight |
 | The stage arrival | R72 *(on main)* | The membrane Kamui STAGED: the summon holds the web still and the throat hands the multiverse over through the dying vortex (the R67 grammar carried to `beginStageWarp`); the eject untouched; the reverse come matched to the way out and always landing back in the cosmic web, never the home page |
+| The throat is not swallowed | R73 *(on main)* | The vault Kamui's vacuum gulp no longer drains a hole/vault body's group — the live telemetry caught Eventide shrinking to 24% and vanishing whole in the last second before the vault opened; the door now stays whole through its own jutsu while planets and galaxies keep the canon drain. New round73 gauntlet in the verify chain |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-29, after R72)
+## 8. CURRENT STATE (as of 2026-09-29, after R73)
 
-- **`main` is the blessed reference.** Its tip is the R72 four-commit train (staged stage-warp →
-  matched reverse push → round72 gauntlet → this brain) on top of the R67-final engine state and
-  two docs-only commits (`7e6ae8fd`, `c4f3ba6b`). **Correction (verified this round):** the
-  earlier claim that R71 step 2's slice table sat on `main` was stale —
-  `src/engine/systems/stageSlices.ts` does NOT exist on `main`; the Ten Slices work lives only
-  on the branches below.
+- **`main` is the blessed reference.** Its tip is the R73 pair (the throat-is-not-swallowed
+  guard → its gauntlet + this brain) on top of the R72 four-commit train (staged stage-warp →
+  matched reverse push → round72 gauntlet → docs), all on the R67-final engine state.
+  **Correction (verified in R72):** the earlier claim that R71 step 2's slice table sat on
+  `main` was stale — `src/engine/systems/stageSlices.ts` does NOT exist on `main`; the Ten
+  Slices work lives only on the branches below.
 - **In flight (branches, not final):** `r71-ten-slices` carries R68/R69 explorer-upgrade work
   (cameraRig orbit/glide grammar, touch grammar, 3.5 s summon, ROUND-68/69 docs) plus R71
   step 3 ("zoom never crosses"; changes in `engine.ts`, `stageThresholds.ts`, `kamuiPhases.ts`,
@@ -245,10 +246,14 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   come's push was matched to the way out (`RETURN_ZOOM_VEL` −0.05 → −0.02) and always lands
   back in the cosmic web (dial 0.72), never the home stellar system — the author's explicit
   law: no reverse Kamui at the home page, the galaxies stay choosable after returning.
-- **Verification status:** `npm run verify` ALL GREEN (typecheck; round16/17/18/63/**72**
+- **R73 (this round):** the vault Kamui's "the black hole totally vanishes" — the vacuum gulp
+  drained the hole/vault body's own group (caught at 24% and collapsing live); the swallow
+  resolver now refuses hole/vault subjects (THE THROAT IS NOT SWALLOWED) while planets and
+  galaxies keep the canon drain. The gulp's surge/rumble/vortex are untouched.
+- **Verification status:** `npm run verify` ALL GREEN (typecheck; round16/17/18/63/72/**73**
   gauntlets; smoke + prod-smoke, zero console errors); `npm audit` 0 vulnerabilities;
   `audit:arch --check` exits 1 with findings identical to the pristine parent commit (the
-  pre-existing R52-baseline drift below — R72 added zero new findings).
+  pre-existing R52-baseline drift below — R72/R73 added zero new findings).
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); architecture-audit snapshot drift vs the frozen R52
   baseline (re-snapshot consciously); 8 dead value exports + 46 dead type exports (including
@@ -260,10 +265,12 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ## 9. WHERE IT'S GOING
 
-1. **R72 watch items (small, user-visible):** if the staged arrival's focus re-aim toward the
-   traveler's reality marble ever reads as a sideways sweep, apply the portal's `holdFocus`
-   discipline during the handoff; `beginGalaxyEntry`'s Kamui garnish still races its own zoom
-   (the same same-frame shape R72 fixed at the membrane) — its own round.
+1. **R72/R73 watch items (small, user-visible):** if the staged arrival's focus re-aim toward
+   the traveler's reality marble ever reads as a sideways sweep, apply the portal's
+   `holdFocus` discipline during the handoff; `beginGalaxyEntry`'s Kamui garnish still races
+   its own zoom (the same same-frame shape R72 fixed at the membrane) — its own round; the
+   first summon of a session compiles the vortex pass on its first frame (a one-time hitch —
+   a shader warm-up would be its own round).
 2. **Finish R71 "Ten Slices"** — the slice system's consumers: the hierarchy stepper firing
    explicit cross-slice Kamui, edge membrane affordances, gauntlet pins for the new law.
 3. **The Signage Wave** (the recommended next theme, from the experience report):
