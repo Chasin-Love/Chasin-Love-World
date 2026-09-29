@@ -4448,7 +4448,13 @@ void main(){
     this.portalFocusPending = true;
     this.portalPendingFocusId = innerTarget ? null : b.data.id;
     this.portalHold = KAMUI_ENTRY_HOLD;
-    this.portalEnterDial = CameraRig.zoomTOf(Math.max(0.4, b.data.radius) * KAMUI_ENTRY_FRAMING);
+    /* THE ARRIVAL SETTLE (R67) — the overlay fires at the throat now, so
+       the dive runs BEHIND the live diary/vault: the rig eases 60% of the
+       way and the overlay's entrance owns the last mile. The old full dial
+       flew ~2s of empty unseen space after the swallow — the beat the
+       traveler read as a processing freeze. */
+    const settleDial = CameraRig.zoomTOf(Math.max(0.4, b.data.radius) * KAMUI_ENTRY_FRAMING);
+    this.portalEnterDial = settleDial + (this.portalReturnDial - settleDial) * 0.4;
     this.portalReturnDial = this.portalSavedCam.rig.tZoomT;
     this.rig.setZoomTarget(this.portalReturnDial);
     /* KAMUI — fire the v1 vortex: the red tear plays around the Demon Core
