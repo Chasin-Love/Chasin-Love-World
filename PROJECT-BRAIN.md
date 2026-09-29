@@ -223,14 +223,15 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | Ten Slices | R71 *(on branch `r71-ten-slices`, NOT in main — verified 2026-09-29)* | The zoom dial cut into ten ordered per-stage slices (`stageSlices.ts` exists only on the branch; a stale brain once claimed it sat on `main`). Step 3 ("zoom never crosses" — explicit `crossSlice` Kamui doors) is also branch-only, in flight |
 | The stage arrival | R72 *(on main)* | The membrane Kamui STAGED: the summon holds the web still and the throat hands the multiverse over through the dying vortex (the R67 grammar carried to `beginStageWarp`); the eject untouched; the reverse come matched to the way out and always landing back in the cosmic web, never the home page |
 | The throat is not swallowed | R73 *(on main)* | The vault Kamui's vacuum gulp no longer drains a hole/vault body's group — the live telemetry caught Eventide shrinking to 24% and vanishing whole in the last second before the vault opened; the door now stays whole through its own jutsu while planets and galaxies keep the canon drain. New round73 gauntlet in the verify chain |
+| The holographic herald | R74 *(on main)* | Hover discipline: honest colliders (web galaxy 1.35×→the disc, multiverse galaxy 0.18×→the glow), the engine projects each hovered object's screen disk and re-emits it at ~8 Hz, and the shared `HoloCardShell` anchors every hover card OUTSIDE that disk with a stem into the rim — 3D entrance, spinning holo border, sheen; pointer-events-none everywhere except real buttons. The cluster card no longer steals clicks. New round74 gauntlet in the verify chain |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-29, after R73)
+## 8. CURRENT STATE (as of 2026-09-30, after R74)
 
-- **`main` is the blessed reference.** Its tip is the R73 pair (the throat-is-not-swallowed
-  guard → its gauntlet + this brain) on top of the R72 four-commit train (staged stage-warp →
-  matched reverse push → round72 gauntlet → docs), all on the R67-final engine state.
+- **`main` is the blessed reference.** Its tip is the R74 pair (the holographic herald → its
+  gauntlet) on top of the R73 pair (the throat-is-not-swallowed guard → its gauntlet) and the
+  R72 four-commit train, all on the R67-final engine state.
   **Correction (verified in R72):** the earlier claim that R71 step 2's slice table sat on
   `main` was stale — `src/engine/systems/stageSlices.ts` does NOT exist on `main`; the Ten
   Slices work lives only on the branches below.
@@ -246,14 +247,19 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   come's push was matched to the way out (`RETURN_ZOOM_VEL` −0.05 → −0.02) and always lands
   back in the cosmic web (dial 0.72), never the home stellar system — the author's explicit
   law: no reverse Kamui at the home page, the galaxies stay choosable after returning.
-- **R73 (this round):** the vault Kamui's "the black hole totally vanishes" — the vacuum gulp
+- **R73:** the vault Kamui's "the black hole totally vanishes" — the vacuum gulp
   drained the hole/vault body's own group (caught at 24% and collapsing live); the swallow
   resolver now refuses hole/vault subjects (THE THROAT IS NOT SWALLOWED) while planets and
   galaxies keep the canon drain. The gulp's surge/rumble/vortex are untouched.
-- **Verification status:** `npm run verify` ALL GREEN (typecheck; round16/17/18/63/72/**73**
+- **R74:** the hover herald — honest colliders, the projected-disk anchor (cards stand
+  OUTSIDE the hovered object, riding it at ~8 Hz), the shared holographic shell (3D entrance,
+  spinning holo border, sheen, stem), pointer-events-none except real buttons. The user's
+  three hover complaints (too-early pop, card covering the target, click stealing) are fixed
+  and live-verified on their own galaxy.
+- **Verification status:** `npm run verify` ALL GREEN (typecheck; round16/17/18/63/72/73/**74**
   gauntlets; smoke + prod-smoke, zero console errors); `npm audit` 0 vulnerabilities;
   `audit:arch --check` exits 1 with findings identical to the pristine parent commit (the
-  pre-existing R52-baseline drift below — R72/R73 added zero new findings).
+  pre-existing R52-baseline drift below — R72–R74 added zero new findings).
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); architecture-audit snapshot drift vs the frozen R52
   baseline (re-snapshot consciously); 8 dead value exports + 46 dead type exports (including
