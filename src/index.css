@@ -1734,12 +1734,15 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 }
 
 /* THE SWALLOW — an open overlay (diary window, vault) being taken by the
-   reverse vortex. Two movements in one breath: first the BEND (perspective
-   tilt, skew, non-uniform squash — the rectangle genuinely loses its shape),
-   then the accelerating spiral down INTO the tear itself. transform-origin
+   reverse vortex, the mirror of the forward summon's vacuum gulp. The card
+   BENDS first (perspective tilt, skew, non-uniform squash — the rectangle
+   genuinely loses its shape), then is PULLED IN CONTINUOUSLY: every stop
+   shrinks it further and sweeps it another lap around the tear (rotate and
+   scale both act about the tear point itself), so the eye watches it spiral
+   down the throat instead of popping out of existence. transform-origin
    rides the live tear position (--kamui-vortex-x/y, written by App on every
-   trigger), so the card is dragged into the vortex instead of shrunk at
-   screen center. */
+   trigger). The old single 0.7,0,0.84,0 ease across 35→100% back-loaded the
+   whole shrink into the last ~60ms — that read as "bent a bit, then gone". */
 @keyframes kamuiSuck {
   0% {
     opacity: 1;
@@ -1748,30 +1751,39 @@ input[type='range'].pw-range::-webkit-slider-thumb {
     box-shadow: 0 0 0 rgba(255, 23, 68, 0), 0 0 0 rgba(139, 92, 246, 0);
     animation-timing-function: cubic-bezier(0.22, 0.9, 0.36, 1); /* the bend snaps in fast */
   }
-  35% {
-    /* maximum bend — the card is no longer a rectangle */
+  30% {
+    /* the bend — shape lost, and the throat's pull takes hold */
     opacity: 1;
-    transform: perspective(1800px) rotate(-42deg) rotateX(9deg) rotateY(-14deg) skewX(15deg) skewY(-8deg) scale(0.86, 1.08);
-    filter: blur(1.5px) brightness(1.45) contrast(125%);
-    box-shadow: 0 0 45px rgba(255, 23, 68, 0.45), 0 0 22px rgba(139, 92, 246, 0.3);
-    animation-timing-function: cubic-bezier(0.7, 0, 0.84, 0); /* then the accelerating swallow */
+    transform: perspective(1800px) rotate(-38deg) rotateX(9deg) rotateY(-14deg) skewX(15deg) skewY(-8deg) scale(0.82, 1.04);
+    filter: blur(1.5px) brightness(1.4) contrast(122%);
+    box-shadow: 0 0 40px rgba(255, 23, 68, 0.4), 0 0 20px rgba(139, 92, 246, 0.28);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.65, 0.35);
   }
-  70% {
-    opacity: 0.85;
-    transform: perspective(1800px) rotate(-170deg) rotateX(20deg) rotateY(-30deg) skewX(22deg) skewY(-11deg) scale(0.32, 0.52);
-    filter: blur(7px) brightness(1.9) contrast(140%);
-    box-shadow: 0 0 90px rgba(255, 23, 68, 0.7), 0 0 45px rgba(139, 92, 246, 0.5);
+  58% {
+    /* half-swallowed — clearly smaller, halfway into the tear, still spiraling */
+    opacity: 0.95;
+    transform: perspective(1800px) rotate(-135deg) rotateX(16deg) rotateY(-24deg) skewX(20deg) skewY(-10deg) scale(0.42, 0.55);
+    filter: blur(4px) brightness(1.7) contrast(132%);
+    box-shadow: 0 0 70px rgba(255, 23, 68, 0.6), 0 0 34px rgba(139, 92, 246, 0.4);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.7, 0.3);
+  }
+  80% {
+    /* deep in the throat — a small burning shard circling the void */
+    opacity: 0.8;
+    transform: perspective(1800px) rotate(-235deg) rotateX(24deg) rotateY(-36deg) skewX(24deg) skewY(-12deg) scale(0.14, 0.18);
+    filter: blur(8px) brightness(2.0) contrast(140%);
+    box-shadow: 0 0 100px rgba(255, 23, 68, 0.8), 0 0 48px rgba(139, 92, 246, 0.5);
   }
   100% {
     opacity: 0;
-    transform: perspective(1800px) rotate(-300deg) rotateX(30deg) rotateY(-44deg) skewX(26deg) skewY(-13deg) scale(0.03, 0.03);
+    transform: perspective(1800px) rotate(-320deg) rotateX(30deg) rotateY(-44deg) skewX(26deg) skewY(-13deg) scale(0.02, 0.02);
     filter: blur(16px) brightness(2.4);
     box-shadow: 0 0 130px rgba(255, 23, 68, 1), 0 0 60px rgba(139, 92, 246, 0.6);
   }
 }
 
 .kamui-suck {
-  animation: kamuiSuck 0.6s cubic-bezier(0.7, 0, 0.84, 0) both;
+  animation: kamuiSuck 0.8s cubic-bezier(0.7, 0, 0.84, 0) both;
   transform-origin: var(--kamui-vortex-x, 50%) var(--kamui-vortex-y, 50%);
   pointer-events: none;
 }

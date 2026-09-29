@@ -653,7 +653,7 @@ export default function App() {
     setVaultClosing(true);
     engineRef.current?.leavePortal();
     setAudioMode('space');
-    setTimeout(() => { setMode('space'); setVaultClosing(false); vaultClosingRef.current = false; }, 700);
+    setTimeout(() => { setMode('space'); setVaultClosing(false); vaultClosingRef.current = false; }, 900);
   }, []);
 
   const closeWin = (key: string) => {
@@ -684,7 +684,7 @@ export default function App() {
   /* kamui-suck closing windows unmount after the swallow animation ends */
   useEffect(() => {
     if (!wins.some((w) => w.closing)) return;
-    const t = setTimeout(() => setWins((cur) => cur.filter((w) => !w.closing)), 700);
+    const t = setTimeout(() => setWins((cur) => cur.filter((w) => !w.closing)), 900);
     return () => clearTimeout(t);
   }, [wins]);
 
