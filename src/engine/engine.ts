@@ -5075,6 +5075,18 @@ void main(){
           this.portalPendingFocusId = null;
         }
         this.rig.setZoomTarget(this.portalEnterDial);
+        /* THE THROAT HANDS OFF (R67) — the hold expires EXACTLY as the
+           summon's last beat completes: the tunnel is finished, so what
+           lives inside the subject ejects NOW, through the dying vortex —
+           the diary/vault materializes while the tear is still spinning
+           and collapsing, never after a silent dive. The dive becomes the
+           arrival settle behind the overlay; the zoom-arrival branch below
+           stays as the safety net (phase is already 'open', so it no-ops). */
+        if (this.portal.phase === 'entering' && !this.portal.fired) {
+          this.portal.fired = true;
+          this.portal.phase = 'open';
+          this.cb.onPortalPeak(this.portal.kind, this.portal.bodyId);
+        }
       }
     }
     /* The portal — a plain camera zoom. Clicking a world dives the camera
