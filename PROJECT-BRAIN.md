@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-09-29, after main's tip `dc68d0fd` (R71 step 2 — the slice table).
+> **Last updated:** 2026-09-30, after R75 (the unbroken bridge).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -224,14 +224,16 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The stage arrival | R72 *(on main)* | The membrane Kamui STAGED: the summon holds the web still and the throat hands the multiverse over through the dying vortex (the R67 grammar carried to `beginStageWarp`); the eject untouched; the reverse come matched to the way out and always landing back in the cosmic web, never the home page |
 | The throat is not swallowed | R73 *(on main)* | The vault Kamui's vacuum gulp no longer drains a hole/vault body's group — the live telemetry caught Eventide shrinking to 24% and vanishing whole in the last second before the vault opened; the door now stays whole through its own jutsu while planets and galaxies keep the canon drain. New round73 gauntlet in the verify chain |
 | The holographic herald | R74 *(on main)* | Hover discipline: honest colliders (web galaxy 1.35×→the disc, multiverse galaxy 0.18×→the glow), the engine projects each hovered object's screen disk and re-emits it at ~8 Hz, and the shared `HoloCardShell` anchors every hover card OUTSIDE that disk with a stem into the rim — 3D entrance, spinning holo border, sheen; pointer-events-none everywhere except real buttons. The cluster card no longer steals clicks. New round74 gauntlet in the verify chain |
+| The unbroken bridge | R75 *(on main)* | The journey from the disk to the card's own buttons no longer kills the card: the last disk and the pointer's resting place live in refs, one `pointerOnBridge` predicate guards the card rect (±8) and the rim+48 corridor, and the 550 ms goodbye is HONEST — it re-checks where the pointer rests before clearing (a pause emits no events; a still traveler on the bridge re-arms it instead of dying). Click discipline pinned: only real buttons inside the cards take clicks. New round75 gauntlet in the verify chain |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-30, after R74)
+## 8. CURRENT STATE (as of 2026-09-30, after R75)
 
-- **`main` is the blessed reference.** Its tip is the R74 pair (the holographic herald → its
-  gauntlet) on top of the R73 pair (the throat-is-not-swallowed guard → its gauntlet) and the
-  R72 four-commit train, all on the R67-final engine state.
+- **`main` is the blessed reference.** Its tip is the R75 work (the unbroken
+  bridge → its gauntlet) on top of the R74 pair (the holographic herald → its
+  gauntlet), the R73 pair (the throat-is-not-swallowed guard → its gauntlet)
+  and the R72 four-commit train, all on the R67-final engine state.
   **Correction (verified in R72):** the earlier claim that R71 step 2's slice table sat on
   `main` was stale — `src/engine/systems/stageSlices.ts` does NOT exist on `main`; the Ten
   Slices work lives only on the branches below.
@@ -256,10 +258,19 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   spinning holo border, sheen, stem), pointer-events-none except real buttons. The user's
   three hover complaints (too-early pop, card covering the target, click stealing) are fixed
   and live-verified on their own galaxy.
-- **Verification status:** `npm run verify` ALL GREEN (typecheck; round16/17/18/63/72/73/**74**
+- **R75:** the unbroken bridge — the card used to die mid-journey to its own buttons: the
+  rim crossing armed a 550 ms goodbye that fired under a paused pointer (a pause emits no
+  events, so cancel-on-move could not save it). Now the last disk and the pointer's resting
+  place are refs, `pointerOnBridge` guards card ±8 and the rim+48 corridor, and the honest
+  goodbye re-checks the resting place at fire time and re-arms while the traveler is still
+  on the bridge. Live-verified on the user's own galaxy: rim crossing + full 1 s stop, two
+  corridor pauses, arrival at "Dive In" — alive at every checkpoint; leaving both lifelines
+  still departs the card on schedule. The interrupted session's "rivers" complaint decoded
+  as "reverse Kamui" — R72's law, already green.
+- **Verification status:** `npm run verify` ALL GREEN (typecheck; round16/17/18/63/72/73/74/**75**
   gauntlets; smoke + prod-smoke, zero console errors); `npm audit` 0 vulnerabilities;
   `audit:arch --check` exits 1 with findings identical to the pristine parent commit (the
-  pre-existing R52-baseline drift below — R72–R74 added zero new findings).
+  pre-existing R52-baseline drift below — R72–R75 added zero new findings).
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); architecture-audit snapshot drift vs the frozen R52
   baseline (re-snapshot consciously); 8 dead value exports + 46 dead type exports (including
