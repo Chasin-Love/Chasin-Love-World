@@ -1,18 +1,27 @@
 /**
- * THE MARK — generates the MY UNIVERSE app icons (PNG + ICO).
- * Pure Node — no image deps, same self-contained spirit as the old placeholder.
+ * THE ICON PIPELINE — two faces of MY UNIVERSE, one generator.
  *
- * The mark: Eventide at rest. A black event-horizon disc wearing its
- * accretion ring — teal core fire falling to solar orange at the rim —
- * wrapped in a violet lens halo, tilted slightly like a world seen
- * from orbit, on the deep-abyss square (#010208, the app's own void).
+ * DEFAULT — THE AUTHOR'S SIGIL: src-tauri/icons/logo-master.jpg (the blue
+ * four-pointed star photo) becomes the icon. The photo is center-cropped to
+ * fill the canvas, unsharp-masked (sharpened), contrast-lifted, then halved
+ * down the size chain with a light re-sharpen at the small sizes so the
+ * pixels stay crisp in the taskbar.
  *
- * Drawn analytically per pixel (supersampled 4×4 at the small sizes)
- * so it stays crisp from 16px taskbar to 128px desktop.
+ * `--eventide` — THE MARK: the analytic Eventide-at-rest render from R80
+ * (black horizon pit, teal→gold accretion ring, violet lens halo), kept as
+ * the fallback and for posterity (it lives on the author's desktop too).
+ *
+ * Both faces land in the same places: src-tauri/icons/{512,128,32}.png,
+ * icon.ico (proper 32bpp DIB — RC.EXE rejects PNG-inside-ICO with RC2175;
+ * that lesson is pinned in encodeIcoDib), and the web's favicon.png.
+ *
+ * Pure Node + the project's own Playwright Chromium for the photo work.
  */
-import { deflateSync, crc32 } from 'node:zlib';
+import { deflateSync, crc32, inflateSync } from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
+
+/* ---------- PNG encoding (unchanged since the placeholder days) ---------- */
 
 function crc32Buf(buf) {
   return crc32(buf) >>> 0;
@@ -43,7 +52,191 @@ function encodePng(width, height, rgba) {
   return Buffer.concat([sig, pngChunk('IHDR', ihdr), pngChunk('IDAT', idat), pngChunk('IEND', Buffer.alloc(0))]);
 }
 
-/* ---------- palette (the app's own contract colors) ---------- */
+/** Reinflate one of our own filter-0 PNGs back into a raw RGBA buffer. */
+function decodePngRGBA(png, size) {
+  let off = 8;
+  const idat = [];
+  while (off < png.length) {
+    const len = png.readUInt32BE(off);
+    const type = png.toString('ascii', off + 4, off + 8);
+    if (type === 'IDAT') idat.push(png.subarray(off + 8, off + 8 + len));
+    if (type === 'IEND') break;
+    off += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const out = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    const rowStart = y * (size * 4 + 1) + 1; // skip our filter byte (always 0)
+    raw.copy(out, y * size * 4, rowStart, rowStart + size * 4);
+  }
+  return out;
+}
+
+/* ---------- the Windows ICO, written the way RC.EXE demands ---------- */
+
+/* History lesson pinned in code: RC2175 broke the first v15.0.5 build
+   because the old generator wrapped a PNG inside the ICO (and mislabeled it
+   a cursor by leaving the type field zero). Windows' resource compiler
+   requires classic 32bpp BITMAPINFOHEADER DIB entries — never PNG. The repo
+   hit this once before by hand (commit a7a299c5); now the generator itself
+   is immune. */
+function encodeIcoDib(rgba, w) {
+  const h = w;
+  const xorStride = w * 4;
+  const xorSize = xorStride * h;
+  const andStride = Math.ceil(w / 32) * 4;
+  const andSize = andStride * h;
+  const bih = Buffer.alloc(40);
+  bih.writeUInt32LE(40, 0);        // biSize: BITMAPINFOHEADER
+  bih.writeInt32LE(w, 4);          // biWidth
+  bih.writeInt32LE(h * 2, 8);      // biHeight: XOR + AND masks combined
+  bih.writeUInt16LE(1, 12);        // biPlanes
+  bih.writeUInt16LE(32, 14);       // biBitCount
+  bih.writeUInt32LE(0, 16);        // biCompression = BI_RGB
+  bih.writeUInt32LE(xorSize, 20);  // biSizeImage
+  // pixels are stored bottom-up; 32bpp ICO alpha is straight (unassociated)
+  const xor = Buffer.alloc(xorSize);
+  const and = Buffer.alloc(andSize);
+  for (let y = 0; y < h; y++) {
+    const srcRow = y * w * 4;
+    const dstRow = (h - 1 - y) * xorStride;
+    for (let x = 0; x < w; x++) {
+      const s = srcRow + x * 4;
+      const d = dstRow + x * 4;
+      xor[d] = rgba[s + 2];     // B
+      xor[d + 1] = rgba[s + 1]; // G
+      xor[d + 2] = rgba[s];     // R
+      xor[d + 3] = rgba[s + 3]; // A
+      if (rgba[s + 3] === 0) {
+        and[(h - 1 - y) * andStride + (x >> 3)] |= 1 << (7 - (x & 7));
+      }
+    }
+  }
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0); // reserved
+  header.writeUInt16LE(1, 2); // type: 1 = icon (NOT cursor — this field was the RC2175 trigger)
+  header.writeUInt16LE(1, 4); // one image
+  const entry = Buffer.alloc(16);
+  entry[0] = w % 256; entry[1] = 0; // width (0 means 256)
+  entry[2] = h % 256; entry[3] = 0; // height
+  entry[4] = 0;  // palette colors
+  entry[5] = 0;  // reserved
+  entry.writeUInt16LE(1, 4);   // planes — entry offset 4 (was wrongly 6: shifted every field)
+  entry.writeUInt16LE(32, 6);  // bits per pixel — entry offset 6
+  entry.writeUInt32LE(40 + xorSize + andSize, 8); // bytes in resource (biSize + masks)
+  entry.writeUInt32LE(22, 12); // data offset: 6-byte header + 16-byte entry
+  return Buffer.concat([header, entry, bih, xor, and]);
+}
+
+/* ---------- face one: THE AUTHOR'S SIGIL (photo → icon) ---------- */
+
+/* Per-size recipe: small sizes crop TIGHTER on the star (the outer swirls
+   become noise at 32px — the core star IS the logo there), lift midtones
+   (gamma) and stretch the star core toward white so it burns through the
+   dark photo on a dark taskbar. */
+const PHOTO_CROP = { cx: 0.50, cy: 0.48 };
+const SIZES = {
+  512: { zoom: 1.22, unsharp: 0.60, contrast: 0.20, gamma: 1.06, white: 246 },
+  128: { zoom: 1.58, unsharp: 0.22, contrast: 0.22, gamma: 1.12, white: 240 },
+  64:  { zoom: 1.95, unsharp: 0.12, contrast: 0.26, gamma: 1.18, white: 234 },
+  32:  { zoom: 2.30, unsharp: 0.06, contrast: 0.28, gamma: 1.25, white: 228 },
+};
+
+async function renderPhoto(masterPath) {
+  const { chromium } = await import('playwright');
+  const jpgB64 = fs.readFileSync(masterPath).toString('base64');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    return await page.evaluate(async ({ jpgB64, sizes }) => {
+      const img = new Image();
+      img.src = 'data:image/jpeg;base64,' + jpgB64;
+      await img.decode();
+
+      /* unsharp mask: out = in*(1+a) - blur*a, blur = 3×3 box */
+      function unsharp(d, w, h, a) {
+        if (a <= 0) return;
+        const src = new Uint8ClampedArray(d);
+        const row = w * 4;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+            for (let c = 0; c < 3; c++) {
+              const l = src[i - row + c] ?? src[i + c];
+              const r = src[i + row + c] ?? src[i + c];
+              const u = src[i - 4 + c] ?? src[i + c];
+              const dn = src[i + 4 + c] ?? src[i + c];
+              const blur = (l + r + u + dn + src[i + c] * 4) / 8;
+              d[i + c] = src[i + c] * (1 + a) - blur * a;
+            }
+          }
+        }
+      }
+
+      /* gentle S-curve for pop: v' = mix(v, smoothstep(v), k) */
+      function contrast(d, k) {
+        for (let i = 0; i < d.length; i += 4) {
+          for (let c = 0; c < 3; c++) {
+            const v = d[i + c] / 255;
+            const s = v * v * (3 - 2 * v);
+            d[i + c] = 255 * (v + (s - v) * k);
+          }
+        }
+      }
+
+      /* levels: gamma lifts the blue nebula out of the dark, the white
+         point pulls the star's core up to burning white */
+      function levels(d, gamma, white) {
+        const g = 1 / gamma;
+        for (let i = 0; i < d.length; i += 4) {
+          for (let c = 0; c < 3; c++) {
+            const v = Math.min(1, d[i + c] / white);
+            d[i + c] = 255 * Math.pow(v, g);
+          }
+        }
+      }
+
+      /* draw the cropped source at `size` (direct high-quality resample —
+         no halving chain, so no accumulated softness or ringing) */
+      function renderSize(size, cfg) {
+        const cv = document.createElement('canvas');
+        cv.width = size; cv.height = size;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        const s = Math.min(img.width, img.height) / cfg.zoom;
+        const sx = img.width * 0.50 - s / 2;
+        const sy = img.height * 0.48 - s / 2;
+        ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+        const d = ctx.getImageData(0, 0, size, size);
+        unsharp(d.data, size, size, cfg.unsharp);
+        contrast(d.data, cfg.contrast);
+        levels(d.data, cfg.gamma, cfg.white);
+        ctx.putImageData(d, 0, 0);
+        return { ctx, data: d };
+      }
+
+      const r512 = renderSize(512, sizes[512]);
+      const r128 = renderSize(128, sizes[128]);
+      const r64 = renderSize(64, sizes[64]);
+      const r32 = renderSize(32, sizes[32]);
+
+      const toB64 = (ctx) => ctx.canvas.toDataURL('image/png').slice('data:image/png;base64,'.length);
+      return {
+        png512: toB64(r512.ctx),
+        png128: toB64(r128.ctx),
+        png64: toB64(r64.ctx),
+        png32: toB64(r32.ctx),
+        rgba128: Array.from(r128.data.data),
+      };
+    }, { jpgB64, sizes: SIZES });
+  } finally {
+    await browser.close();
+  }
+}
+
+/* ---------- face two: THE MARK (analytic Eventide, kept from R80) ---------- */
+
 const ABYSS = [1, 2, 8];        // #010208 — the void behind everything
 const TEAL_ICE = [66, 224, 206]; // teal-ice — the instrument color
 const SOLAR = [255, 196, 90];    // solar — the anchor star's warmth
@@ -171,39 +364,42 @@ function drawIcon(size) {
       rgba[i + 3] = Math.round(a / n);
     }
   }
-  return encodePng(size, size, rgba);
+  return { rgba, png: encodePng(size, size, rgba) };
 }
 
-/* square corners: the abyss square keeps its corners (it IS the void),
-   so no rounding — Windows tiles already frame it. */
+/* ---------- orchestration ---------- */
 
 const outDir = path.join(process.cwd(), 'src-tauri', 'icons');
 fs.mkdirSync(outDir, { recursive: true });
+const masterJpg = path.join(outDir, 'logo-master.jpg');
+const eventide = process.argv.includes('--eventide');
 
-const png128 = drawIcon(128);
-const png32 = drawIcon(32);
+let png512, png128, png32, png64, rgba128, faceName;
+
+if (!eventide && fs.existsSync(masterJpg)) {
+  faceName = "THE AUTHOR'S SIGIL (the blue star photo — sharpened, pixel-crisp)";
+  const r = await renderPhoto(masterJpg);
+  png512 = Buffer.from(r.png512, 'base64');
+  png128 = Buffer.from(r.png128, 'base64');
+  png64 = Buffer.from(r.png64, 'base64');
+  png32 = Buffer.from(r.png32, 'base64');
+  rgba128 = Uint8Array.from(r.rgba128);
+} else {
+  faceName = 'THE MARK (analytic Eventide at rest)';
+  const big = drawIcon(512);
+  const mid = drawIcon(128);
+  const tiny = drawIcon(32);
+  const fav = drawIcon(64);
+  png512 = big.png; png128 = mid.png; png32 = tiny.png; png64 = fav.png;
+  rgba128 = mid.rgba;
+}
+
+fs.writeFileSync(path.join(outDir, '512x512.png'), png512);
 fs.writeFileSync(path.join(outDir, '128x128.png'), png128);
 fs.writeFileSync(path.join(outDir, '32x32.png'), png32);
+fs.writeFileSync(path.join(outDir, 'icon.ico'), encodeIcoDib(rgba128, 128));
+// The web face: the same sigil as the browser-tab favicon.
+fs.writeFileSync(path.join(process.cwd(), 'public', 'favicon.png'), png64);
 
-// A big render for human eyes + the preview panel.
-fs.writeFileSync(path.join(outDir, '512x512.png'), drawIcon(512));
-
-// The web face: the same mark as the browser-tab favicon (the app never had one).
-fs.writeFileSync(path.join(process.cwd(), 'public', 'favicon.png'), drawIcon(64));
-
-// ICO wrapping the 128px PNG (Vista+ supports PNG-compressed ICO entries).
-const header = Buffer.alloc(6);
-header.writeUInt16LE(0, 0);
-header.writeUInt16LE(1, 4); // one image
-const entry = Buffer.alloc(16);
-entry[0] = 128; entry[1] = 0; // width
-entry[2] = 128; entry[3] = 0; // height
-entry[4] = 0;  // palette colors
-entry[5] = 0;  // reserved
-entry.writeUInt16LE(1, 6);   // planes
-entry.writeUInt16LE(32, 8);  // bits per pixel
-entry.writeUInt32LE(png128.length, 8);  // bytes in resource
-entry.writeUInt32LE(22, 12); // data offset: 6-byte header + 16-byte entry
-fs.writeFileSync(path.join(outDir, 'icon.ico'), Buffer.concat([header, entry, png128]));
-
-console.log('the mark written to src-tauri/icons/ (128, 32, 512, ico) + public/favicon.png');
+console.log(`icons written (${faceName}):`);
+console.log('  src-tauri/icons/{512x128,128x128,32x32}.png + icon.ico (32bpp DIB) + public/favicon.png');

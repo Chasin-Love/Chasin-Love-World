@@ -229,7 +229,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The tail trim | R77 *(on main)* | The Kamui's mature-vortex plateau — the stretch the author highlighted in R73's telemetry (4.85→5.25s) where the vortex is fully formed and merely stabilizing — is trimmed: the summon ends at 5.0s (was 5.5), the throat beat with it, the vacuum drain compressed to 1.0s (same surge machinery), the R67 hold following to 5.0. The build beats and the eject are untouched. Round18's timing pins reconciled consciously |
 | The living spin | R78 *(on main)* | The mature vortex no longer sits frozen: the tear's twist was a static bend saturating in the first half-second, so between the tear and the throat nothing moved. The engine now integrates the vortex's own rotation (uSpin) for as long as the tear is visible — differential in the shader (inner band winds faster), surging with the gulp, coasting to a stop with the fade — the ripple marches inward on the summon (outward on the eject), and the early bite is a touch sharper (twist 6.5→7.0, pull 0.28/0.22→0.32/0.26). Round18 reconciled + a new living-spin check |
 | The one sky | R79 *(on main)* | The Sky Studio's photo sky becomes THE sky: the vertical barrier died (the vignette sat on the atan branch cut + mipmaps collapsed there — now a camera-relative seam-free vignette and a mip-free texture), the procedural family stands down while a photo owns the view (no ghost floor, no glow tint, blend 1.0 across all three contract tiers), and the dome rides the camera — full-screen at every cosmological stage, the equirect always 1:1. Deactivation rides the crossfade out; uploads rasterize at 4096×2048 when light. New round79 gauntlet in the verify chain |
-| The mark | R80 *(on main)* | The placeholder icon replaced by THE MARK — Eventide at rest drawn analytically (event-horizon pit, teal→gold accretion ring, violet lens halo, abyss square), shipped to the desktop icons and the web's first favicon; released as v15.0.5 via the proven tag-push ritual |
+| The mark | R80 *(on main)* | The placeholder icon replaced by the author's star sigil (photo pipeline: crop, sharpen, levels) with the analytic Eventide mark as fallback, shipped to the desktop icons and the web's first favicon; the first v15.0.5 tag caught a Windows-only RC2175 ICO defect, the generator was made DIB-correct, released as v15.0.5 via the proven tag-push ritual |
 
 ---
 
@@ -338,20 +338,26 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   the card's 8-second update-check timer first — so v15.0.4 was installed
   once manually; every later version arrives via the card).
 - **R80 — THE MARK (2026-09-30, v15.0.5):** the placeholder icon died.
-  `scripts/make-icons.mjs` now draws THE MARK — Eventide at rest: a black
-  event-horizon pit with a photon-ring whisper, wearing its accretion ring
-  (white-hot teal edge → teal-ice → gold fringe), wrapped in the violet lens
-  halo, tilted toward the viewer, on the abyss square (#010208, corners
-  kept). Pure per-pixel analytic rendering (supersampled), zero image deps;
-  palette is the app's contract colors. Ships as `src-tauri/icons/` (128/32/
-  512/ico) AND as the web's first favicon (`public/favicon.png`, linked in
-  `index.html`). 32px legibility audited (ASCII luminance map); typecheck
-  green. Housekeeping: `Cargo.toml` version drift (15.0.2 vs 15.0.4) fixed —
-  `tauri.conf.json` + `Cargo.toml` + `Cargo.lock` now move in lockstep.
-  RELEASE RITUAL (proven twice now): bump the three version files → commit →
-  tag `v*` → push; the GitHub pipeline builds (MSVC lives there, not on the
-  laptop), generates `latest.json`, publishes the release, and the updater
-  card delivers it. See `docs/ROUND-80-THE-MARK-2026-09-30.md`.
+  The OFFICIAL face is the AUTHOR'S SIGIL — their blue four-pointed-star
+  photo (`src-tauri/icons/logo-master.jpg`), rendered per-size through a
+  Playwright-Chromium photo pipeline in `scripts/make-icons.mjs` (center-
+  crop to fill, unsharp mask, S-curve contrast, gamma + white-point lift,
+  tighter crop at small sizes; each size drawn directly from the source).
+  The FALLBACK face (`--eventide`) is the analytic Eventide-at-rest mark
+  (black horizon pit, teal→gold accretion ring, violet lens halo, abyss
+  square) — both faces saved as PNGs on the author's desktop. Ships as
+  `src-tauri/icons/` (128/32/512/ico) AND the web's first favicon
+  (`public/favicon.png`, linked in `index.html`). THE RC2175 LESSON: the
+  first v15.0.5 tag failed on Windows only — the old generator's ICO wrapped
+  a PNG and mislabeled itself a cursor; Windows RC requires 32bpp DIB
+  entries (the repo hit this by hand once, commit `a7a299c5`); the generator
+  now writes proper DIBs and is immune. Housekeeping: `Cargo.toml` version
+  drift (15.0.2 vs 15.0.4) fixed — `tauri.conf.json` + `Cargo.toml` +
+  `Cargo.lock` move in lockstep. RELEASE RITUAL (proven twice; the third
+  time caught a Windows-only build break): bump the three version files →
+  commit → tag `v*` → push; the GitHub pipeline builds (MSVC lives there,
+  not on the laptop), generates `latest.json`, publishes the release, and
+  the updater card delivers it. See `docs/ROUND-80-THE-MARK-2026-09-30.md`.
 - **Verification status:** `npm run verify` ALL GREEN (typecheck;
   round16/17/18/63/72/73/74/75/76/**79** gauntlets; smoke + prod-smoke, zero
   console errors); `npm audit` 0 vulnerabilities; `audit:arch --check` exits 1
