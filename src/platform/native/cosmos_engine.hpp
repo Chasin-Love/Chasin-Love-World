@@ -135,11 +135,14 @@ extern "C" {
                                double* out);
 
     /* Batch Kepler positions for n bodies per frame.
-     * Inputs: per-body arrays a/e/phase/incl/speed (each n doubles) + simDays.
+     * Inputs: per-body arrays a/e/phase/incl/speed (each n doubles) + simDays,
+     * plus the R84 ascending-node arrays node/argP (n doubles each; NULL or
+     * per-entry 0 = the historical node-at-X plane).
      * Outputs: outXyz (3n), outRadius (n), outTrueAnomaly (n). */
     void cosmos_kepler_batch(const double* a, const double* e, const double* phase,
                              const double* incl, const double* speed, int n,
-                             double simDays, double* outXyz,
+                             double simDays, const double* node, const double* argP,
+                             double* outXyz,
                              double* outRadius, double* outTrueAnomaly);
 
     /* Full astrophysics telemetry batch — exact port of calculatePhysics.

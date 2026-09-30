@@ -28,6 +28,11 @@ struct KeplerBatchArgs {
     inclination: Vec<f64>,
     speed: Vec<f64>,
     sim_days: f64,
+    /* R84 ascending-node elements — optional so older callers stay valid */
+    #[serde(default)]
+    node: Vec<f64>,
+    #[serde(default)]
+    arg_peri: Vec<f64>,
 }
 
 #[tauri::command]
@@ -53,6 +58,10 @@ fn cosmos_kepler_batch(args: KeplerBatchArgs) -> Result<serde_json::Value, Strin
     let mut xyz = vec![0f64; n * 3];
     let mut radius = vec![0f64; n];
     let mut anomaly = vec![0f64; n];
+    /* missing node/argP arrays (older callers) mean the historical node-at-X plane */
+    let zeros = vec![0f64; n];
+    let node = if args.node.len() == n { args.node.as_slice() } else { zeros.as_slice() };
+    let arg_peri = if args.arg_peri.len() == n { args.arg_peri.as_slice() } else { zeros.as_slice() };
     unsafe {
         cosmos::ffi::cosmos_kepler_batch(
             args.a.as_ptr(),
@@ -62,6 +71,8 @@ fn cosmos_kepler_batch(args: KeplerBatchArgs) -> Result<serde_json::Value, Strin
             args.speed.as_ptr(),
             n as i32,
             args.sim_days,
+            node.as_ptr(),
+            arg_peri.as_ptr(),
             xyz.as_mut_ptr(),
             radius.as_mut_ptr(),
             anomaly.as_mut_ptr(),

@@ -95,7 +95,9 @@ export function seedBodies(now: number, day: number): CosmicBody[] {
         atmo: '#8a7462',
         ice: '#d8cfc4',
       },
-      orbit: { a: 26, speed: TAU / 88, phase: 0.8, incl: (7.0 * Math.PI) / 180 },
+      /* R84 — node/argP are the real J2000 elements (JPL approx-pos Table 1),
+         so every orbit crosses the ecliptic at its own place like the real sky */
+      orbit: { a: 26, speed: TAU / 88, phase: 0.8, incl: (7.0 * Math.PI) / 180, node: (48.33076593 * Math.PI) / 180, argP: (29.12703035 * Math.PI) / 180 }, /* Mercury */
     },
     {
       id: 'veil',
@@ -113,7 +115,7 @@ export function seedBodies(now: number, day: number): CosmicBody[] {
         atmo: '#e8cf9e',
         ice: '#fff2d8',
       },
-      orbit: { a: 38, speed: TAU / 224, phase: 2.4, incl: (3.4 * Math.PI) / 180 },
+      orbit: { a: 38, speed: TAU / 224, phase: 2.4, incl: (3.4 * Math.PI) / 180, node: (76.67984255 * Math.PI) / 180, argP: (54.92262463 * Math.PI) / 180 }, /* Venus */
     },
     {
       id: 'aurelia',
@@ -132,7 +134,9 @@ export function seedBodies(now: number, day: number): CosmicBody[] {
         atmo: '#7fc4e8',
         ice: '#eef6ff',
       },
-      orbit: { a: 52, speed: TAU / 365, phase: 4.2, incl: 0.0 }, /* invariable-plane reference */
+      /* invariable-plane reference (i = 0); argP is Earth's real J2000
+         longitude of perihelion ϖ = 102.94° — the node is degenerate at i=0 */
+      orbit: { a: 52, speed: TAU / 365, phase: 4.2, incl: 0.0, node: 0, argP: (102.93768193 * Math.PI) / 180 },
     },
     {
       id: 'rust',
@@ -149,7 +153,7 @@ export function seedBodies(now: number, day: number): CosmicBody[] {
         atmo: '#d9a184',
         ice: '#f0d9c8',
       },
-      orbit: { a: 68, speed: TAU / 687, phase: 1.1, incl: (1.85 * Math.PI) / 180 },
+      orbit: { a: 68, speed: TAU / 687, phase: 1.1, incl: (1.85 * Math.PI) / 180, node: (49.55953891 * Math.PI) / 180, argP: (286.49683150 * Math.PI) / 180 }, /* Mars */
     },
     {
       id: 'goliath',
@@ -168,7 +172,7 @@ export function seedBodies(now: number, day: number): CosmicBody[] {
         atmo: '#e0c493',
         ice: '#f5ead0',
       },
-      orbit: { a: 100, speed: TAU / 1600, phase: 5.4, incl: (1.3 * Math.PI) / 180 },
+      orbit: { a: 100, speed: TAU / 1600, phase: 5.4, incl: (1.3 * Math.PI) / 180, node: (100.47390909 * Math.PI) / 180, argP: (274.25457074 * Math.PI) / 180 }, /* Jupiter */
     },
     {
       id: 'mirror',
@@ -185,7 +189,7 @@ export function seedBodies(now: number, day: number): CosmicBody[] {
         atmo: '#a8d8ea',
         ice: '#f2fbff',
       },
-      orbit: { a: 132, speed: TAU / 2600, phase: 3.0, incl: (2.5 * Math.PI) / 180 },
+      orbit: { a: 132, speed: TAU / 2600, phase: 3.0, incl: (2.5 * Math.PI) / 180, node: (74.01692503 * Math.PI) / 180, argP: (96.93735127 * Math.PI) / 180 }, /* Uranus */
     },
     {
       id: 'hollow',
@@ -202,7 +206,7 @@ export function seedBodies(now: number, day: number): CosmicBody[] {
         atmo: '#7d8b99',
         ice: '#dfe6ec',
       },
-      orbit: { a: 160, speed: TAU / 3800, phase: 0.2, incl: (17.2 * Math.PI) / 180 },
+      orbit: { a: 160, speed: TAU / 3800, phase: 0.2, incl: (17.2 * Math.PI) / 180, node: (110.30393684 * Math.PI) / 180, argP: (113.76497945 * Math.PI) / 180 }, /* Pluto */
     },
     {
       id: 'wisp',
@@ -219,7 +223,7 @@ export function seedBodies(now: number, day: number): CosmicBody[] {
         atmo: '#6fc2b4',
         ice: '#e8fff8',
       },
-      orbit: { a: 205, speed: TAU / 9000, phase: 2.0, incl: (11.0 * Math.PI) / 180 },
+      orbit: { a: 205, speed: TAU / 9000, phase: 2.0, incl: (11.0 * Math.PI) / 180, node: (250.0 * Math.PI) / 180, argP: (35.0 * Math.PI) / 180 }, /* no real analogue — a distinct crossing of its own */
     },
     {
       id: 'eventide',
@@ -236,8 +240,9 @@ export function seedBodies(now: number, day: number): CosmicBody[] {
         atmo: '#6fc2b4',
         ice: '#ffffff',
       },
-      /* RETROGRADE capture: negative mean motion — the only world orbiting backwards */
-      orbit: { a: 250, speed: -TAU / 12000, phase: 4.6, incl: (-12.0 * Math.PI) / 180 },
+      /* RETROGRADE capture: negative mean motion — the only world orbiting backwards;
+         its node sits opposite the planets' so the backward crossing reads at a glance */
+      orbit: { a: 250, speed: -TAU / 12000, phase: 4.6, incl: (-12.0 * Math.PI) / 180, node: (200.0 * Math.PI) / 180, argP: (80.0 * Math.PI) / 180 },
     },
   ];
 }

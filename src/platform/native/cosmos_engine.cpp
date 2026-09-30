@@ -255,9 +255,11 @@ const BodyProfile* bodyProfileOf(const char* id) {
     return &DEFAULT;
 }
 
-/* Kepler solver shared by the single and batch ports. */
+/* Kepler solver shared by the single and batch ports. node/argP carry the
+   R84 ascending-node elements (Ω the node azimuth, ω the periapsis angle);
+   0/0 reproduces the historical node-at-X behavior exactly. */
 inline void keplerSolve(double a, double e, double phase, double incl,
-                        double simDays, double speed, double* out) {
+                        double simDays, double speed, double node, double argP, double* out) {
     e = std::fmin(0.85, std::fmax(0.0, e));
 
     double M = std::fmod(phase + simDays * speed, 2.0 * 3.14159265358979323846);
@@ -271,11 +273,17 @@ inline void keplerSolve(double a, double e, double phase, double incl,
         2.0 * std::atan2(std::sqrt(1.0 + e) * std::sin(E / 2.0),
                          std::sqrt(1.0 - e) * std::cos(E / 2.0));
     const double currentRadius = (a * (1.0 - e * e)) / (1.0 + e * std::cos(trueAnomaly));
-    /* TRUE 3D inclined plane — exact port of physicsEngine.calculateKeplerPosition */
-    const double x = std::cos(trueAnomaly) * currentRadius;
-    const double zPlane = std::sin(trueAnomaly) * currentRadius;
-    const double y = zPlane * std::sin(incl);
-    const double z = zPlane * std::cos(incl);
+    /* TRUE 3D inclined plane — exact port of physicsEngine.calculateKeplerPosition:
+       ω rotates the periapsis inside the orbital plane, i tilts about the
+       ascending-node line, Ω carries the node to its azimuth (+X toward +Z). */
+    const double x0 = std::cos(trueAnomaly) * currentRadius;
+    const double z0 = std::sin(trueAnomaly) * currentRadius;
+    const double x1 = x0 * std::cos(argP) - z0 * std::sin(argP);
+    const double z1 = x0 * std::sin(argP) + z0 * std::cos(argP);
+    const double y = z1 * std::sin(incl);
+    const double z1t = z1 * std::cos(incl);
+    const double x = x1 * std::cos(node) - z1t * std::sin(node);
+    const double z = x1 * std::sin(node) + z1t * std::cos(node);
 
     out[0] = x; out[1] = y; out[2] = z;
     out[3] = trueAnomaly; out[4] = currentRadius;
@@ -293,17 +301,19 @@ void cosmos_orbit_position(double a, double eccentricity, double phase,
                            double inclination, double simDays, double speed,
                            double* out) {
     if (!out) return;
-    keplerSolve(a, eccentricity, phase, inclination, simDays, speed, out);
+    keplerSolve(a, eccentricity, phase, inclination, simDays, speed, 0.0, 0.0, out);
 }
 
 void cosmos_kepler_batch(const double* a, const double* e, const double* phase,
                          const double* incl, const double* speed, int n,
-                         double simDays, double* outXyz,
+                         double simDays, const double* node, const double* argP,
+                         double* outXyz,
                          double* outRadius, double* outTrueAnomaly) {
     if (!a || !e || !phase || !incl || !speed || n <= 0) return;
     double tmp[5];
     for (int i = 0; i < n; ++i) {
-        keplerSolve(a[i], e[i], phase[i], incl[i], simDays, speed[i], tmp);
+        keplerSolve(a[i], e[i], phase[i], incl[i], simDays, speed[i],
+                    node ? node[i] : 0.0, argP ? argP[i] : 0.0, tmp);
         if (outXyz) {
             outXyz[3 * i + 0] = tmp[0];
             outXyz[3 * i + 1] = tmp[1];

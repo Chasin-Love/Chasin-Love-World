@@ -111,7 +111,7 @@ const BODY_PROFILES: Record<string, { eccentricity: number; density: number; alb
 const _physMemo = new Map<string, { sig: string; data: BodyPhysicsData }>();
 
 function _physSignature(body: CosmicBody): string {
-  return `${body.orbit.a}|${body.orbit.phase}|${body.orbit.incl}|${body.radius}|${body.kind}|${body.id in BODY_PROFILES ? 'p' : 'g'}`;
+  return `${body.orbit.a}|${body.orbit.phase}|${body.orbit.incl}|${body.orbit.node ?? 0}|${body.orbit.argP ?? 0}|${body.radius}|${body.kind}|${body.id in BODY_PROFILES ? 'p' : 'g'}`;
 }
 
 export function calculatePhysics(body: CosmicBody, simTimeSec: number = 0): BodyPhysicsData {
@@ -363,6 +363,35 @@ function computePhysicsFresh(body: CosmicBody, simTimeSec: number): BodyPhysicsD
   };
 }
 
+/* R84 — THE ASCENDING NODES: one plane composition shared by the solver, the
+   moons, the star's wobble and Living Gravity. An in-plane vector (x0 toward
+   periapsis' reference, z0 the motion side) is carried into world space:
+   ω rotates the ellipse's periapsis within the orbital plane, i tilts about
+   the ascending-node line (the blessed node-at-X tilt), Ω carries the node
+   to its own azimuth around the star — so every world crosses the ecliptic
+   at its OWN place, not on one shared spine. node/argP default to 0, which
+   reproduces the historical node-at-+X behavior exactly. Azimuths run
+   +X → +Z (the codebase's in-plane sense). */
+export function tiltInPlaneVector(
+  x0: number,
+  z0: number,
+  inclination: number,
+  node = 0,
+  argP = 0,
+): { x: number; y: number; z: number } {
+  const cosW = Math.cos(argP), sinW = Math.sin(argP);
+  const x1 = x0 * cosW - z0 * sinW;
+  const z1 = x0 * sinW + z0 * cosW;
+  const y = z1 * Math.sin(inclination);
+  const z1t = z1 * Math.cos(inclination);
+  const cosO = Math.cos(node), sinO = Math.sin(node);
+  return {
+    x: x1 * cosO - z1t * sinO,
+    y,
+    z: x1 * sinO + z1t * cosO,
+  };
+}
+
 /**
  * Calculates exact elliptical position (x, y, z) for Kepler's 1st Law.
  */
@@ -373,9 +402,11 @@ export function calculateKeplerPosition(
   inclination: number,
   simDays: number,
   speed: number,
+  node = 0,
+  argP = 0,
 ): { x: number; y: number; z: number; trueAnomaly: number; currentRadius: number } {
   const e = Math.min(0.85, Math.max(0, eccentricity));
-  
+
   /* Mean anomaly M = M0 + n*t */
   const M = (phase + simDays * speed) % (2 * Math.PI);
 
@@ -391,16 +422,16 @@ export function calculateKeplerPosition(
   /* Distance r(theta) = a * (1 - e^2) / (1 + e * cos(nu)) */
   const currentRadius = (a * (1 - e * e)) / (1 + e * Math.cos(trueAnomaly));
 
-  /* TRUE 3D inclined orbit: rotate the in-plane position about the node
-     line (X axis) by the inclination. Every world rides its own plane and
-     crosses the ecliptic at its ascending/descending nodes — the old
-     vertical sine wobble pinned every world to one apparent flat sheet.
-     Inclination arrives in radians (seeds use real solar-system values:
-     Mercury 7°, Mars 1.85°, Pluto 17.2°, the vault −12°). */
-  const x = Math.cos(trueAnomaly) * currentRadius;
-  const zPlane = Math.sin(trueAnomaly) * currentRadius;
-  const y = zPlane * Math.sin(inclination);
-  const z = zPlane * Math.cos(inclination);
-
-  return { x, y, z, trueAnomaly, currentRadius };
+  /* TRUE 3D inclined orbit — the full element set. Inclination arrives in
+     radians (seeds use real solar-system values: Mercury 7°, Mars 1.85°,
+     Pluto 17.2°, the vault −12°); node/argP place the plane and the
+     periapsis the way the real sky does (R84). */
+  const p = tiltInPlaneVector(
+    Math.cos(trueAnomaly) * currentRadius,
+    Math.sin(trueAnomaly) * currentRadius,
+    inclination,
+    node,
+    argP,
+  );
+  return { ...p, trueAnomaly, currentRadius };
 }

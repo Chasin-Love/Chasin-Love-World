@@ -29,6 +29,22 @@ export function prng(seed: number): () => number {
   };
 }
 
+/* R84 — THE EXOPLANET SPICE. Every new world rides its own plane: mostly the
+   gentle near-coplanar band real systems form from (the caller's band), with
+   a spiced tail like the observed misaligned exoplanets — ~15% steep
+   (30–60°), ~5% near-polar (80–95°) — and a random sign, so some worlds
+   lean the other way. node/argP scatter around the full circle so every
+   orbit crosses the ecliptic at its OWN place, never one shared spine. */
+export function inclinedOrbitElements(r: () => number, gentleBand: number): { incl: number; node: number; argP: number } {
+  const roll = r();
+  let incl: number;
+  if (roll < 0.05) incl = ((80 + r() * 15) * Math.PI) / 180;
+  else if (roll < 0.2) incl = ((30 + r() * 30) * Math.PI) / 180;
+  else incl = (r() - 0.5) * gentleBand;
+  if (r() < 0.5) incl = -incl;
+  return { incl, node: r() * Math.PI * 2, argP: r() * Math.PI * 2 };
+}
+
 const GALAXY_NAME_POOL = [
   'Andromeda Reach', 'Triangulum Veil', 'Sombrero Halo', 'Whirlpool Crown',
   'Cartwheel Drift', 'Pinwheel Ember', 'Vesper Cascade', 'Lyra Bloom',
@@ -372,7 +388,7 @@ export function generateStellarSystemForGalaxy(gal: GalaxyData): CosmicBody[] {
       clouds: arche.clouds,
       nightside: arche.nightside,
       palette: arche.palette,
-      orbit: { a, speed: TAU / periodDays, phase: rnd() * TAU, incl: (rnd() - 0.5) * 0.24 },
+      orbit: { a, speed: TAU / periodDays, phase: rnd() * TAU, ...inclinedOrbitElements(rnd, 0.24) },
     });
   }
 
@@ -393,7 +409,7 @@ export function generateStellarSystemForGalaxy(gal: GalaxyData): CosmicBody[] {
       atmo: '#6fc2b4',
       ice: '#ffffff',
     },
-    orbit: { a: 220 + rnd() * 18, speed: TAU / 10000, phase: rnd() * TAU, incl: -0.15 + rnd() * 0.3 },
+    orbit: { a: 220 + rnd() * 18, speed: TAU / 10000, phase: rnd() * TAU, incl: -0.15 + rnd() * 0.3, node: rnd() * TAU, argP: rnd() * TAU },
   });
 
   /* a stellar nursery at the system edge — the Wisp Nebula grammar; the
@@ -413,7 +429,7 @@ export function generateStellarSystemForGalaxy(gal: GalaxyData): CosmicBody[] {
     note: `A stellar nursery drifting at the edge of the ${sys.starName} system.`,
     createdAt: now, radius: 7,
     palette: nebTints[(rnd() * nebTints.length) | 0],
-    orbit: { a: 285 + rnd() * 20, speed: TAU / 9000, phase: rnd() * TAU, incl: 0.3 },
+    orbit: { a: 285 + rnd() * 20, speed: TAU / 9000, phase: rnd() * TAU, incl: 0.3, node: rnd() * TAU, argP: rnd() * TAU },
   });
   return bodies;
 }

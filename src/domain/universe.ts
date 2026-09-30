@@ -20,7 +20,10 @@ export const MEANINGS: { id: Exclude<Meaning, null>; desc: string; color: string
   { id: 'unresolved', desc: 'still falling inward', color: '#8b93a8' },
 ];
 export interface Palette { deep: string; base: string; high: string; atmo: string; ice: string; }
-export interface Orbit { a: number; speed: number; phase: number; incl: number; }
+/* R84 — the ascending nodes: `node` (Ω) places the orbit plane's crossing line
+   around the star, `argP` (ω) orients the ellipse's periapsis within the plane.
+   Both optional radians — absent means the historical node-at-+X behavior. */
+export interface Orbit { a: number; speed: number; phase: number; incl: number; node?: number; argP?: number; }
 export interface CosmicBody {
   id: string;
   name: string;

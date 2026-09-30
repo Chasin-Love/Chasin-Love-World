@@ -7,7 +7,7 @@ import type { VaultFile, TrashedFile, VfsNode, VaultUser, FileVersion, VaultSecr
 import { VAULT_HOME_FOLDERS } from '../vault/storage/seeds';
 import { state, bucket, ensureBucket, newId, listeners, refreshSnapshot, EMPTY_DISK_SYNC, getState, rebindState } from './store';
 import { persistState, externalizeLargeDiaryAttachments, STORAGE_KEY, primeState, sanitizeDiaryEntries, normalizeVaultFiles, normalizeLegacyLock } from './persist';
-import { getReality, REALITIES, RAW_REALITIES, computeAllRealities, setRuntimeRealities, createGalaxyData, folderNameForReality, deriveFolderName, RealityMetaOverride, RealityConfig } from '../realities';
+import { getReality, REALITIES, RAW_REALITIES, computeAllRealities, setRuntimeRealities, createGalaxyData, folderNameForReality, deriveFolderName, RealityMetaOverride, RealityConfig, inclinedOrbitElements } from '../realities';
 import {
   delLocalPayload, delPayload, getPayload, putLocalPayload,
   procPalette, procRadius,
@@ -588,7 +588,7 @@ export const actions = {
         a: 170 + r() * 70,
         speed: TAU / (4000 + r() * 4000),
         phase: r() * TAU,
-        incl: (r() - 0.5) * 0.4,
+        ...inclinedOrbitElements(r, 0.4),
       },
     };
     bucket().bodies.push(body);

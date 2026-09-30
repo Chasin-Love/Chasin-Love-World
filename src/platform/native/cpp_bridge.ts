@@ -29,6 +29,9 @@ export interface KeplerBatchInput {
   phase: number[];
   incl: number[];
   speed: number[];
+  /* R84 ascending-node elements (radians) — optional, zeros = node-at-X */
+  node?: number[];
+  argP?: number[];
   simDays: number;
 }
 
@@ -169,6 +172,8 @@ class CosmosBridge {
           inclination: input.incl,
           speed: input.speed,
           simDays: input.simDays,
+          node: input.node ?? [],
+          argPeri: input.argP ?? [],
         },
       });
       return {
@@ -186,10 +191,11 @@ class CosmosBridge {
       };
       const pa = malloc(input.a), pe = malloc(input.e), pp = malloc(input.phase);
       const pi = malloc(input.incl), ps = malloc(input.speed);
+      const pn = malloc(input.node ?? []), pw = malloc(input.argP ?? []);
       const po = w._malloc!(n * 3 * 8), pr = w._malloc!(n * 8), pt = w._malloc!(n * 8);
       try {
-        w.ccall('cosmos_kepler_batch', null, ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-          [pa, pe, pp, pi, ps, n, input.simDays, po, pr, pt]);
+        w.ccall('cosmos_kepler_batch', null, ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+          [pa, pe, pp, pi, ps, n, input.simDays, pn, pw, po, pr, pt]);
         const xyz = new Float64Array(n * 3);
         xyz.set(w.HEAPF64!.subarray(po / 8, po / 8 + n * 3));
         const radius = new Float64Array(n);
@@ -199,6 +205,7 @@ class CosmosBridge {
         return { xyz, radius, trueAnomaly };
       } finally {
         w._free!(pa); w._free!(pe); w._free!(pp); w._free!(pi); w._free!(ps);
+        w._free!(pn); w._free!(pw);
         w._free!(po); w._free!(pr); w._free!(pt);
       }
     }
@@ -319,7 +326,7 @@ class CosmosBridge {
     const radius = new Float64Array(n);
     const trueAnomaly = new Float64Array(n);
     for (let i = 0; i < n; i++) {
-      const r = keplerPositionTS(input.a[i], input.e[i], input.phase[i], input.incl[i], input.simDays, input.speed[i]);
+      const r = keplerPositionTS(input.a[i], input.e[i], input.phase[i], input.incl[i], input.simDays, input.speed[i], input.node?.[i] ?? 0, input.argP?.[i] ?? 0);
       xyz[3 * i] = r.x; xyz[3 * i + 1] = r.y; xyz[3 * i + 2] = r.z;
       radius[i] = r.currentRadius;
       trueAnomaly[i] = r.trueAnomaly;
@@ -436,7 +443,7 @@ function kindFromCode(code: number): string {
 
 function keplerPositionTS(
   a: number, eccentricity: number, phase: number, inclination: number,
-  simDays: number, speed: number,
+  simDays: number, speed: number, node = 0, argP = 0,
 ): { x: number; y: number; z: number; trueAnomaly: number; currentRadius: number } {
   const e = Math.min(0.85, Math.max(0, eccentricity));
   const M = (phase + simDays * speed) % (2 * Math.PI);
@@ -446,12 +453,18 @@ function keplerPositionTS(
   }
   const trueAnomaly = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
   const currentRadius = (a * (1 - e * e)) / (1 + e * Math.cos(trueAnomaly));
-  /* true-3D inclined plane — mirrors physicsEngine.calculateKeplerPosition */
-  const zPlane = Math.sin(trueAnomaly) * currentRadius;
+  /* true-3D inclined plane — mirrors physicsEngine.calculateKeplerPosition:
+     ω in-plane, i about the node line, Ω to the node's azimuth (+X toward +Z) */
+  const x0 = Math.cos(trueAnomaly) * currentRadius;
+  const z0 = Math.sin(trueAnomaly) * currentRadius;
+  const x1 = x0 * Math.cos(argP) - z0 * Math.sin(argP);
+  const z1 = x0 * Math.sin(argP) + z0 * Math.cos(argP);
+  const y = z1 * Math.sin(inclination);
+  const z1t = z1 * Math.cos(inclination);
   return {
-    x: Math.cos(trueAnomaly) * currentRadius,
-    y: zPlane * Math.sin(inclination),
-    z: zPlane * Math.cos(inclination),
+    x: x1 * Math.cos(node) - z1t * Math.sin(node),
+    y,
+    z: x1 * Math.sin(node) + z1t * Math.cos(node),
     trueAnomaly,
     currentRadius,
   };

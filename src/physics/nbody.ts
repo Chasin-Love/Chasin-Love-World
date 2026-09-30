@@ -67,6 +67,7 @@ export interface GravityNode {
   isStar: boolean;
   /* canonical orbital elements — set at sync time, NEVER integrated */
   a: number; e0: number; phase: number; incl: number; speed: number; /* rad/day */
+  node: number; argP: number; /* R84 — node azimuth / periapsis angle (rad), canonical */
   /* per-frame feed from the engine's exact Kepler solve */
   cx: number; cy: number; cz: number;   /* canonical position */
   trueAnomaly: number;                  /* f, from the same solve */
@@ -107,11 +108,12 @@ export class LivingGravityField {
   /** Rebuild the roster to match the reality's bodies. Fresh or changed
       bodies start healed (zero element perturbation) — a new world is born
       on its divine path, then feels its neighbours. */
-  sync(entries: { id: string; massKg: number; isStar: boolean; a: number; e0: number; phase: number; incl: number; speed: number }[]): void {
+  sync(entries: { id: string; massKg: number; isStar: boolean; a: number; e0: number; phase: number; incl: number; speed: number; node?: number; argP?: number }[]): void {
     const prev = new Map(this.nodes.map((n) => [n.id, n]));
     this.nodes = entries.map((e) => {
       const old = prev.get(e.id);
-      const same = old && Math.abs(old.massKg - e.massKg) < 1e-6 && old.a === e.a && old.e0 === e.e0 && old.speed === e.speed;
+      const same = old && Math.abs(old.massKg - e.massKg) < 1e-6 && old.a === e.a && old.e0 === e.e0 && old.speed === e.speed
+        && old.node === (e.node ?? 0) && old.argP === (e.argP ?? 0);
       if (same) {
         old!.massKg = e.massKg;
         old!.massSolar = e.massKg / CONSTANTS.M_sun;
@@ -123,6 +125,7 @@ export class LivingGravityField {
         massSolar: e.massKg / CONSTANTS.M_sun,
         isStar: e.isStar,
         a: e.a, e0: e.e0, phase: e.phase, incl: e.incl, speed: e.speed,
+        node: e.node ?? 0, argP: e.argP ?? 0,
         cx: 0, cy: 0, cz: 0,
         trueAnomaly: 0,
         eP: 0, omegaP: 0, incP: 0,
@@ -203,8 +206,8 @@ export class LivingGravityField {
       const rx = nd.cx / rMag, ry = nd.cy / rMag, rz = nd.cz / rMag;
       /* canonical velocity by numeric derivative of the exact solution */
       const d = 0.05;
-      const p1 = calculateKeplerPosition(nd.a, nd.e0, nd.phase, nd.incl, simDays + d, nd.speed);
-      const p0 = calculateKeplerPosition(nd.a, nd.e0, nd.phase, nd.incl, simDays - d, nd.speed);
+      const p1 = calculateKeplerPosition(nd.a, nd.e0, nd.phase, nd.incl, simDays + d, nd.speed, nd.node, nd.argP);
+      const p0 = calculateKeplerPosition(nd.a, nd.e0, nd.phase, nd.incl, simDays - d, nd.speed, nd.node, nd.argP);
       let vx = (p1.x - p0.x) / (2 * d), vy = (p1.y - p0.y) / (2 * d), vz = (p1.z - p0.z) / (2 * d);
       const vDotR = vx * rx + vy * ry + vz * rz;
       vx -= vDotR * rx; vy -= vDotR * ry; vz -= vDotR * rz; /* transverse part */
@@ -251,19 +254,18 @@ export class LivingGravityField {
   }
 
   /** Osculating position of a body: the exact Kepler solver run on the
-      perturbed elements, with the apsidal precession applied as an in-plane
-      rotation (exact for the solver's node-at-+x geometry up to O(Δω·sin i),
-      irrelevant at precession angles ~10⁻⁴ rad). Returns the deviation from
-      the canonical position in scene units as well. */
+      perturbed elements. R84 — the apsidal precession folds into argP
+      (exactly in-plane now, whatever the node azimuth) and the nodal
+      breathing into the inclination, both about the real ascending node.
+      Returns the deviation from the canonical position in scene units. */
   perturbedPosition(nd: GravityNode, simDays: number): { x: number; y: number; z: number; deviation: number } {
     const eEff = Math.max(0, Math.min(E_MAX, nd.e0 + nd.eP));
-    const canon = calculateKeplerPosition(nd.a, nd.e0, nd.phase, nd.incl, simDays, nd.speed);
-    const pert = calculateKeplerPosition(nd.a, eEff, nd.phase, nd.incl + nd.incP, simDays, nd.speed);
-    const cw = Math.cos(nd.omegaP), sw = Math.sin(nd.omegaP);
+    const canon = calculateKeplerPosition(nd.a, nd.e0, nd.phase, nd.incl, simDays, nd.speed, nd.node, nd.argP);
+    const pert = calculateKeplerPosition(nd.a, eEff, nd.phase, nd.incl + nd.incP, simDays, nd.speed, nd.node, nd.argP + nd.omegaP);
     return {
-      x: pert.x * cw - pert.z * sw,
+      x: pert.x,
       y: pert.y,
-      z: pert.x * sw + pert.z * cw,
+      z: pert.z,
       deviation: Math.hypot(pert.x - canon.x, pert.y - canon.y, pert.z - canon.z),
     };
   }

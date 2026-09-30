@@ -129,7 +129,7 @@ export function defaultBodiesSource(id: string, name: string, colorA: string, co
       clouds: true,
       nightside: true,
       palette: { deep: '#0c1b33', base: '#10b981', high: '#6ee7b7', atmo: colorA, ice: '#e0f2fe' },
-      orbit: { a: 45, speed: Math.PI * 2 / 365, phase: 1.2, incl: 0.04 },
+      orbit: { a: 45, speed: Math.PI * 2 / 365, phase: 1.2, incl: 0.04, node: Math.random() * Math.PI * 2, argP: Math.random() * Math.PI * 2 },
     },
   ];
   return JSON.stringify(bodies, null, 2);

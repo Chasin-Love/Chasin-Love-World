@@ -1,7 +1,7 @@
 import { RealityConfig, RealityMetaOverride } from './types';
 import { solPrimeReality } from './solPrime';
 import { generateClustersForReality } from './clusterGenerator';
-import { generateGalaxiesForReality, prng, seedOf } from './galaxyGenerator';
+import { generateGalaxiesForReality, prng, seedOf, inclinedOrbitElements } from './galaxyGenerator';
 import { GalaxyData } from './hierarchyTypes';
 
 export * from './types';
@@ -139,7 +139,7 @@ export function buildRealityConfig(
       createdAt: now - 850 * day,
       radius: 2.8,
       palette: { deep: '#000000', base: '#0f172a', high: '#38bdf8', atmo: '#6fc2b4', ice: '#ffffff' },
-      orbit: { a: 220 + (i % 4) * 20, speed: TAU / (10000 + i * 500), phase: (i * 1.3) % TAU, incl: -0.15 + (i % 3) * 0.1 },
+      orbit: { a: 220 + (i % 4) * 20, speed: TAU / (10000 + i * 500), phase: (i * 1.3) % TAU, incl: -0.15 + (i % 3) * 0.1, node: Math.random() * TAU, argP: Math.random() * TAU },
     };
     updatedBodies.push(vaultBody);
   } else {
@@ -300,7 +300,7 @@ export function createNewRealityConfig(params: {
     createdAt: now - 900 * day,
     radius: 2.9,
     palette: { deep: '#000000', base: '#0b0f19', high: params.colorA, atmo: params.colorB, ice: '#ffffff' },
-    orbit: { a: 210, speed: TAU / 12000, phase: 1.2, incl: -0.1 },
+    orbit: { a: 210, speed: TAU / 12000, phase: 1.2, incl: -0.1, node: Math.random() * TAU, argP: Math.random() * TAU },
   };
 
   /* world names are drawn from a wide pool, seeded by this reality's own id —
@@ -320,7 +320,6 @@ export function createNewRealityConfig(params: {
     const semiMajor = 35 + p * 22 + Math.random() * 6;
     const speed = TAU / (1400 + p * 600);
     const phase = Math.random() * TAU;
-    const incl = (Math.random() - 0.5) * 0.18;
     generatedBodies.push({
       id: `${id}-planet-${p + 1}`,
       name: pName,
@@ -338,7 +337,7 @@ export function createNewRealityConfig(params: {
         atmo: params.colorA,
         ice: '#ffffff',
       },
-      orbit: { a: semiMajor, speed, phase, incl },
+      orbit: { a: semiMajor, speed, phase, ...inclinedOrbitElements(Math.random, 0.18) },
     });
   }
   generatedBodies.push(vaultBody);

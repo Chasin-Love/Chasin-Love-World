@@ -46,6 +46,8 @@ pub(crate) mod ffi {
             speed: *const c_double,
             n: c_int,
             sim_days: c_double,
+            node: *const c_double,
+            arg_peri: *const c_double,
             out_xyz: *mut c_double,
             out_radius: *mut c_double,
             out_true_anomaly: *mut c_double,
@@ -107,7 +109,8 @@ pub(crate) mod ffi {
     pub unsafe fn cosmos_kepler_batch(
         _a: *const c_double, _e: *const c_double, _phase: *const c_double,
         _incl: *const c_double, _speed: *const c_double, n: c_int,
-        _days: c_double, out_xyz: *mut c_double, out_radius: *mut c_double,
+        _days: c_double, _node: *const c_double, _arg_peri: *const c_double,
+        out_xyz: *mut c_double, out_radius: *mut c_double,
         out_anomaly: *mut c_double,
     ) {
         let n = n.max(0) as usize;

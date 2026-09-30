@@ -345,7 +345,7 @@ export type Weather = 'clear' | 'rain' | 'storm' | 'fog' | 'dust';
 //   moment 'brief, bright, gone' #e0785a · idea 'a seed, not yet a planet' #9fd8a8
 //   chapter 'an era of the life' #d8b48a · unresolved 'still falling inward' #8b93a8
 export interface Palette { deep: string; base: string; high: string; atmo: string; ice: string; }
-export interface Orbit  { a: number; speed: number; phase: number; incl: number; } // a in scene units (52 = 1 AU)
+export interface Orbit  { a: number; speed: number; phase: number; incl: number; node?: number; argP?: number; } // a in scene units (52 = 1 AU); R84: node Ω = ascending-node azimuth (rad), argP ω = periapsis angle (rad) — absent/0 = the historical node-at-+X plane
 export interface CosmicBody {
   id: string; name: string; kind: BodyKind; meaning: Meaning;
   note: string; createdAt: number; radius: number;
@@ -496,22 +496,29 @@ the original Eventide Vault." · `bubblePos [0,0,0]` · `bubbleSize 7500` · `co
 `colorB #f59e0b` · `starColor #ffb54d` · `galaxyCountHint 5` · 6 literal clusters · 5 literal
 galaxies · full literal home lineage.
 
-| # | id | name | kind | meaning | radius | orbit a / speed (rad/s) | phase | incl | extras | palette (deep / base / high / atmo / ice) |
-|:-:|:--|:--|:--|:--|--:|:--|--:|--:|:--|:--|
-| 0 | anchor | ANCHOR STAR | star | null | 6 | 0 / 0 | 0 | 0 | — | `#5a2a08 #ffb54d #fff3d9 #ffd9a0 #ffffff` |
-| 1 | cinder | Cinder | planet | moment | 1.15 | 26 / TAU/88 | 0.8 | 0.12 | — | `#1c1512 #6e5a4c #b39a83 #8a7462 #d8cfc4` |
-| 2 | veil | Veil | planet | dream | 1.9 | 38 / TAU/224 | 2.4 | 0.05 | clouds | `#2a1f14 #c9a86a #efd9a8 #e8cf9e #fff2d8` |
-| 3 | aurelia | Aurelia | planet | memory | 2.05 | 52 / TAU/365 | 4.2 | 0.0 | clouds, nightside | `#0b2d4d #1f6e52 #9db88a #7fc4e8 #eef6ff` |
-| 4 | rust | Rust | planet | project | 1.5 | 68 / TAU/687 | 1.1 | 0.09 | — | `#2b120c #a34b2a #d98d5f #d9a184 #f0d9c8` |
-| 5 | goliath | Goliath | planet | chapter | 4.3 | 100 / TAU/1600 | 5.4 | 0.04 | rings, clouds | `#241a12 #b08d5f #e8d3a8 #e0c493 #f5ead0` |
-| 6 | mirror | Mirror | planet | person | 1.75 | 132 / TAU/2600 | 3.0 | 0.14 | — | `#10222e #4f7f96 #bcd9e6 #a8d8ea #f2fbff` |
-| 7 | hollow | Hollow | dwarf | idea | 0.8 | 160 / TAU/3800 | 0.2 | 0.22 | — | `#191d24 #5c6672 #9aa7b4 #7d8b99 #dfe6ec` |
-| 8 | wisp | Wisp Nebula | nebula | idea | 7 | 205 / TAU/9000 | 2.0 | 0.3 | — | `#0a2a2c #2f8f83 #9fe8d8 #6fc2b4 #e8fff8` |
-| 9 | eventide | Eventide | vault | null | 2.6 | 250 / TAU/12000 | 4.6 | −0.18 | THE black hole (§7) | `#000000 #14100c #3a2c1c #6fc2b4 #ffffff` |
+| # | id | name | kind | meaning | radius | orbit a / speed (rad/s) | phase | incl | node Ω / ω (deg, J2000) | extras | palette (deep / base / high / atmo / ice) |
+|:-:|:--|:--|:--|:--|--:|:--|--:|--:|:--|:--|:--|
+| 0 | anchor | ANCHOR STAR | star | null | 6 | 0 / 0 | 0 | 0 | — | — | `#5a2a08 #ffb54d #fff3d9 #ffd9a0 #ffffff` |
+| 1 | cinder | Cinder | planet | moment | 1.15 | 26 / TAU/88 | 0.8 | 0.12 | 48.33 / 29.13 (Mercury) | — | `#1c1512 #6e5a4c #b39a83 #8a7462 #d8cfc4` |
+| 2 | veil | Veil | planet | dream | 1.9 | 38 / TAU/224 | 2.4 | 0.05 | 76.68 / 54.92 (Venus) | clouds | `#2a1f14 #c9a86a #efd9a8 #e8cf9e #fff2d8` |
+| 3 | aurelia | Aurelia | planet | memory | 2.05 | 52 / TAU/365 | 4.2 | 0.0 | 0 / 102.94 (Earth ϖ) | clouds, nightside | `#0b2d4d #1f6e52 #9db88a #7fc4e8 #eef6ff` |
+| 4 | rust | Rust | planet | project | 1.5 | 68 / TAU/687 | 1.1 | 0.09 | 49.56 / 286.50 (Mars) | — | `#2b120c #a34b2a #d98d5f #d9a184 #f0d9c8` |
+| 5 | goliath | Goliath | planet | chapter | 4.3 | 100 / TAU/1600 | 5.4 | 0.04 | 100.47 / 274.25 (Jupiter) | rings, clouds | `#241a12 #b08d5f #e8d3a8 #e0c493 #f5ead0` |
+| 6 | mirror | Mirror | planet | person | 1.75 | 132 / TAU/2600 | 3.0 | 0.14 | 74.02 / 96.94 (Uranus) | — | `#10222e #4f7f96 #bcd9e6 #a8d8ea #f2fbff` |
+| 7 | hollow | Hollow | dwarf | idea | 0.8 | 160 / TAU/3800 | 0.2 | 0.22 | 110.30 / 113.76 (Pluto) | — | `#191d24 #5c6672 #9aa7b4 #7d8b99 #dfe6ec` |
+| 8 | wisp | Wisp Nebula | nebula | idea | 7 | 205 / TAU/9000 | 2.0 | 0.3 | 250 / 35 (no analogue) | — | `#0a2a2c #2f8f83 #9fe8d8 #6fc2b4 #e8fff8` |
+| 9 | eventide | Eventide | vault | null | 2.6 | 250 / TAU/12000 | 4.6 | −0.18 | 200 / 80 (retrograde vault) | THE black hole (§7) | `#000000 #14100c #3a2c1c #6fc2b4 #ffffff` |
 
-`TAU = 2π`. Notes carry the metaphor (Cinder: "Small, fast, scorched close to the light. A moment
-that burned bright and brief." · Aurelia: "The inhabited one. Oceans, weather, city light on the
-dark side." · Eventide: "A quiet black hole. Digital storage object.") — preserve them.
+`TAU = 2π`. **R84 — the node/argP column:** the ascending-node azimuth Ω and periapsis
+argument ω arrive in the seeds as exact radians — `(deg · π) / 180` — and are the real
+J2000 elements from JPL's "Approximate Positions of the Planets" Table 1
+(ω = ϖ − Ω; for Aurelia, i = 0 makes Ω degenerate so argP carries the real longitude of
+perihelion ϖ = 102.94°). The solver composes the full plane: rotate in-plane by ω, tilt
+about the node line by i, carry the node to azimuth Ω. Every orbit crosses the ecliptic
+at its own place, exactly like the real sky. Notes carry the metaphor (Cinder: "Small,
+fast, scorched close to the light. A moment that burned bright and brief." · Aurelia:
+"The inhabited one. Oceans, weather, city light on the dark side." · Eventide: "A quiet
+black hole. Digital storage object.") — preserve them.
 
 Sol-Prime ships exactly **3 diary entries**: `e-sol-1` (aurelia, "First light on the water",
 tags `['origin','sea']`, bookmarked), `e-sol-2` (aurelia, "Weather report, interior",
@@ -676,11 +683,16 @@ Memoization: full solve once per body signature
   note: 'A quiet black hole. Digital storage object.',
   createdAt: now - 900 * day, radius: 2.6,
   palette: { deep: '#000000', base: '#14100c', high: '#3a2c1c', atmo: '#6fc2b4', ice: '#ffffff' },
-  orbit: { a: 250, speed: TAU/12000, phase: 4.6, incl: -0.18 } }
+  /* R84 — node 200°/argP 80°: the retrograde vault crosses the ecliptic
+     opposite the planets, in the persisted seed (index.ts's config twin
+     keeps its own rounded values) */
+  orbit: { a: 250, speed: TAU/12000, phase: 4.6, incl: -0.18,
+           node: (200.0 * Math.PI) / 180, argP: (80.0 * Math.PI) / 180 } }
 ```
 
 - Every reality gets exactly one vault hole; missing ones are auto-added:
-  `{ id: '<reality>-vault-blackhole', radius: 2.8, orbit: { a: 220 + (i%4)·20, speed: TAU/(10000+i·500), incl: −0.15 + (i%3)·0.1 } }`.
+  `{ id: '<reality>-vault-blackhole', radius: 2.8, orbit: { a: 220 + (i%4)·20, speed: TAU/(10000+i·500), incl: −0.15 + (i%3)·0.1, node/argP: random } }`
+  — R84: auto-vaults scatter their node and periapsis around the full circle.
 - Profile: `eccentricity 0.0, density 1e12, albedo 0.00, tiltDeg 30.0`. `isRelativistic` is true
   for `kind 'hole' | 'vault'`. Mass forced to **10 M☉**.
 - `eventide` is undeletable (same protection as the anchor).

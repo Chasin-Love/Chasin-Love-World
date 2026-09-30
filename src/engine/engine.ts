@@ -30,7 +30,7 @@ import type { CosmicBody, DiaryEntry } from '../domain/universe';
 import { REALITIES, RealityConfig, GalaxyClusterData, GalaxyData } from '../realities';
 import { HIERARCHY_DIALS } from '../realities/hierarchyStages';
 import { generateStellarSystemForGalaxy } from '../realities/galaxyGenerator';
-import { calculateKeplerPosition, calculatePhysics } from '../physics/physicsEngine';
+import { calculateKeplerPosition, calculatePhysics, tiltInPlaneVector } from '../physics/physicsEngine';
 import { LivingGravityField, lensHaloFor, dynamicMassKg, gravityTelemetry, SCENE_UNITS_PER_AU } from '../physics/nbody';
 import { cosmosBridge } from '../platform/native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../platform/performance';
@@ -156,7 +156,7 @@ interface RuntimeBody {
   streakRing?: THREE.Mesh;
   streakTarget?: number;
   streakDays?: number;
-  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number }[];
+  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number; node?: number }[];
   extras?: THREE.ShaderMaterial[];
   orbitLine?: THREE.LineLoop;
   ghost: number;
@@ -186,7 +186,7 @@ interface InnerPlanet {
   spinMesh?: THREE.Mesh;
   spinRate?: number;
   cloudSpinRate?: number;
-  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number }[];
+  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number; node?: number }[];
   orbitLine?: THREE.LineLoop;
   streakRing?: THREE.Mesh;
   streakTarget?: number;
@@ -1408,7 +1408,7 @@ export class UniverseEngine {
       const periodDays = (Math.PI * 2) / speed;
       for (let i = 0; i <= segments; i++) {
         const simStep = (i / segments) * periodDays;
-        const pos = calculateKeplerPosition(data.orbit.a, e, data.orbit.phase, data.orbit.incl, simStep, speed);
+        const pos = calculateKeplerPosition(data.orbit.a, e, data.orbit.phase, data.orbit.incl, simStep, speed, data.orbit.node ?? 0, data.orbit.argP ?? 0);
         pts.push(pos.x, pos.y, pos.z);
       }
       const og = new THREE.BufferGeometry();
@@ -1433,8 +1433,11 @@ export class UniverseEngine {
       (i, a) => {
         const ang = R() * Math.PI * 2;
         const r = 78 + R() * 15 + Math.pow(R(), 3) * 4;
-        const band = (R() + R() + R() - 1.5) / 1.5; /* gaussian-ish thickness */
-        a[i * 3] = Math.cos(ang) * r; a[i * 3 + 1] = band * 1.7; a[i * 3 + 2] = Math.sin(ang) * r;
+        /* R84 — a real toroidal belt: each speck rides its own small
+           orbital inclination (gaussian σ≈6°) instead of one flat sheet */
+        const inc = (R() + R() + R() - 1.5) / 1.5 * 0.34;
+        const band = (R() + R() + R() - 1.5) / 1.5 * 0.9; /* residual local thickness */
+        a[i * 3] = Math.cos(ang) * r; a[i * 3 + 1] = Math.sin(inc) * r + band; a[i * 3 + 2] = Math.sin(ang) * r;
       },
       () => 0.22 + R() * 0.6,
       () => { const w = 0.38 + R() * 0.3; const warm = R() * 0.1; return [w + warm, w * 0.86, w * 0.7] as [number, number, number]; },
@@ -1459,7 +1462,9 @@ export class UniverseEngine {
       for (let k = 0; k < PER_SHAPE; k++) {
         const ang = R() * Math.PI * 2;
         const r = 78 + R() * 15;
-        const y = (R() + R() + R() - 1.5) / 1.5 * 1.9;
+        /* R84 — the rocks follow the same per-speck inclination as the dust */
+        const inc = (R() + R() + R() - 1.5) / 1.5 * 0.34;
+        const y = Math.sin(inc) * r + (R() + R() + R() - 1.5) / 1.5 * 1.1;
         const sc = 0.22 + Math.pow(R(), 2.4) * 1.45; /* many pebbles, few boulders */
         const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(R() * Math.PI * 2, R() * Math.PI * 2, R() * Math.PI * 2));
         const pos = new THREE.Vector3(Math.cos(ang) * r, y, Math.sin(ang) * r);
@@ -1883,8 +1888,10 @@ export class UniverseEngine {
       node.e0 = phys.eccentricity;
       node.phase = o.phase;
       node.incl = o.incl;
+      node.node = o.node ?? 0;
+      node.argP = o.argP ?? 0;
       node.speed = o.speed || 0.01;
-      const kp = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01);
+      const kp = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01, o.node ?? 0, o.argP ?? 0);
       node.cx = kp.x; node.cy = kp.y; node.cz = kp.z;
       node.trueAnomaly = kp.trueAnomaly;
     }
@@ -3436,8 +3443,10 @@ void main(){
       (i, a) => {
         const ang = R() * Math.PI * 2;
         const r = beltR - 8 + R() * 16 + Math.pow(R(), 3) * 4;
-        const band = (R() + R() + R() - 1.5) / 1.5; /* gaussian-ish thickness */
-        a[i * 3] = Math.cos(ang) * r; a[i * 3 + 1] = band * 1.7; a[i * 3 + 2] = Math.sin(ang) * r;
+        /* R84 — same toroidal grammar as the home belt */
+        const inc = (R() + R() + R() - 1.5) / 1.5 * 0.34;
+        const band = (R() + R() + R() - 1.5) / 1.5 * 0.9;
+        a[i * 3] = Math.cos(ang) * r; a[i * 3 + 1] = Math.sin(inc) * r + band; a[i * 3 + 2] = Math.sin(ang) * r;
       },
       () => 0.22 + R() * 0.6,
       () => { const w = 0.38 + R() * 0.3; const warm = R() * 0.1; return [w + warm, w * 0.86, w * 0.7] as [number, number, number]; },
@@ -3461,7 +3470,9 @@ void main(){
       for (let k = 0; k < PER_SHAPE; k++) {
         const ang = R() * Math.PI * 2;
         const r = beltR - 8 + R() * 16;
-        const y = (R() + R() + R() - 1.5) / 1.5 * 1.9;
+        /* R84 — rocks follow the same per-speck inclination as the dust */
+        const inc = (R() + R() + R() - 1.5) / 1.5 * 0.34;
+        const y = Math.sin(inc) * r + (R() + R() + R() - 1.5) / 1.5 * 1.1;
         const sc = 0.22 + Math.pow(R(), 2.4) * 1.45; /* many pebbles, few boulders */
         const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(R() * Math.PI * 2, R() * Math.PI * 2, R() * Math.PI * 2));
         const pos = new THREE.Vector3(Math.cos(ang) * r, y, Math.sin(ang) * r);
@@ -3506,7 +3517,7 @@ void main(){
     const periodDays = (Math.PI * 2) / speed;
     for (let i = 0; i <= segments; i++) {
       const simStep = (i / segments) * periodDays;
-      const pos = calculateKeplerPosition(data.orbit.a, e, data.orbit.phase, data.orbit.incl, simStep, speed);
+      const pos = calculateKeplerPosition(data.orbit.a, e, data.orbit.phase, data.orbit.incl, simStep, speed, data.orbit.node ?? 0, data.orbit.argP ?? 0);
       pts.push(pos.x, pos.y, pos.z);
     }
     const og = new THREE.BufferGeometry();
@@ -3556,7 +3567,7 @@ void main(){
     for (const p of sys.planets) {
       const o = p.data.orbit;
       const phys = calculatePhysics(p.data, this.simDays);
-      const pos = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01);
+      const pos = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01, o.node ?? 0, o.argP ?? 0);
       p.group.position.set(pos.x, pos.y, pos.z);
 
       /* hover pulse — the pointer's world swells gently, like home */
@@ -3606,11 +3617,12 @@ void main(){
       }
       p.moons.forEach((m) => {
         const ma = m.phase + this.simDays * m.speed;
-        /* each moon rides its OWN inclined plane — no shared moon-sheet */
+        /* same R84 moon planes in the isolated systems — own tilt, own node */
+        const mp = tiltInPlaneVector(Math.cos(ma) * m.a, Math.sin(ma) * m.a, m.incl ?? 0, m.node ?? 0);
         m.mesh.position.set(
-          Math.cos(ma) * m.a,
-          Math.sin(ma * 0.7) * m.a * 0.12 * Math.cos(m.incl ?? 0) + Math.sin(ma) * m.a * Math.sin(m.incl ?? 0),
-          Math.sin(ma) * m.a * Math.cos(m.incl ?? 0),
+          mp.x,
+          mp.y + Math.sin(ma * 0.7) * m.a * 0.12 * Math.cos(m.incl ?? 0),
+          mp.z,
         );
       });
 
@@ -4634,6 +4646,7 @@ void main(){
           speed: (Math.PI * 2) / (14 + i * 8),
           phase: seed * 6.28,
           incl: 0.18 + seed * 0.3,
+          node: hash(i + 3, b.data.id.length + 5) * Math.PI * 2,
         });
       }
     });
@@ -4680,6 +4693,7 @@ void main(){
             speed: (Math.PI * 2) / (14 + i * 8),
             phase: seed * 6.28,
             incl: 0.18 + seed * 0.3,
+            node: hash(i + 3, p.data.id.length + 5) * Math.PI * 2,
           });
         }
       }
@@ -5724,7 +5738,7 @@ this.updateBodies(dt);
         pz = this.keplerCache.xyz[3 * i + 2];
       } else {
         const phys = calculatePhysics(b.data, this.simDays);
-        const pos = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01);
+        const pos = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01, o.node ?? 0, o.argP ?? 0);
         px = pos.x; py = pos.y; pz = pos.z;
       }
       b.group.position.set(px, py, pz);
@@ -5797,11 +5811,13 @@ this.updateBodies(dt);
 
       b.moons.forEach((m) => {
         const ma = m.phase + this.simDays * m.speed;
-        /* each moon rides its OWN inclined plane — no shared moon-sheet */
+        /* each moon rides its OWN inclined plane at its OWN node — no shared
+           moon-sheet, and no shared crossing line either (R84) */
+        const mp = tiltInPlaneVector(Math.cos(ma) * m.a, Math.sin(ma) * m.a, m.incl ?? 0, m.node ?? 0);
         m.mesh.position.set(
-          Math.cos(ma) * m.a,
-          Math.sin(ma * 0.7) * m.a * 0.12 * Math.cos(m.incl ?? 0) + Math.sin(ma) * m.a * Math.sin(m.incl ?? 0),
-          Math.sin(ma) * m.a * Math.cos(m.incl ?? 0),
+          mp.x,
+          mp.y + Math.sin(ma * 0.7) * m.a * 0.12 * Math.cos(m.incl ?? 0),
+          mp.z,
         );
         m.mesh.visible = b.fade * sysW * (1 - b.ghost) > 0.05;
       });
@@ -5856,10 +5872,13 @@ this.updateBodies(dt);
         const mEarth = Math.pow(Math.max(0.05, wb.data.radius / 2.05), 3);
         const amp = Math.min(0.22, 0.028 * (mEarth / aAU));
         const ang = i * 2.39996 + this.simDays * (wb.data.orbit.speed || 0.01);
-        const inc = wb.data.orbit.incl;
-        wobbleX += Math.cos(ang) * amp;
-        wobbleY += Math.sin(ang) * amp * Math.sin(inc);
-        wobbleZ += Math.sin(ang) * amp * Math.cos(inc);
+        const o = wb.data.orbit;
+        /* R84 — the tug points along the world's own full plane geometry
+           (node + periapsis), not a shared X-axis node line */
+        const tug = tiltInPlaneVector(Math.cos(ang) * amp, Math.sin(ang) * amp, o.incl, o.node ?? 0, o.argP ?? 0);
+        wobbleX += tug.x;
+        wobbleY += tug.y;
+        wobbleZ += tug.z;
       }
       this.anchorGroup.position.set(wobbleX, wobbleY, wobbleZ);
 
@@ -5941,6 +5960,8 @@ this.updateBodies(dt);
       const phase: number[] = [];
       const incl: number[] = [];
       const speed: number[] = [];
+      const node: number[] = [];
+      const argP: number[] = [];
       for (const b of this.bodies) {
         const o = b.data.orbit;
         a.push(o.a);
@@ -5953,8 +5974,10 @@ this.updateBodies(dt);
         phase.push(o.phase);
         incl.push(o.incl);
         speed.push(o.speed || 0.01);
+        node.push(o.node ?? 0);
+        argP.push(o.argP ?? 0);
       }
-      const res = await cosmosBridge.keplerBatch({ a, e, phase, incl, speed, simDays: this.simDays });
+      const res = await cosmosBridge.keplerBatch({ a, e, phase, incl, speed, node, argP, simDays: this.simDays });
       /* bodies may have resynced mid-flight — only accept a matching count */
       if (res.xyz.length === this.bodies.length * 3) {
         this.keplerCache.xyz = res.xyz;
