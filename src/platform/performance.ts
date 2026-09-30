@@ -5,7 +5,7 @@
  * users pay no sampling or global-object overhead beyond this tiny module.
  */
 
-export interface UniversePerformanceSnapshot {
+interface UniversePerformanceSnapshot {
   enabled: boolean;
   elapsedMs: number;
   frames: number;

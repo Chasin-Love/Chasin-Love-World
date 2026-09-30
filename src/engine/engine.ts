@@ -8,10 +8,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import {
   starVert, starFrag, planetVert, planetFrag, cloudFrag, atmoFrag,
-  ringVert, ringFrag, discFrag, nebulaVert, nebulaFrag, pointsVert, pointsFrag,
+  ringVert, ringFrag, nebulaVert, nebulaFrag, pointsVert, pointsFrag,
   terrainVert, terrainFrag, skyFrag,
-  coronaVert, coronaFrag, backdropVert, backdropFrag,
-  multiverseVert, multiverseFrag, asteroidVert, asteroidFrag,
+  coronaVert, coronaFrag, 
+  asteroidVert, asteroidFrag,
   exoplanetPlateVert, exoplanetPlateFrag,
   demonCoreVert, demonCoreFrag,
   multiverseBoundaryVert, multiverseBoundaryFrag,
@@ -23,7 +23,7 @@ import { LENS_UNIFORMS_GLSL, LENS_WARP_GLSL, LENS_POINT_GLSL } from './surface/s
 import { createBlackHole, updateRaymarchUniforms, type BlackHoleVisual } from './blackholeRaymarch';
 import { getBlackHoleParams } from './blackholeParams';
 import { canUseRaymarchBlackHole, isSoftwareRasterizer, probeCapability, pixelRatioFor, getQualityTier, QUALITY_CHANGE_EVENT } from './capability';
-import { getRaymarchOverride, setRaymarchStatus, RAYMARCH_OVERRIDE_EVENT, type RaymarchStatus } from './blackholeTier';
+import { getRaymarchOverride, setRaymarchStatus, RAYMARCH_OVERRIDE_EVENT } from './blackholeTier';
 import { CameraRig } from './cameraRig';
 import { getCameraMemory, setCameraMemory, clearCameraMemory, type CameraMemory } from './cameraMemory';
 import type { CosmicBody, DiaryEntry } from '../domain/universe';
@@ -36,7 +36,7 @@ import { cosmosBridge } from '../platform/native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../platform/performance';
 import { isDesktop } from '../platform/desktop/adapter';
 import { ensureSkyFor, getActiveSkySpec, type ActiveSkySpec } from '../platform/sky/skyRegistry';
-import { MOOD_HEX, type AuroraSignal, type EchoEntry } from '../platform/sentiment/sentiment';
+import { MOOD_HEX, type AuroraSignal } from '../platform/sentiment/sentiment';
 import {
   WEB_CEILING,
   MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,
@@ -73,7 +73,7 @@ interface ShootingMeteor {
   size: number;
 }
 
-export interface EngineCallbacks {
+interface EngineCallbacks {
   /** R74 — `disk` is THE HERALD'S DISK: the hovered object's projected screen
       circle (center + radius, in CSS px), so the hover card can anchor
       OUTSIDE the object instead of standing on it. Re-emitted ~8 Hz while

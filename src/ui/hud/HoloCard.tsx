@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface HoverDisk { cx: number; cy: number; r: number }
-export interface HoloStem { x1: number; y1: number; x2: number; y2: number }
+interface HoloStem { x1: number; y1: number; x2: number; y2: number }
 
 /** THE HERALD'S PLACEMENT (R74) — the card never stands on the thing it
     heralds. All four sides of the disk are scored (clamped penetration into

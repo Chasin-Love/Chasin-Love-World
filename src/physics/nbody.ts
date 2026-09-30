@@ -60,7 +60,7 @@ const E_MAX = 0.6;
 const INC_MAX = 0.35;        /* rad of inclination breathing (~20°) */
 const RATE_CLAMP = 0.02;     /* max |d(element)/dt| per day — pathological-mass brake */
 
-export interface GravityNode {
+interface GravityNode {
   id: string;
   massSolar: number;
   massKg: number;
@@ -81,7 +81,7 @@ export interface GravityNode {
   guarded: boolean;
 }
 
-export interface GravityTelemetry {
+interface GravityTelemetry {
   deviationAU: number;
   dE: number;
   dOmegaDeg: number;

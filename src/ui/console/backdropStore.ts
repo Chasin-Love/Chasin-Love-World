@@ -14,11 +14,11 @@ import { useCallback, useEffect, useState } from 'react';
 const DB_NAME = 'chasin-universe-ui';
 const STORE = 'backdrop';
 const KEY = 'active';
-export const BACKDROP_MAX_BYTES = 150 * 1024 * 1024; // the night stays lighter than this
+const BACKDROP_MAX_BYTES = 150 * 1024 * 1024; // the night stays lighter than this
 
-export type BackdropKind = 'image' | 'video'; // image covers GIFs (animated natively)
+type BackdropKind = 'image' | 'video'; // image covers GIFs (animated natively)
 
-export interface BackdropRecord {
+interface BackdropRecord {
   kind: BackdropKind;
   mime: string;
   name: string;
@@ -65,13 +65,13 @@ async function deleteRecord(): Promise<void> {
   await withStore('readwrite', (s) => s.delete(KEY));
 }
 
-export function kindForMime(mime: string): BackdropKind | null {
+function kindForMime(mime: string): BackdropKind | null {
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   return null;
 }
 
-export interface ConsoleBackdrop {
+interface ConsoleBackdrop {
   kind: 'shader' | BackdropKind;
   url: string | null;
   dim: number;

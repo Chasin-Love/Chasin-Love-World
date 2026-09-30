@@ -18,7 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, ArrowDownToLine, RotateCw, Rocket, Check } from 'lucide-react';
 
-export type UpdaterPhase = 'idle' | 'downloading' | 'installing' | 'relaunching';
+type UpdaterPhase = 'idle' | 'downloading' | 'installing' | 'relaunching';
 type UpdateHandle = {
   version: string;
   downloadAndInstall(cb?: (event: { event: string; data: { contentLength?: number; chunkLength?: number } }) => void): Promise<void>;
@@ -77,7 +77,7 @@ function UpdateStar({ phase, progress }: { phase: UpdaterPhase; progress: number
 
 /* THE BODY — everything the traveler sees, staged by whoever mounts it.
    Pure presentation: no Tauri, no timers, no surprises. */
-export function UpdaterCardBody({ version, phase, progress, onApply, onLater }: {
+function UpdaterCardBody({ version, phase, progress, onApply, onLater }: {
   version: string;
   phase: UpdaterPhase;
   progress: number;

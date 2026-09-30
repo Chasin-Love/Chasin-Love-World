@@ -75,7 +75,7 @@ export function computeAurora(entries: DiaryEntry[], now = Date.now()): AuroraSi
   return { weights: norm, intensity, storm, dominant };
 }
 
-export interface EchoEntry {
+interface EchoEntry {
   entry: DiaryEntry;
   planetName: string;
   planetId: string;

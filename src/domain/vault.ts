@@ -1,7 +1,7 @@
 /* DOMAIN — VAULT (Eventide EFS, files, users, secrets) — R52: split out of src/types.ts (the single 400-line type hub).
    No imports outside the domain — the vault is self-describing.Changes here are API changes: check inbound importers with npm run audit:arch. */
 export type VaultKind = 'document' | 'image' | 'audio' | 'video' | 'dataset' | 'archive' | 'iso' | 'exe' | 'application' | 'game' | 'other';
-export type VfsNodeType = 'dir' | 'file';
+type VfsNodeType = 'dir' | 'file';
 export interface VfsNode {
   id: string;
   type: VfsNodeType;
@@ -28,7 +28,7 @@ export interface VfsShadow {
   tree: Record<string, VfsNode>;  /* frozen metadata tree (payload ids kept,
                                      inline content stripped — extents shared) */
 }
-export interface EfsSuperblock {
+interface EfsSuperblock {
   uuid: string;
   label: string;             /* 'eventide-efs' */
   createdAt: number;
@@ -53,7 +53,7 @@ export interface VfsState {
   shadows: VfsShadow[];
   scrub?: EfsScrubReport;
 }
-export interface VaultLock {
+interface VaultLock {
   version: 1;
   salt: string;
   verifier: string;
@@ -114,7 +114,7 @@ export interface VaultUser {
   kdfRounds?: number;
 }
 export interface PasswordField { k: string; v: string; }
-export interface PasswordHistoryEntry { secret: string; changedAt: number; }
+interface PasswordHistoryEntry { secret: string; changedAt: number; }
 export interface PasswordRecord {
   id: string;
   label: string;

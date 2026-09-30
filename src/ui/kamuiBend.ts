@@ -132,7 +132,7 @@ export function playKamuiBend(durationMs = SWALLOW_MS): void {
   raf = requestAnimationFrame(step);
 }
 
-export function stopKamuiBend(): void {
+function stopKamuiBend(): void {
   if (raf) cancelAnimationFrame(raf);
   raf = 0;
   const displace = el<SVGFEDisplacementMapElement>('kamui-bend-displace');

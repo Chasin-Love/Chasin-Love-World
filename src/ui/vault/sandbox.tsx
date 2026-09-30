@@ -1,46 +1,39 @@
 import { AtmosphereSynth } from './atmosphere';
-import { STORAGE_KEYS } from '../../platform/storageKeys';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { actions, newId } from '../../state';
-import { prettyPrint } from '../format';
-import type { MonacoHandle } from '../vault/MonacoCodeEditor';
 
 /* the real editor (VS Code engine) — loaded in its own chunk on first open */
 const MonacoCodeEditor = lazy(() =>
   import('./MonacoCodeEditor').then((m) => ({ default: m.MonacoCodeEditor })),
 );
 import {
-  authorizeVaultFile, checkVerifier, clearPayloadSession, decryptRecords, dedupeImport, encryptRecords,
-  isSealHardened, isVaultFileAuthorized, isVaultFileLocked, novaScan, importVaultExport, revokeVaultFileAuthorization,
-  buildRingSecrets, keyfileFingerprint, keyfileSecret, openRing, rewrapMasterEnvelope, sealRecords, unwrapRingKey,
-  wrapRingKey, b64enc,
-  sealComet, openComet, genCustodianKey, COMET_TTL_DAYS,
-  KDF_LEGACY_ROUNDS, KDF_TARGET_ROUNDS, makeVerifier, parseOtpAuth, sha256Hex, totpAt, totpRemaining,
-  unlockPayloadSession, validateOtpAuth, CORPUS_SIZE, SOURCE_LABELS,
-  fmtBytes, fmtDate,
-  efsChecksumOf, efsChildren as efsChildrenOf, efsDirOf, efsPathString, EFS_ROOT,
-  getPayload, hasIdb, hasOpfs, putPayload,
+  
+  
+  
+  
+  
+  
+  
+  fmtBytes, 
+  efsChecksumOf, efsPathString, EFS_ROOT,
+  getPayload, putPayload,
   bundleWebApp, canExecute, detectRunner, extractArchiveEntry, pickAppEntry,
   readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
   parseIsoBlob, extractIsoFile, flattenIsoRecords,
-  type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
+  type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
 } from '../../vault';
-import type { AvatarFit, FileVersion, PasswordField, PasswordRecord, VaultFile, VfsNode, VaultKind, VaultSecrets, VaultUser } from '../../domain/vault';
-import type { AuditEntry } from '../../domain/universe';
+import type { VaultFile } from '../../domain/vault';
 import {
-  AudioChip, IcClose, IcCopy, IcDownload, IcEdit, IcEye, IcFolder, IcLock, IcMove, IcPlus,
-  IcScan, IcSearch, IcTerminal, IcTrash, IcUnlock, IcUser, useUniverse,
+  IcDownload, 
+  useUniverse,
 } from '../bits';
 import { toast } from '../toast';
-import { readAsDataURL } from '../lib';
-import { FileManager } from '../FileManager';
-import { HexInspector, KindGlyph, TilePreview, WaveStripLocal, seedRnd } from '../VaultBits';
+import { KindGlyph, seedRnd } from '../VaultBits';
 
-import { sleep, videoEvent, coverCrop, clampFit, videoToFrames, processAvatar, wavBlob, imageBlob, videoBlob, synthPayload, downloadFile, kindOf } from './helpers';
+import { sleep, downloadFile, kindOf } from './helpers';
 /* ======================= execution engine (real) ======================= */
 
-export const RUNNER_LABEL: Record<RunnerKind, string> = {
+const RUNNER_LABEL: Record<RunnerKind, string> = {
   'web-app': 'web runtime · CSP-restricted iframe',
   javascript: 'js runtime · dedicated worker',
   python: 'python runtime · terminable worker',
@@ -49,7 +42,7 @@ export const RUNNER_LABEL: Record<RunnerKind, string> = {
   iso: 'iso 9660 engine · virtual disc mount & execution',
 };
 
-export function ConsolePane({ lines, running, onStop, bootLabel }: {
+function ConsolePane({ lines, running, onStop, bootLabel }: {
   lines: { t: string; level: 'info' | 'warn' | 'error' | 'sys' }[];
   running: boolean;
   onStop: () => void;
@@ -78,7 +71,7 @@ export function ConsolePane({ lines, running, onStop, bootLabel }: {
 }
 
 /* html / html5-game / web app — bundled with its sibling assets, run in a locked iframe */
-export function WebAppRun({ file, blob }: { file: VaultFile; blob: Blob }) {
+function WebAppRun({ file, blob }: { file: VaultFile; blob: Blob }) {
   const state = useUniverse();
   const [url, setUrl] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
@@ -122,7 +115,7 @@ export function WebAppRun({ file, blob }: { file: VaultFile; blob: Blob }) {
 }
 
 /* plain javascript — executed in a dedicated Web Worker, console piped live */
-export function JsRun({ blob }: { blob: Blob }) {
+function JsRun({ blob }: { blob: Blob }) {
   const [lines, setLines] = useState<{ t: string; level: 'info' | 'warn' | 'error' | 'sys' }[]>([]);
   const [running, setRunning] = useState(false);
   const handleRef = useRef<{ stop: () => void } | null>(null);
@@ -162,7 +155,7 @@ export function JsRun({ blob }: { blob: Blob }) {
 }
 
 /* python — real CPython on wasm via pyodide, fetched once on demand */
-export function PyRun({ blob }: { blob: Blob }) {
+function PyRun({ blob }: { blob: Blob }) {
   const [lines, setLines] = useState<{ t: string; level: 'info' | 'warn' | 'error' | 'sys' }[]>([]);
   const [running, setRunning] = useState(false);
   const runId = useRef(0);
@@ -219,7 +212,7 @@ export function PyRun({ blob }: { blob: Blob }) {
 }
 
 /* pdf — native browser viewer over the real stored bytes */
-export function PdfRun({ file, blob }: { file: VaultFile; blob: Blob }) {
+function PdfRun({ file, blob }: { file: VaultFile; blob: Blob }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     const u = URL.createObjectURL(blob);
@@ -240,7 +233,7 @@ export function PdfRun({ file, blob }: { file: VaultFile; blob: Blob }) {
 
 /* zip — REAL listing of the real bytes: extract entries, import them into the
    vault, or launch the archive as a web app when it holds an index.html */
-export function ArchiveRun({ file, blob }: { file: VaultFile; blob: Blob }) {
+function ArchiveRun({ file, blob }: { file: VaultFile; blob: Blob }) {
   const state = useUniverse();
   const [entries, setEntries] = useState<ZipEntry[] | null>(null);
   const [err, setErr] = useState('');
@@ -375,7 +368,7 @@ export function ArchiveRun({ file, blob }: { file: VaultFile; blob: Blob }) {
   );
 }
 
-export function IsoRun({ file, blob }: { file: VaultFile; blob: Blob }) {
+function IsoRun({ file, blob }: { file: VaultFile; blob: Blob }) {
   const state = useUniverse();
   const [parseResult, setParseResult] = useState<IsoParseResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -679,7 +672,7 @@ export function RunView({ file }: { file: VaultFile }) {
   return <ArchiveRun file={file} blob={blob} />;
 }
 
-export function SandboxLaunch({ file }: { file: VaultFile }) {
+function SandboxLaunch({ file }: { file: VaultFile }) {
   const state = useUniverse();
   const [phase, setPhase] = useState<'idle' | 'boot' | 'run' | 'game' | 'app' | 'dead'>('idle');
   const [bootLines, setBootLines] = useState<string[]>([]);
@@ -775,7 +768,7 @@ export function SandboxLaunch({ file }: { file: VaultFile }) {
   );
 }
 
-export function GravityGarden({ name, onExit }: { name: string; onExit: () => void }) {
+function GravityGarden({ name, onExit }: { name: string; onExit: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(30);
@@ -883,7 +876,7 @@ export function IsoMount({ name }: { name: VaultFile['name'] }) {
   );
 }
 
-export function extractEntry(entry: string, from: string) {
+function extractEntry(entry: string, from: string) {
   const blob = new Blob([`Materialized from ${from} :: ${entry}\nThe full payload lives in the desktop execution layer.\n`], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

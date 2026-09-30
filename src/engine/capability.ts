@@ -14,7 +14,7 @@ import { STORAGE_KEYS } from '../platform/storageKeys';
 
 export type QualityTier = 'low' | 'medium' | 'cinematic';
 
-export interface GpuCapability {
+interface GpuCapability {
   tier: QualityTier;
   renderer: string;
   webgl2: boolean;

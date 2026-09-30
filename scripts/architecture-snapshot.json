@@ -1,252 +1,8 @@
 {
-  "generatedAt": "2026-09-30T19:35:26.237Z",
+  "generatedAt": "2026-09-30T19:51:26.901Z",
   "fileCount": 137,
-  "deadExports": [
-    {
-      "symbol": "KAMUI_RAMP",
-      "file": "src/engine/systems/kamuiPhases.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "WEB_EDGE_TRIGGER",
-      "file": "src/engine/systems/stageThresholds.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "WARP_ZOOM_VEL",
-      "file": "src/engine/systems/stageThresholds.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "renderKamuiReturnVoiceCache",
-      "file": "src/platform/audio.ts",
-      "action": "de-export"
-    },
-    {
-      "symbol": "prewarmKamuiReturnVoice",
-      "file": "src/platform/audio.ts",
-      "action": "de-export"
-    },
-    {
-      "symbol": "getSnapshot",
-      "file": "src/state/store.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "UpdaterCardBody",
-      "file": "src/ui/UpdaterCard.tsx",
-      "action": "de-export"
-    },
-    {
-      "symbol": "BACKDROP_MAX_BYTES",
-      "file": "src/ui/console/backdropStore.ts",
-      "action": "de-export"
-    },
-    {
-      "symbol": "kindForMime",
-      "file": "src/ui/console/backdropStore.ts",
-      "action": "de-export"
-    },
-    {
-      "symbol": "stopKamuiBend",
-      "file": "src/ui/kamuiBend.ts",
-      "action": "de-export"
-    }
-  ],
-  "deadTypes": [
-    {
-      "name": "SurfaceTemplateInput",
-      "file": "server/realityTemplates.ts"
-    },
-    {
-      "name": "RealityTemplateInput",
-      "file": "server/realityTemplates.ts"
-    },
-    {
-      "name": "Connection",
-      "file": "src/domain/universe.ts"
-    },
-    {
-      "name": "RealityMetaPatch",
-      "file": "src/domain/universe.ts"
-    },
-    {
-      "name": "VfsNodeType",
-      "file": "src/domain/vault.ts"
-    },
-    {
-      "name": "EfsSuperblock",
-      "file": "src/domain/vault.ts"
-    },
-    {
-      "name": "VaultLock",
-      "file": "src/domain/vault.ts"
-    },
-    {
-      "name": "PasswordHistoryEntry",
-      "file": "src/domain/vault.ts"
-    },
-    {
-      "name": "BlackHoleOptions",
-      "file": "src/engine/blackholeRaymarch.ts"
-    },
-    {
-      "name": "RigFrame",
-      "file": "src/engine/cameraRig.ts"
-    },
-    {
-      "name": "RigSnapshot",
-      "file": "src/engine/cameraRig.ts"
-    },
-    {
-      "name": "GpuCapability",
-      "file": "src/engine/capability.ts"
-    },
-    {
-      "name": "EngineCallbacks",
-      "file": "src/engine/engine.ts"
-    },
-    {
-      "name": "SharedLensUniforms",
-      "file": "src/engine/surface/photoDome.ts"
-    },
-    {
-      "name": "GravityNode",
-      "file": "src/physics/nbody.ts"
-    },
-    {
-      "name": "GravityTelemetry",
-      "file": "src/physics/nbody.ts"
-    },
-    {
-      "name": "CosmosBackend",
-      "file": "src/platform/native/cpp_bridge.ts"
-    },
-    {
-      "name": "KeplerBatchInput",
-      "file": "src/platform/native/cpp_bridge.ts"
-    },
-    {
-      "name": "KeplerBatchResult",
-      "file": "src/platform/native/cpp_bridge.ts"
-    },
-    {
-      "name": "PhysicsBatchInput",
-      "file": "src/platform/native/cpp_bridge.ts"
-    },
-    {
-      "name": "UniversePerformanceSnapshot",
-      "file": "src/platform/performance.ts"
-    },
-    {
-      "name": "HierarchyStage",
-      "file": "src/realities/hierarchyStages.ts"
-    },
-    {
-      "name": "UpdaterPhase",
-      "file": "src/ui/UpdaterCard.tsx"
-    },
-    {
-      "name": "PaletteApi",
-      "file": "src/ui/console/CommandPalette.tsx"
-    },
-    {
-      "name": "ScenicBackdropMedia",
-      "file": "src/ui/console/ScenicBackdrop.tsx"
-    },
-    {
-      "name": "BackdropKind",
-      "file": "src/ui/console/backdropStore.ts"
-    },
-    {
-      "name": "BackdropRecord",
-      "file": "src/ui/console/backdropStore.ts"
-    },
-    {
-      "name": "ConsoleBackdrop",
-      "file": "src/ui/console/backdropStore.ts"
-    },
-    {
-      "name": "ExportFormat",
-      "file": "src/ui/diary/exportDiary.ts"
-    },
-    {
-      "name": "HoloStem",
-      "file": "src/ui/hud/HoloCard.tsx"
-    },
-    {
-      "name": "Tok",
-      "file": "src/ui/syntax.ts"
-    },
-    {
-      "name": "ToastTone",
-      "file": "src/ui/toast.ts"
-    },
-    {
-      "name": "ToastHandler",
-      "file": "src/ui/toast.ts"
-    },
-    {
-      "name": "JsRunHandle",
-      "file": "src/vault/executors/index.ts"
-    },
-    {
-      "name": "LogSink",
-      "file": "src/vault/executors/index.ts"
-    },
-    {
-      "name": "PythonRunHandle",
-      "file": "src/vault/executors/index.ts"
-    },
-    {
-      "name": "NovaVerdict",
-      "file": "src/vault/storage/breaches.ts"
-    },
-    {
-      "name": "NovaScanResult",
-      "file": "src/vault/storage/breaches.ts"
-    },
-    {
-      "name": "CometOpenResult",
-      "file": "src/vault/storage/courier.ts"
-    },
-    {
-      "name": "KdfSpec",
-      "file": "src/vault/storage/crypto.ts"
-    },
-    {
-      "name": "BuildRingOptions",
-      "file": "src/vault/storage/crypto.ts"
-    },
-    {
-      "name": "DedupReport",
-      "file": "src/vault/storage/efs.ts"
-    },
-    {
-      "name": "ScrubProgress",
-      "file": "src/vault/storage/efs.ts"
-    },
-    {
-      "name": "ImportResult",
-      "file": "src/vault/storage/importers.ts"
-    },
-    {
-      "name": "TotpParams",
-      "file": "src/vault/storage/totp.ts"
-    },
-    {
-      "name": "ExtractedFile",
-      "file": "src/vault/storage/zip.ts"
-    },
-    {
-      "name": "ExecutionContext",
-      "file": "src/vault/types.ts"
-    },
-    {
-      "name": "ExecutionResult",
-      "file": "src/vault/types.ts"
-    }
-  ],
+  "deadExports": [],
+  "deadTypes": [],
   "deadCss": [
     "cc-tab",
     "cc-tab-active",
@@ -260,8 +16,8 @@
     "server/routes/sky.ts": 1,
     "server/skyStore.ts": 1,
     "src/App.tsx": 1,
-    "src/domain/universe.ts": 31,
-    "src/domain/vault.ts": 18,
+    "src/domain/universe.ts": 22,
+    "src/domain/vault.ts": 16,
     "src/engine/blackholeParams.ts": 4,
     "src/engine/blackholeRaymarch.ts": 3,
     "src/engine/blackholeTier.ts": 2,
@@ -289,26 +45,26 @@
     "src/platform/sentiment/sentiment.ts": 2,
     "src/platform/simClock.ts": 2,
     "src/platform/sky/skyRegistry.ts": 3,
-    "src/platform/storageKeys.ts": 17,
+    "src/platform/storageKeys.ts": 8,
     "src/platform/sync/realitySync.ts": 2,
     "src/realities/clusterGenerator.ts": 1,
     "src/realities/galaxyGenerator.ts": 2,
     "src/realities/hierarchyStages.ts": 4,
-    "src/realities/hierarchyTypes.ts": 8,
-    "src/realities/index.ts": 18,
+    "src/realities/hierarchyTypes.ts": 7,
+    "src/realities/index.ts": 17,
     "src/realities/solPrime/index.ts": 1,
     "src/realities/types.ts": 4,
     "src/state/actions.ts": 1,
-    "src/state/index.ts": 25,
+    "src/state/index.ts": 23,
     "src/state/persist.ts": 2,
     "src/state/store.ts": 3,
     "src/ui/CoreMode.tsx": 1,
-    "src/ui/FileManager.tsx": 10,
+    "src/ui/FileManager.tsx": 1,
     "src/ui/PhysicsHUD.tsx": 1,
     "src/ui/UpdaterCard.tsx": 1,
-    "src/ui/VaultBits.tsx": 11,
+    "src/ui/VaultBits.tsx": 7,
     "src/ui/VaultUI.tsx": 1,
-    "src/ui/bits.tsx": 16,
+    "src/ui/bits.tsx": 14,
     "src/ui/console/BlackHoleTuningCard.tsx": 1,
     "src/ui/console/CommandPalette.tsx": 1,
     "src/ui/console/CoreConsole.tsx": 1,
@@ -323,7 +79,7 @@
     "src/ui/diary/DiaryWindow.tsx": 1,
     "src/ui/diary/MediaPlates.tsx": 1,
     "src/ui/diary/exportDiary.ts": 1,
-    "src/ui/format.ts": 13,
+    "src/ui/format.ts": 3,
     "src/ui/hud/ClusterHoverCard.tsx": 1,
     "src/ui/hud/CosmicWebHUD.tsx": 1,
     "src/ui/hud/GalaxyHoverCard.tsx": 1,
@@ -332,28 +88,28 @@
     "src/ui/hud/MultiverseBar.tsx": 1,
     "src/ui/hud/RealityHoverCard.tsx": 1,
     "src/ui/kamuiBend.ts": 1,
-    "src/ui/lib.ts": 12,
+    "src/ui/lib.ts": 4,
     "src/ui/lineage/CosmicLineageModal.tsx": 1,
     "src/ui/lineage/ThinkingCloudTooltip.tsx": 2,
     "src/ui/reality/CreateRealityModal.tsx": 2,
     "src/ui/reality/RealityAdvancedModal.tsx": 1,
     "src/ui/reality/RealityAdvancedPanel.tsx": 2,
     "src/ui/syntax.ts": 2,
-    "src/ui/toast.ts": 29,
+    "src/ui/toast.ts": 28,
     "src/ui/vault/MonacoCodeEditor.tsx": 10,
-    "src/ui/vault/atmosphere.tsx": 2,
+    "src/ui/vault/atmosphere.tsx": 1,
     "src/ui/vault/avatars.tsx": 3,
     "src/ui/vault/gate.tsx": 1,
-    "src/ui/vault/helpers.ts": 9,
+    "src/ui/vault/helpers.ts": 6,
     "src/ui/vault/keyring.tsx": 1,
     "src/ui/vault/monacoSetup.ts": 1,
-    "src/ui/vault/sandbox.tsx": 2,
+    "src/ui/vault/sandbox.tsx": 1,
     "src/ui/vault/shell.tsx": 1,
     "src/ui/vault/viewers.tsx": 1,
     "src/ui/vault/void.tsx": 1,
     "src/vault/executors/index.ts": 1,
     "src/vault/executors/isoExecutor.ts": 2,
-    "src/vault/index.ts": 15,
+    "src/vault/index.ts": 13,
     "src/vault/storage/breaches.ts": 1,
     "src/vault/storage/courier.ts": 1,
     "src/vault/storage/crypto.ts": 4,
@@ -364,7 +120,7 @@
     "src/vault/storage/metrics.ts": 2,
     "src/vault/storage/procedural.ts": 1,
     "src/vault/storage/sanitizeHtml.ts": 2,
-    "src/vault/storage/seeds.ts": 4,
+    "src/vault/storage/seeds.ts": 3,
     "src/vault/storage/totp.ts": 2,
     "src/vault/storage/zip.ts": 2,
     "src/vault/types.ts": 11
@@ -509,10 +265,7 @@
     "src/state/persist.ts → src/state/store.ts",
     "src/state/persist.ts → src/ui/toast.ts",
     "src/state/persist.ts → src/vault/index.ts",
-    "src/state/persist.ts → src/vault/storage/seeds.ts",
     "src/state/store.ts → src/domain/universe.ts",
-    "src/state/store.ts → src/domain/vault.ts",
-    "src/state/store.ts → src/realities/hierarchyTypes.ts",
     "src/state/store.ts → src/realities/index.ts",
     "src/state/store.ts → src/vault/index.ts",
     "src/state/store.ts → src/vault/storage/seeds.ts",
@@ -532,23 +285,18 @@
     "src/ui/PhysicsHUD.tsx → src/physics/nbody.ts",
     "src/ui/PhysicsHUD.tsx → src/physics/physicsEngine.ts",
     "src/ui/VaultBits.tsx → src/domain/vault.ts",
-    "src/ui/VaultUI.tsx → src/domain/universe.ts",
     "src/ui/VaultUI.tsx → src/domain/vault.ts",
-    "src/ui/VaultUI.tsx → src/platform/storageKeys.ts",
     "src/ui/VaultUI.tsx → src/state/index.ts",
     "src/ui/VaultUI.tsx → src/ui/FileManager.tsx",
     "src/ui/VaultUI.tsx → src/ui/VaultBits.tsx",
     "src/ui/VaultUI.tsx → src/ui/bits.tsx",
-    "src/ui/VaultUI.tsx → src/ui/format.ts",
     "src/ui/VaultUI.tsx → src/ui/lib.ts",
     "src/ui/VaultUI.tsx → src/ui/toast.ts",
     "src/ui/VaultUI.tsx → src/ui/vault/MonacoCodeEditor.tsx",
-    "src/ui/VaultUI.tsx → src/ui/vault/atmosphere.tsx",
     "src/ui/VaultUI.tsx → src/ui/vault/avatars.tsx",
     "src/ui/VaultUI.tsx → src/ui/vault/gate.tsx",
     "src/ui/VaultUI.tsx → src/ui/vault/helpers.ts",
     "src/ui/VaultUI.tsx → src/ui/vault/keyring.tsx",
-    "src/ui/VaultUI.tsx → src/ui/vault/sandbox.tsx",
     "src/ui/VaultUI.tsx → src/ui/vault/shell.tsx",
     "src/ui/VaultUI.tsx → src/ui/vault/viewers.tsx",
     "src/ui/VaultUI.tsx → src/ui/vault/void.tsx",
@@ -573,7 +321,6 @@
     "src/ui/console/CoreConsole.tsx → src/ui/console/ScenicBackdrop.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/TiltButton.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/backdropStore.ts",
-    "src/ui/console/CoreConsole.tsx → src/ui/format.ts",
     "src/ui/console/CoreConsole.tsx → src/ui/lineage/ThinkingCloudTooltip.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/reality/CreateRealityModal.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/reality/RealityAdvancedPanel.tsx",
@@ -633,7 +380,6 @@
     "src/ui/lineage/CosmicLineageModal.tsx → src/realities/index.ts",
     "src/ui/lineage/CosmicLineageModal.tsx → src/state/index.ts",
     "src/ui/lineage/CosmicLineageModal.tsx → src/ui/toast.ts",
-    "src/ui/reality/CreateRealityModal.tsx → src/realities/index.ts",
     "src/ui/reality/RealityAdvancedModal.tsx → src/realities/index.ts",
     "src/ui/reality/RealityAdvancedModal.tsx → src/state/index.ts",
     "src/ui/reality/RealityAdvancedModal.tsx → src/ui/reality/RealityAdvancedPanel.tsx",
@@ -643,54 +389,23 @@
     "src/ui/reality/RealityAdvancedPanel.tsx → src/ui/hud/GalaxyRoster.tsx",
     "src/ui/reality/RealityAdvancedPanel.tsx → src/ui/toast.ts",
     "src/ui/vault/MonacoCodeEditor.tsx → src/ui/vault/monacoSetup.ts",
-    "src/ui/vault/atmosphere.tsx → src/domain/universe.ts",
-    "src/ui/vault/atmosphere.tsx → src/domain/vault.ts",
-    "src/ui/vault/atmosphere.tsx → src/platform/storageKeys.ts",
-    "src/ui/vault/atmosphere.tsx → src/state/index.ts",
-    "src/ui/vault/atmosphere.tsx → src/ui/FileManager.tsx",
-    "src/ui/vault/atmosphere.tsx → src/ui/VaultBits.tsx",
-    "src/ui/vault/atmosphere.tsx → src/ui/bits.tsx",
-    "src/ui/vault/atmosphere.tsx → src/ui/format.ts",
-    "src/ui/vault/atmosphere.tsx → src/ui/lib.ts",
-    "src/ui/vault/atmosphere.tsx → src/ui/toast.ts",
     "src/ui/vault/atmosphere.tsx → src/ui/vault/MonacoCodeEditor.tsx",
-    "src/ui/vault/atmosphere.tsx → src/ui/vault/helpers.ts",
-    "src/ui/vault/atmosphere.tsx → src/vault/index.ts",
-    "src/ui/vault/avatars.tsx → src/domain/universe.ts",
     "src/ui/vault/avatars.tsx → src/domain/vault.ts",
-    "src/ui/vault/avatars.tsx → src/platform/storageKeys.ts",
     "src/ui/vault/avatars.tsx → src/state/index.ts",
-    "src/ui/vault/avatars.tsx → src/ui/FileManager.tsx",
-    "src/ui/vault/avatars.tsx → src/ui/VaultBits.tsx",
     "src/ui/vault/avatars.tsx → src/ui/bits.tsx",
-    "src/ui/vault/avatars.tsx → src/ui/format.ts",
-    "src/ui/vault/avatars.tsx → src/ui/lib.ts",
     "src/ui/vault/avatars.tsx → src/ui/toast.ts",
     "src/ui/vault/avatars.tsx → src/ui/vault/MonacoCodeEditor.tsx",
     "src/ui/vault/avatars.tsx → src/ui/vault/helpers.ts",
-    "src/ui/vault/avatars.tsx → src/vault/index.ts",
-    "src/ui/vault/gate.tsx → src/domain/universe.ts",
     "src/ui/vault/gate.tsx → src/domain/vault.ts",
-    "src/ui/vault/gate.tsx → src/platform/storageKeys.ts",
     "src/ui/vault/gate.tsx → src/state/index.ts",
-    "src/ui/vault/gate.tsx → src/ui/FileManager.tsx",
-    "src/ui/vault/gate.tsx → src/ui/VaultBits.tsx",
     "src/ui/vault/gate.tsx → src/ui/bits.tsx",
-    "src/ui/vault/gate.tsx → src/ui/format.ts",
-    "src/ui/vault/gate.tsx → src/ui/lib.ts",
     "src/ui/vault/gate.tsx → src/ui/toast.ts",
     "src/ui/vault/gate.tsx → src/ui/vault/MonacoCodeEditor.tsx",
     "src/ui/vault/gate.tsx → src/ui/vault/avatars.tsx",
     "src/ui/vault/gate.tsx → src/ui/vault/helpers.ts",
     "src/ui/vault/gate.tsx → src/vault/index.ts",
-    "src/ui/vault/helpers.ts → src/domain/universe.ts",
     "src/ui/vault/helpers.ts → src/domain/vault.ts",
-    "src/ui/vault/helpers.ts → src/platform/storageKeys.ts",
-    "src/ui/vault/helpers.ts → src/state/index.ts",
-    "src/ui/vault/helpers.ts → src/ui/FileManager.tsx",
     "src/ui/vault/helpers.ts → src/ui/VaultBits.tsx",
-    "src/ui/vault/helpers.ts → src/ui/bits.tsx",
-    "src/ui/vault/helpers.ts → src/ui/format.ts",
     "src/ui/vault/helpers.ts → src/ui/lib.ts",
     "src/ui/vault/helpers.ts → src/ui/toast.ts",
     "src/ui/vault/helpers.ts → src/ui/vault/MonacoCodeEditor.tsx",
@@ -699,69 +414,44 @@
     "src/ui/vault/keyring.tsx → src/domain/vault.ts",
     "src/ui/vault/keyring.tsx → src/platform/storageKeys.ts",
     "src/ui/vault/keyring.tsx → src/state/index.ts",
-    "src/ui/vault/keyring.tsx → src/ui/FileManager.tsx",
-    "src/ui/vault/keyring.tsx → src/ui/VaultBits.tsx",
     "src/ui/vault/keyring.tsx → src/ui/bits.tsx",
-    "src/ui/vault/keyring.tsx → src/ui/format.ts",
-    "src/ui/vault/keyring.tsx → src/ui/lib.ts",
     "src/ui/vault/keyring.tsx → src/ui/toast.ts",
     "src/ui/vault/keyring.tsx → src/ui/vault/MonacoCodeEditor.tsx",
-    "src/ui/vault/keyring.tsx → src/ui/vault/helpers.ts",
     "src/ui/vault/keyring.tsx → src/vault/index.ts",
-    "src/ui/vault/sandbox.tsx → src/domain/universe.ts",
     "src/ui/vault/sandbox.tsx → src/domain/vault.ts",
-    "src/ui/vault/sandbox.tsx → src/platform/storageKeys.ts",
     "src/ui/vault/sandbox.tsx → src/state/index.ts",
-    "src/ui/vault/sandbox.tsx → src/ui/FileManager.tsx",
     "src/ui/vault/sandbox.tsx → src/ui/VaultBits.tsx",
     "src/ui/vault/sandbox.tsx → src/ui/bits.tsx",
-    "src/ui/vault/sandbox.tsx → src/ui/format.ts",
-    "src/ui/vault/sandbox.tsx → src/ui/lib.ts",
     "src/ui/vault/sandbox.tsx → src/ui/toast.ts",
     "src/ui/vault/sandbox.tsx → src/ui/vault/MonacoCodeEditor.tsx",
     "src/ui/vault/sandbox.tsx → src/ui/vault/atmosphere.tsx",
     "src/ui/vault/sandbox.tsx → src/ui/vault/helpers.ts",
     "src/ui/vault/sandbox.tsx → src/vault/index.ts",
-    "src/ui/vault/shell.tsx → src/domain/universe.ts",
     "src/ui/vault/shell.tsx → src/domain/vault.ts",
-    "src/ui/vault/shell.tsx → src/platform/storageKeys.ts",
     "src/ui/vault/shell.tsx → src/state/index.ts",
-    "src/ui/vault/shell.tsx → src/ui/FileManager.tsx",
     "src/ui/vault/shell.tsx → src/ui/VaultBits.tsx",
     "src/ui/vault/shell.tsx → src/ui/bits.tsx",
-    "src/ui/vault/shell.tsx → src/ui/format.ts",
-    "src/ui/vault/shell.tsx → src/ui/lib.ts",
     "src/ui/vault/shell.tsx → src/ui/toast.ts",
     "src/ui/vault/shell.tsx → src/ui/vault/MonacoCodeEditor.tsx",
     "src/ui/vault/shell.tsx → src/ui/vault/avatars.tsx",
     "src/ui/vault/shell.tsx → src/ui/vault/helpers.ts",
     "src/ui/vault/shell.tsx → src/vault/index.ts",
-    "src/ui/vault/viewers.tsx → src/domain/universe.ts",
     "src/ui/vault/viewers.tsx → src/domain/vault.ts",
-    "src/ui/vault/viewers.tsx → src/platform/storageKeys.ts",
     "src/ui/vault/viewers.tsx → src/state/index.ts",
-    "src/ui/vault/viewers.tsx → src/ui/FileManager.tsx",
     "src/ui/vault/viewers.tsx → src/ui/VaultBits.tsx",
     "src/ui/vault/viewers.tsx → src/ui/bits.tsx",
     "src/ui/vault/viewers.tsx → src/ui/format.ts",
-    "src/ui/vault/viewers.tsx → src/ui/lib.ts",
     "src/ui/vault/viewers.tsx → src/ui/toast.ts",
     "src/ui/vault/viewers.tsx → src/ui/vault/MonacoCodeEditor.tsx",
     "src/ui/vault/viewers.tsx → src/ui/vault/helpers.ts",
     "src/ui/vault/viewers.tsx → src/ui/vault/sandbox.tsx",
     "src/ui/vault/viewers.tsx → src/vault/index.ts",
-    "src/ui/vault/void.tsx → src/domain/universe.ts",
     "src/ui/vault/void.tsx → src/domain/vault.ts",
-    "src/ui/vault/void.tsx → src/platform/storageKeys.ts",
     "src/ui/vault/void.tsx → src/state/index.ts",
-    "src/ui/vault/void.tsx → src/ui/FileManager.tsx",
     "src/ui/vault/void.tsx → src/ui/VaultBits.tsx",
     "src/ui/vault/void.tsx → src/ui/bits.tsx",
-    "src/ui/vault/void.tsx → src/ui/format.ts",
-    "src/ui/vault/void.tsx → src/ui/lib.ts",
     "src/ui/vault/void.tsx → src/ui/toast.ts",
     "src/ui/vault/void.tsx → src/ui/vault/MonacoCodeEditor.tsx",
-    "src/ui/vault/void.tsx → src/ui/vault/helpers.ts",
     "src/ui/vault/void.tsx → src/vault/index.ts",
     "src/vault/executors/index.ts → src/vault/executors/isoExecutor.ts",
     "src/vault/executors/index.ts → src/vault/storage/crypto.ts",
@@ -871,19 +561,19 @@
     "src/realities/types.ts": 55,
     "src/state/actions.ts": 1257,
     "src/state/index.ts": 12,
-    "src/state/persist.ts": 399,
-    "src/state/store.ts": 148,
+    "src/state/persist.ts": 398,
+    "src/state/store.ts": 146,
     "src/types/monaco-esm.d.ts": 21,
     "src/ui/CoreMode.tsx": 921,
     "src/ui/FileManager.tsx": 1280,
     "src/ui/PhysicsHUD.tsx": 485,
     "src/ui/UpdaterCard.tsx": 264,
     "src/ui/VaultBits.tsx": 133,
-    "src/ui/VaultUI.tsx": 551,
+    "src/ui/VaultUI.tsx": 544,
     "src/ui/bits.tsx": 144,
     "src/ui/console/BlackHoleTuningCard.tsx": 194,
     "src/ui/console/CommandPalette.tsx": 350,
-    "src/ui/console/CoreConsole.tsx": 1370,
+    "src/ui/console/CoreConsole.tsx": 1369,
     "src/ui/console/CoreSigil.tsx": 226,
     "src/ui/console/CppNativeEngineCard.tsx": 269,
     "src/ui/console/QuantumBinTab.tsx": 342,
@@ -907,26 +597,26 @@
     "src/ui/lib.ts": 31,
     "src/ui/lineage/CosmicLineageModal.tsx": 579,
     "src/ui/lineage/ThinkingCloudTooltip.tsx": 266,
-    "src/ui/reality/CreateRealityModal.tsx": 308,
+    "src/ui/reality/CreateRealityModal.tsx": 307,
     "src/ui/reality/RealityAdvancedModal.tsx": 80,
     "src/ui/reality/RealityAdvancedPanel.tsx": 523,
     "src/ui/syntax.ts": 195,
     "src/ui/toast.ts": 16,
     "src/ui/vault/MonacoCodeEditor.tsx": 156,
-    "src/ui/vault/atmosphere.tsx": 128,
-    "src/ui/vault/avatars.tsx": 401,
-    "src/ui/vault/gate.tsx": 416,
-    "src/ui/vault/helpers.ts": 305,
-    "src/ui/vault/keyring.tsx": 1525,
+    "src/ui/vault/atmosphere.tsx": 96,
+    "src/ui/vault/avatars.tsx": 378,
+    "src/ui/vault/gate.tsx": 408,
+    "src/ui/vault/helpers.ts": 294,
+    "src/ui/vault/keyring.tsx": 1521,
     "src/ui/vault/monacoSetup.ts": 175,
-    "src/ui/vault/sandbox.tsx": 951,
-    "src/ui/vault/shell.tsx": 711,
-    "src/ui/vault/viewers.tsx": 838,
-    "src/ui/vault/void.tsx": 114,
-    "src/vault/executors/index.ts": 352,
+    "src/ui/vault/sandbox.tsx": 944,
+    "src/ui/vault/shell.tsx": 704,
+    "src/ui/vault/viewers.tsx": 833,
+    "src/ui/vault/void.tsx": 106,
+    "src/vault/executors/index.ts": 351,
     "src/vault/executors/isoExecutor.ts": 257,
-    "src/vault/index.ts": 42,
-    "src/vault/storage/breaches.ts": 133,
+    "src/vault/index.ts": 35,
+    "src/vault/storage/breaches.ts": 135,
     "src/vault/storage/courier.ts": 127,
     "src/vault/storage/crypto.ts": 437,
     "src/vault/storage/efs.ts": 481,
@@ -960,11 +650,11 @@
     ],
     [
       "src/ui/vault/keyring.tsx",
-      1525
+      1521
     ],
     [
       "src/ui/console/CoreConsole.tsx",
-      1370
+      1369
     ],
     [
       "src/ui/FileManager.tsx",
@@ -980,7 +670,7 @@
     ],
     [
       "src/ui/vault/sandbox.tsx",
-      951
+      944
     ],
     [
       "src/ui/CoreMode.tsx",
@@ -988,11 +678,11 @@
     ],
     [
       "src/ui/vault/viewers.tsx",
-      838
+      833
     ],
     [
       "src/ui/vault/shell.tsx",
-      711
+      704
     ],
     [
       "src/ui/hud/MultiverseBar.tsx",
@@ -1060,7 +750,7 @@
     ],
     "public roots": [
       "index.html:11",
-      "src/vault/executors/index.ts:319"
+      "src/vault/executors/index.ts:318"
     ],
     "route↔command strings": [
       "server/realityTemplates.ts:4",
@@ -1121,7 +811,7 @@
       "src/state/actions.ts:399",
       "src/state/actions.ts:432",
       "src/state/actions.ts:480",
-      "src/ui/reality/CreateRealityModal.tsx:70",
+      "src/ui/reality/CreateRealityModal.tsx:69",
       "src-tauri/src/realities.rs:437"
     ],
     "localStorage keys": [
@@ -1136,7 +826,7 @@
       "src/platform/storageKeys.ts:24",
       "src/platform/storageKeys.ts:26",
       "src/platform/storageKeys.ts:28",
-      "src/state/persist.ts:268"
+      "src/state/persist.ts:267"
     ],
     "window seams": [
       "scripts/round63-void-probe.ts:73",

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {Globe, Sun, Orbit, Search, Layers, Database, Cpu, Zap, Crosshair,
-  Compass, Radio, Sparkles, CircleDot, BookOpen, Star } from 'lucide-react';
+  Compass, Radio, Sparkles, CircleDot, BookOpen } from 'lucide-react';
 import { REALITIES } from '../../realities';
 import { HIERARCHY_STAGES } from '../../realities/hierarchyStages';
 import { useUniverse } from '../../state';
@@ -14,7 +14,7 @@ import { useUniverse } from '../../state';
  * fire the console's quick powers — all without touching the mouse.
  */
 
-export interface PaletteApi {
+interface PaletteApi {
   onWarpReality: (realityId: string) => void;
   onEnterGalaxy: (realityId: string, galaxyId: string) => void;
   onFocusBody: (bodyId: string) => void;

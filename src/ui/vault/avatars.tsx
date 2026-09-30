@@ -1,42 +1,19 @@
-import { STORAGE_KEYS } from '../../platform/storageKeys';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { actions, newId } from '../../state';
-import { prettyPrint } from '../format';
-import type { MonacoHandle } from '../vault/MonacoCodeEditor';
+import { actions } from '../../state';
 
 /* the real editor (VS Code engine) — loaded in its own chunk on first open */
 const MonacoCodeEditor = lazy(() =>
   import('./MonacoCodeEditor').then((m) => ({ default: m.MonacoCodeEditor })),
 );
+import type { AvatarFit, VaultUser } from '../../domain/vault';
 import {
-  authorizeVaultFile, checkVerifier, clearPayloadSession, decryptRecords, dedupeImport, encryptRecords,
-  isSealHardened, isVaultFileAuthorized, isVaultFileLocked, novaScan, importVaultExport, revokeVaultFileAuthorization,
-  buildRingSecrets, keyfileFingerprint, keyfileSecret, openRing, rewrapMasterEnvelope, sealRecords, unwrapRingKey,
-  wrapRingKey, b64enc,
-  sealComet, openComet, genCustodianKey, COMET_TTL_DAYS,
-  KDF_LEGACY_ROUNDS, KDF_TARGET_ROUNDS, makeVerifier, parseOtpAuth, sha256Hex, totpAt, totpRemaining,
-  unlockPayloadSession, validateOtpAuth, CORPUS_SIZE, SOURCE_LABELS,
-  fmtBytes, fmtDate,
-  efsChecksumOf, efsChildren as efsChildrenOf, efsDirOf, efsPathString, EFS_ROOT,
-  getPayload, hasIdb, hasOpfs, putPayload,
-  bundleWebApp, canExecute, detectRunner, extractArchiveEntry, pickAppEntry,
-  readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
-  parseIsoBlob, extractIsoFile, flattenIsoRecords,
-  type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
-} from '../../vault';
-import type { AvatarFit, FileVersion, PasswordField, PasswordRecord, VaultFile, VfsNode, VaultKind, VaultSecrets, VaultUser } from '../../domain/vault';
-import type { AuditEntry } from '../../domain/universe';
-import {
-  AudioChip, IcClose, IcCopy, IcDownload, IcEdit, IcEye, IcFolder, IcLock, IcMove, IcPlus,
-  IcScan, IcSearch, IcTerminal, IcTrash, IcUnlock, IcUser, useUniverse,
+  
+  IcUser, 
 } from '../bits';
 import { toast } from '../toast';
-import { readAsDataURL } from '../lib';
-import { FileManager } from '../FileManager';
-import { HexInspector, KindGlyph, TilePreview, WaveStripLocal, seedRnd } from '../VaultBits';
 
-import { sleep, videoEvent, coverCrop, clampFit, videoToFrames, processAvatar, wavBlob, imageBlob, videoBlob, synthPayload, downloadFile, kindOf } from './helpers';
+import { coverCrop, clampFit, processAvatar } from './helpers';
 /* ================================ avatars ================================ */
 
 export function AvatarMedia({ src, alt, size, fit, className = '' }: { src: string; alt: string; size: number; fit?: AvatarFit | null; className?: string }) {
@@ -125,7 +102,7 @@ export function FrameCycler({ frames, fps, size, alt, fit }: { frames: string[];
 
 /* crossfades between two avatar states — the outgoing face blurs away while
    the incoming one sharpens in, so switching never feels like a hard swap */
-export function Crossfade({ sig, size, children }: { sig: string; size: number; children: React.ReactNode }) {
+function Crossfade({ sig, size, children }: { sig: string; size: number; children: React.ReactNode }) {
   const [cur, setCur] = useState<{ sig: string; node: React.ReactNode }>({ sig, node: children });
   const [prev, setPrev] = useState<{ sig: string; node: React.ReactNode } | null>(null);
   useEffect(() => {
@@ -144,7 +121,7 @@ export function Crossfade({ sig, size, children }: { sig: string; size: number; 
   );
 }
 
-export function Avatar({ user, size = 44 }: { user: VaultUser | null; size?: number }) {
+function Avatar({ user, size = 44 }: { user: VaultUser | null; size?: number }) {
   let node: React.ReactNode;
   let sig: string;
   if (user?.avatarFrames && user.avatarFrames.length) {

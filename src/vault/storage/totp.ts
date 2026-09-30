@@ -27,7 +27,7 @@ function base32Decode(input: string): Uint8Array {
   return new Uint8Array(out);
 }
 
-export interface TotpParams {
+interface TotpParams {
   secret: string;       /* base32 seed */
   digits: number;       /* 6 or 8 */
   period: number;       /* seconds — 30 standard */

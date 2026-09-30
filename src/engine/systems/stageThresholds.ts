@@ -13,9 +13,9 @@
 /** Hard clamp — the dial can never rest above this on the web stage. */
 export const WEB_CEILING = 0.865;
 /** Pulling at or beyond this with outward zoom velocity crosses into the multiverse. */
-export const WEB_EDGE_TRIGGER = 0.855;
+const WEB_EDGE_TRIGGER = 0.855;
 /** Outward zoom velocity (dial/s) required to cross at a stage edge. */
-export const WARP_ZOOM_VEL = 0.05;
+const WARP_ZOOM_VEL = 0.05;
 
 /* ---- multiverse floor: the way back to the web ---- */
 

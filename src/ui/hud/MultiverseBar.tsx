@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { REALITIES, getReality, RealityConfig, GalaxyClusterData, GalaxyData, createNewRealityConfig } from '../../realities';
 import { HIERARCHY_STAGES } from '../../realities/hierarchyStages';
-import { actions, getState, useUniverse } from '../../state';
-import { Globe, Sparkles, Orbit, Layers, ChevronRight, Compass, Zap, Eye, Edit3, Shield, ShieldCheck, Flame, X, Plus, Trash2, CircleDot } from 'lucide-react';
+import { actions, useUniverse } from '../../state';
+import { Globe, Sparkles, Orbit, Layers, ChevronRight, Compass, Zap, Eye, Edit3, ShieldCheck, X, Trash2, CircleDot } from 'lucide-react';
 import { CreateRealityModal } from '../reality/CreateRealityModal';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
 import { toast } from '../../ui/toast';

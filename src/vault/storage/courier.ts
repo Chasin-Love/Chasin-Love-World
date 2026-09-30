@@ -69,7 +69,7 @@ export async function sealComet(
   return { packet, starlightKey: b64enc(key.buffer as ArrayBuffer) };
 }
 
-export type CometOpenResult =
+type CometOpenResult =
   | { ok: true; records: PasswordRecord[]; packet: CometPacket }
   | { ok: false; reason: 'expired' | 'burned' | 'bad-key' | 'bad-file'; message: string };
 

@@ -15,7 +15,7 @@ export * from '../domain/vault';
 
 export type RunnerKind = 'web-app' | 'javascript' | 'python' | 'pdf' | 'archive' | 'iso';
 
-export interface BackendStatus {
+interface BackendStatus {
   version: string;
   hasOpfs: boolean;
   hasIndexedDb: boolean;
@@ -53,13 +53,13 @@ export interface IsoParseResult {
 
 /* -------------------- Execution Contracts -------------------- */
 
-export interface ExecutionContext {
+interface ExecutionContext {
   file: VaultFile;
   blob: Blob;
   runnerKind: RunnerKind;
 }
 
-export interface ExecutionResult {
+interface ExecutionResult {
   success: boolean;
   output?: string;
   error?: string;

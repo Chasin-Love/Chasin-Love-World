@@ -1,5 +1,5 @@
-export type ToastTone = 'ok' | 'warn';
-export type ToastHandler = (msg: string, tone?: ToastTone) => void;
+type ToastTone = 'ok' | 'warn';
+type ToastHandler = (msg: string, tone?: ToastTone) => void;
 
 let toastHandler: ToastHandler | null = null;
 

@@ -3,7 +3,7 @@ import { LENS_UNIFORMS_GLSL, LENS_WARP_GLSL } from './surfaceShaders';
 
 /** Uniform-object shape shared by every lens-bending material (assigned by
  *  UniverseSurfaceManager, which owns the one true set). */
-export interface SharedLensUniforms {
+interface SharedLensUniforms {
   [key: string]: { value: unknown };
 }
 

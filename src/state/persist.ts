@@ -2,20 +2,19 @@ import { STORAGE_KEYS } from '../platform/storageKeys';
 /* STATE — persistence (R52): loadState + migrations, debounced persist,
    desktop file hydration, diary payload externalization. */
 import type { DiaryEntry, UniverseState } from '../domain/universe';
-import type { VaultFile, VfsNode, TrashedFile, VaultUser } from '../domain/vault';
-import { state, emptyBucket, ensureBucket, bucket, createSnapshot, refreshSnapshot, newId, listeners } from './store';
-import { setRuntimeRealities, computeAllRealities, folderNameForReality, deriveFolderName, RealityMetaOverride } from '../realities';
+import type { VaultFile } from '../domain/vault';
+import { state, emptyBucket, bucket, refreshSnapshot, newId, listeners } from './store';
+import { setRuntimeRealities, computeAllRealities, RealityMetaOverride } from '../realities';
 import {
-  delLocalPayload, delPayload, getPayload, putLocalPayload,
-  procPalette, procRadius,
-  createInitialSeed, seedBodies,
+  putLocalPayload,
+  
+  createInitialSeed, 
   sanitizeDiaryHtml,
-  createVfs, efsAddFileNode, efsBump, efsChildren, efsCreateShadow, efsDedup,
-  efsDeleteShadow, efsMkdir, efsMove, efsNodeOf, efsPathString, efsRename,
-  efsScrub, efsSubtreeIds, efsHeal, efsUniqueName, EFS_ROOT, migrateLegacyVault,
-  seedVfs,
+  createVfs, 
+  
+  efsHeal, migrateLegacyVault,
+  
 } from '../vault';
-import { VAULT_HOME_FOLDERS } from '../vault/storage/seeds';
 import { recordPersistence } from '../platform/performance';
 import { desktopStore } from '../platform/desktop/adapter';
 import { toast } from '../ui/toast';

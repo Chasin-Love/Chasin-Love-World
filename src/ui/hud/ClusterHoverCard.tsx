@@ -1,6 +1,6 @@
 import React from 'react';
 import { GalaxyClusterData } from '../../realities';
-import { Sparkles, Orbit, Layers, ArrowRight, Compass, Shield, ChevronRight } from 'lucide-react';
+import { Layers, ArrowRight, Compass, ChevronRight } from 'lucide-react';
 import { HoloCardShell, HoverDisk } from './HoloCard';
 
 interface ClusterHoverCardProps {

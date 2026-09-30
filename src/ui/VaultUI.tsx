@@ -1,50 +1,43 @@
-import { STORAGE_KEYS } from '../platform/storageKeys';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { actions, newId } from '../state';
-import { prettyPrint } from './format';
-import type { MonacoHandle } from './vault/MonacoCodeEditor';
 
 /* the real editor (VS Code engine) — loaded in its own chunk on first open */
 const MonacoCodeEditor = lazy(() =>
   import('./vault/MonacoCodeEditor').then((m) => ({ default: m.MonacoCodeEditor })),
 );
 import {
-  authorizeVaultFile, checkVerifier, clearPayloadSession, decryptRecords, dedupeImport, encryptRecords,
-  isSealHardened, isVaultFileAuthorized, isVaultFileLocked, novaScan, importVaultExport, revokeVaultFileAuthorization,
-  buildRingSecrets, keyfileFingerprint, keyfileSecret, openRing, rewrapMasterEnvelope, sealRecords, unwrapRingKey,
-  wrapRingKey, b64enc,
-  sealComet, openComet, genCustodianKey, COMET_TTL_DAYS,
-  KDF_LEGACY_ROUNDS, KDF_TARGET_ROUNDS, makeVerifier, parseOtpAuth, sha256Hex, totpAt, totpRemaining,
-  unlockPayloadSession, validateOtpAuth, CORPUS_SIZE, SOURCE_LABELS,
+  authorizeVaultFile, clearPayloadSession, 
+  isVaultFileAuthorized, isVaultFileLocked, 
+  
+  
+  
+  KDF_TARGET_ROUNDS, 
+  unlockPayloadSession, 
   fmtBytes, fmtDate,
-  efsChecksumOf, efsChildren as efsChildrenOf, efsDirOf, efsPathString, EFS_ROOT,
+  efsChecksumOf, efsChildren as efsChildrenOf, efsPathString, EFS_ROOT,
   getPayload, hasIdb, hasOpfs, putPayload,
-  bundleWebApp, canExecute, detectRunner, extractArchiveEntry, pickAppEntry,
-  readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
-  parseIsoBlob, extractIsoFile, flattenIsoRecords,
-  type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
+  
+  
+  
+  
 } from '../vault';
-import type { AvatarFit, FileVersion, PasswordField, PasswordRecord, VaultFile, VfsNode, VaultKind, VaultSecrets, VaultUser } from '../domain/vault';
-import type { AuditEntry } from '../domain/universe';
+import type { VaultFile, VaultUser } from '../domain/vault';
 import {
-  AudioChip, IcClose, IcCopy, IcDownload, IcEdit, IcEye, IcFolder, IcLock, IcMove, IcPlus,
-  IcScan, IcSearch, IcTerminal, IcTrash, IcUnlock, IcUser, useUniverse,
+  IcClose, IcDownload, IcEdit, IcEye, IcFolder, IcLock, IcPlus,
+  IcScan, IcSearch, IcTerminal, IcTrash, IcUnlock, useUniverse,
 } from './bits';
 import { toast } from './toast';
 import { readAsDataURL } from './lib';
 import { FileManager } from './FileManager';
-import { HexInspector, KindGlyph, TilePreview, WaveStripLocal, seedRnd } from './VaultBits';
+import { KindGlyph, TilePreview } from './VaultBits';
 
-import { sleep, videoEvent, coverCrop, clampFit, videoToFrames, processAvatar, wavBlob, imageBlob, videoBlob, synthPayload, downloadFile, kindOf } from './vault/helpers';
-import { AvatarMedia, FrameCycler, Crossfade, Avatar, avatarKind, AvatarKindBadge, AvatarCropModal, AvatarPicker } from './vault/avatars';
+import { downloadFile, kindOf } from './vault/helpers';
+import { AvatarPicker } from './vault/avatars';
 import { VaultBackdrop, Gate } from './vault/gate';
-import { VOID_DAYS, TheVoid } from './vault/void';
-import { AtmosphereSynth } from './vault/atmosphere';
-import { RUNNER_LABEL, ConsolePane, WebAppRun, JsRun, PyRun, PdfRun, ArchiveRun, IsoRun, RunView, SandboxLaunch, GravityGarden, IsoMount, extractEntry, CsvView, FitsView } from './vault/sandbox';
-import { AudioPlayer, AdvancedVideoPlayer, CodeDocStudio, OtherView, Viewer } from './vault/viewers';
-import { CATEGORIES, CAT_COLORS, HISTORY_CAP, TRASH_TTL_DAYS, WORDS, pwScore, pwTier, genKey, genPassphrase, ageDays, withHistory, HISTORY_LABELS, PulsarCode, NovaGlyph, GravityWellModal, parseCardExpiry, EXPIRY_KEY, sentinelIssues, SentinelPanel, KeyGenerator, b64url, b64urlDecode, copyScrubbed, prfDerive, StargateModal, StellarWillModal, CourierModal, ReceiveModal, RotateKeyModal, PasswordVault } from './vault/keyring';
-import { IdentityEditor, LockModal, UnlockPrompt, Telemetry, ALLOC, VaultHome, VaultTerminal, DeepScan, SECTIONS } from './vault/shell';
+import { TheVoid } from './vault/void';
+import { Viewer } from './vault/viewers';
+import { PasswordVault } from './vault/keyring';
+import { IdentityEditor, LockModal, UnlockPrompt, VaultHome, VaultTerminal, DeepScan, SECTIONS } from './vault/shell';
 
 export default function VaultUI({ onClose, closing }: { onClose: () => void; closing?: boolean }) {
   const state = useUniverse();

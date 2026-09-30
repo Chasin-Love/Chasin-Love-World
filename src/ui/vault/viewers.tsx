@@ -1,8 +1,6 @@
 import { CsvView, FitsView, IsoMount, RunView } from './sandbox';
-import { STORAGE_KEYS } from '../../platform/storageKeys';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { actions, newId } from '../../state';
+import { actions } from '../../state';
 import { prettyPrint } from '../format';
 import type { MonacoHandle } from '../vault/MonacoCodeEditor';
 
@@ -11,37 +9,34 @@ const MonacoCodeEditor = lazy(() =>
   import('./MonacoCodeEditor').then((m) => ({ default: m.MonacoCodeEditor })),
 );
 import {
-  authorizeVaultFile, checkVerifier, clearPayloadSession, decryptRecords, dedupeImport, encryptRecords,
-  isSealHardened, isVaultFileAuthorized, isVaultFileLocked, novaScan, importVaultExport, revokeVaultFileAuthorization,
-  buildRingSecrets, keyfileFingerprint, keyfileSecret, openRing, rewrapMasterEnvelope, sealRecords, unwrapRingKey,
-  wrapRingKey, b64enc,
-  sealComet, openComet, genCustodianKey, COMET_TTL_DAYS,
-  KDF_LEGACY_ROUNDS, KDF_TARGET_ROUNDS, makeVerifier, parseOtpAuth, sha256Hex, totpAt, totpRemaining,
-  unlockPayloadSession, validateOtpAuth, CORPUS_SIZE, SOURCE_LABELS,
+  
+  
+  
+  
+  
+  sha256Hex, 
+  
   fmtBytes, fmtDate,
-  efsChecksumOf, efsChildren as efsChildrenOf, efsDirOf, efsPathString, EFS_ROOT,
-  getPayload, hasIdb, hasOpfs, putPayload,
-  bundleWebApp, canExecute, detectRunner, extractArchiveEntry, pickAppEntry,
-  readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
-  parseIsoBlob, extractIsoFile, flattenIsoRecords,
-  type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
+  
+  getPayload, putPayload,
+  
+  
+  
+  
 } from '../../vault';
-import type { AvatarFit, FileVersion, PasswordField, PasswordRecord, VaultFile, VfsNode, VaultKind, VaultSecrets, VaultUser } from '../../domain/vault';
-import type { AuditEntry } from '../../domain/universe';
+import type { FileVersion, VaultFile } from '../../domain/vault';
 import {
-  AudioChip, IcClose, IcCopy, IcDownload, IcEdit, IcEye, IcFolder, IcLock, IcMove, IcPlus,
-  IcScan, IcSearch, IcTerminal, IcTrash, IcUnlock, IcUser, useUniverse,
+  IcClose, IcDownload, IcLock, 
+  
 } from '../bits';
 import { toast } from '../toast';
-import { readAsDataURL } from '../lib';
-import { FileManager } from '../FileManager';
-import { HexInspector, KindGlyph, TilePreview, WaveStripLocal, seedRnd } from '../VaultBits';
+import { HexInspector, KindGlyph, WaveStripLocal } from '../VaultBits';
 
-import { sleep, videoEvent, coverCrop, clampFit, videoToFrames, processAvatar, wavBlob, imageBlob, videoBlob, synthPayload, downloadFile, kindOf } from './helpers';
+import { synthPayload, downloadFile } from './helpers';
 /* ================== Enhanced Vault Players & Studios ================== */
 
 /* Real audio player — waveform, scrubbing, speed controls, loop, time readout */
-export function AudioPlayer({ src, name }: { src: string; name: string }) {
+function AudioPlayer({ src, name }: { src: string; name: string }) {
   const ref = useRef<HTMLAudioElement>(null);
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
@@ -165,7 +160,7 @@ export function AudioPlayer({ src, name }: { src: string; name: string }) {
 }
 
 /* Enhanced Video Player */
-export function AdvancedVideoPlayer({ src, name }: { src: string; name: string }) {
+function AdvancedVideoPlayer({ src, name }: { src: string; name: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [rate, setRate] = useState(1);
   const [loop, setLoop] = useState(false);
@@ -245,7 +240,7 @@ interface CodeDocStudioProps {
   onDownload?: () => void;
 }
 
-export function CodeDocStudio({
+function CodeDocStudio({
   initial,
   fileName,
   mime = 'text/plain',
@@ -621,7 +616,7 @@ export function CodeDocStudio({
 
 /* unknown / binary objects (.dat, .bin, …) — readable when they hold text,
    otherwise a clean card with a download and an opt-in byte view */
-export function OtherView({ file }: { file: VaultFile }) {
+function OtherView({ file }: { file: VaultFile }) {
   const [showBytes, setShowBytes] = useState(false);
   const looksText = !!file.content && /^[\x09\x0a\x0d\x20-\x7e\u00a0-\uffff]*$/.test(file.content.slice(0, 2000));
   return (

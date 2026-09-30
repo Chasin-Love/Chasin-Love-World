@@ -1,43 +1,35 @@
 import { AvatarPicker, AvatarKindBadge, FrameCycler, AvatarMedia, AvatarCropModal, avatarKind } from './avatars';
-import { STORAGE_KEYS } from '../../platform/storageKeys';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { lazy, useEffect, useRef, useState } from 'react';
 import { actions, newId } from '../../state';
-import { prettyPrint } from '../format';
-import type { MonacoHandle } from '../vault/MonacoCodeEditor';
 
 /* the real editor (VS Code engine) — loaded in its own chunk on first open */
 const MonacoCodeEditor = lazy(() =>
   import('./MonacoCodeEditor').then((m) => ({ default: m.MonacoCodeEditor })),
 );
 import {
-  authorizeVaultFile, checkVerifier, clearPayloadSession, decryptRecords, dedupeImport, encryptRecords,
-  isSealHardened, isVaultFileAuthorized, isVaultFileLocked, novaScan, importVaultExport, revokeVaultFileAuthorization,
-  buildRingSecrets, keyfileFingerprint, keyfileSecret, openRing, rewrapMasterEnvelope, sealRecords, unwrapRingKey,
-  wrapRingKey, b64enc,
-  sealComet, openComet, genCustodianKey, COMET_TTL_DAYS,
-  KDF_LEGACY_ROUNDS, KDF_TARGET_ROUNDS, makeVerifier, parseOtpAuth, sha256Hex, totpAt, totpRemaining,
-  unlockPayloadSession, validateOtpAuth, CORPUS_SIZE, SOURCE_LABELS,
-  fmtBytes, fmtDate,
-  efsChecksumOf, efsChildren as efsChildrenOf, efsDirOf, efsPathString, EFS_ROOT,
-  getPayload, hasIdb, hasOpfs, putPayload,
-  bundleWebApp, canExecute, detectRunner, extractArchiveEntry, pickAppEntry,
-  readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
-  parseIsoBlob, extractIsoFile, flattenIsoRecords,
-  type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
+  checkVerifier, decryptRecords, encryptRecords,
+  isSealHardened, 
+  
+  
+  
+  KDF_LEGACY_ROUNDS, KDF_TARGET_ROUNDS, makeVerifier, 
+  
+  fmtDate,
+  
+  
+  
+  
+  
+  
 } from '../../vault';
-import type { AvatarFit, FileVersion, PasswordField, PasswordRecord, VaultFile, VfsNode, VaultKind, VaultSecrets, VaultUser } from '../../domain/vault';
-import type { AuditEntry } from '../../domain/universe';
+import type { AvatarFit, VaultUser } from '../../domain/vault';
 import {
-  AudioChip, IcClose, IcCopy, IcDownload, IcEdit, IcEye, IcFolder, IcLock, IcMove, IcPlus,
-  IcScan, IcSearch, IcTerminal, IcTrash, IcUnlock, IcUser, useUniverse,
+  IcLock, 
+  IcUser, useUniverse,
 } from '../bits';
 import { toast } from '../toast';
-import { readAsDataURL } from '../lib';
-import { FileManager } from '../FileManager';
-import { HexInspector, KindGlyph, TilePreview, WaveStripLocal, seedRnd } from '../VaultBits';
 
-import { sleep, videoEvent, coverCrop, clampFit, videoToFrames, processAvatar, wavBlob, imageBlob, videoBlob, synthPayload, downloadFile, kindOf } from './helpers';
+import { processAvatar } from './helpers';
 /* =============================== backdrop ================================ */
 
 export function VaultBackdrop() {

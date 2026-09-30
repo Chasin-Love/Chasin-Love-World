@@ -1,45 +1,34 @@
-import { STORAGE_KEYS } from '../../platform/storageKeys';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { actions, newId } from '../../state';
-import { prettyPrint } from '../format';
-import type { MonacoHandle } from '../vault/MonacoCodeEditor';
+import { lazy } from 'react';
 
 /* the real editor (VS Code engine) — loaded in its own chunk on first open */
 const MonacoCodeEditor = lazy(() =>
   import('./MonacoCodeEditor').then((m) => ({ default: m.MonacoCodeEditor })),
 );
 import {
-  authorizeVaultFile, checkVerifier, clearPayloadSession, decryptRecords, dedupeImport, encryptRecords,
-  isSealHardened, isVaultFileAuthorized, isVaultFileLocked, novaScan, importVaultExport, revokeVaultFileAuthorization,
-  buildRingSecrets, keyfileFingerprint, keyfileSecret, openRing, rewrapMasterEnvelope, sealRecords, unwrapRingKey,
-  wrapRingKey, b64enc,
-  sealComet, openComet, genCustodianKey, COMET_TTL_DAYS,
-  KDF_LEGACY_ROUNDS, KDF_TARGET_ROUNDS, makeVerifier, parseOtpAuth, sha256Hex, totpAt, totpRemaining,
-  unlockPayloadSession, validateOtpAuth, CORPUS_SIZE, SOURCE_LABELS,
-  fmtBytes, fmtDate,
-  efsChecksumOf, efsChildren as efsChildrenOf, efsDirOf, efsPathString, EFS_ROOT,
-  getPayload, hasIdb, hasOpfs, putPayload,
-  bundleWebApp, canExecute, detectRunner, extractArchiveEntry, pickAppEntry,
-  readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
-  parseIsoBlob, extractIsoFile, flattenIsoRecords,
-  type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
+  
+  isVaultFileAuthorized, isVaultFileLocked, 
+  
+  
+  
+  
+  
+  
+  
+  getPayload, 
+  
+  
+  
+  
 } from '../../vault';
-import type { AvatarFit, FileVersion, PasswordField, PasswordRecord, VaultFile, VfsNode, VaultKind, VaultSecrets, VaultUser } from '../../domain/vault';
-import type { AuditEntry } from '../../domain/universe';
-import {
-  AudioChip, IcClose, IcCopy, IcDownload, IcEdit, IcEye, IcFolder, IcLock, IcMove, IcPlus,
-  IcScan, IcSearch, IcTerminal, IcTrash, IcUnlock, IcUser, useUniverse,
-} from '../bits';
+import type { AvatarFit, VaultFile, VaultKind } from '../../domain/vault';
 import { toast } from '../toast';
 import { readAsDataURL } from '../lib';
-import { FileManager } from '../FileManager';
-import { HexInspector, KindGlyph, TilePreview, WaveStripLocal, seedRnd } from '../VaultBits';
+import { seedRnd } from '../VaultBits';
 
 /* ================================ helpers ================================ */
 
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-export const videoEvent = (v: HTMLVideoElement, ev: string) => new Promise<void>((res) => {
+const videoEvent = (v: HTMLVideoElement, ev: string) => new Promise<void>((res) => {
   const h = () => { v.removeEventListener(ev, h); res(); };
   v.addEventListener(ev, h);
 });
@@ -59,7 +48,7 @@ export function clampFit(fit: AvatarFit, w: number, h: number): AvatarFit {
 }
 
 /* decode a video into frames at the chosen framing — loops forever, plays everywhere */
-export async function videoToFrames(file: File, fit: AvatarFit): Promise<{ dataUrl: string | null; frames: string[]; fps: number; note: string }> {
+async function videoToFrames(file: File, fit: AvatarFit): Promise<{ dataUrl: string | null; frames: string[]; fps: number; note: string }> {
   const url = URL.createObjectURL(file);
   const v = document.createElement('video');
   v.src = url; v.muted = true; v.playsInline = true; v.preload = 'auto';
@@ -134,7 +123,7 @@ export async function processAvatar(file: File, fit?: AvatarFit): Promise<{ data
 
 /* --------------------------- download synthesis -------------------------- */
 
-export function wavBlob(seconds = 1.3, freq = 320): Blob {
+function wavBlob(seconds = 1.3, freq = 320): Blob {
   const sr = 22050;
   const n = Math.floor(sr * seconds);
   const buf = new ArrayBuffer(44 + n * 2);
@@ -153,7 +142,7 @@ export function wavBlob(seconds = 1.3, freq = 320): Blob {
   return new Blob([buf], { type: 'audio/wav' });
 }
 
-export function imageBlob(name: string): Promise<Blob | null> {
+function imageBlob(name: string): Promise<Blob | null> {
   return new Promise((res) => {
     const cv = document.createElement('canvas');
     cv.width = 640; cv.height = 400;
@@ -173,7 +162,7 @@ export function imageBlob(name: string): Promise<Blob | null> {
   });
 }
 
-export async function videoBlob(): Promise<Blob | null> {
+async function videoBlob(): Promise<Blob | null> {
   try {
     if (typeof MediaRecorder === 'undefined') return null;
     const cv = document.createElement('canvas');

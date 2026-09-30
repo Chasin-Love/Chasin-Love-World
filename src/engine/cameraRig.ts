@@ -44,7 +44,7 @@ const FLING_PX_CAP = 2600; /* px/s — fastest flick the rig believes */
 const ORBIT_FLING_CAP = 2.2; /* rad/s */
 const PAN_FLING_FACTOR = 2.2; /* × distance per second */
 
-export interface RigFrame {
+interface RigFrame {
   /** world-space point the camera orbits this frame (body position or origin) */
   focus: THREE.Vector3;
   /** a body is focused — distance is framed to focusRadius */
@@ -58,7 +58,7 @@ export interface RigFrame {
 }
 
 /** Plain-number camera placement, savable/restorable across a portal. */
-export interface RigSnapshot {
+interface RigSnapshot {
   zoomT: number; tZoomT: number;
   theta: number; tTheta: number;
   phi: number; tPhi: number;

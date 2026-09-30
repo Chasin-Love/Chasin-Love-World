@@ -3,8 +3,8 @@ import { GalaxyClusterData, CosmicLineage } from '../../realities';
 import { actions, useUniverse } from '../../state';
 import { toast } from '../../ui/toast';
 import {
-  Globe, Sparkles, Orbit, Layers, ArrowRight, Compass,
-  ChevronRight, Disc, Activity, Eye, Zap, Shield, Sun, CircleDot, Plus
+  Globe, Sparkles, Orbit, Layers, Compass,
+  Disc, Activity, Zap, Shield, Sun, Plus
 } from 'lucide-react';
 
 interface CosmicLineageModalProps {

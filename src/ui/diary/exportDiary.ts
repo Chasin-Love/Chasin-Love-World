@@ -4,7 +4,7 @@ import type { CosmicBody, DiaryEntry } from '../../domain/universe';
 import { fmtDate } from '../../vault/storage/formatters';
 import { toast } from '../toast';
 
-export type ExportFormat = 'pdf' | 'png' | 'cosmic';
+type ExportFormat = 'pdf' | 'png' | 'cosmic';
 
 interface ExportOptions {
   format: ExportFormat;

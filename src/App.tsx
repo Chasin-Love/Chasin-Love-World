@@ -28,7 +28,7 @@ const RealityAdvancedModal = lazy(() => import('./ui/reality/RealityAdvancedModa
 const CommandPalette = lazy(() => import('./ui/console/CommandPalette').then((module) => ({ default: module.CommandPalette })));
 const UpdaterCard = lazy(() => import('./ui/UpdaterCard'));
 import { GalaxyHoverCard } from './ui/hud/GalaxyHoverCard';
-import { getReality, type RealityConfig, type GalaxyClusterData, type GalaxyData } from './realities';
+import { getReality, type GalaxyClusterData, type GalaxyData } from './realities';
 
 interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean; maximized?: boolean; closing?: boolean }
 

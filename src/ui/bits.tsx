@@ -60,14 +60,14 @@ export const IcChevL = (p: IconProps) => <I {...p} d="M14 6l-6 6 6 6" />;
 export const IcChevR = (p: IconProps) => <I {...p} d="M10 6l6 6-6 6" />;
 export const IcMic = (p: IconProps) => <I {...p} d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4" />;
 export const IcStop = (p: IconProps) => <I {...p} d="M8 8h8v8H8z" />;
-export const IcPlay = (p: IconProps) => (
+const IcPlay = (p: IconProps) => (
   <svg width={p.size ?? 14} height={p.size ?? 14} viewBox="0 0 24 24" fill="currentColor" className={p.className}><path d="M8 5.5v13l11-6.5z" /></svg>
 );
-export const IcPause = (p: IconProps) => (
+const IcPause = (p: IconProps) => (
   <svg width={p.size ?? 14} height={p.size ?? 14} viewBox="0 0 24 24" fill="currentColor" className={p.className}><path d="M7 5h3.4v14H7zM13.6 5H17v14h-3.4z" /></svg>
 );
 export const IcBook = (p: IconProps) => <I {...p} d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5V5.5M20 18v3H6.5" />;
-export const IcInline = (p: IconProps) => <I {...p} d="M4 5h16M4 19h16M8.5 9h7v6h-7z" />;
+const IcInline = (p: IconProps) => <I {...p} d="M4 5h16M4 19h16M8.5 9h7v6h-7z" />;
 export const IcImage = (p: IconProps) => <I {...p} d="M4 5h16v14H4zM8.5 11a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM4 16l5-4 3 2.5L16 11l4 4" />;
 export const IcLock = (p: IconProps) => <I {...p} d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6zM12 15v2" />;
 export const IcUnlock = (p: IconProps) => <I {...p} d="M7 11V8a5 5 0 0 1 9.6-2M6 11h12v9H6zM12 15v2" />;
@@ -84,7 +84,7 @@ export const IcScan = (p: IconProps) => <I {...p} d="M4 8V5.5A1.5 1.5 0 0 1 5.5 
 export const IcFolder = (p: IconProps) => <I {...p} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />;
 
 
-export const IcMove = (p: IconProps) => <I {...p} d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5" />;
+const IcMove = (p: IconProps) => <I {...p} d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5" />;
 
 
 /* --------------------------------- toast -------------------------------- */
@@ -110,7 +110,7 @@ export function ToastHost() {
 
 /* ------------------------------- audio chip ------------------------------ */
 
-export function AudioChip({ dataUrl, peaks, duration }: { dataUrl: string; peaks?: number[]; duration?: number }) {
+function AudioChip({ dataUrl, peaks, duration }: { dataUrl: string; peaks?: number[]; duration?: number }) {
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const bars = peaks ?? Array.from({ length: 34 }, (_, i) => 0.3 + 0.7 * Math.abs(Math.sin(i * 0.7)));

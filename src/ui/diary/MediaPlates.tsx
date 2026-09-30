@@ -12,11 +12,11 @@ import {
   Volume2,
   VolumeX,
   Volume1,
-  RotateCcw,
+  
   Maximize2,
-  Minimize2,
+  
   Repeat,
-  Sparkles,
+  
   Film,
   Music,
   Image as ImageIcon,
@@ -31,17 +31,17 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  ShieldCheck,
-  Activity,
+  
+  
   Sliders,
-  Radio,
+  
   FastForward,
   Rewind,
   ZoomIn,
   ZoomOut,
   Layers,
   Terminal,
-  Cpu,
+  
 } from 'lucide-react';
 
 function fmtTime(sec: number): string {

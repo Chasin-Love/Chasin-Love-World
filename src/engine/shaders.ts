@@ -502,7 +502,7 @@ void main(){
 
 /* -------------------------- accretion disc ------------------------ */
 
-export const discFrag = /* glsl */ `
+const discFrag = /* glsl */ `
 uniform float uTime; uniform float uInner; uniform float uOuter;
 uniform vec3 uColor; uniform vec3 uColor2;
 varying vec2 vP;
@@ -938,7 +938,7 @@ void main(){
 }`;
 
 /* ------------------------- deep-sky backdrop ----------------------- */
-export const backdropVert = /* glsl */ `
+const backdropVert = /* glsl */ `
 varying vec3 vDir;
 
 void main(){
@@ -946,7 +946,7 @@ void main(){
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
-export const backdropFrag = /* glsl */ `
+const backdropFrag = /* glsl */ `
 uniform float uTime;
 uniform float uKamuiErase;
 uniform vec3 uVortexDir;
@@ -1116,7 +1116,7 @@ void main(){
 `;
 
 /* --------------------------- multiverse bubble ----------------------- */
-export const multiverseVert = /* glsl */ `
+const multiverseVert = /* glsl */ `
 varying vec3 vN; varying vec3 vW; varying vec3 vP; varying vec2 vUv;
 void main(){
   vN = normalize(normalMatrix * normal);
@@ -1126,7 +1126,7 @@ void main(){
   gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0);
 }`;
 
-export const multiverseFrag = /* glsl */ `
+const multiverseFrag = /* glsl */ `
 uniform float uTime; uniform vec3 uColorA; uniform vec3 uColorB; uniform float uOpacity;
 uniform float uTearStrength;
 varying vec3 vN; varying vec3 vW; varying vec3 vP; varying vec2 vUv;

@@ -11,7 +11,7 @@
  * windows (dist = 3 · 800000^zoomT) so each stage LANDS inside its own
  * label band.
  */
-export interface HierarchyStage {
+interface HierarchyStage {
   /** Full display name */
   label: string;
   /** Compact chip label for the stepper */

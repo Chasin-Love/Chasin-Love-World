@@ -3,13 +3,13 @@
    through notify() → refreshSnapshot + persistState. */
 import type { GalaxyData } from '../realities/hierarchyTypes';
 import type { UniverseState, DiaryEntry, CosmicBody, BodyKind, Meaning, DiskSyncState, BinFolderInfo, Attachment } from '../domain/universe';
-import type { VaultFile, TrashedFile, VfsNode, VaultUser, FileVersion, VaultSecrets, VfsShadow, EfsScrubReport } from '../domain/vault';
+import type { VaultFile, VfsNode, FileVersion, VaultSecrets, VfsShadow, EfsScrubReport } from '../domain/vault';
 import { VAULT_HOME_FOLDERS } from '../vault/storage/seeds';
-import { state, bucket, ensureBucket, newId, listeners, refreshSnapshot, EMPTY_DISK_SYNC, getState, rebindState } from './store';
+import { state, bucket, ensureBucket, newId, listeners, refreshSnapshot, EMPTY_DISK_SYNC, rebindState } from './store';
 import { persistState, externalizeLargeDiaryAttachments, STORAGE_KEY, primeState, sanitizeDiaryEntries, normalizeVaultFiles, normalizeLegacyLock } from './persist';
 import { getReality, REALITIES, RAW_REALITIES, computeAllRealities, setRuntimeRealities, createGalaxyData, folderNameForReality, deriveFolderName, RealityMetaOverride, RealityConfig, inclinedOrbitElements } from '../realities';
 import {
-  delLocalPayload, delPayload, getPayload, putLocalPayload,
+  delLocalPayload, delPayload, getPayload, 
   procPalette, procRadius,
   createInitialSeed, seedBodies,
   sanitizeDiaryHtml,

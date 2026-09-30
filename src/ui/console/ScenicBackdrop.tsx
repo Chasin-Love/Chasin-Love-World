@@ -198,7 +198,7 @@ function compile(gl: WebGLRenderingContext, type: number, src: string) {
   return sh;
 }
 
-export interface ScenicBackdropMedia {
+interface ScenicBackdropMedia {
   kind: 'image' | 'video';
   url: string;
 }

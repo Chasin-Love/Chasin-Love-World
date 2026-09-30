@@ -38,7 +38,7 @@ export interface CosmicBody {
   palette: Palette;
   orbit: Orbit;
 }
-export interface Connection { id: string; a: string; b: string; createdAt: number; }
+interface Connection { id: string; a: string; b: string; createdAt: number; }
 export type Mood = 'calm' | 'warm' | 'bright' | 'heavy' | 'burning';
 export type Weather = 'clear' | 'rain' | 'storm' | 'fog' | 'dust';
 export interface Attachment {
@@ -85,7 +85,7 @@ export interface DiaryEntry {
   attachments: Attachment[];
 }
 export interface AuditEntry { t: number; msg: string; }
-export interface RealityMetaPatch {
+interface RealityMetaPatch {
   name?: string;
   codeName?: string;
   spectral?: string;

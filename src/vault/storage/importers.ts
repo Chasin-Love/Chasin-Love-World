@@ -25,7 +25,7 @@ export const SOURCE_LABELS: Record<ImportSource, string> = {
   'generic-csv': 'generic CSV',
 };
 
-export interface ImportResult {
+interface ImportResult {
   source: ImportSource;
   records: PasswordRecord[];
   skipped: number;   /* rows without a usable secret */

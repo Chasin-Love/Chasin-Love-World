@@ -83,7 +83,7 @@ export async function extractZipEntry(buffer: ArrayBuffer, entry: ZipEntry): Pro
   return await new Response(stream).blob();
 }
 
-export interface ExtractedFile {
+interface ExtractedFile {
   path: string;
   blob: Blob;
 }

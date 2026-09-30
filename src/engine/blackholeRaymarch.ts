@@ -372,7 +372,7 @@ function buildDiskBasis(): THREE.Matrix3 {
  *  the hole simply hides itself — the R52 sky lens keeps bending the sky
  *  where it stands. There is no stand-in sphere, no painted fallback. */
 
-export interface BlackHoleOptions {
+interface BlackHoleOptions {
   /** start with the geodesic marcher live (false = the hole renders nothing) */
   geodesic?: boolean;
   /** ray steps (quality) — his march runs 64 fixed steps */

@@ -31,7 +31,7 @@ function surfaceVarNameOf(folderName: string): string {
 
 const esc = (s: string): string => JSON.stringify(s ?? '');
 
-export interface SurfaceTemplateInput {
+interface SurfaceTemplateInput {
   id: string;
   name: string;
   colorA: string;
@@ -58,7 +58,7 @@ export const ${surfaceVarNameOf(input.folderName)}: UniverseSurfaceConfig = {
 `;
 }
 
-export interface RealityTemplateInput {
+interface RealityTemplateInput {
   id: string;
   name: string;
   codeName: string;

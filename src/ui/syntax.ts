@@ -7,7 +7,7 @@
  * editor at a glance, never used for anything semantic.
  */
 
-export interface Tok {
+interface Tok {
   text: string;
   color: string;
 }

@@ -3,12 +3,10 @@
    the snapshot derivation, and the React subscription. Persistence lives in
    ./persist, mutations in ./actions; both read state via the live binding. */
 import { useSyncExternalStore } from 'react';
-import { REALITIES, createGalaxyData } from '../realities';
-import { createVfs, seedVfs, EFS_ROOT } from '../vault';
+import { REALITIES } from '../realities';
+import { createVfs, seedVfs } from '../vault';
 import { VAULT_HOME_FOLDERS } from '../vault/storage/seeds';
 import type { DiskSyncState, RealityBucket, UniverseState, CosmicBody, DiaryEntry } from '../domain/universe';
-import type { VfsState } from '../domain/vault';
-import type { GalaxyData } from '../realities/hierarchyTypes';
 
 
 export const EMPTY_DISK_SYNC: DiskSyncState = {
@@ -47,7 +45,7 @@ export function initState(initial: UniverseState): void {
 }
 /** Recompute the snapshot from the current state (notify + persist use this). */
 export function refreshSnapshot(): void { snapshot = createSnapshot(state); }
-export function getSnapshot(): UniverseState { return snapshot; }
+function getSnapshot(): UniverseState { return snapshot; }
 /** Rebind the root (reset/import flows) — the only place state is reassigned. */
 export function rebindState(next: UniverseState): void {
   state = next;

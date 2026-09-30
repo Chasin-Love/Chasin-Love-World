@@ -16,7 +16,7 @@ const KDF_LEGACY_RECORD_ROUNDS = 120000;
 /** OWASP 2026 floor for PBKDF2-SHA256 when Argon2id cannot be used */
 const KDF_PBKDF2_FLOOR = 600000;
 
-export type KdfSpec =
+type KdfSpec =
   | { type: 'argon2id'; mem: number; iters: number }
   | { type: 'pbkdf2'; rounds: number };
 
@@ -223,7 +223,7 @@ export async function openRing(
   return JSON.parse(new TextDecoder().decode(pt)) as PasswordRecord[];
 }
 
-export interface BuildRingOptions {
+interface BuildRingOptions {
   keyfileHash?: string;    /* binds the master envelope to a keyfile */
   custodianKey?: string;   /* arms the stellar will */
   months?: number;         /* custodian darkness threshold */

@@ -1,58 +1,51 @@
 import { STORAGE_KEYS } from '../../platform/storageKeys';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { actions, newId } from '../../state';
-import { prettyPrint } from '../format';
-import type { MonacoHandle } from '../vault/MonacoCodeEditor';
 
 /* the real editor (VS Code engine) — loaded in its own chunk on first open */
 const MonacoCodeEditor = lazy(() =>
   import('./MonacoCodeEditor').then((m) => ({ default: m.MonacoCodeEditor })),
 );
 import {
-  authorizeVaultFile, checkVerifier, clearPayloadSession, decryptRecords, dedupeImport, encryptRecords,
-  isSealHardened, isVaultFileAuthorized, isVaultFileLocked, novaScan, importVaultExport, revokeVaultFileAuthorization,
+  decryptRecords, dedupeImport, encryptRecords,
+  novaScan, importVaultExport, 
   buildRingSecrets, keyfileFingerprint, keyfileSecret, openRing, rewrapMasterEnvelope, sealRecords, unwrapRingKey,
   wrapRingKey, b64enc,
   sealComet, openComet, genCustodianKey, COMET_TTL_DAYS,
-  KDF_LEGACY_ROUNDS, KDF_TARGET_ROUNDS, makeVerifier, parseOtpAuth, sha256Hex, totpAt, totpRemaining,
-  unlockPayloadSession, validateOtpAuth, CORPUS_SIZE, SOURCE_LABELS,
-  fmtBytes, fmtDate,
-  efsChecksumOf, efsChildren as efsChildrenOf, efsDirOf, efsPathString, EFS_ROOT,
-  getPayload, hasIdb, hasOpfs, putPayload,
-  bundleWebApp, canExecute, detectRunner, extractArchiveEntry, pickAppEntry,
-  readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
-  parseIsoBlob, extractIsoFile, flattenIsoRecords,
-  type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
+  parseOtpAuth, sha256Hex, totpAt, totpRemaining,
+  validateOtpAuth, CORPUS_SIZE, SOURCE_LABELS,
+  
+  
+  
+  
+  
+  
+  type ImportSource, type CometPacket, type RingEnvelope, 
 } from '../../vault';
-import type { AvatarFit, FileVersion, PasswordField, PasswordRecord, VaultFile, VfsNode, VaultKind, VaultSecrets, VaultUser } from '../../domain/vault';
+import type { PasswordField, PasswordRecord, VaultSecrets } from '../../domain/vault';
 import type { AuditEntry } from '../../domain/universe';
 import {
-  AudioChip, IcClose, IcCopy, IcDownload, IcEdit, IcEye, IcFolder, IcLock, IcMove, IcPlus,
-  IcScan, IcSearch, IcTerminal, IcTrash, IcUnlock, IcUser, useUniverse,
+  IcCopy, IcEdit, IcEye, IcLock, 
+  IcSearch, IcTrash, useUniverse,
 } from '../bits';
 import { toast } from '../toast';
-import { readAsDataURL } from '../lib';
-import { FileManager } from '../FileManager';
-import { HexInspector, KindGlyph, TilePreview, WaveStripLocal, seedRnd } from '../VaultBits';
 
-import { sleep, videoEvent, coverCrop, clampFit, videoToFrames, processAvatar, wavBlob, imageBlob, videoBlob, synthPayload, downloadFile, kindOf } from './helpers';
 /* ================================ key ring ================================ */
 
-export const CATEGORIES = ['site', 'app', 'finance', 'wifi', 'device', 'note'] as const;
-export const CAT_COLORS: Record<string, string> = {
+const CATEGORIES = ['site', 'app', 'finance', 'wifi', 'device', 'note'] as const;
+const CAT_COLORS: Record<string, string> = {
   site: '#7fc4e8', app: '#9fd8a8', finance: '#f2c178', wifi: '#b49ae8', device: '#e0785a', note: '#8b93a8',
 };
-export const HISTORY_CAP = 8;
-export const TRASH_TTL_DAYS = 30;
+const HISTORY_CAP = 8;
+const TRASH_TTL_DAYS = 30;
 
-export const WORDS = [
+const WORDS = [
   'orbit', 'comet', 'lunar', 'solar', 'nebula', 'quasar', 'pulsar', 'zenith', 'aurora', 'photon',
   'eclipse', 'gravity', 'horizon', 'ion', 'meteor', 'nova', 'plasma', 'radial', 'signal', 'tides',
   'umbra', 'vector', 'vertex', 'wave', 'anchor', 'basalt', 'cipher', 'drift', 'ember', 'fathom',
 ];
 
-export function pwScore(s: string): number {
+function pwScore(s: string): number {
   if (!s) return 0;
   let sc = Math.min(4, s.length / 6);
   if (/[a-z]/.test(s) && /[A-Z]/.test(s)) sc += 1;
@@ -61,13 +54,13 @@ export function pwScore(s: string): number {
   if (s.length >= 16) sc += 1;
   return Math.min(8, sc);
 }
-export function pwTier(sc: number): { label: string; color: string } {
+function pwTier(sc: number): { label: string; color: string } {
   if (sc < 2) return { label: 'fragile', color: '#e06a5a' };
   if (sc < 4) return { label: 'fair', color: '#e8b25c' };
   if (sc < 6) return { label: 'strong', color: '#9fd8a8' };
   return { label: 'eventide-grade', color: '#6fc2b4' };
 }
-export function genKey(len: number, opts: { upper: boolean; digits: boolean; symbols: boolean }): string {
+function genKey(len: number, opts: { upper: boolean; digits: boolean; symbols: boolean }): string {
   let pool = 'abcdefghijkmnopqrstuvwxyz';
   if (opts.upper) pool += 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   if (opts.digits) pool += '23456789';
@@ -76,7 +69,7 @@ export function genKey(len: number, opts: { upper: boolean; digits: boolean; sym
   crypto.getRandomValues(arr);
   return Array.from(arr, (n) => pool[n % pool.length]).join('');
 }
-export function genPassphrase(words: number): string {
+function genPassphrase(words: number): string {
   const arr = new Uint32Array(words * 2);
   crypto.getRandomValues(arr);
   const out: string[] = [];
@@ -89,19 +82,19 @@ export function genPassphrase(words: number): string {
 export const ageDays = (t: number) => Math.floor((Date.now() - t) / 86400000);
 
 /** Push a replaced secret into history (newest last, capped). */
-export function withHistory(rec: PasswordRecord, replacedSecret: string): PasswordRecord {
+function withHistory(rec: PasswordRecord, replacedSecret: string): PasswordRecord {
   if (!replacedSecret || replacedSecret === rec.secret) return rec;
   const entry = { secret: replacedSecret, changedAt: Date.now() };
   const history = [...(rec.history ?? []), entry].slice(-HISTORY_CAP);
   return { ...rec, history };
 }
 
-export const HISTORY_LABELS = ['janitor', 'orbiter', 'satellite', 'moon', 'planet', 'star', 'giant', 'quasar'];
+const HISTORY_LABELS = ['janitor', 'orbiter', 'satellite', 'moon', 'planet', 'star', 'giant', 'quasar'];
 
 /* ------------------------------- pulsar code ------------------------------ */
 
 /** Live TOTP code with a countdown ring — the pulsar's light-curve. */
-export function PulsarCode({ otpauth, onCopy }: { otpauth: string; onCopy: (code: string, issuer: string) => void }) {
+function PulsarCode({ otpauth, onCopy }: { otpauth: string; onCopy: (code: string, issuer: string) => void }) {
   const params = useMemo(() => { try { return parseOtpAuth(otpauth); } catch { return null; } }, [otpauth]);
   const [code, setCode] = useState('······');
   const [remain, setRemain] = useState(params?.period ?? 30);
@@ -142,7 +135,7 @@ export function PulsarCode({ otpauth, onCopy }: { otpauth: string; onCopy: (code
 
 /* ------------------------------ nova marker ------------------------------- */
 
-export const NovaGlyph = () => (
+const NovaGlyph = () => (
   <svg width="11" height="11" viewBox="0 0 12 12" className="shrink-0" role="img" aria-label="nova — compromised secret">
     <path d="M6 0 L7.2 4.8 L12 6 L7.2 7.2 L6 12 L4.8 7.2 L0 6 L4.8 4.8 Z" fill="#e06a5a">
       <animate attributeName="opacity" values="1;0.35;1" dur="1.6s" repeatCount="indefinite" />
@@ -152,7 +145,7 @@ export const NovaGlyph = () => (
 
 /* ------------------------------ gravity well ------------------------------ */
 
-export function GravityWellModal({ existing, onClose, onIngest }: {
+function GravityWellModal({ existing, onClose, onIngest }: {
   existing: PasswordRecord[];
   onClose: () => void;
   onIngest: (fresh: PasswordRecord[], duplicates: number, source: ImportSource) => void;
@@ -224,7 +217,7 @@ interface SentinelIssue {
 }
 
 /** Parse MM/YY or MM/YYYY card-expiry style field values. */
-export function parseCardExpiry(v: string): Date | null {
+function parseCardExpiry(v: string): Date | null {
   const m = v.trim().match(/^(\d{1,2})\s*\/\s*(\d{2}|\d{4})$/);
   if (!m) return null;
   const month = Number(m[1]);
@@ -234,10 +227,10 @@ export function parseCardExpiry(v: string): Date | null {
   return new Date(year, month, 0, 23, 59, 59); /* end of expiry month */
 }
 
-export const EXPIRY_KEY = /^(exp|expiry|expires|expiration|valid|valid until|card expiry|expires on|good thru|good through)/i;
+const EXPIRY_KEY = /^(exp|expiry|expires|expiration|valid|valid until|card expiry|expires on|good thru|good through)/i;
 
 /** Itemized Watchtower-grade audit of the ring, derived from live records. */
-export function sentinelIssues(records: PasswordRecord[]): SentinelIssue[] {
+function sentinelIssues(records: PasswordRecord[]): SentinelIssue[] {
   const active = records.filter((r) => !r.deletedAt);
   const issues: SentinelIssue[] = [];
   const weak = active.filter((r) => pwScore(r.secret) < 4);
@@ -263,7 +256,7 @@ export function sentinelIssues(records: PasswordRecord[]): SentinelIssue[] {
   return issues;
 }
 
-export function SentinelPanel({ records, onScan, scanning }: { records: PasswordRecord[]; onScan: () => void; scanning: boolean }) {
+function SentinelPanel({ records, onScan, scanning }: { records: PasswordRecord[]; onScan: () => void; scanning: boolean }) {
   const issues = sentinelIssues(records);
   return (
     <div className="px-5 py-3">
@@ -295,7 +288,7 @@ export function SentinelPanel({ records, onScan, scanning }: { records: Password
   );
 }
 
-export function KeyGenerator({ onUse }: { onUse: (k: string) => void }) {
+function KeyGenerator({ onUse }: { onUse: (k: string) => void }) {
   const [len, setLen] = useState(20);
   const [upper, setUpper] = useState(true);
   const [digits, setDigits] = useState(true);
@@ -352,10 +345,10 @@ export function KeyGenerator({ onUse }: { onUse: (k: string) => void }) {
 /* -------------------------- stargate · will · courier --------------------- */
 
 export const b64url = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-export const b64urlDecode = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+const b64urlDecode = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
 
 /** Module-level clipboard copy with the standard 20-second scrub. */
-export const copyScrubbed = (text: string, what: string) => {
+const copyScrubbed = (text: string, what: string) => {
   void navigator.clipboard?.writeText(text).then(() => {
     toast(`${what} copied — clipboard scrubs in 20s`);
     setTimeout(() => { void navigator.clipboard?.writeText('·').catch(() => undefined); }, 20000);
@@ -363,7 +356,7 @@ export const copyScrubbed = (text: string, what: string) => {
 };
 
 /** Ask the authenticator to evaluate the PRF extension for a salt → b64 secret. */
-export async function prfDerive(credIdB64: string, prfSaltB64: string): Promise<string> {
+async function prfDerive(credIdB64: string, prfSaltB64: string): Promise<string> {
   const assertion = await navigator.credentials.get({
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
@@ -378,7 +371,7 @@ export async function prfDerive(credIdB64: string, prfSaltB64: string): Promise<
   return btoa(String.fromCharCode(...new Uint8Array(first)));
 }
 
-export function StargateModal({ ringKey, onAttuned, onClose }: {
+function StargateModal({ ringKey, onAttuned, onClose }: {
   ringKey: Uint8Array;
   onAttuned: (env: RingEnvelope) => void;
   onClose: () => void;
@@ -430,7 +423,7 @@ export function StargateModal({ ringKey, onAttuned, onClose }: {
   );
 }
 
-export function StellarWillModal({ mode, secrets, ringKey, onArm, onClaim, onClose }: {
+function StellarWillModal({ mode, secrets, ringKey, onArm, onClaim, onClose }: {
   mode: 'arm' | 'claim';
   secrets: VaultSecrets | null;
   ringKey?: Uint8Array;
@@ -528,7 +521,7 @@ export function StellarWillModal({ mode, secrets, ringKey, onArm, onClaim, onClo
   );
 }
 
-export function CourierModal({ records, onSend, onClose }: {
+function CourierModal({ records, onSend, onClose }: {
   records: PasswordRecord[];
   onSend: (picked: PasswordRecord[], note: string) => Promise<void>;
   onClose: () => void;
@@ -594,7 +587,7 @@ export function CourierModal({ records, onSend, onClose }: {
   );
 }
 
-export function ReceiveModal({ onIngest, onClose }: {
+function ReceiveModal({ onIngest, onClose }: {
   onIngest: (fresh: PasswordRecord[]) => Promise<void>;
   onClose: () => void;
 }) {
@@ -648,7 +641,7 @@ export function ReceiveModal({ onIngest, onClose }: {
   );
 }
 
-export function RotateKeyModal({ secrets, ringKey, onRewound, onClose }: {
+function RotateKeyModal({ secrets, ringKey, onRewound, onClose }: {
   secrets: VaultSecrets;
   ringKey: Uint8Array;
   onRewound: (next: VaultSecrets, message: string) => void;

@@ -11,7 +11,6 @@ import { REALITIES, getReality, createNewRealityConfig, RealityConfig } from '..
 import { actions, useUniverse } from '../../state';
 import type { DiskSyncState } from '../../domain/universe';
 import { toast } from '../../ui/toast';
-import { prettyPrint } from '../../ui/format';
 import { CreateRealityModal } from '../reality/CreateRealityModal';
 import { CoreSigil } from './CoreSigil';
 import { ScenicBackdrop, FALLBACK_NIGHT } from './ScenicBackdrop';

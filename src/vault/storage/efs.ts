@@ -254,7 +254,7 @@ export function efsDeleteShadow(vfs: VfsState, shadowId: string): void {
 
 /* ------------------------- dedup (shared extents) ------------------------ */
 
-export interface DedupReport { groups: number; collapsed: number; savedBytes: number; }
+interface DedupReport { groups: number; collapsed: number; savedBytes: number; }
 
 /** Groups files by checksum and marks duplicates to share the first file's payload. */
 export function efsDedup(vault: VaultFile[]): DedupReport {
@@ -350,7 +350,7 @@ export async function efsChecksumOf(file: VaultFile, getPayload: (id: string) =>
   return undefined;
 }
 
-export interface ScrubProgress { done: number; total: number; current: string; }
+interface ScrubProgress { done: number; total: number; current: string; }
 
 /**
  * Verifies every file's payload against its stored checksum (computing it

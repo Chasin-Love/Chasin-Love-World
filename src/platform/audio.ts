@@ -324,7 +324,7 @@ function kamuiForwardInto(ctx: OfflineAudioContext, out: AudioNode, total: numbe
   go.connect(gg).connect(out); go.start(total - gd); go.stop(total + 0.02);
 }
 
-export async function renderKamuiReturnVoiceCache(): Promise<void> {
+async function renderKamuiReturnVoiceCache(): Promise<void> {
   const c = ensure();
   if (!c || returnVoiceCache || returnVoiceRendering) return;
   returnVoiceRendering = true;
@@ -357,7 +357,7 @@ export async function renderKamuiReturnVoiceCache(): Promise<void> {
 /* PRE-WARM (R82.5): the mirror renders once at audio-init — long before any
    eject — so the reverse voice always fires on the very first frame of the
    1.9s window instead of arriving seconds late behind its own render. */
-export function prewarmKamuiReturnVoice(): void {
+function prewarmKamuiReturnVoice(): void {
   void renderKamuiReturnVoiceCache();
 }
 

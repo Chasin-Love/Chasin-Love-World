@@ -14,7 +14,7 @@
  * so "C++ is driving" is a verified claim, not marketing.
  */
 
-export type CosmosBackend = 'native-cpp' | 'wasm' | 'typescript';
+type CosmosBackend = 'native-cpp' | 'wasm' | 'typescript';
 
 export interface CosmosStatus {
   backend: CosmosBackend;
@@ -23,7 +23,7 @@ export interface CosmosStatus {
   ready: boolean;
 }
 
-export interface KeplerBatchInput {
+interface KeplerBatchInput {
   a: number[];
   e: number[];
   phase: number[];
@@ -35,13 +35,13 @@ export interface KeplerBatchInput {
   simDays: number;
 }
 
-export interface KeplerBatchResult {
+interface KeplerBatchResult {
   xyz: Float64Array;      /* 3n */
   radius: Float64Array;   /* n */
   trueAnomaly: Float64Array; /* n */
 }
 
-export interface PhysicsBatchInput {
+interface PhysicsBatchInput {
   ids: string[];
   orbitA: number[];
   radius: number[];

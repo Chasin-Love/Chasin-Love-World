@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RealityConfig, RAW_REALITIES } from '../../realities';
-import { X, Sparkles, Plus, Orbit, Globe, Compass, Shield, Check } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 interface CreateRealityModalProps {
   isOpen: boolean;

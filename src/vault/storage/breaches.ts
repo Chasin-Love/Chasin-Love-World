@@ -92,7 +92,7 @@ function getCorpus(): Promise<Set<string>> {
   return corpusHashes;
 }
 
-export interface NovaVerdict {
+interface NovaVerdict {
   secret: string;
   nova: boolean;
 }
@@ -107,7 +107,7 @@ async function isNova(secret: string): Promise<boolean> {
   return corpus.has(await sha1Hex(secret.toLowerCase()));
 }
 
-export interface NovaScanResult {
+interface NovaScanResult {
   records: PasswordRecord[];       /* updated copies — breachedAt stamped  */
   novae: PasswordRecord[];         /* newly discovered compromised items  */
   cleared: number;                 /* items whose earlier nova flag lifted */

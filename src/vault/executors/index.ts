@@ -14,7 +14,6 @@ import type { VaultFile } from '../types';
 import { getPayload } from '../storage/indexedDB';
 import { isVaultFileAuthorized, isVaultFileLocked } from '../storage/crypto';
 import { readZipEntries, extractZipEntry, unzipAll, type ZipEntry } from '../storage/zip';
-import { parseIsoBlob, extractIsoFile, flattenIsoRecords } from './isoExecutor';
 import type { RunnerKind } from '../types';
 
 export type { RunnerKind } from '../types';
@@ -187,12 +186,12 @@ export function pickAppEntry(paths: string[]): string | null {
 
 /* ------------------------- javascript worker ------------------------- */
 
-export interface JsRunHandle {
+interface JsRunHandle {
   worker: Worker;
   stop: () => void;
 }
 
-export type LogSink = (line: string, level: 'info' | 'warn' | 'error') => void;
+type LogSink = (line: string, level: 'info' | 'warn' | 'error') => void;
 
 const WORKER_SHIM = `
 const __send = (lvl, args) => self.postMessage({ __vault: true, level: lvl, text: args.map(a => {
@@ -262,7 +261,7 @@ self.onmessage = async (event) => {
 };
 `;
 
-export interface PythonRunHandle {
+interface PythonRunHandle {
   promise: Promise<void>;
   stop: () => void;
 }

@@ -38,7 +38,7 @@ export const KAMUI_TRIGGER_DURATION = 5.0; /* seconds */
     twist and hard-cutting. */
 export const KAMUI_REVERSE_DURATION = 1.9; /* seconds */
 
-export const KAMUI_RAMP: string[] = ['#ff1744', '#8b5cf6', '#f2c178'];
+const KAMUI_RAMP: string[] = ['#ff1744', '#8b5cf6', '#f2c178'];
 
 /** THE CHOREOGRAPHY — the summon is a SEQUENCE of distinct beats, not one
     stretched motion. The rip opens (the original start, kept), the middle
