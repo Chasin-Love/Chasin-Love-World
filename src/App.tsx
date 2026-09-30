@@ -391,7 +391,7 @@ export default function App() {
         if (!isMuted()) {
           kamuiVoiceRef.current?.stop();
           if (reverse) {
-            void playKamuiReturnVoice(1.9).then((h) => { kamuiVoiceRef.current = h; });
+            kamuiVoiceRef.current = playKamuiReturnVoice(1.9);
           } else {
             kamuiVoiceRef.current = playKamuiVoice(5.0, 1.0);
           }

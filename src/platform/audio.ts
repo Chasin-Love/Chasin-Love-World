@@ -33,6 +33,7 @@ export function initAudio() {
   userInteracted = true;
   ensure(true);
   setAudioMode(currentMode);
+  prewarmKamuiReturnVoice(); /* R82.5: the mirror renders NOW, not on the first eject */
 }
 
 export function isMuted() { return muted; }
@@ -323,41 +324,70 @@ function kamuiForwardInto(ctx: OfflineAudioContext, out: AudioNode, total: numbe
   go.connect(gg).connect(out); go.start(total - gd); go.stop(total + 0.02);
 }
 
-export async function playKamuiReturnVoice(reverseDuration = 1.9): Promise<KamuiVoiceHandle | null> {
+export async function renderKamuiReturnVoiceCache(): Promise<void> {
+  const c = ensure();
+  if (!c || returnVoiceCache || returnVoiceRendering) return;
+  returnVoiceRendering = true;
+  try {
+    const OAC = window.OfflineAudioContext || (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+    const SR = c.sampleRate;
+    const total = 3.2;
+    const off = new OAC(2, Math.ceil(SR * total), SR);
+    const comp = off.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.ratio.value = 4;
+    const makeup = off.createGain(); makeup.gain.value = 1.15;
+    makeup.connect(comp).connect(off.destination);
+    kamuiForwardInto(off, makeup, total);
+    const rendered = await off.startRendering();
+    /* THE MIRROR: flip every sample */
+    const flipped = c.createBuffer(2, rendered.length, SR);
+    for (let ch = 0; ch < 2; ch++) {
+      const s = rendered.getChannelData(ch);
+      const d = flipped.getChannelData(ch);
+      for (let i = 0; i < s.length; i++) d[i] = s[s.length - 1 - i];
+    }
+    returnVoiceCache = flipped;
+  } catch {
+    /* the cache simply stays absent — ejects skip silently (zero-fail law) */
+  } finally {
+    returnVoiceRendering = false;
+  }
+}
+
+/* PRE-WARM (R82.5): the mirror renders once at audio-init — long before any
+   eject — so the reverse voice always fires on the very first frame of the
+   1.9s window instead of arriving seconds late behind its own render. */
+export function prewarmKamuiReturnVoice(): void {
+  void renderKamuiReturnVoiceCache();
+}
+
+export function playKamuiReturnVoice(reverseDuration = 1.9): KamuiVoiceHandle | null {
   const c = ensure();
   if (!c || !master) return null;
+  /* no cache yet? render for NEXT time and skip this eject silently —
+     waiting here is exactly the "audio arrives late" defect (R82.5). With
+     the init-time prewarm this path is virtually unreachable. */
+  if (!returnVoiceCache) {
+    void renderKamuiReturnVoiceCache();
+    return null;
+  }
   try {
-    /* one offline render per session (3.4s of reversed audio, stereo) */
-    if (!returnVoiceCache) {
-      if (returnVoiceRendering) return null;
-      returnVoiceRendering = true;
-      const OAC = window.OfflineAudioContext || (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext }).webkitOfflineAudioContext;
-      const SR = c.sampleRate;
-      const total = 3.2;
-      const off = new OAC(2, Math.ceil(SR * total), SR);
-      const comp = off.createDynamicsCompressor();
-      comp.threshold.value = -14; comp.ratio.value = 4;
-      const makeup = off.createGain(); makeup.gain.value = 1.15;
-      makeup.connect(comp).connect(off.destination);
-      kamuiForwardInto(off, makeup, total);
-      const rendered = await off.startRendering();
-      /* THE MIRROR: flip every sample */
-      const flipped = c.createBuffer(2, rendered.length, SR);
-      for (let ch = 0; ch < 2; ch++) {
-        const s = rendered.getChannelData(ch);
-        const d = flipped.getChannelData(ch);
-        for (let i = 0; i < s.length; i++) d[i] = s[s.length - 1 - i];
-      }
-      returnVoiceCache = flipped;
-      returnVoiceRendering = false;
-    }
     const bus = c.createGain(); bus.gain.value = 1.1;
     bus.connect(master);
     const player = c.createBufferSource();
     player.buffer = returnVoiceCache;
     player.connect(bus);
-    player.start(c.currentTime + 0.02);
-    const playLen = (returnVoiceCache.length / c.sampleRate) * 1000;
+    /* skip the quiet head: the reversed buffer opens with the forward's
+       silent gulp-tail (~0.9s of near-nothing) — the R82.5 lateness fix
+       starts playback at the audible content, the mirrored drone mid-roar,
+       with a 30ms fade to be click-safe at the seam */
+    const bufDur = returnVoiceCache.length / c.sampleRate;
+    const offset = Math.max(0, bufDur - (reverseDuration + 0.45));
+    const playLen = (bufDur - offset) * 1000;
+    const when = c.currentTime + 0.02;
+    bus.gain.setValueAtTime(0.0001, when);
+    bus.gain.linearRampToValueAtTime(1.1, when + 0.03);
+    player.start(when, offset);
     const watchdog = window.setTimeout(() => { try { bus.disconnect(); } catch { /* */ } }, playLen + 400);
     return {
       stop() {
@@ -368,7 +398,6 @@ export async function playKamuiReturnVoice(reverseDuration = 1.9): Promise<Kamui
       },
     };
   } catch {
-    returnVoiceRendering = false;
     return null; /* the zero-fail law: audio never breaks the cosmos */
   }
 }
