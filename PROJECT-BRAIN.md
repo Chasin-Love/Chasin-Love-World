@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-09-30, after R80 (the mark).
+> **Last updated:** 2026-09-30, after R81 (the herald reborn).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -230,10 +230,11 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The living spin | R78 *(on main)* | The mature vortex no longer sits frozen: the tear's twist was a static bend saturating in the first half-second, so between the tear and the throat nothing moved. The engine now integrates the vortex's own rotation (uSpin) for as long as the tear is visible — differential in the shader (inner band winds faster), surging with the gulp, coasting to a stop with the fade — the ripple marches inward on the summon (outward on the eject), and the early bite is a touch sharper (twist 6.5→7.0, pull 0.28/0.22→0.32/0.26). Round18 reconciled + a new living-spin check |
 | The one sky | R79 *(on main)* | The Sky Studio's photo sky becomes THE sky: the vertical barrier died (the vignette sat on the atan branch cut + mipmaps collapsed there — now a camera-relative seam-free vignette and a mip-free texture), the procedural family stands down while a photo owns the view (no ghost floor, no glow tint, blend 1.0 across all three contract tiers), and the dome rides the camera — full-screen at every cosmological stage, the equirect always 1:1. Deactivation rides the crossfade out; uploads rasterize at 4096×2048 when light. New round79 gauntlet in the verify chain |
 | The mark | R80 *(on main)* | The placeholder icon replaced by the author's star sigil (photo pipeline: crop, sharpen, levels) with the analytic Eventide mark as fallback, shipped to the desktop icons and the web's first favicon; the first v15.0.5 tag caught a Windows-only RC2175 ICO defect, the generator was made DIB-correct, released as v15.0.5 via the proven tag-push ritual |
+| The herald reborn | R81 *(on main)* | The updater card redesigned as an artifact — framer-motion spring entrance, lucide star glyph with breathing/spinning halo rings, orbital download progress ring, per-phase copy and glyphs, a real `later` dismiss — zero new deps (vendored framer-motion + lucide), presentation split into `UpdaterCardBody` for staging; released as v15.0.6, the card that delivers its own release |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-30, after R80)
+## 8. CURRENT STATE (as of 2026-09-30, after R81)
 
 - **`main` is the blessed reference.** Its tip is the R79 one sky
   (the photo sky's barrier/double-sky/zoom trio → its gauntlet) on top of
