@@ -225,13 +225,15 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The throat is not swallowed | R73 *(on main)* | The vault Kamui's vacuum gulp no longer drains a hole/vault body's group — the live telemetry caught Eventide shrinking to 24% and vanishing whole in the last second before the vault opened; the door now stays whole through its own jutsu while planets and galaxies keep the canon drain. New round73 gauntlet in the verify chain |
 | The holographic herald | R74 *(on main)* | Hover discipline: honest colliders (web galaxy 1.35×→the disc, multiverse galaxy 0.18×→the glow), the engine projects each hovered object's screen disk and re-emits it at ~8 Hz, and the shared `HoloCardShell` anchors every hover card OUTSIDE that disk with a stem into the rim — 3D entrance, spinning holo border, sheen; pointer-events-none everywhere except real buttons. The cluster card no longer steals clicks. New round74 gauntlet in the verify chain |
 | The unbroken bridge | R75 *(on main)* | The journey from the disk to the card's own buttons no longer kills the card: the last disk and the pointer's resting place live in refs, one `pointerOnBridge` predicate guards the card rect (±8) and the rim+48 corridor, and the 550 ms goodbye is HONEST — it re-checks where the pointer rests before clearing (a pause emits no events; a still traveler on the bridge re-arms it instead of dying). Click discipline pinned: only real buttons inside the cards take clicks. New round75 gauntlet in the verify chain |
+| The steady herald & the web door | R76 *(on main)* | The card is now stable enough to ROAM: the disk state is set only by a real disk emission (the old null-erasing write re-anchored the mounted card onto the cursor fallback the moment the rim was crossed — teleport + flicker + vanish), and clearHoverCard stays the only eraser. And clicking a reality sphere is an explicit Kamui: zoomToHierarchy(2) carries the traveler to that reality's COSMIC WEB (dial 0.858) — the old resetView() dove straight into the home stellar system. New round76 gauntlet in the verify chain; R74/R75 checks reconciled to the evolved contract |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-30, after R75)
+## 8. CURRENT STATE (as of 2026-09-30, after R76)
 
-- **`main` is the blessed reference.** Its tip is the R75 work (the unbroken
-  bridge → its gauntlet) on top of the R74 pair (the holographic herald → its
+- **`main` is the blessed reference.** Its tip is the R76 work (the steady
+  herald & the web door → its gauntlet) on top of the R75 pair (the unbroken
+  bridge → its gauntlet), the R74 pair (the holographic herald → its
   gauntlet), the R73 pair (the throat-is-not-swallowed guard → its gauntlet)
   and the R72 four-commit train, all on the R67-final engine state.
   **Correction (verified in R72):** the earlier claim that R71 step 2's slice table sat on
@@ -267,10 +269,19 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   corridor pauses, arrival at "Dive In" — alive at every checkpoint; leaving both lifelines
   still departs the card on schedule. The interrupted session's "rivers" complaint decoded
   as "reverse Kamui" — R72's law, already green.
-- **Verification status:** `npm run verify` ALL GREEN (typecheck; round16/17/18/63/72/73/74/**75**
-  gauntlets; smoke + prod-smoke, zero console errors); `npm audit` 0 vulnerabilities;
-  `audit:arch --check` exits 1 with findings identical to the pristine parent commit (the
-  pre-existing R52-baseline drift below — R72–R75 added zero new findings).
+- **R76:** the steady herald & the web door. The card is stable enough to roam: the disk
+  state survives null hover emissions (the card keeps its anchored placement + stem for the
+  whole crossing; the old code teleported it onto the cursor fallback at the rim and
+  flickered it at every boundary graze — the "vanishes before I get there" report). And a
+  reality-sphere click now fires the Kamui and lands on that reality's COSMIC WEB (dial
+  0.858) instead of resetView's home stellar system. Both live-verified; watch items
+  queued: the camera memory can remember a mid-dive placement (boots inside a galaxy until
+  resetView), and a dive queued before a reality switch executes on the roster landing.
+- **Verification status:** `npm run verify` ALL GREEN (typecheck;
+  round16/17/18/63/72/73/74/75/**76** gauntlets; smoke + prod-smoke, zero console errors);
+  `npm audit` 0 vulnerabilities; `audit:arch --check` exits 1 with findings identical to
+  the pristine parent commit (the pre-existing R52-baseline drift below — R72–R76 added
+  zero new findings).
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); architecture-audit snapshot drift vs the frozen R52
   baseline (re-snapshot consciously); 8 dead value exports + 46 dead type exports (including
@@ -282,12 +293,17 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ## 9. WHERE IT'S GOING
 
-1. **R72/R73 watch items (small, user-visible):** if the staged arrival's focus re-aim toward
-   the traveler's reality marble ever reads as a sideways sweep, apply the portal's
-   `holdFocus` discipline during the handoff; `beginGalaxyEntry`'s Kamui garnish still races
-   its own zoom (the same same-frame shape R72 fixed at the membrane) — its own round; the
-   first summon of a session compiles the vortex pass on its first frame (a one-time hitch —
-   a shader warm-up would be its own round).
+1. **R76 watch items (small, user-visible):** the camera memory can save a
+   mid-dive placement — every reload then boots inside a galaxy disc until
+   Reset View forgets it (a save-time guard is its own small round); a
+   galaxy dive queued before a reality switch executes on the roster
+   landing (`pendingGalaxyEntry`, correct per R54 but surprising); if the
+   staged arrival's focus re-aim toward the traveler's reality marble ever
+   reads as a sideways sweep, apply the portal's `holdFocus` discipline
+   during the handoff; `beginGalaxyEntry`'s Kamui garnish still races its
+   own zoom (the same same-frame shape R72 fixed at the membrane) — its own
+   round; the first summon of a session compiles the vortex pass on its
+   first frame (a one-time hitch — a shader warm-up would be its own round).
 2. **Finish R71 "Ten Slices"** — the slice system's consumers: the hierarchy stepper firing
    explicit cross-slice Kamui, edge membrane affordances, gauntlet pins for the new law.
 3. **The Signage Wave** (the recommended next theme, from the experience report):
