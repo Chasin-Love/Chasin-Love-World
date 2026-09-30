@@ -1961,7 +1961,7 @@ dependencies = [
 
 [[package]]
 name = "my-universe"
-version = "15.0.2"
+version = "15.0.5"
 dependencies = [
  "cc",
  "serde",
