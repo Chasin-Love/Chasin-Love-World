@@ -226,13 +226,15 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The holographic herald | R74 *(on main)* | Hover discipline: honest colliders (web galaxy 1.35×→the disc, multiverse galaxy 0.18×→the glow), the engine projects each hovered object's screen disk and re-emits it at ~8 Hz, and the shared `HoloCardShell` anchors every hover card OUTSIDE that disk with a stem into the rim — 3D entrance, spinning holo border, sheen; pointer-events-none everywhere except real buttons. The cluster card no longer steals clicks. New round74 gauntlet in the verify chain |
 | The unbroken bridge | R75 *(on main)* | The journey from the disk to the card's own buttons no longer kills the card: the last disk and the pointer's resting place live in refs, one `pointerOnBridge` predicate guards the card rect (±8) and the rim+48 corridor, and the 550 ms goodbye is HONEST — it re-checks where the pointer rests before clearing (a pause emits no events; a still traveler on the bridge re-arms it instead of dying). Click discipline pinned: only real buttons inside the cards take clicks. New round75 gauntlet in the verify chain |
 | The steady herald & the web door | R76 *(on main)* | The card is now stable enough to ROAM: the disk state is set only by a real disk emission (the old null-erasing write re-anchored the mounted card onto the cursor fallback the moment the rim was crossed — teleport + flicker + vanish), and clearHoverCard stays the only eraser. And clicking a reality sphere is an explicit Kamui: zoomToHierarchy(2) carries the traveler to that reality's COSMIC WEB (dial 0.858) — the old resetView() dove straight into the home stellar system. New round76 gauntlet in the verify chain; R74/R75 checks reconciled to the evolved contract |
+| The tail trim | R77 *(on main)* | The Kamui's mature-vortex plateau — the stretch the author highlighted in R73's telemetry (4.85→5.25s) where the vortex is fully formed and merely stabilizing — is trimmed: the summon ends at 5.0s (was 5.5), the throat beat with it, the vacuum drain compressed to 1.0s (same surge machinery), the R67 hold following to 5.0. The build beats and the eject are untouched. Round18's timing pins reconciled consciously |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-30, after R76)
+## 8. CURRENT STATE (as of 2026-09-30, after R77)
 
-- **`main` is the blessed reference.** Its tip is the R76 work (the steady
-  herald & the web door → its gauntlet) on top of the R75 pair (the unbroken
+- **`main` is the blessed reference.** Its tip is the R77 trim (the Kamui
+  tail → its round18 reconciliation) on top of the R76 work (the steady
+  herald & the web door → its gauntlet), the R75 pair (the unbroken
   bridge → its gauntlet), the R74 pair (the holographic herald → its
   gauntlet), the R73 pair (the throat-is-not-swallowed guard → its gauntlet)
   and the R72 four-commit train, all on the R67-final engine state.
@@ -277,10 +279,17 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   0.858) instead of resetView's home stellar system. Both live-verified; watch items
   queued: the camera memory can remember a mid-dive placement (boots inside a galaxy until
   resetView), and a dive queued before a reality switch executes on the roster landing.
+- **R77:** the tail trim — the Kamui's mature-vortex plateau (the stretch highlighted in
+  R73's telemetry) is cut: the summon ends at 5.0s, the vacuum drain at 1.0s, the R67 hold
+  follows to 5.0; the build beats and the eject are untouched. Live-verified (hold and
+  Kamui in lockstep 4.9→0.1 over 5.0s; the vault opens at machine +5.3s vs ≈5.65 before).
+  New watch item: a click can be refused while a reverse Kamui is still unwinding — if a
+  traveler ever feels a dead click right after closing a diary/vault, that refusal window
+  is where to look.
 - **Verification status:** `npm run verify` ALL GREEN (typecheck;
-  round16/17/18/63/72/73/74/75/**76** gauntlets; smoke + prod-smoke, zero console errors);
+  round16/17/18/63/72/73/74/75/76 gauntlets; smoke + prod-smoke, zero console errors);
   `npm audit` 0 vulnerabilities; `audit:arch --check` exits 1 with findings identical to
-  the pristine parent commit (the pre-existing R52-baseline drift below — R72–R76 added
+  the pristine parent commit (the pre-existing R52-baseline drift below — R72–R77 added
   zero new findings).
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); architecture-audit snapshot drift vs the frozen R52
