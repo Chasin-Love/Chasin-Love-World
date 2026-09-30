@@ -119,7 +119,10 @@ export const desktopPayloads = {
 
 function mapRealityEndpoint<T = unknown>(path: string, body: unknown): { cmd: string; args: Record<string, unknown> } | null {
   const b = (body ?? {}) as Record<string, unknown>;
-  switch (path) {
+  /* Match on the bare route — callers may append a query string (the sky
+     status twin carries ?folder=…), which must not break the exact-path
+     cases below. The case bodies still read the query off `path` itself. */
+  switch (path.split('?')[0]) {
     case '/api/realities/rename-folder':
       return { cmd: 'reality_rename', args: { realityId: b.realityId, newName: b.newName } };
     case '/api/realities/bin/move-to-bin':
