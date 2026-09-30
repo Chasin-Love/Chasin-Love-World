@@ -1316,11 +1316,14 @@ export function PasswordVault({ masterPass, keyName }: { masterPass: string; key
                 const sc = pwScore(r.secret);
                 const tier = pwTier(sc);
                 const isEdit = editing === r.id;
-                const isNova = Boolean(r.breachedAt);
+                /* R85 — named isBreached, not isNova: the old name shadowed
+                   the corpus check in storage/breaches.ts and hid it from
+                   every usage scan. This flag is the persisted scan verdict. */
+                const isBreached = Boolean(r.breachedAt);
                 return (
                   <div key={r.id} className="border-b border-line/40">
                     <div className="vault-row flex items-center gap-3.5 px-5 py-2.5">
-                      {isNova ? <NovaGlyph /> : <span className="w-1.75 h-1.75 rounded-full shrink-0" style={{ background: tier.color, boxShadow: `0 0 6px ${tier.color}` }} title={`strength: ${tier.label}`} />}
+                      {isBreached ? <NovaGlyph /> : <span className="w-1.75 h-1.75 rounded-full shrink-0" style={{ background: tier.color, boxShadow: `0 0 6px ${tier.color}` }} title={`strength: ${tier.label}`} />}
                       <span className="w-[64px] shrink-0 font-mono text-[7.5px] tracking-[0.18em] uppercase px-1.5 py-0.5 text-center border"
                         style={{ color: CAT_COLORS[r.category ?? 'note'], borderColor: `${CAT_COLORS[r.category ?? 'note']}44` }}>
                         {r.category ?? 'site'}
@@ -1328,7 +1331,7 @@ export function PasswordVault({ masterPass, keyName }: { masterPass: string; key
                       <div className="w-40 min-w-0">
                         <p className="text-[12px] text-paper truncate">{r.label}</p>
                         <p className="font-mono text-[8px] tracking-[0.2em] uppercase text-slate-dim">
-                          {age}d{isNova && <span className="text-red-300"> · nova</span>}{age > 365 && <span className="text-red-300"> · rotate</span>}{age > 180 && age <= 365 && <span className="text-solar"> · aged</span>}
+                          {age}d{isBreached && <span className="text-red-300"> · nova</span>}{age > 365 && <span className="text-red-300"> · rotate</span>}{age > 180 && age <= 365 && <span className="text-solar"> · aged</span>}
                         </p>
                       </div>
                       <button onClick={() => copy(r.user, 'identity')} className="w-40 min-w-0 text-left group/uid" title="copy identity">

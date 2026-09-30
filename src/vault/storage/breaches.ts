@@ -97,8 +97,11 @@ export interface NovaVerdict {
   nova: boolean;
 }
 
-/** True when the secret matches the compromised corpus. */
-export async function isNova(secret: string): Promise<boolean> {
+/** True when the secret matches the compromised corpus. (R85: module-private —
+    novaScan is the only caller, and its inline duplicate of this exact check
+    is gone; the keyring's local `isNova` shadow that hid this function from
+    every usage scan is renamed `isBreached`.) */
+async function isNova(secret: string): Promise<boolean> {
   if (!secret) return false;
   const corpus = await getCorpus();
   return corpus.has(await sha1Hex(secret.toLowerCase()));
@@ -112,12 +115,11 @@ export interface NovaScanResult {
 
 /** Scan a whole ring; stamps `breachedAt` on hits, clears stale flags. */
 export async function novaScan(records: PasswordRecord[]): Promise<NovaScanResult> {
-  const corpus = await getCorpus();
   const novae: PasswordRecord[] = [];
   let cleared = 0;
   const now = Date.now();
   const updated = await Promise.all(records.map(async (r) => {
-    const hit = r.secret ? corpus.has(await sha1Hex(r.secret.toLowerCase())) : false;
+    const hit = await isNova(r.secret);
     if (hit && !r.breachedAt) {
       const stamped = { ...r, breachedAt: now };
       novae.push(stamped);

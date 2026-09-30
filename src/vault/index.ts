@@ -7,7 +7,7 @@
  *  2. Triple-Tier Persistence — Desktop FS (Tauri) → OPFS → IndexedDB
  *  3. Cryptographic Armor — PBKDF2 key derivation & AES-GCM 256-bit encryption
  *  4. Universal Execution Engine — ISO 9660, Web Apps, Pyodide, Workers, ZIP
- *  5. Domain Contracts — types, runner kinds, backend status
+ *  5. Domain Contracts — types, runner kinds
  */
 
 // Master types
@@ -31,11 +31,4 @@ export * from './storage/seeds';
 // Universal Execution Engine
 export * from './executors';
 export * from './executors/isoExecutor';
-
-import { hasOpfs, hasIdb } from './storage/indexedDB';
-import type { BackendStatus } from './types';
-
-/**
- * Returns real-time health and capabilities of the backend engine
- */
 
