@@ -89,28 +89,39 @@ function kamuiNoise(c: AudioContext, seconds: number): AudioBufferSourceNode {
   return src;
 }
 
-/* the summon: blooming riser (noise sweep + low climb) */
+/* the summon: blooming riser (noise sweep + low climb).
+   R82.1 — THE LATENESS FIX: the first mix rode the vortex's cubic ease-in,
+   so the first ~2.2s sat near silence and the ear heard the sound as
+   "starting 2–3 seconds late." The portal must announce itself the instant
+   it tears: the riser now leads with an immediate presence floor (a fast
+   80ms attack to a solid base level) and the ease rides ON TOP of that
+   floor instead of from zero. The low climb also starts at 65 Hz (still
+   felt, but reproducible on laptop speakers) instead of 46. */
 function kamuiRiser(c: AudioContext, out: AudioNode, t0: number, dur: number) {
   const src = kamuiNoise(c, dur + 0.1);
   src.loop = true;
   const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
   const g = c.createGain();
-  bp.frequency.setValueAtTime(180, t0);
+  bp.frequency.setValueAtTime(240, t0);
   bp.frequency.exponentialRampToValueAtTime(2600, t0 + dur);
   bp.Q.setValueAtTime(0.8, t0);
   bp.Q.linearRampToValueAtTime(2.2, t0 + dur);
+  const base = 0.34; /* the presence floor — audible from the first frame */
   g.gain.setValueAtTime(0.0001, t0);
-  for (let i = 0; i <= 24; i++) {
+  g.gain.linearRampToValueAtTime(base, t0 + 0.08); /* instant announce */
+  for (let i = 1; i <= 24; i++) {
     const t = t0 + (dur * i) / 24;
-    g.gain.linearRampToValueAtTime(Math.max(0.0001, kamuiVortexStrength(i / 24) * 0.5), t);
+    const s = base + (0.5 - base) * kamuiVortexStrength(i / 24);
+    g.gain.linearRampToValueAtTime(s, t);
   }
   src.connect(bp).connect(g).connect(out);
   src.start(t0); src.stop(t0 + dur + 0.05);
   const o = c.createOscillator(); o.type = 'sine';
   const og = c.createGain();
-  o.frequency.setValueAtTime(46, t0);
+  o.frequency.setValueAtTime(65, t0);
   o.frequency.exponentialRampToValueAtTime(184, t0 + dur);
   og.gain.setValueAtTime(0.0001, t0);
+  og.gain.linearRampToValueAtTime(0.26, t0 + 0.15); /* the low lift lands early too */
   og.gain.linearRampToValueAtTime(0.34, t0 + dur * 0.8);
   og.gain.linearRampToValueAtTime(0.42, t0 + dur);
   o.connect(og).connect(out);
@@ -186,30 +197,12 @@ function kamuiSubDrop(c: AudioContext, out: AudioNode, t0: number, dur: number) 
   src.start(t0); src.stop(t0 + dur + 0.1);
 }
 
-/* the arrival: the app's own chimes re-voiced with air */
-function kamuiExhale(c: AudioContext, out: AudioNode, t0: number) {
-  const notes: Array<[number, number]> = [[880, 0], [760, 0.07], [587.33, 0.16]];
-  for (const [f, dt] of notes) {
-    const o = c.createOscillator(); o.type = 'sine';
-    o.frequency.value = f;
-    const g = c.createGain();
-    g.gain.setValueAtTime(0.0001, t0 + dt);
-    g.gain.linearRampToValueAtTime(0.16, t0 + dt + 0.05);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.9);
-    o.connect(g).connect(out);
-    o.start(t0 + dt); o.stop(t0 + dt + 1);
-  }
-  const src = kamuiNoise(c, 1.4);
-  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400;
-  const g = c.createGain();
-  g.gain.setValueAtTime(0.14, t0);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.2);
-  const pL = c.createStereoPanner(); pL.pan.value = -0.6;
-  const pR = c.createStereoPanner(); pR.pan.value = 0.6;
-  src.connect(lp).connect(g);
-  g.connect(pL).connect(out); g.connect(pR).connect(out);
-  src.start(t0); src.stop(t0 + 1.4);
-}
+/* the arrival exhale — REMOVED (R82.2, the author's call): in the standalone
+   candidate it resolved the sequence beautifully, but inside the app it
+   stacked on top of the app's OWN arrival chimes (chime(880/760) already
+   fire on every arrival in App.tsx) — two arrival voices at once read as
+   misplaced. The existing arrival grammar speaks alone; the voice ends
+   with the gulp's swallow, which hands off to the app's chime naturally. */
 
 export type KamuiVoiceHandle = { stop(): void };
 
@@ -229,8 +222,9 @@ export function playKamuiVoice(summonDuration = 5.0, vacuumDuration = 1.0): Kamu
   kamuiRip(c, makeup, t0 + summonDuration * 0.45);
   kamuiDrone(c, makeup, t0 + summonDuration * 0.45, summonDuration * 0.55 + vacuumDuration * 0.4);
   kamuiSubDrop(c, makeup, t0 + summonDuration, vacuumDuration);
-  kamuiExhale(c, makeup, t0 + summonDuration + vacuumDuration + 0.25);
-  const end = t0 + summonDuration + vacuumDuration + 1.8;
+  /* no exhale — the app's own arrival chimes own the landing (see the
+     REMOVED note above); the sub-drop's fade IS the handoff to them */
+  const end = t0 + summonDuration + vacuumDuration + 0.4;
   const watchdog = window.setTimeout(() => { try { comp.disconnect(); makeup.disconnect(); } catch { /* */ } }, (end - c.currentTime) * 1000 + 400);
   return {
     stop() {
