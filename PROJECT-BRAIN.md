@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-09-30, after R75 (the unbroken bridge).
+> **Last updated:** 2026-09-30, after R78 (the living spin).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -227,13 +227,15 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The unbroken bridge | R75 *(on main)* | The journey from the disk to the card's own buttons no longer kills the card: the last disk and the pointer's resting place live in refs, one `pointerOnBridge` predicate guards the card rect (±8) and the rim+48 corridor, and the 550 ms goodbye is HONEST — it re-checks where the pointer rests before clearing (a pause emits no events; a still traveler on the bridge re-arms it instead of dying). Click discipline pinned: only real buttons inside the cards take clicks. New round75 gauntlet in the verify chain |
 | The steady herald & the web door | R76 *(on main)* | The card is now stable enough to ROAM: the disk state is set only by a real disk emission (the old null-erasing write re-anchored the mounted card onto the cursor fallback the moment the rim was crossed — teleport + flicker + vanish), and clearHoverCard stays the only eraser. And clicking a reality sphere is an explicit Kamui: zoomToHierarchy(2) carries the traveler to that reality's COSMIC WEB (dial 0.858) — the old resetView() dove straight into the home stellar system. New round76 gauntlet in the verify chain; R74/R75 checks reconciled to the evolved contract |
 | The tail trim | R77 *(on main)* | The Kamui's mature-vortex plateau — the stretch the author highlighted in R73's telemetry (4.85→5.25s) where the vortex is fully formed and merely stabilizing — is trimmed: the summon ends at 5.0s (was 5.5), the throat beat with it, the vacuum drain compressed to 1.0s (same surge machinery), the R67 hold following to 5.0. The build beats and the eject are untouched. Round18's timing pins reconciled consciously |
+| The living spin | R78 *(on main)* | The mature vortex no longer sits frozen: the tear's twist was a static bend saturating in the first half-second, so between the tear and the throat nothing moved. The engine now integrates the vortex's own rotation (uSpin) for as long as the tear is visible — differential in the shader (inner band winds faster), surging with the gulp, coasting to a stop with the fade — the ripple marches inward on the summon (outward on the eject), and the early bite is a touch sharper (twist 6.5→7.0, pull 0.28/0.22→0.32/0.26). Round18 reconciled + a new living-spin check |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-30, after R77)
+## 8. CURRENT STATE (as of 2026-09-30, after R78)
 
-- **`main` is the blessed reference.** Its tip is the R77 trim (the Kamui
-  tail → its round18 reconciliation) on top of the R76 work (the steady
+- **`main` is the blessed reference.** Its tip is the R78 living spin
+  (the vortex's own rotation → its round18 reconciliation) on top of the
+  R77 trim (the Kamui tail → its round18 reconciliation), the R76 work (the steady
   herald & the web door → its gauntlet), the R75 pair (the unbroken
   bridge → its gauntlet), the R74 pair (the holographic herald → its
   gauntlet), the R73 pair (the throat-is-not-swallowed guard → its gauntlet)
@@ -286,6 +288,17 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   New watch item: a click can be refused while a reverse Kamui is still unwinding — if a
   traveler ever feels a dead click right after closing a diary/vault, that refusal window
   is where to look.
+- **R78:** the living spin — the mature vortex no longer sits frozen. The tear's twist
+  was a static bend (uTwist, a running max saturating in the first half-second), so from
+  ~0.5s to the gulp the vortex geometry did not move. The engine now integrates the
+  vortex's own rotation (`kamuiSpinPhase` → `uSpin`) for as long as the tear is visible:
+  the rate rides the eased strength, surges with the gulp, and coasts to a stop with the
+  fading glow (the R67 unwind law honored); the shader folds it in through the existing
+  falloff, making the spin differential (the inner band winds visibly faster), and the
+  ripple marches inward on the summon / outward on the eject. The early bite is a touch
+  sharper (twist 6.5→7.0, pull 0.28/0.22→0.32/0.26). The R66b revert boundary is respected:
+  that revert was the Universe Surface sky lens — this round touches only the portal pass,
+  at the author's explicit request.
 - **Verification status:** `npm run verify` ALL GREEN (typecheck;
   round16/17/18/63/72/73/74/75/76 gauntlets; smoke + prod-smoke, zero console errors);
   `npm audit` 0 vulnerabilities; `audit:arch --check` exits 1 with findings identical to
