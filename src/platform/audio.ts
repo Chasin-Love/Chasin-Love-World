@@ -237,88 +237,142 @@ export function playKamuiVoice(summonDuration = 5.0, vacuumDuration = 1.0): Kamu
 }
 /* ------------------ end THE KAMUI VOICE (R82) ------------------ */
 
-/* ------------------ THE KAMUI RETURN VOICE (R82.3) ------------------
-   The reverse speaks — and it speaks THE KNIT. From the return dossier
-   (Desktop \"KAMUI RETURN - discussion\"), the author chose the zip-close:
-   the tear's edges pulling shut, noise descending and tightening (the
-   forward riser mirrored), with a faint gather rising into the seal.
-   Where the forward climbs and swallows, the return lands and closes.
-   The knit fills the real 1.9s reverse timeline (KAMUI_REVERSE_DURATION);
-   a whisper-seal (one soft consonant tone where the gather lands) closes
-   the gesture without stacking on the app's own arrival sounds — the
-   lesson of R82.2. Mute law identical to the forward voice. */
+/* ------------------ THE KAMUI RETURN VOICE (R82.4) ------------------
+   The reverse speaks — and it speaks THE TIME MIRROR: the actual forward
+   Kamui audio rendered offline and REVERSED in time. The literal sound of
+   the jutsu un-happening (the author's pick, return dossier round 2 — the
+   round-1 knit was rejected as too light for the cinematic forward).
 
-/* the REVERSE envelope: the eject starts at full intensity (the burst) and
-   decays as the reality re-forms — the mirror of the forward ease-in */
-function kamuiReturnStrength(t: number): number {
-  if (t < 0.12) { const k = t / 0.12; return 1 - 0.35 * k; }
-  const k = Math.min(1, (t - 0.12) / 0.88);
-  return 1 - k * k * (3 - 2 * k);
+   Implementation: the forward sequence (riser → rip → drone → gulp,
+   compressed to the 1.9s reverse window) renders once through an
+   OfflineAudioContext, the sample buffers are flipped, and the reversed
+   buffer plays through the master bus. The render is cached — one offline
+   pass per session, zero cost on repeat Kamuis. Mute law identical. */
+
+let returnVoiceCache: AudioBuffer | null = null;
+let returnVoiceRendering = false;
+
+/* the forward voice's own pieces, re-scheduled into the compressed reverse
+   window (this is the same synthesis, just rendered offline and shorter) */
+function kamuiForwardInto(ctx: OfflineAudioContext, out: AudioNode, total: number): void {
+  const noise = (seconds: number): AudioBufferSourceNode => {
+    const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * seconds), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    return src;
+  };
+  const strength = (t: number) => {
+    if (t < 0.45) { const k = t / 0.45; return k * k * k; }
+    if (t < 0.8) return 1;
+    const k = (t - 0.8) / 0.2; return 1 - k * k * k;
+  };
+  /* riser: 0 → 0.7 of the window */
+  const rd = total * 0.7;
+  const rsrc = noise(rd + 0.1); rsrc.loop = true;
+  const rbp = ctx.createBiquadFilter(); rbp.type = 'bandpass'; rbp.Q.value = 1.2;
+  const rg = ctx.createGain();
+  rbp.frequency.setValueAtTime(240, 0);
+  rbp.frequency.exponentialRampToValueAtTime(2600, rd);
+  rbp.Q.setValueAtTime(0.8, 0); rbp.Q.linearRampToValueAtTime(2.2, rd);
+  rg.gain.setValueAtTime(0.0001, 0);
+  rg.gain.linearRampToValueAtTime(0.34, 0.04);
+  for (let i = 1; i <= 24; i++) {
+    const t = (rd * i) / 24;
+    rg.gain.linearRampToValueAtTime(0.34 + (0.5 - 0.34) * strength(i / 24), t);
+  }
+  rsrc.connect(rbp).connect(rg).connect(out);
+  rsrc.start(0); rsrc.stop(rd + 0.05);
+  const ro = ctx.createOscillator(); ro.type = 'sine';
+  const rog = ctx.createGain();
+  ro.frequency.setValueAtTime(65, 0);
+  ro.frequency.exponentialRampToValueAtTime(184, rd);
+  rog.gain.setValueAtTime(0.0001, 0);
+  rog.gain.linearRampToValueAtTime(0.26, 0.1);
+  rog.gain.linearRampToValueAtTime(0.42, rd);
+  ro.connect(rog).connect(out); ro.start(0); ro.stop(rd + 0.05);
+  /* rip + drone enter mid-window (like the forward's 45% tear point) */
+  const mid = total * 0.5;
+  const isrc = noise(0.4);
+  const ibp = ctx.createBiquadFilter(); ibp.type = 'bandpass';
+  const ig = ctx.createGain();
+  ibp.frequency.setValueAtTime(3200, mid);
+  ibp.frequency.exponentialRampToValueAtTime(420, mid + 0.22);
+  ibp.Q.value = 3.5;
+  ig.gain.setValueAtTime(0.5, mid);
+  ig.gain.exponentialRampToValueAtTime(0.0001, mid + 0.26);
+  isrc.connect(ibp).connect(ig).connect(out); isrc.start(mid); isrc.stop(mid + 0.3);
+  const Bb1 = 58.27;
+  [1, 1.5, 2.0, 2.997].forEach((mult, i) => {
+    const o = ctx.createOscillator(); o.type = i === 0 ? 'sine' : 'triangle';
+    o.frequency.value = Bb1 * mult;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, mid);
+    g.gain.linearRampToValueAtTime([0.3, 0.14, 0.1, 0.05][i], mid + (total - mid) * 0.55);
+    g.gain.linearRampToValueAtTime(0.0001, total);
+    o.connect(g).connect(out); o.start(mid); o.stop(total + 0.05);
+  });
+  /* gulp: the final 0.3 — pitch falling, the swallow that ends the forward */
+  const gd = total * 0.18;
+  const go = ctx.createOscillator(); go.type = 'sine';
+  const gg = ctx.createGain();
+  go.frequency.setValueAtTime(82, total - gd);
+  go.frequency.exponentialRampToValueAtTime(24, total);
+  gg.gain.setValueAtTime(0.5, total - gd);
+  gg.gain.exponentialRampToValueAtTime(0.0001, total);
+  go.connect(gg).connect(out); go.start(total - gd); go.stop(total + 0.02);
 }
 
-export function playKamuiReturnVoice(reverseDuration = 1.9): KamuiVoiceHandle | null {
+export async function playKamuiReturnVoice(reverseDuration = 1.9): Promise<KamuiVoiceHandle | null> {
   const c = ensure();
   if (!c || !master) return null;
-  const t0 = c.currentTime + 0.02;
-  const bus = c.createGain(); bus.gain.value = 1.5;
-  bus.connect(master);
-
-  /* THE KNIT — the zip-close: filtered noise descending and tightening */
-  const dur = reverseDuration * 0.82; /* the knit spans most of the 1.9s */
-  const src = kamuiNoise(c, dur + 0.1);
-  src.loop = true;
-  const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 3.2;
-  const g = c.createGain();
-  bp.frequency.setValueAtTime(1800, t0);
-  bp.frequency.exponentialRampToValueAtTime(220, t0 + dur); /* the sweep falls */
-  bp.Q.setValueAtTime(1.4, t0);
-  bp.Q.linearRampToValueAtTime(4.5, t0 + dur);             /* the zip tightens */
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.linearRampToValueAtTime(0.4, t0 + 0.06);
-  for (let i = 1; i <= 20; i++) {
-    const t = t0 + (dur * i) / 20;
-    g.gain.linearRampToValueAtTime(Math.max(0.0001, 0.4 * kamuiReturnStrength(i / 20)), t);
+  try {
+    /* one offline render per session (3.4s of reversed audio, stereo) */
+    if (!returnVoiceCache) {
+      if (returnVoiceRendering) return null;
+      returnVoiceRendering = true;
+      const OAC = window.OfflineAudioContext || (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+      const SR = c.sampleRate;
+      const total = 3.2;
+      const off = new OAC(2, Math.ceil(SR * total), SR);
+      const comp = off.createDynamicsCompressor();
+      comp.threshold.value = -14; comp.ratio.value = 4;
+      const makeup = off.createGain(); makeup.gain.value = 1.15;
+      makeup.connect(comp).connect(off.destination);
+      kamuiForwardInto(off, makeup, total);
+      const rendered = await off.startRendering();
+      /* THE MIRROR: flip every sample */
+      const flipped = c.createBuffer(2, rendered.length, SR);
+      for (let ch = 0; ch < 2; ch++) {
+        const s = rendered.getChannelData(ch);
+        const d = flipped.getChannelData(ch);
+        for (let i = 0; i < s.length; i++) d[i] = s[s.length - 1 - i];
+      }
+      returnVoiceCache = flipped;
+      returnVoiceRendering = false;
+    }
+    const bus = c.createGain(); bus.gain.value = 1.1;
+    bus.connect(master);
+    const player = c.createBufferSource();
+    player.buffer = returnVoiceCache;
+    player.connect(bus);
+    player.start(c.currentTime + 0.02);
+    const playLen = (returnVoiceCache.length / c.sampleRate) * 1000;
+    const watchdog = window.setTimeout(() => { try { bus.disconnect(); } catch { /* */ } }, playLen + 400);
+    return {
+      stop() {
+        window.clearTimeout(watchdog);
+        try { player.stop(); } catch { /* */ }
+        try { bus.gain.setTargetAtTime(0.0001, c.currentTime, 0.06); } catch { /* */ }
+        window.setTimeout(() => { try { bus.disconnect(); } catch { /* */ } }, 260);
+      },
+    };
+  } catch {
+    returnVoiceRendering = false;
+    return null; /* the zero-fail law: audio never breaks the cosmos */
   }
-  src.connect(bp).connect(g).connect(bus);
-  src.start(t0); src.stop(t0 + dur + 0.05);
-
-  /* the gather: a faint tone rising into the seal (the edges coming together) */
-  const o = c.createOscillator(); o.type = 'sine';
-  const og = c.createGain();
-  o.frequency.setValueAtTime(196, t0);
-  o.frequency.linearRampToValueAtTime(261.63, t0 + dur); /* G3 rises to C4 */
-  og.gain.setValueAtTime(0.0001, t0);
-  og.gain.linearRampToValueAtTime(0.16, t0 + dur * 0.85);
-  og.gain.linearRampToValueAtTime(0.0001, t0 + dur);
-  o.connect(og).connect(bus);
-  o.start(t0); o.stop(t0 + dur + 0.05);
-
-  /* the whisper-seal: where the gather lands, one soft consonant tone —
-     the period at the end of the sentence (NOT a bell; the R82.2 lesson) */
-  const s1 = c.createOscillator(); s1.type = 'sine'; s1.frequency.value = 261.63;
-  const s2 = c.createOscillator(); s2.type = 'sine'; s2.frequency.value = 392.0;
-  const sg = c.createGain();
-  const sealT = t0 + dur;
-  sg.gain.setValueAtTime(0.0001, sealT);
-  sg.gain.linearRampToValueAtTime(0.09, sealT + 0.03);
-  sg.gain.exponentialRampToValueAtTime(0.0001, sealT + 0.65);
-  s1.connect(sg);
-  const sg2 = c.createGain(); sg2.gain.value = 0.35; s2.connect(sg2).connect(sg);
-  sg.connect(bus);
-  s1.start(sealT); s1.stop(sealT + 0.7);
-  s2.start(sealT); s2.stop(sealT + 0.7);
-
-  const end = sealT + 0.8;
-  const watchdog = window.setTimeout(() => { try { bus.disconnect(); } catch { /* */ } }, (end - c.currentTime) * 1000 + 300);
-  return {
-    stop() {
-      window.clearTimeout(watchdog);
-      try { bus.gain.setTargetAtTime(0.0001, c.currentTime, 0.06); } catch { /* */ }
-      window.setTimeout(() => { try { bus.disconnect(); } catch { /* */ } }, 260);
-    },
-  };
 }
-/* ---------------- end THE KAMUI RETURN VOICE (R82.3) ---------------- */
+/* ---------------- end THE KAMUI RETURN VOICE (R82.4) ---------------- */
 
 /* ------------------------------ ambience ------------------------------- */
 

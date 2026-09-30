@@ -380,17 +380,21 @@ export default function App() {
           void import('./ui/diary/DiaryWindow');
           void import('./ui/VaultUI');
         }
-        /* THE VOICE (R82/R82.3) — both directions speak: the forward
+        /* THE VOICE (R82/R82.4) — both directions speak: the forward
            summon gets the chosen cinematic sequence (riser → rip → B♭
-           drone → sub-drop), the eject gets THE KNIT — the zip-close the
-           author chose from the return dossier. Only when the audio
-           context is alive (a user gesture has blessed this session) and
-           the master is unmuted. */
+           drone → sub-drop), the eject gets THE TIME MIRROR — the forward
+           voice itself rendered offline and reversed, the jutsu
+           un-happening (the author's round-2 pick). The mirror renders
+           once per session; repeat ejects replay the cached buffer. Only
+           when the audio context is alive (a user gesture has blessed
+           this session) and the master is unmuted. */
         if (!isMuted()) {
           kamuiVoiceRef.current?.stop();
-          kamuiVoiceRef.current = reverse
-            ? playKamuiReturnVoice(1.9)
-            : playKamuiVoice(5.0, 1.0);
+          if (reverse) {
+            void playKamuiReturnVoice(1.9).then((h) => { kamuiVoiceRef.current = h; });
+          } else {
+            kamuiVoiceRef.current = playKamuiVoice(5.0, 1.0);
+          }
         }
       },
       onFirstFrame: () => setEngineReady(true),
