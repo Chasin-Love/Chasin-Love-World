@@ -29,7 +29,7 @@ export interface SkyManifest {
   activeId: string | null;
   photos: SkyPhoto[];
   settings: {
-    blend: number;       /* 0..1 photo visibility over the procedural cosmos */
+    blend: number;       /* 0..1 photo opacity — 1.0 = the photo IS the sky (R79) */
     dim: number;         /* 0..1 darkening so stars/planets read over it */
     blur: number;        /* 0..1 nebula softness (0 = crisp photo) */
     vignette: number;    /* 0..1 edge darkening */
@@ -38,7 +38,7 @@ export interface SkyManifest {
 }
 
 const DEFAULT_SKY_SETTINGS: SkyManifest['settings'] = {
-  blend: 0.85,
+  blend: 1.0,
   dim: 0.45,
   blur: 0.12,
   vignette: 0.55,

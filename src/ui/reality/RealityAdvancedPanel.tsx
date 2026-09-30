@@ -72,10 +72,10 @@ function darkenHex(hex: string, k: number): string {
    src/realities/<folder>/sky.json + assets/. Reality A's photo can never
    leak into Reality B — total isolation, like every other reality file. */
 const SKY_SLIDERS: { key: keyof SkySettings; label: string; hint: string }[] = [
-  { key: 'blend', label: 'Presence', hint: 'photo ↔ procedural cosmos balance' },
-  { key: 'dim', label: 'Depth', hint: 'darken the photo so stars read over it' },
-  { key: 'blur', label: 'Nebula', hint: 'soften the photo into cosmic haze' },
-  { key: 'vignette', label: 'Vignette', hint: 'edges fall into real space' },
+  { key: 'blend', label: 'Presence', hint: 'photo opacity — 100% = the photo IS the sky' },
+  { key: 'dim', label: 'Depth', hint: 'deepen the photo toward night' },
+  { key: 'blur', label: 'Nebula', hint: 'soften the photo into haze' },
+  { key: 'vignette', label: 'Vignette', hint: 'the edges of your view fall into space' },
   { key: 'drift', label: 'Drift', hint: 'slow parallax breathing' },
 ];
 
@@ -130,7 +130,9 @@ const SkyStudioTab: React.FC<{ realityId: string }> = ({ realityId }) => {
         <p className="text-[9.5px] text-slate-400 leading-relaxed">
           Upload any picture — it is stored inside this reality's own folder and becomes
           its personal universe backdrop. Other realities keep theirs; no photo ever
-          crosses the dimensional barrier. The real 3D star shells keep shining over it.
+          crosses the dimensional barrier. While a photo hangs here it IS the sky —
+          full-screen at every stage of the cosmos, one sky at a time, with the
+          procedural universe standing down until you return to it.
         </p>
         <div
           role="button"

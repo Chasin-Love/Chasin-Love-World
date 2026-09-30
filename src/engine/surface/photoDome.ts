@@ -10,15 +10,24 @@ export interface SharedLensUniforms {
 /**
  * PhotoDome — the Sky Studio's canvas inside the 3D universe.
  *
- * Renders the active reality's uploaded photo on an inverted sphere that sits
- * BELOW the far star shell but ABOVE the procedural shader cosmos, so the
- * real 3D stars keep twinkling over the picture while the procedural nebulae
- * softly blend underneath it. Every reality owns its own texture; switching
- * realities crossfades the two skies over ~1.2s.
+ * R79 — THE ONE SKY. While a reality's photo is active, the photo IS the
+ * sky: the dome is locked to the camera (full-screen at every cosmological
+ * stage — zoom lives in the universe, never in the sky), it renders as
+ * itself (no procedural glow tint, no ghost floor), and the procedural sky
+ * family stands down while the photo owns the view (UniverseSurfaceManager
+ * reads `hasPhoto` / `strength` for that gate). One sky at a time — the
+ * author's law.
  *
- * The shader mixes: photo ← dim (exposure) ← procedural cosmos color glow,
- * plus radial blur and vignette, all driven by the reality's sky.json
- * settings through the Sky Studio sliders.
+ * The vignette is camera-relative and seam-free: the old UV-space vignette
+ * centered exactly on the atan branch cut (the ±π meridian) and split the
+ * sky into a bright side and a gray side. The texture is mip-free for the
+ * same reason — the branch-cut derivative spike collapsed a mipmapped
+ * photo to its 1×1 gray average in a thin vertical line.
+ *
+ * Every reality owns its own texture; switching realities crossfades the
+ * two skies over ~1.2s, and deactivating a sky rides the same fade-out
+ * machinery back to the procedural cosmos. Settings come from the
+ * reality's sky.json through the Sky Studio sliders.
  */
 export class PhotoDome {
   private group: THREE.Group | null = null;
@@ -28,7 +37,7 @@ export class PhotoDome {
   private visible = true;
 
   /* live settings from sky.json */
-  private blend = 0.85;
+  private blend = 1.0;      /* photo opacity — 1.0 = the photo IS the sky */
   private dim = 0.45;
   private blur = 0.12;
   private vignette = 0.55;
@@ -36,6 +45,9 @@ export class PhotoDome {
 
   /* crossfade: fades OUT the previous reality's sky while the new one enters */
   private fadeK = 0;         /* 0..1 — 1 = fully entered a photo sky */
+  /* R79 — the erase factor from the last update (fadeK × erase = how much
+     of the view the photo currently owns; the one-sky gate reads it) */
+  private lastErase = 1;
   private prevTexture: THREE.Texture | null = null;
   /* apply sequencing — a superseded texture load (two reality switches in a
      row) must never win: last-CHOSEN sky renders, not last-finished load */
@@ -77,7 +89,7 @@ export class PhotoDome {
     uniform float uVignette;
     uniform float uDrift;
     uniform float uTime;
-    uniform vec3 uGlowColor;
+    uniform vec3 uCamDir;
     ${LENS_UNIFORMS_GLSL}
     ${LENS_WARP_GLSL}
     varying vec2 vUv;
@@ -125,22 +137,25 @@ export class PhotoDome {
       );
 
       vec3 photo = sampleSoft(uMap, uv, uBlur * 0.02);
-      vec3 photoDark = photo * (1.0 - uDim * 0.75);
+      /* R79 — the photo renders as ITSELF: no cosmos glow tint mixed in.
+         One sky means the traveler's picture is the sky, not a picture
+         under a color wash. */
+      vec3 color = photo * (1.0 - uDim * 0.75);
 
-      /* the reality's light breathes through from below — keeps the photo
-         native to its reality even when the picture is from elsewhere */
-      vec3 cosmos = uGlowColor * (0.16 + 0.05 * sin(uTime * 0.21));
-      float cosmosMask = uBlend * 0.35 + 0.65 * (1.0 - uBlend);
-      vec3 color = mix(photoDark, photoDark + cosmos * 0.5, cosmosMask * 0.45);
-
-      /* vignette — the edges fall into real space so the dome never shows
-         a hard seam at the horizon (lens-space coords keep the vignette
-         centered where the lens actually samples) */
-      float r = length(lensUv - 0.5) * 1.414;
-      float vig = 1.0 - uVignette * smoothstep(0.42, 1.05, r);
+      /* R79 vignette — camera-relative and seam-free. The angle between the
+         fragment's own ray and the traveler's forward decides the falloff,
+         so the edges of the VIEW fall into real space — never a meridian of
+         the texture. The old UV-space vignette sat its center exactly on
+         the atan branch cut and split the sky into a bright side and a
+         gray side (the barrier the author saw). */
+      float ang = acos(clamp(dot(normalize(vDir), uCamDir), -1.0, 1.0));
+      float r = ang / 0.72; /* ~the screen-corner angle at the 50° FOV */
+      float vig = 1.0 - uVignette * smoothstep(0.45, 1.1, r);
       color *= vig;
 
-      /* crossfade from the previous reality's sky while entering */
+      /* crossfade from the previous sky while entering (R79: also the
+         deactivation path — the old photo hands its slot to the prev map
+         and rides this same fade back out to the procedural cosmos) */
       float alpha = uHasMap * uBlend * uFade;
       if (uHasPrev > 0.5 && uFade < 0.999) {
         vec3 prev = sampleSoft(uPrevMap, lensUv, uBlur * 0.02) * (1.0 - uDim * 0.75) * vig;
@@ -149,8 +164,6 @@ export class PhotoDome {
         alpha = max(alpha, prevAlpha * 0.9);
       }
 
-      /* floor: even at blend 0 keep a 6% ghost so the fade never pops */
-      alpha = max(alpha, uHasMap * 0.06 * uFade);
       /* ROUND 61 — the shared well: the photo pours into the hole by the
          SAME one-law curve as the procedural dome and every star shell
          (lensWellDarken in LENS_WARP_GLSL). No layer can disagree with
@@ -180,7 +193,7 @@ export class PhotoDome {
         uVignette: { value: this.vignette },
         uDrift: { value: this.drift },
         uTime: { value: 0 },
-        uGlowColor: { value: new THREE.Color('#38bdf8') },
+        uCamDir: { value: new THREE.Vector3(0, 0, -1) },
         ...(sharedLens ?? {}),
       },
       vertexShader: this.vert,
@@ -220,6 +233,13 @@ export class PhotoDome {
       const tex = await new THREE.TextureLoader().loadAsync(url);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.wrapS = THREE.RepeatWrapping; /* the drift may push u past 1 */
+      /* R79 seam law — NO mipmaps: the atan-based UV has a derivative spike
+         at the ±π branch cut and a mipmapped photo collapses to its 1×1
+         gray average there — a thin gray vertical line down the sky. The
+         dome is camera-locked so the photo is always magnified; bilinear
+         is the right filter everywhere on it. */
+      tex.generateMipmaps = false;
+      tex.minFilter = THREE.LinearFilter;
       this.textures.set(url, tex);
       /* keep the cache human-scale — the oldest skies evict first */
       if (this.textures.size > 12) {
@@ -235,19 +255,21 @@ export class PhotoDome {
     }
   }
 
-  /** Push the reality's active photo + settings into the dome. */
+  /** Push the reality's active photo + settings into the dome.
+   *  Null spec = return to the pure procedural cosmos — the current photo
+   *  hands its slot to the prev map and rides the shader's fade-out branch,
+   *  so the handback is a crossfade instead of a pop (R79 one-sky law). */
   async apply(
     spec: { url: string; blend: number; dim: number; blur: number; vignette: number; drift: number } | null,
-    glowColor: string,
   ): Promise<void> {
     if (!this.mat) return;
     const seq = ++this.applySeq;
+    const u = this.mat.uniforms;
     this.blend = spec?.blend ?? this.blend;
     this.dim = spec?.dim ?? this.dim;
     this.blur = spec?.blur ?? this.blur;
     this.vignette = spec?.vignette ?? this.vignette;
     this.drift = spec?.drift ?? this.drift;
-    (this.mat.uniforms.uGlowColor.value as THREE.Color).set(glowColor);
 
     let tex: THREE.Texture | null = null;
     if (spec) {
@@ -259,7 +281,12 @@ export class PhotoDome {
        abandon silently; the newer apply owns the dome (and its pending flag) */
     if (seq !== this.applySeq) return;
     this.pendingLoad = false; /* landed or failed — the fade may proceed */
-    const u = this.mat.uniforms;
+    if (!spec && (u.uHasMap.value as number) > 0.5) {
+      this.prevTexture = u.uMap.value as THREE.Texture | null;
+      u.uHasPrev.value = 1;
+      u.uPrevMap.value = this.prevTexture;
+      this.fadeK = 0; /* the outgoing sky keeps the view while it fades */
+    }
     u.uMap.value = tex;
     u.uHasMap.value = tex ? 1 : 0;
     u.uBlend.value = this.blend;
@@ -269,14 +296,23 @@ export class PhotoDome {
     u.uDrift.value = this.drift;
   }
 
-  update(params: { clockT: number; kamuiErase: number; skyVisible: boolean }): void {
+  update(params: {
+    clockT: number; kamuiErase: number; skyVisible: boolean;
+    camPos?: THREE.Vector3; camDir?: THREE.Vector3;
+  }): void {
     if (!this.group || !this.mat) return;
+    /* R79 — the dome rides the camera: the sky is full-screen at every
+       cosmological stage, the equirect mapping is always the intended 1:1,
+       and zooming the universe never zooms the sky. */
+    if (params.camPos) this.group.position.copy(params.camPos);
+    if (params.camDir) (this.mat.uniforms.uCamDir.value as THREE.Vector3).copy(params.camDir);
     const hasMap = this.mat.uniforms.uHasMap.value > 0.5;
+    this.lastErase = Math.max(0, 1 - params.kamuiErase * 2.2);
     this.group.visible = this.visible && params.skyVisible && (hasMap || this.fadeK < 0.999);
     if (!this.group.visible) return;
 
     /* Kamui tear swallows the sky too — the photo dome obeys the same field */
-    const erase = Math.max(0, 1 - params.kamuiErase * 2.2);
+    const erase = this.lastErase;
     this.mat.uniforms.uTime.value = params.clockT;
     this.mat.uniforms.uFade.value = this.fadeK * erase;
 
@@ -297,6 +333,18 @@ export class PhotoDome {
 
   setVisible(v: boolean): void {
     this.visible = v;
+  }
+
+  /* R79 one-sky gate — read by UniverseSurfaceManager: whether a photo is
+     chosen, and how much of the view it currently owns (entry fade × Kamui
+     erase). The procedural sky family stands down only at full strength,
+     so the entry crossfade, the Kamui tear and the multiverse stage all
+     keep their procedural cosmos. */
+  get hasPhoto(): boolean {
+    return !!this.mat && (this.mat.uniforms.uHasMap.value as number) > 0.5;
+  }
+  get strength(): number {
+    return this.fadeK * this.lastErase;
   }
 
   dispose(scene: THREE.Scene): void {

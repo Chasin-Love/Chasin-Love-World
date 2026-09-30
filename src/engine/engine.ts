@@ -4461,10 +4461,7 @@ void main(){
     this.activeSkySpec = getActiveSkySpec(this.activeRealityId);
     this.skyApplying = true;
     try {
-      await this.surfaceManager.getPhotoDome().apply(
-        this.activeSkySpec,
-        this.activeReality?.starColor || '#38bdf8',
-      );
+      await this.surfaceManager.getPhotoDome().apply(this.activeSkySpec);
     } finally {
       this.skyApplying = false;
     }

@@ -63,7 +63,9 @@ pub struct SkySettings {
 
 impl Default for SkySettings {
     fn default() -> Self {
-        Self { blend: 0.85, dim: 0.45, blur: 0.12, vignette: 0.55, drift: 0.3 }
+        /* blend 1.0 — R79 one-sky law: the photo IS the sky by default,
+           contract-identical with server/skyStore.ts */
+        Self { blend: 1.0, dim: 0.45, blur: 0.12, vignette: 0.55, drift: 0.3 }
     }
 }
 

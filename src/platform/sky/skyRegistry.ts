@@ -27,7 +27,7 @@ export interface SkyPhoto {
 }
 
 export interface SkySettings {
-  blend: number;     /* 0..1 photo visibility over the procedural cosmos */
+  blend: number;     /* 0..1 photo opacity — 1.0 = the photo IS the sky (R79 one-sky law) */
   dim: number;       /* 0..1 darkening so stars read over the photo */
   blur: number;      /* 0..1 nebula softness */
   vignette: number;  /* 0..1 edge darkening */
@@ -125,7 +125,7 @@ const EMPTY_SKY: SkyManifest = {
   version: 1,
   activeId: null,
   photos: [],
-  settings: { blend: 0.85, dim: 0.45, blur: 0.12, vignette: 0.55, drift: 0.3 },
+  settings: { blend: 1.0, dim: 0.45, blur: 0.12, vignette: 0.55, drift: 0.3 },
 };
 
 /* ----------------------- desktop blob-URL bridge ------------------------
@@ -214,9 +214,23 @@ export async function uploadSkyPhoto(realityId: string, file: File): Promise<Sky
   return adopt(realityId, res.manifest);
 }
 
-/** Draw any image onto a 2048×1024 equirect canvas (cover-crop), return JPEG base64. */
+/** Draw any image onto a 2:1 equirect canvas (cover-crop), return JPEG base64.
+ *  R79 — rasterize at 4096×2048 when the JPEG stays light (the camera-locked
+ *  dome shows only a ~50° slice at once, so panorama resolution IS on-screen
+ *  sharpness), falling back to 2048×1024 when it would crowd the server's
+ *  10 MB body limit. */
 async function rasterizeToEquirect(file: File): Promise<string> {
-  const W = 2048, H = 1024;
+  const drawCover = (img: HTMLImageElement, W: number, H: number): string | null => {
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const g = canvas.getContext('2d');
+    if (!g) return null; /* canvas unavailable — upload as-is */
+    /* cover-crop: fill the panorama, centering the interesting middle band */
+    const scale = Math.max(W / img.width, H / img.height);
+    const dw = img.width * scale, dh = img.height * scale;
+    g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    return canvas.toDataURL('image/jpeg', 0.85);
+  };
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -225,16 +239,11 @@ async function rasterizeToEquirect(file: File): Promise<string> {
       im.onerror = () => reject(new Error('could not decode the image'));
       im.src = url;
     });
-    const canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
-    const g = canvas.getContext('2d');
-    if (!g) return await readUploadFile(file); /* canvas unavailable — upload as-is */
-    /* cover-crop: fill the panorama, centering the interesting middle band */
-    const scale = Math.max(W / img.width, H / img.height);
-    const dw = img.width * scale, dh = img.height * scale;
-    g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    return dataUrl.split(',')[1] ?? '';
+    const wide = drawCover(img, 4096, 2048);
+    if (wide && wide.length <= 6_000_000) return wide.split(',')[1] ?? '';
+    const dataUrl = drawCover(img, 2048, 1024);
+    if (dataUrl) return dataUrl.split(',')[1] ?? '';
+    return await readUploadFile(file);
   } catch {
     /* decode failed — let the server surface the real error */
     return await readUploadFile(file);

@@ -33,6 +33,9 @@ export class UniverseSurfaceManager {
   /* the Sky Studio's photo layer — sits between the procedural cosmos and
      the far stars, owned per reality */
   private photoDome = new PhotoDome();
+  /* R79 — camera feed for the photo dome's ride and its vignette */
+  private _camPos = new THREE.Vector3();
+  private _camDir = new THREE.Vector3();
   /* Round 14 — GRAVITATIONAL LENSING of the universe surface. One shared set
      of uniform objects referenced by every background material (celestial
      dome + star shells + nebula points): the masses bend THIS canvas and
@@ -425,9 +428,20 @@ export class UniverseSurfaceManager {
     const kamuiErase = params.kamuiErase ?? 0;
     const vortexDir = params.vortexDir ?? new THREE.Vector3(0, 0, -1);
 
+    /* R79 — THE ONE SKY: while a photo sky fully owns the view (active,
+       sky-visible, entry fade complete, no Kamui erase), the ENTIRE
+       procedural sky family stands down — dome, deep nebulae, far stars,
+       near neighborhood. It returns for the entry crossfade (the photo
+       fades in over it), the Kamui tear (both skies obey the same erase
+       field), the multiverse stage (where the photo rests) and the moment
+       the photo is deactivated. One sky at a time — the author's law. */
+    const photoOwns = this.photoDome.hasPhoto && skyVisible && this.photoDome.strength > 0.995;
+
     if (this.skyDomeMesh) {
-      this.skyDomeMesh.visible = skyVisible;
+      this.skyDomeMesh.visible = skyVisible && !photoOwns;
     }
+    this.farStarsPoints.visible = !photoOwns;
+    this.skyNebulae.forEach((neb) => { neb.visible = !photoOwns; });
 
     if (this.backdropMat) {
       this.backdropMat.uniforms.uTime.value = clockT;
@@ -436,11 +450,14 @@ export class UniverseSurfaceManager {
     }
 
     /* the uploaded photo sky obeys the same sky visibility + Kamui tear as
-       the procedural dome */
-    this.photoDome.update({ clockT, kamuiErase, skyVisible });
+       the procedural dome — and rides the camera, so it is the full-screen
+       sky at every cosmological stage (R79) */
+    params.camera.getWorldPosition(this._camPos);
+    params.camera.getWorldDirection(this._camDir);
+    this.photoDome.update({ clockT, kamuiErase, skyVisible, camPos: this._camPos, camDir: this._camDir });
 
-    // Neighborhood visibility and smooth opacity fade
-    this.gNeighborhood.visible = neighborhoodVisibility > 0.01;
+    // Neighborhood visibility and smooth opacity fade (stands down under a photo sky too)
+    this.gNeighborhood.visible = neighborhoodVisibility > 0.01 && !photoOwns;
     if (this.gNeighborhood.visible) {
       const op = Math.max(0, Math.min(1, neighborhoodVisibility));
       this.levelSprites.forEach(({ mat, base }) => {

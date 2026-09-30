@@ -12,7 +12,7 @@
     }
   ],
   "settings": {
-    "blend": 0.85,
+    "blend": 1.0,
     "dim": 0.45,
     "blur": 0.12,
     "vignette": 0.55,
