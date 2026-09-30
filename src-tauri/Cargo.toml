@@ -2,7 +2,7 @@
 name = "my-universe"
 # App version drives the installer filename AND the updater check — keep it
 # aligned with the git tag (v15.0.2 → 15.0.2) on every release.
-version = "15.0.7"
+version = "15.0.8"
 description = "MY UNIVERSE — a living 3D cosmos, diary and vault (desktop shell)"
 authors = ["Chasin-Love"]
 edition = "2021"
