@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "activeId": "sky-munuxfhb-3wshu",
+  "photos": [
+    {
+      "id": "sky-munuxfhb-3wshu",
+      "file": "assets/sky-munuxfhb-3wshu.jpg",
+      "name": "hinata.png",
+      "mime": "image/jpeg",
+      "size": 405769,
+      "addedAt": 1790757750431
+    }
+  ],
+  "settings": {
+    "blend": 1,
+    "dim": 0.45,
+    "blur": 0.12,
+    "vignette": 0.55,
+    "drift": 0.3
+  }
+}

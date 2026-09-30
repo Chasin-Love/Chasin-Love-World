@@ -200,16 +200,21 @@ export async function uploadSkyPhoto(realityId: string, file: File): Promise<Sky
     throw new Error('that file is not a photo — png, jpg, webp, gif or avif');
   }
   if (file.size > MAX_UPLOAD_BYTES) {
-    throw new Error(`too large — ${Math.round(file.size / 1024 / 1024)} MB, the sky holds 6 MB`);
+    throw new Error(`File too large (${Math.round(file.size / 1024 / 1024)} MB). Limit is 6 MB.`);
   }
+  console.log(`[SkyStudio] Uploading ${file.type} (${file.size} bytes)`);
   /* cover-crop onto a 2:1 equirectangular canvas so sphere mapping never
      pole-stretches the photo — wide sky, no funhouse distortion */
   const dataBase64 = await rasterizeToEquirect(file);
+  console.log(`[SkyStudio] Base64 size: ${Math.round(dataBase64.length * 3 / 4 / 1024 / 1024)} MB`);
   const res = await realityApi<{ success?: boolean; error?: string; manifest?: SkyManifest }>(
     '/api/realities/sky/upload',
     { folder: skyFolderForReality(realityId), name: file.name, mime: 'image/jpeg', dataBase64, ensure: true },
   );
-  if (!res?.success || !res.manifest) throw new Error(res?.error ?? 'the sky rejected the upload');
+  if (!res?.success || !res.manifest) {
+    console.error(`[SkyStudio] Upload failed: ${res?.error}`);
+    throw new Error(res?.error ?? 'the sky rejected the upload');
+  }
   await warmSkyAssets(realityId, res.manifest);
   return adopt(realityId, res.manifest);
 }
