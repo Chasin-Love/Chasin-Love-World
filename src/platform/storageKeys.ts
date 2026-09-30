@@ -6,6 +6,9 @@ export const STORAGE_KEYS = {
   universeState: 'my-universe:v4',
   /** Quota-failure backup of the universe snapshot */
   universeStateRecovery: 'my-universe:v4:recovery',
+  /** sessionStorage one-time guard: the desktop snapshot was adopted and the
+      window reloaded once this session (state/persist hydration) */
+  hydrateAdopted: 'my-universe:hydrate-adopted',
   /** Render quality tier override (engine/capability) */
   quality: 'my-universe:quality',
   /** One-time guard for the cinematic-tier migration */

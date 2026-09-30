@@ -375,10 +375,23 @@ export async function hydrateDesktopSnapshot(): Promise<void> {
     const canon = (s: string | null): string => {
       try { return JSON.stringify(JSON.parse(s ?? 'null')); } catch { return s ?? ''; }
     };
-    if (canon(fileJson) !== canon(local)) {
-      localStorage.setItem(STORAGE_KEY, fileJson);
-      window.location.reload();
+    if (canon(fileJson) === canon(local)) return;
+    /* One adoption per webview session — the reload must never loop. If the
+       two stores disagree AGAIN on the boot after the reload, the cache can
+       only be loadState's own forward-migration of the file we just adopted
+       (its boot-time defaults/repairs are the only cache-only writer, and the
+       reload always lands before the first debounced persist can carry the
+       migrated shape to the file). Clobbering here would discard the
+       migration and re-produce the difference on every launch — the intro
+       replayed forever. So the second time, the cache is the newer shape:
+       adopt it and converge the file, no reload. */
+    if (sessionStorage.getItem(STORAGE_KEYS.hydrateAdopted)) {
+      if (local) void desktopStore.writeState(local);
+      return;
     }
+    try { sessionStorage.setItem(STORAGE_KEYS.hydrateAdopted, '1'); } catch { /* guard is best-effort */ }
+    localStorage.setItem(STORAGE_KEY, fileJson);
+    window.location.reload();
   } catch (err) {
     console.warn('[desktop] hydrate failed:', err);
   }
