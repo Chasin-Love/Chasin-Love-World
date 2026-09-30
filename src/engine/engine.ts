@@ -323,6 +323,13 @@ export class UniverseEngine {
      ever grows during a summon, so the swirl never relaxes backward at a
      beat seam (the user's forward-backward-forward jank). */
   private kamuiTwist = 0;
+  /* THE LIVING SPIN (R78) — the twist above is a STATIC bend (a running max
+     that saturates in the first half-second), so the mature vortex used to
+     sit frozen between the tear and the throat. This integrates the vortex's
+     own rotation (rad/s, differential in the shader via its falloff), so the
+     stabilized vortex keeps visibly swirling inward for the whole summon and
+     coasts to a stop with the fading glow. Reset on every trigger. */
+  private kamuiSpinPhase = 0;
   private cb: EngineCallbacks;
   private bodies: RuntimeBody[] = [];
   private colliderList: THREE.Mesh[] = [];
@@ -856,7 +863,7 @@ export class UniverseEngine {
         tDiffuse: { value: null }, uCenter: { value: new THREE.Vector2(0.5, 0.5) },
         uStrength: { value: 0 }, uTime: { value: 0 }, uAspect: { value: 1 },
         uColor: { value: new THREE.Color('#f2c178') }, uDir: { value: 1 },
-        uVac: { value: 0 }, uWind: { value: 0 }, uPulse: { value: 0 }, uTwist: { value: 0 },
+        uVac: { value: 0 }, uWind: { value: 0 }, uPulse: { value: 0 }, uTwist: { value: 0 }, uSpin: { value: 0 },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: portalFrag,
@@ -5645,6 +5652,16 @@ this.updateBodies(dt);
         }
       }
     }
+    /* THE LIVING SPIN (R78) — the vortex rotates for as long as it is
+       visible: the rate rides the eased strength (the beats breathe it) and
+       surges with the gulp, the shader's falloff makes it differential (the
+       inner band winds visibly faster), and the fade coasts the swirl to a
+       stop — never a frozen still, never a cut. The shader signs it with
+       uDir, so the eject spins the other way. */
+    if (this.kamuiEase > 0.002) {
+      this.kamuiSpinPhase += dt * (1.5 * Math.min(1, this.kamuiEase / 1.15) + 1.6 * pu.uVac.value);
+    }
+    pu.uSpin.value = this.kamuiSpinPhase;
     /* the instability — a decaying rumble on the camera itself (applied
        after the rig's own write, so the shake rides the final transform) */
     if (this.kamuiShakeT > 0) {
@@ -5664,6 +5681,7 @@ this.updateBodies(dt);
   triggerKamui(targetUv?: THREE.Vector2, reverse = false) {
     this.portalPass.uniforms.uDir.value = reverse ? -1 : 1;
     this.kamuiTwist = reverse ? 1 : 0; /* the eject bursts at full twist */
+    this.kamuiSpinPhase = 0; /* a fresh tear spins up from rest */
     this.kamuiVacuumTail = -1; /* a fresh tear owns the throat — no stale unwind */
     if (reverse) this.kamuiShakeT = 1; /* the eject burst shocks the frame */
     if (targetUv) {

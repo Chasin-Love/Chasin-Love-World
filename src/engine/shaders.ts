@@ -167,12 +167,18 @@ void main(){
    the rings inward; uPulse strobes the void — new frames in the forming
    middle, each at full speed (never a slowed single motion).
    uTwist is the spin driver — a RUNNING MAXIMUM that only ever grows, so
-   the swirl never relaxes backward while the brightness breathes. */
+   the swirl never relaxes backward while the brightness breathes.
+   uSpin is the LIVING SPIN (R78) — the vortex's own rotation, integrated
+   by the engine for as long as the tear is visible, so the stabilized
+   vortex keeps visibly swirling inward instead of freezing into a bent
+   still. The fall falloff makes it differential (the inner band winds
+   faster), the fade coasts it to a stop, and uDir flips it for the eject. */
 export const portalFrag = /* glsl */ `
 uniform sampler2D tDiffuse; uniform vec2 uCenter; uniform float uStrength;
 uniform float uTime; uniform vec3 uColor; uniform float uAspect;
 uniform float uDir; uniform float uVac; uniform float uWind; uniform float uPulse;
 uniform float uTwist;
+uniform float uSpin;
 varying vec2 vUv;
 void main(){
   vec2 uv = vUv;
@@ -186,9 +192,11 @@ void main(){
   // Kamui Space-Time Vortex Distortion
   float fall = exp(-r * 3.8);
   // High-frequency spiral twisting effect — uTwist is the monotonic spin
-  // driver (always forward), uWind tightens further, uVac is the gulp surge
-  float spiralTwist = uTwist * 6.5 * fall * uDir + vac * 2.4 * fall + uWind * 3.0 * fall;
-  float ripple = sin(r * 32.0 - uTime * 6.0) * s * 0.18 * fall;
+  // driver (always forward), uWind tightens further, uVac is the gulp surge,
+  // uSpin is the living rotation that never lets the vortex sit still
+  float spiralTwist = uTwist * 7.0 * fall * uDir + vac * 2.4 * fall + uWind * 3.0 * fall + uSpin * fall * uDir;
+  // the ripple marches INWARD on the summon (suction) and OUTWARD on the eject
+  float ripple = sin(r * 32.0 + uTime * 6.0 * uDir) * s * 0.22 * fall;
   float ang = spiralTwist + ripple;
 
   float ca = cos(ang); float sa = sin(ang);
@@ -196,7 +204,7 @@ void main(){
 
   // Gravitational implosion pull — also monotonic (twist + wind + gulp surge)
   vec2 pullDir = normalize(o + vec2(1e-6));
-  vec2 suv = uCenter + vec2(d.x / uAspect, d.y) - pullDir * (uTwist * 0.28 + uWind * 0.22 + vac * 0.9) * fall * uDir;
+  vec2 suv = uCenter + vec2(d.x / uAspect, d.y) - pullDir * (uTwist * 0.32 + uWind * 0.26 + vac * 0.9) * fall * uDir;
 
   // Chromatic dispersion (RGB separation caused by extreme spatial warping)
   float ab = s * 0.025 * fall + 0.0002;

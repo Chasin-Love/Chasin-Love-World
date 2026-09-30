@@ -29,7 +29,7 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 {
   /* the v1 fragment shader is ported with its signature terms intact */
   const shaderOk = /Kamui Space-Time Vortex Distortion/.test(shSrc)
-    && /spiralTwist = uTwist \* 6\.5 \* fall/.test(shSrc)
+    && /spiralTwist = uTwist \* 7\.0 \* fall/.test(shSrc)
     && /Central Kamui singularity void/.test(shSrc)
     && /KamuiGlow/.test(shSrc)
     && /if \(s < 0\.001\) \{ gl_FragColor = texture2D\(tDiffuse, uv\); return; \}/.test(shSrc);
@@ -75,8 +75,8 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
     && /uniform float uDir; uniform float uVac; uniform float uWind; uniform float uPulse;/.test(shSrc)
     && /uniform float uTwist;/.test(shSrc)
     && /float vac = uVac \* uVac;/.test(shSrc)
-    && /spiralTwist = uTwist \* 6\.5 \* fall \* uDir \+ vac \* 2\.4 \* fall \+ uWind \* 3\.0 \* fall/.test(shSrc)
-    && /pullDir \* \(uTwist \* 0\.28 \+ uWind \* 0\.22 \+ vac \* 0\.9\) \* fall \* uDir/.test(shSrc)
+    && /spiralTwist = uTwist \* 7\.0 \* fall \* uDir \+ vac \* 2\.4 \* fall \+ uWind \* 3\.0 \* fall \+ uSpin \* fall \* uDir/.test(shSrc)
+    && /pullDir \* \(uTwist \* 0\.32 \+ uWind \* 0\.26 \+ vac \* 0\.9\) \* fall \* uDir/.test(shSrc)
     && /coreR = 0\.22 \* s \* \(1\.0 \+ 0\.45 \* uPulse \* sin\(uTime \* 20\.0\)\)/.test(shSrc)
     && /KAMUI_BEATS/.test(engSrc)
     && /pu\.uVac\.value = t;/.test(engSrc)
@@ -86,6 +86,23 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
     && /kamuiSwallowFactorFor\(/.test(engSrc)
     && /this\.camera\.position\.x \+= \(Math\.random\(\) - 0\.5\) \* 2 \* amp;/.test(engSrc);
   check('R18: the vacuum gulp — the tear finishes by swallowing its subject (surge, size drain, rumble)', vacuum, 'vacuum wiring missing');
+
+  /* R78 — THE LIVING SPIN: the twist is a static bend (a running max that
+     saturates in the first half-second), so the mature vortex used to sit
+     frozen between the tear and the throat — the author's verdict. The
+     engine now integrates the vortex's own rotation for as long as the tear
+     is visible (rate riding the eased strength, surging with the gulp,
+     coasting to a stop with the fade) and the shader folds it into the
+     spiral differentially; the ripple marches inward on the summon. */
+  const livingSpin = /uniform float uSpin;/.test(shSrc)
+    && /uSpin \* fall \* uDir/.test(shSrc)
+    && /sin\(r \* 32\.0 \+ uTime \* 6\.0 \* uDir\)/.test(shSrc)
+    && /uSpin: \{ value: 0 \},/.test(engSrc)
+    && /private kamuiSpinPhase = 0;/.test(engSrc)
+    && /this\.kamuiSpinPhase \+= dt \* \(1\.5 \* Math\.min\(1, this\.kamuiEase \/ 1\.15\) \+ 1\.6 \* pu\.uVac\.value\);/.test(engSrc)
+    && /pu\.uSpin\.value = this\.kamuiSpinPhase;/.test(engSrc)
+    && /this\.kamuiSpinPhase = 0; \/\* a fresh tear spins up from rest \*\//.test(engSrc);
+  check('R78: the living spin — the stabilized vortex keeps rotating inward for the whole summon and coasts to a stop with the glow', livingSpin, 'living-spin wiring missing');
 
   const events = /onKamuiTrigger\?: \(reverse: boolean, vortexUv: \{ x: number; y: number \}\) => void;/.test(engSrc)
     && /onKamuiTrigger\?\.\(reverse, \{ x: uv\.x, y: 1 - uv\.y \}\);/.test(engSrc)
