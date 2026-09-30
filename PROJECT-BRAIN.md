@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-09-30, after R81 (the herald reborn).
+> **Last updated:** 2026-09-30, after R83 (the deep audit).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -231,12 +231,16 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The one sky | R79 *(on main)* | The Sky Studio's photo sky becomes THE sky: the vertical barrier died (the vignette sat on the atan branch cut + mipmaps collapsed there — now a camera-relative seam-free vignette and a mip-free texture), the procedural family stands down while a photo owns the view (no ghost floor, no glow tint, blend 1.0 across all three contract tiers), and the dome rides the camera — full-screen at every cosmological stage, the equirect always 1:1. Deactivation rides the crossfade out; uploads rasterize at 4096×2048 when light. New round79 gauntlet in the verify chain |
 | The mark | R80 *(on main)* | The placeholder icon replaced by the author's star sigil (photo pipeline: crop, sharpen, levels) with the analytic Eventide mark as fallback, shipped to the desktop icons and the web's first favicon; the first v15.0.5 tag caught a Windows-only RC2175 ICO defect, the generator was made DIB-correct, released as v15.0.5 via the proven tag-push ritual |
 | The herald reborn | R81 *(on main)* | The updater card redesigned as an artifact — framer-motion spring entrance, lucide star glyph with breathing/spinning halo rings, orbital download progress ring, per-phase copy and glyphs, a real `later` dismiss — zero new deps (vendored framer-motion + lucide), presentation split into `UpdaterCardBody` for staging; released as v15.0.6, the card that delivers its own release |
+| The voice | R82 *(on main)* | The Kamui speaks: the author's chosen cinematic sequence synthesized in-house (blooming riser on the vortex's eased-strength curve, tear rip, B♭ Perseus-homage drone, sub-drop gulp with stereo collapse), then R82.2 removed the arrival exhale (it stacked on the app's own chimes), R82.3 gave the eject the zip-close "knit" voice, R82.4 replaced it with THE TIME MIRROR (the forward sequence rendered offline and sample-flipped — the jutsu un-happening), R82.5 prewarmed the mirror at audio-init and seam-faded its silent head so the seal lands on frame one. Mute law intact, zero files, zero deps. `docs/ROUND-82-THE-VOICE-2026-09-30.md` |
+| The deep audit | R83 *(on main)* | The author's decree: report-only census of every bug, orphan, dead end and hidden seam, plus a deep debug of their own changes (testOne sky swap, the Version 17.1 mirror churn, the Version 18 license deletion). Six real findings — headline: the desktop `sky/status` seam can never match (exact-path switch vs query-bearing caller), so desktop never shows a boot sky. NOTHING in the app changed. `docs/ROUND-83-THE-DEEP-AUDIT-2026-09-30.md` is the decision queue |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-30, after R81)
+## 8. CURRENT STATE (as of 2026-09-30, after R83)
 
-- **`main` is the blessed reference.** Its tip is the R79 one sky
+- **`main` is the blessed reference.** Its tip is the R82 voice chain
+  (R82 the Kamui speaks → R82.2 exhale removed → R82.3 return voice → R82.4 the time
+  mirror → R82.5 the prewarmed mirror) on top of the R79 one sky
   (the photo sky's barrier/double-sky/zoom trio → its gauntlet) on top of
   the R78 living spin
   (the vortex's own rotation → its round18 reconciliation), the R77 trim (the Kamui tail → its round18 reconciliation), the R76 work (the steady
@@ -359,16 +363,45 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   commit → tag `v*` → push; the GitHub pipeline builds (MSVC lives there,
   not on the laptop), generates `latest.json`, publishes the release, and
   the updater card delivers it. See `docs/ROUND-80-THE-MARK-2026-09-30.md`.
+- **R83 — THE DEEP AUDIT (2026-09-30, report-only):** the author's decree — find every bug,
+  orphan, dead end and hidden seam; touch nothing. Their own changes were deep-debugged: the
+  testOne sky swap is sound (GIF is a designed input, rasterized to a first-frame 4096×2048
+  equirect; asset byte-verified) EXCEPT testOne is the last reality at pre-R79 `blend: 0.8`
+  (the one-sky gate still stands the procedural family down while the photo renders at 80 %
+  over raw void — R83-1); the Version 17.1 "seed change" decoded as the disk mirror
+  re-serializing a stale browser generation of data.json (boot truth is index.ts — no lore
+  or physics impact, R83-2); the Version 18 commits deleted the dgreenheck/webgpu-black-hole
+  MIT notice — a compliance gap, text recoverable from history (R83-3). The sweep's six real
+  findings: **R83-4 the desktop sky/status seam can never match** (exact-path switch at
+  `adapter.ts:143` vs the query-bearing caller at `skyRegistry.ts:166` — desktop never shows
+  a boot sky, present since Version 14.3); R83-5 `/api/realities/write-data` has no desktop
+  twin (silent 5-retry burn); R83-6 two chain-dead routes (`folders`, `delete-folder`);
+  R83-7 `BlackHoleVisual.dispose` never called — window listener + stale-visual accumulation
+  across reality switches; R83-8 two events fired into the void (`eventide-camera-memory`,
+  `eventide-vault-pulse` — the latter contract-dead per the R55 gauntlet); R83-9/10 facade
+  promising a never-written `getBackendStatus`, `isNova` dead by shadowing. The census:
+  11 dead value exports + 48 dead type exports (auditor), 4 never-called functions + ~50
+  export-only-dead, 12 write-only fields/seams, ~299 unused imports (291 in the vault UI
+  preamble), 8 dead Rust commands (6 deliberate parity scaffolding), 3 test realities
+  shipping in the product UI, 4 unconsumed surface.ts configs, `scripts/test-upload.ts`
+  dead AND broken, the 512×512 icon generated but unbundled. CLEAN: zero dead files, zero
+  dead actions/components, all 19 EngineCallbacks alive both ways, all EFS/executors/tiers
+  exercised, gauntlet-pinned "dead" items flagged (PortalPhase, KAMUI_PHASE_WEIGHTS).
+  **The full decision queue with proposed solves lives in `docs/ROUND-83-THE-DEEP-AUDIT-
+  2026-09-30.md` — the author decides; nothing was applied.**
 - **Verification status:** `npm run verify` ALL GREEN (typecheck;
   round16/17/18/63/72/73/74/75/76/**79** gauntlets; smoke + prod-smoke, zero
-  console errors); `npm audit` 0 vulnerabilities; `audit:arch --check` exits 1
-  with findings identical to the pristine parent commit modulo mechanical
-  churn (+6 churn lines from `skyRegistry.ts` line shifts; zero semantic new
-  findings — R72–R79 added zero new findings).
+  console errors) — re-verified in R83 on the traveler's changed tree;
+  `npm audit` 0 vulnerabilities; `audit:arch --check` exits 1 with findings identical to the
+  pristine parent commit modulo mechanical churn, plus exactly two new benign de-export
+  findings from R82's audio work (`prewarmKamuiReturnVoice`, `renderKamuiReturnVoiceCache`
+  — internal-only, alive).
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); architecture-audit snapshot drift vs the frozen R52
-  baseline (re-snapshot consciously); 8 dead value exports + 46 dead type exports (including
-  the never-imported `WEB_EDGE_TRIGGER`/`WARP_ZOOM_VEL` on main); stale `BUILD` constant.
+  baseline (re-snapshot consciously); the dead-export census is now exactly measured (11
+  value + 48 type exports; see R83 doc) plus ~299 unused imports; the R83 findings queue
+  (desktop sky seam, write-data twin, black hole dispose, license notice) awaits the
+  author's verdict; stale `BUILD` constant (`R52-v15`).
 - **Experience baseline:** 8.3/10 overall (see `docs/EXPERIENCE-REPORT-2026-09-29.md` for the
   persona-by-persona audit). The gap to 9+ is *signage*, not capability.
 
@@ -376,6 +409,13 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ## 9. WHERE IT'S GOING
 
+0. **R83 decision queue (the author is thinking; do NOTHING until they rule):** the six
+   real findings + the census in `docs/ROUND-83-THE-DEEP-AUDIT-2026-09-30.md` — proposed
+   order: (1) the one-line desktop sky/status seam fix, (2) testOne's blend → 1.0
+   migration, (3) restore the webgpu-black-hole MIT notice, (4) black hole dispose +
+   the write-data desktop twin, (5) the mechanical de-export/import sweep with a conscious
+   audit re-snapshot, (6) the law-level question of test realities (testOne/testWorld/
+   auroraTest) shipping in the product UI.
 1. **R79 leftovers (small):** the author should eyeball chasinLove's hinata
    sky at stellar zoom → cosmic web (no barrier, no double sky, the whole
    photo at every stage). The `UNCLAIMED-hydrate-adopted-fix.patch` has been
