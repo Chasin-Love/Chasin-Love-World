@@ -3,7 +3,7 @@ import type { InnerWorldInfo, UniverseEngine } from './engine/engine';
 import { actions, getState, newId, hydrateDesktopSnapshot } from './state';
 import { MEANING_LABEL } from './domain/universe';
 import type { CosmicBody, Meaning } from './domain/universe';
-import { chime, initAudio, isMuted, setAudioMode, toggleMute } from './platform/audio';
+import { chime, initAudio, isMuted, setAudioMode, toggleMute, playKamuiVoice, type KamuiVoiceHandle } from './platform/audio';
 import type { WinRect } from './ui/diary/DiaryWindow';
 import { PhysicsHUD } from './ui/PhysicsHUD';
 import { ErrorBoundary, IcLink, ToastHost, useUniverse } from './ui/bits';
@@ -78,6 +78,7 @@ function AsyncOverlay({ label = 'LOADING' }: { label?: string }) {
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<UniverseEngine | null>(null);
+  const kamuiVoiceRef = useRef<KamuiVoiceHandle | null>(null);
   const state = useUniverse();
 
   /* continuous reality ⇄ disk reconciler — one poll loop for the whole app */
@@ -379,6 +380,15 @@ export default function App() {
           void import('./ui/diary/DiaryWindow');
           void import('./ui/VaultUI');
         }
+        /* THE VOICE (R82) — the Kamui speaks: the cinematic sequence
+           (riser → rip → B♭ drone → sub-drop → exhale) scheduled on the
+           real timeline constants; the reverse (eject) keeps the existing
+           quiet grammar. Only when the audio context is alive (a user
+           gesture has blessed this session) and the master is unmuted. */
+        if (!reverse && !isMuted()) {
+          kamuiVoiceRef.current?.stop();
+          kamuiVoiceRef.current = playKamuiVoice(5.0, 1.0);
+        }
       },
       onFirstFrame: () => setEngineReady(true),
       onEchoOpen: (entryId, planetId, title) => {
@@ -478,6 +488,8 @@ export default function App() {
     return () => {
       cancelled = true;
       if (boot) window.removeEventListener('pointerdown', boot);
+      kamuiVoiceRef.current?.stop();
+      kamuiVoiceRef.current = null;
       loadedEngine?.dispose();
       engineRef.current = null;
     };

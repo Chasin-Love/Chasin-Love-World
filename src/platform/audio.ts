@@ -62,6 +62,187 @@ export function sfxTick() { tone(1240, 0.06, 'triangle', 0.05); }
 export function sfxPage() { tone(320, 0.18, 'sine', 0.06); tone(240, 0.22, 'sine', 0.04, 0.05); }
 export function sfxConnect() { tone(520, 0.3, 'sine', 0.07); tone(780, 0.35, 'sine', 0.05, 0.1); }
 
+/* ---------------------- THE KAMUI VOICE (R82) ----------------------
+   The jutsu speaks: the cinematic full sequence the author chose from the
+   listening dossier (Desktop \\"KAMUI VOICE - discussion\\"), synthesized
+   with the same building blocks as everything else in this file — noise,
+   oscillators, filters — riding the vortex's real timeline constants
+   (5.0s summon + 1.0s vacuum + arrival, from kamuiPhases.ts).
+   Every layer is scheduled from ONE start call; the mute law is honored
+   by routing everything through the master gain (muted → silence, and a
+   summon begun unmuted simply fades with the master knob if muted later). */
+
+/* the vortex's eased-strength shape (the R77/78 envelope, mirrored here so
+   the sound breathes with the SAME curve the visuals ride) */
+function kamuiVortexStrength(t: number): number {
+  if (t < 0.45) { const k = t / 0.45; return k * k * k; }
+  if (t < 0.8) return 1;
+  const k = (t - 0.8) / 0.2; return 1 - k * k * k;
+}
+
+function kamuiNoise(c: AudioContext, seconds: number): AudioBufferSourceNode {
+  const buf = c.createBuffer(1, Math.ceil(c.sampleRate * seconds), c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  return src;
+}
+
+/* the summon: blooming riser (noise sweep + low climb) */
+function kamuiRiser(c: AudioContext, out: AudioNode, t0: number, dur: number) {
+  const src = kamuiNoise(c, dur + 0.1);
+  src.loop = true;
+  const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+  const g = c.createGain();
+  bp.frequency.setValueAtTime(180, t0);
+  bp.frequency.exponentialRampToValueAtTime(2600, t0 + dur);
+  bp.Q.setValueAtTime(0.8, t0);
+  bp.Q.linearRampToValueAtTime(2.2, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  for (let i = 0; i <= 24; i++) {
+    const t = t0 + (dur * i) / 24;
+    g.gain.linearRampToValueAtTime(Math.max(0.0001, kamuiVortexStrength(i / 24) * 0.5), t);
+  }
+  src.connect(bp).connect(g).connect(out);
+  src.start(t0); src.stop(t0 + dur + 0.05);
+  const o = c.createOscillator(); o.type = 'sine';
+  const og = c.createGain();
+  o.frequency.setValueAtTime(46, t0);
+  o.frequency.exponentialRampToValueAtTime(184, t0 + dur);
+  og.gain.setValueAtTime(0.0001, t0);
+  og.gain.linearRampToValueAtTime(0.34, t0 + dur * 0.8);
+  og.gain.linearRampToValueAtTime(0.42, t0 + dur);
+  o.connect(og).connect(out);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+
+/* the tear bite: a short downward rip at the moment the tear opens */
+function kamuiRip(c: AudioContext, out: AudioNode, t0: number) {
+  const src = kamuiNoise(c, 0.4);
+  const bp = c.createBiquadFilter(); bp.type = 'bandpass';
+  const g = c.createGain();
+  bp.frequency.setValueAtTime(3200, t0);
+  bp.frequency.exponentialRampToValueAtTime(420, t0 + 0.22);
+  bp.Q.value = 3.5;
+  g.gain.setValueAtTime(0.5, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.26);
+  src.connect(bp).connect(g).connect(out);
+  src.start(t0); src.stop(t0 + 0.3);
+}
+
+/* the heart: the B♭ drone (the Perseus homage), partials orbiting the head */
+function kamuiDrone(c: AudioContext, out: AudioNode, t0: number, dur: number) {
+  const Bb1 = 58.27;
+  const partials = [1, 1.5, 2.0, 2.997];
+  const gains = [0.30, 0.14, 0.10, 0.05];
+  const pans = [-0.7, 0.5, -0.35, 0.8];
+  partials.forEach((mult, i) => {
+    const o = c.createOscillator(); o.type = i === 0 ? 'sine' : 'triangle';
+    o.frequency.value = Bb1 * mult;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(gains[i], t0 + 1.4);
+    g.gain.setValueAtTime(gains[i], t0 + dur * 0.75);
+    g.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+    const lfo = c.createOscillator(); lfo.frequency.value = 0.11 + i * 0.043;
+    const pan = c.createStereoPanner();
+    const plg = c.createGain(); plg.gain.value = pans[i];
+    lfo.connect(plg).connect(pan.pan);
+    o.connect(g).connect(pan).connect(out);
+    o.start(t0); o.stop(t0 + dur + 0.1);
+    lfo.start(t0); lfo.stop(t0 + dur + 0.1);
+  });
+}
+
+/* the gulp: sub-drop while the stereo field collapses to center */
+function kamuiSubDrop(c: AudioContext, out: AudioNode, t0: number, dur: number) {
+  const o = c.createOscillator(); o.type = 'sine';
+  const g = c.createGain();
+  o.frequency.setValueAtTime(82, t0);
+  o.frequency.exponentialRampToValueAtTime(24, t0 + dur);
+  g.gain.setValueAtTime(0.55, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 1.15);
+  const comp = c.createDynamicsCompressor();
+  o.connect(g).connect(comp).connect(out);
+  o.start(t0); o.stop(t0 + dur * 1.2);
+  const src = kamuiNoise(c, dur + 0.2);
+  src.loop = true;
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(900, t0);
+  lp.frequency.exponentialRampToValueAtTime(120, t0 + dur);
+  const ng = c.createGain();
+  ng.gain.setValueAtTime(0.22, t0);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  const l = c.createGain(); const r = c.createGain();
+  l.gain.setValueAtTime(0.5, t0); r.gain.setValueAtTime(0.5, t0);
+  l.gain.linearRampToValueAtTime(0, t0 + dur); /* the sides die into the center */
+  r.gain.linearRampToValueAtTime(0, t0 + dur);
+  const sl = c.createStereoPanner(); sl.pan.value = -1;
+  const sr = c.createStereoPanner(); sr.pan.value = 1;
+  src.connect(lp);
+  lp.connect(sl).connect(l).connect(out);
+  lp.connect(sr).connect(r).connect(out);
+  src.start(t0); src.stop(t0 + dur + 0.1);
+}
+
+/* the arrival: the app's own chimes re-voiced with air */
+function kamuiExhale(c: AudioContext, out: AudioNode, t0: number) {
+  const notes: Array<[number, number]> = [[880, 0], [760, 0.07], [587.33, 0.16]];
+  for (const [f, dt] of notes) {
+    const o = c.createOscillator(); o.type = 'sine';
+    o.frequency.value = f;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t0 + dt);
+    g.gain.linearRampToValueAtTime(0.16, t0 + dt + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.9);
+    o.connect(g).connect(out);
+    o.start(t0 + dt); o.stop(t0 + dt + 1);
+  }
+  const src = kamuiNoise(c, 1.4);
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.14, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.2);
+  const pL = c.createStereoPanner(); pL.pan.value = -0.6;
+  const pR = c.createStereoPanner(); pR.pan.value = 0.6;
+  src.connect(lp).connect(g);
+  g.connect(pL).connect(out); g.connect(pR).connect(out);
+  src.start(t0); src.stop(t0 + 1.4);
+}
+
+export type KamuiVoiceHandle = { stop(): void };
+
+/* THE VOICE — the full cinematic Kamui, scheduled from the summon's first
+   frame. Timeline constants come from kamuiPhases.ts so sound and pixels
+   never drift apart. Safe to call again while one is flying (the previous
+   voice is stopped, never overlapped). */
+export function playKamuiVoice(summonDuration = 5.0, vacuumDuration = 1.0): KamuiVoiceHandle | null {
+  const c = ensure();
+  if (!c || !master) return null;
+  const t0 = c.currentTime + 0.03;
+  const comp = c.createDynamicsCompressor();
+  comp.threshold.value = -14; comp.ratio.value = 4;
+  const makeup = c.createGain(); makeup.gain.value = 1.15;
+  makeup.connect(comp).connect(master);
+  kamuiRiser(c, makeup, t0, summonDuration);
+  kamuiRip(c, makeup, t0 + summonDuration * 0.45);
+  kamuiDrone(c, makeup, t0 + summonDuration * 0.45, summonDuration * 0.55 + vacuumDuration * 0.4);
+  kamuiSubDrop(c, makeup, t0 + summonDuration, vacuumDuration);
+  kamuiExhale(c, makeup, t0 + summonDuration + vacuumDuration + 0.25);
+  const end = t0 + summonDuration + vacuumDuration + 1.8;
+  const watchdog = window.setTimeout(() => { try { comp.disconnect(); makeup.disconnect(); } catch { /* */ } }, (end - c.currentTime) * 1000 + 400);
+  return {
+    stop() {
+      window.clearTimeout(watchdog);
+      /* graceful cut: duck the bus, then release the graph */
+      try { makeup.gain.setTargetAtTime(0.0001, c.currentTime, 0.08); } catch { /* */ }
+      window.setTimeout(() => { try { comp.disconnect(); makeup.disconnect(); } catch { /* */ } }, 320);
+    },
+  };
+}
+/* ------------------ end THE KAMUI VOICE (R82) ------------------ */
+
 /* ------------------------------ ambience ------------------------------- */
 
 function killDrone() {
