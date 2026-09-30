@@ -257,9 +257,15 @@ export default function App() {
       onHover: (id, x, y, disk) => {
         /* THE HERALD'S DISK (R74) — the card anchors outside this circle.
            THE UNBROKEN BRIDGE (R75) — a null disk never erases the last one:
-           the ref keeps it so the corridor to the card stays bridged. */
-        if (disk) hoverDiskRef.current = disk;
-        setHoverDisk(disk ?? null);
+           the ref keeps it so the corridor to the card stays bridged.
+           THE STEADY HERALD (R76) — and the mounted card's STATE anchor
+           survives the null too: roaming the click-transparent crossing
+           re-picks empty space, and the old null-erasing write answered by
+           re-anchoring the card onto the cursor fallback — it
+           teleported the moment the rim was crossed and flickered back at
+           every boundary graze. The anchor now clears only with the card
+           (clearHoverCard); only a real disk emission ever moves it. */
+        if (disk) { hoverDiskRef.current = disk; setHoverDisk(disk); }
         /* a fresh hover cancels any pending sticky-clear */
         if (id && hoverClearTimer.current) { clearTimeout(hoverClearTimer.current); hoverClearTimer.current = null; }
         setHoverId(id);
@@ -390,7 +396,13 @@ export default function App() {
         const r = getReality(realityId, getState().customRealityDescriptions);
         toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
         chime(880);
-        engineRef.current?.resetView();
+        /* THE WEB DOOR (R76) — clicking a reality sphere is an explicit
+           stage crossing: the Kamui carries the traveler to that reality's
+           COSMIC WEB (zoomToHierarchy(2) fires the staged beginStageWarp
+           from the multiverse side — R72's carrier). The old resetView()
+           dove straight into the home stellar system, skipping the web —
+           the arrival the author called a lack of logic. */
+        engineRef.current?.zoomToHierarchy(2);
       },
       onDoubleClickReality: (realityId) => {
         setAdvancedReality({ realityId, focusGalaxyId: null });
