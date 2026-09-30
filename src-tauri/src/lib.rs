@@ -194,17 +194,6 @@ fn store_payload_delete(id: String) -> Result<(), String> {
     store::payload_delete(id)
 }
 
-#[tauri::command]
-fn store_payload_list() -> Result<Vec<String>, String> {
-    store::payload_list()
-}
-
-#[tauri::command]
-fn store_payload_stats() -> Result<serde_json::Value, String> {
-    let s = store::payload_stats()?;
-    Ok(serde_json::json!({ "count": s.count, "totalBytes": s.total_bytes, "dir": s.dir }))
-}
-
 /* ---------------------------- realities (daemon) -------------------------- */
 
 #[tauri::command]
@@ -462,8 +451,6 @@ pub fn run() {
             store_payload_put,
             store_payload_get,
             store_payload_delete,
-            store_payload_list,
-            store_payload_stats,
             reality_bin_list,
             reality_move_to_bin,
             reality_restore,

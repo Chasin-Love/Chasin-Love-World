@@ -345,7 +345,6 @@ export class UniverseEngine {
   private selectedId: string | null = null;
   private focusId: string | null = null;
   private simDays = 0;
-  private timeScale = 1;
   private paused = false;
   private rendering = true;
   private coreActive = false; private coreT = 0;
@@ -555,7 +554,6 @@ export class UniverseEngine {
      Traversals clear the timer so a flight is never saved. The resetView()
      path clears the memory entirely: the default stays reachable on demand. */
   private _camMemTimer = 0;
-  private _camMemStable = 0;
   private _camMemLast: Omit<CameraMemory, 'savedAt'> | null = null;
 
   /** Worth remembering? A view is checkpointed only when the traveler is
@@ -566,7 +564,6 @@ export class UniverseEngine {
       && this.galaxyDive === null && this.cosmicStage === 'web';
     if (!quiescent) {
       this._camMemTimer = 0;
-      this._camMemStable = 0;
       return;
     }
     this._camMemTimer += dt;
@@ -744,8 +741,6 @@ export class UniverseEngine {
      They are never visible at the same time; the zoom dial carries you
      between them and the stage swaps when you cross its edge. */
   private cosmicStage: 'web' | 'multiverse' = 'web';
-  /* dial the camera eases to when arriving at your own reality marble */
-  private arrivalZoom = REALITY_FLOOR;
   /* the quiet boot — the scene sits fully formed behind the App's intro veil;
      this finalize runs once on the first frame */
   private bootIntro = true;
@@ -831,7 +826,6 @@ export class UniverseEngine {
      folder). Desktop fetches the registry itself so a device that never ran
      the web server still gets its skies. */
   private activeSkySpec: ActiveSkySpec | null = null;
-  private skyApplying = false;
 
   /* THE SENTIMENT AURORA — live emotional state of the active reality,
      damped toward the latest signal so mood shifts read as weather, not cuts */
@@ -844,7 +838,6 @@ export class UniverseEngine {
      meteor a memory you can click to reopen */
   private echoMeteors: (ShootingMeteor & { entryId: string; planetId: string; title: string })[] = [];
   private echoArmedDay = '';
-  private echoShowerClock = 0;
   private echoHoverId: string | null = null;
   private echoGroup: THREE.Group | null = null;
   private echoColliders: THREE.Sprite[] = [];
@@ -1662,7 +1655,6 @@ export class UniverseEngine {
     const active = this.echoMeteors.some((m) => m.entryId !== '');
     this.echoGroup.visible = active;
     if (!active) return;
-    this.echoShowerClock += dt;
     let anyVisible = false;
     for (const m of this.echoMeteors) {
       if (m.entryId === '') { m.headSprite.visible = false; m.line.visible = false; continue; }
@@ -4494,12 +4486,7 @@ void main(){
       } catch { /* keep whatever cache already holds */ }
     }
     this.activeSkySpec = getActiveSkySpec(this.activeRealityId);
-    this.skyApplying = true;
-    try {
-      await this.surfaceManager.getPhotoDome().apply(this.activeSkySpec);
-    } finally {
-      this.skyApplying = false;
-    }
+    await this.surfaceManager.getPhotoDome().apply(this.activeSkySpec);
   }
 
   setTemporal(asOf: number | null) {
@@ -4920,16 +4907,6 @@ void main(){
     }
   }
 
-  /** Pan and zoom camera to the supreme Multiverse Core {Demon} */
-  zoomToDemonCore() {
-    this.focusId = null;
-    this.realityFocused = false;
-
-    this.rig.setZoomTarget(0.94);
-    this.rig.setOrbit(0.82, 1.12);
-    this.rig.clearPan();
-  }
-
   /** Frame the Astral Core */
   zoomToCore() {
     this.focusId = null;
@@ -5135,7 +5112,7 @@ void main(){
     this.checkpointCameraView(dt);
 
     /* time */
-    const rate = this.paused ? 0 : 6 * this.timeScale * (this.coreActive ? 0.35 : 1);
+    const rate = this.paused ? 0 : 6 * (this.coreActive ? 0.35 : 1);
     this.simDays += dt * rate;
     this.lastSimDelta = dt * rate;
     if (this.clockT - this.lastDateSent > 0.25) {
@@ -5573,19 +5550,6 @@ this.updateBodies(dt);
       if (node) return node.group;
     }
     return null;
-  }
-
-  /** Field radius for the reverse traversal — re-derived from the target
-     body (the portal contract stores only the id). */
-  private portalBodyRadiusForReverse(): number {
-    if (!this.kamuiTearBodyId) return 6;
-    const home = this.bodies.find((b) => b.data.id === this.kamuiTearBodyId);
-    if (home) return home.data.radius;
-    for (const node of this.galaxyStageNodes) {
-      const inner = node.innerSys?.planets.find((pl) => pl.data.id === this.kamuiTearBodyId);
-      if (inner) return inner.data.radius;
-    }
-    return 6;
   }
 
 

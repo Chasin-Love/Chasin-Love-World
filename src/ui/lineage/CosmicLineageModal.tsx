@@ -14,7 +14,6 @@ interface CosmicLineageModalProps {
   lineageOverride?: CosmicLineage;
   /* header title when exploring a galaxy (falls back to cluster.name) */
   subjectLabel?: string;
-  subjectBadge?: string;
   realityName: string;
   onClose: () => void;
   onWarpToReality: (realityId: string) => void;
@@ -26,7 +25,6 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
   cluster,
   lineageOverride,
   subjectLabel,
-  subjectBadge,
   realityName,
   onClose,
   onWarpToReality,
@@ -311,7 +309,7 @@ export const CosmicLineageModal: React.FC<CosmicLineageModalProps> = ({
                 <span>{cluster?.name ?? subjectLabel ?? lineage.galaxy.name}</span>
                 {(cluster?.isHomeCluster || lineageOverride) && (
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
-                    {subjectBadge ?? (cluster ? 'Home Cluster' : 'Major Galaxy')}
+                    {cluster ? 'Home Cluster' : 'Major Galaxy'}
                   </span>
                 )}
               </h2>

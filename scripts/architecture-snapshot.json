@@ -1,11 +1,9 @@
 {
-  "generatedAt": "2026-09-30T19:51:26.901Z",
-  "fileCount": 137,
+  "generatedAt": "2026-09-30T20:28:48.423Z",
+  "fileCount": 136,
   "deadExports": [],
   "deadTypes": [],
   "deadCss": [
-    "cc-tab",
-    "cc-tab-active",
     "kamui-disappear"
   ],
   "importers": {
@@ -511,7 +509,6 @@
     "scripts/round79-sky-gauntlet.ts": 81,
     "scripts/round84-inclination-gauntlet.ts": 160,
     "scripts/smoke.ts": 233,
-    "scripts/test-upload.ts": 16,
     "server/index.ts": 85,
     "server/paths.ts": 35,
     "server/realityDaemon.ts": 464,
@@ -519,7 +516,7 @@
     "server/routes/realities.ts": 255,
     "server/routes/sky.ts": 94,
     "server/skyStore.ts": 251,
-    "src/App.tsx": 1547,
+    "src/App.tsx": 1544,
     "src/domain/universe.ts": 167,
     "src/domain/vault.ts": 176,
     "src/engine/blackholeParams.ts": 125,
@@ -528,7 +525,7 @@
     "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 6633,
+    "src/engine/engine.ts": 6597,
     "src/engine/math.ts": 42,
     "src/engine/shaders.ts": 1542,
     "src/engine/surface/UniverseSurfaceManager.ts": 546,
@@ -595,7 +592,7 @@
     "src/ui/hud/RealityHoverCard.tsx": 132,
     "src/ui/kamuiBend.ts": 141,
     "src/ui/lib.ts": 31,
-    "src/ui/lineage/CosmicLineageModal.tsx": 579,
+    "src/ui/lineage/CosmicLineageModal.tsx": 577,
     "src/ui/lineage/ThinkingCloudTooltip.tsx": 266,
     "src/ui/reality/CreateRealityModal.tsx": 307,
     "src/ui/reality/RealityAdvancedModal.tsx": 80,
@@ -634,7 +631,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      6633
+      6597
     ],
     [
       "src/ui/diary/DiaryWindow.tsx",
@@ -642,7 +639,7 @@
     ],
     [
       "src/App.tsx",
-      1547
+      1544
     ],
     [
       "src/engine/shaders.ts",

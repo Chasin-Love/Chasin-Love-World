@@ -14,7 +14,6 @@
   --color-solar: #f2c178;
   --color-solar-hot: #ffd9a0;
   --color-teal-ice: #6fc2b4;
-  --color-danger: #f0a08c;
 }
 
 html, body {
@@ -1433,18 +1432,6 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   color: #fff;
 }
 
-.cc-tab {
-  background: rgba(10, 12, 20, 0.55);
-  border-color: rgba(255, 255, 255, 0.10);
-}
-.cc-tab:hover { border-color: rgba(255, 255, 255, 0.28); color: #fff; }
-/* active tab — a raised smoked segment with a quiet accent edge; no glow */
-.cc-tab-active {
-  background: rgba(10, 12, 20, 0.75) !important;
-  border-color: rgb(var(--cc) / 0.55) !important;
-  color: #fff;
-}
-
 /* ---- Quantum Glass primitives --------------------------------------- */
 
 /* quiet pill badge — status readouts (accent-aware via --cc) */
@@ -1652,20 +1639,6 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 
 
 /* ============ Round-8 console polish ============ */
-/* active tab: a white-gold accent underline blooms in beneath the label */
-.cc-tab { position: relative; overflow: hidden; }
-.cc-tab-active::after {
-  content: '';
-  position: absolute;
-  left: 14%; right: 14%; bottom: 3px;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, rgba(255, 244, 214, 0.9), transparent);
-  box-shadow: 0 0 10px rgba(255, 240, 200, 0.55);
-  animation: ccTabUnderline 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-@keyframes ccTabUnderline { from { transform: scaleX(0.2); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
-
 /* radar: a CSS conic sweep gliding above the canvas plot */
 .cc-radar-frame::after {
   content: '';
@@ -1685,7 +1658,6 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 
 @media (prefers-reduced-motion: reduce) {
   .cc-radar-frame::after, .cc-vital { animation: none; }
-  .cc-tab-active::after { animation: none; }
 }
 
 /* ----------------------- Kamui Space-Time Vortex Animation (v1) ----------------------- */
@@ -1709,6 +1681,14 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   }
 }
 
+.kamui-appear {
+  animation: kamuiVortexIn 0.82s cubic-bezier(0.1, 1, 0.3, 1) both;
+  transform-origin: center center;
+}
+
+/* kamui-disappear has no textual consumer today, but round18's gauntlet pins
+   the v1 vortex CSS (appear / disappear / demon pulse / eye warp) — it is
+   law-pinned, not dead. Do not remove without reconciling the gauntlet. */
 @keyframes kamuiVortexOut {
   0% {
     opacity: 1;
@@ -1721,11 +1701,6 @@ input[type='range'].pw-range::-webkit-slider-thumb {
     filter: blur(24px) brightness(3.2);
     box-shadow: 0 0 140px rgba(255, 23, 68, 1);
   }
-}
-
-.kamui-appear {
-  animation: kamuiVortexIn 0.82s cubic-bezier(0.1, 1, 0.3, 1) both;
-  transform-origin: center center;
 }
 
 .kamui-disappear {
