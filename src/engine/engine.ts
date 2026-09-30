@@ -502,6 +502,28 @@ export class UniverseEngine {
     return visual;
   }
 
+  /* R85 — the release path. attachBlackHole registers every hole visual, and
+     until now nothing ever un-registered one: the visual's window listener
+     (BLACKHOLE_CHANGE_EVENT), its LUT texture and its shader material outlived
+     the body, and the dead visual kept marching (criticalImpactParam's
+     per-frame bisection) through every later reality switch. Call BEFORE the
+     generic Object3D teardown — dispose() removes the window listener and
+     frees the GPU resources; disposeObject3D still owns the group's meshes.
+     Idempotent: a visual already released is neither disposed twice into the
+     registry nor spliced twice. */
+  private releaseBlackHolesUnder(root: THREE.Object3D): void {
+    const released: BlackHoleVisual[] = [];
+    root.traverse((o) => {
+      const bh = o.userData?.bh as BlackHoleVisual | undefined;
+      if (bh) released.push(bh);
+    });
+    for (const visual of released) {
+      visual.dispose();
+      const i = this.blackHoles.indexOf(visual);
+      if (i >= 0) this.blackHoles.splice(i, 1);
+    }
+  }
+
   /* One switch for every hole: the geodesic marcher renders it, or the hole
      hides itself (frame-budget breaker, shader failure, quality tier,
      Studio switch). Round 55 — nothing stands in for it anymore. */
@@ -2999,6 +3021,7 @@ void main(){
     const preservedMaterials = new Set<THREE.Material>();
     if (this.moonGeo) preservedGeometries.add(this.moonGeo);
     if (this.moonMat) preservedMaterials.add(this.moonMat);
+    this.releaseBlackHolesUnder(this.gGalaxyContents);
     this.disposeObject3D(this.gGalaxyContents, {
       geometries: preservedGeometries,
       materials: preservedMaterials,
@@ -4710,6 +4733,7 @@ void main(){
         const preservedMaterials = new Set<THREE.Material>();
         if (this.moonGeo) preservedGeometries.add(this.moonGeo);
         if (this.moonMat) preservedMaterials.add(this.moonMat);
+        this.releaseBlackHolesUnder(rb.group);
         this.disposeObject3D(rb.group, {
           geometries: preservedGeometries,
           materials: preservedMaterials,
@@ -6596,6 +6620,7 @@ this.updateBodies(dt);
     this.echoColliders = [];
     this.canvas.style.touchAction = this.originalTouchAction;
     this.rig.dispose();
+    this.releaseBlackHolesUnder(this.scene);
     this.disposeObject3D(this.scene);
     this.scene.clear();
     this.composer.dispose();
