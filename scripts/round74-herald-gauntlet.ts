@@ -75,8 +75,15 @@ const clusterCard = readFileSync(new URL('../src/ui/hud/ClusterHoverCard.tsx', i
   const clusterClean = !/pointer-events-auto w-\[400px\]/.test(clusterCard);
   check('R74: the cluster card no longer steals every click over it', clusterClean, 'root still pointer-events-auto');
 
+  /* R76 reconciliation: the emission handler no longer writes
+     `setHoverDisk(disk ?? null)` — a null emission must never re-anchor a
+     mounted card onto the cursor fallback (THE STEADY HERALD). The disk
+     state is set only by a real disk emission and cleared only by the
+     shared clear. The disk={hoverDisk} wiring into all three cards is
+     unchanged R74 law. */
   const appWired = (appSrc.match(/disk=\{hoverDisk\}/g) ?? []).length === 3
-    && /setHoverDisk\(disk \?\? null\)/.test(appSrc);
+    && /if \(disk\) \{ hoverDiskRef\.current = disk; setHoverDisk\(disk\); \}/.test(appSrc)
+    && !/setHoverDisk\(disk \?\? null\)/.test(appSrc);
   check('R74: App carries the disk state into all three cards', appWired, 'App wiring incomplete');
 }
 

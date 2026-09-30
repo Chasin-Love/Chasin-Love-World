@@ -37,7 +37,10 @@ const cards: [string, string][] = [
     && /pointerRef = useRef/.test(appSrc);
   check('R75: the bridge state exists (last disk + resting pointer, both in refs)', refs, 'bridge state missing');
 
-  const keeper = /if \(disk\) hoverDiskRef\.current = disk;/.test(appSrc);
+  /* R76 reconciliation: the keeper line now also writes the STATE anchor
+     (THE STEADY HERALD) — same if(disk) guard, so a null disk still never
+     erases the last one. */
+  const keeper = /if \(disk\) \{ hoverDiskRef\.current = disk; setHoverDisk\(disk\); \}/.test(appSrc);
   check('R75: a null disk never erases the last one (the corridor stays bridged)', keeper, 'disk ref erased on null');
 
   const predicate = /const pointerOnBridge = useCallback\(\(x: number, y: number\): boolean/.test(appSrc)
