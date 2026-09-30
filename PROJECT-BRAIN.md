@@ -234,10 +234,11 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The voice | R82 *(on main)* | The Kamui speaks: the author's chosen cinematic sequence synthesized in-house (blooming riser on the vortex's eased-strength curve, tear rip, B♭ Perseus-homage drone, sub-drop gulp with stereo collapse), then R82.2 removed the arrival exhale (it stacked on the app's own chimes), R82.3 gave the eject the zip-close "knit" voice, R82.4 replaced it with THE TIME MIRROR (the forward sequence rendered offline and sample-flipped — the jutsu un-happening), R82.5 prewarmed the mirror at audio-init and seam-faded its silent head so the seal lands on frame one. Mute law intact, zero files, zero deps. `docs/ROUND-82-THE-VOICE-2026-09-30.md` |
 | The deep audit | R83 *(on main)* | The author's decree: report-only census of every bug, orphan, dead end and hidden seam, plus a deep debug of their own changes (testOne sky swap, the Version 17.1 mirror churn, the Version 18 license deletion). Six real findings — headline: the desktop `sky/status` seam can never match (exact-path switch vs query-bearing caller), so desktop never shows a boot sky. NOTHING in the app changed. `docs/ROUND-83-THE-DEEP-AUDIT-2026-09-30.md` is the decision queue |
 | The ascending nodes | R84 *(on main)* | The author's realism decree: orbits may not all ride one flat sheet. The missing logic was found (every node line was hardwired to +X; no periapsis angle) and added end-to-end: `Orbit.node`/`Orbit.argP`, the exact R(Ω)·R(i)·R(ω) composition in one shared helper used by solver, moons, star-wobble and Living Gravity, C++/WASM/Rust/bridge parity, real J2000 elements pinned into Sol-Prime (JPL Table 1), exoplanet-spice codegen (steep + near-polar tail, full-circle nodes), toroidal asteroid belts. The four test realities deleted at the author's ruling. New round84 gauntlet in the verify chain |
+| The six seams | R85 *(on branch `r85-the-six-seams`, NOT in main — verified 2026-10-01)* | The author's ruling on the R83 decision queue, executed on an isolated branch: the desktop sky/status seam finally matches (one line — the boot photo sky lives again), `/api/realities/write-data` gains its Tauri twin (the reality mirror lands on desktop; the deterministic 5-retry burn dies), both chain-dead routes deleted at every layer (`list_folders` stays — the daemon uses it), `releaseBlackHolesUnder` disposes every hole visual at all three teardown paths (the listener/marcher leak dies), both void events removed (R55's full-erase honored — removal, not re-wiring), the lying vault facade tail deleted and `isNova` adopted by `novaScan` (the keyring shadow renamed `isBreached`); then the mechanical sweep iterated to the audit's fixed point — **zero dead value/type exports, 1147 unused imports removed**; `THIRD-PARTY-NOTICES.md` restored verbatim and `BUILD` → R85. `docs/ROUND-85-THE-SIX-SEAMS-2026-10-01.md` |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-30, after R84)
+## 8. CURRENT STATE (as of 2026-10-01, after R85 — on branch; main's tip is R84 / v15.0.8)
 
 - **`main` is the blessed reference.** Its tip is the R84 ascending nodes
   on top of the R82 voice chain
@@ -256,8 +257,26 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 - **In flight (branches, not final):** `r71-ten-slices` carries R68/R69 explorer-upgrade work
   (cameraRig orbit/glide grammar, touch grammar, 3.5 s summon, ROUND-68/69 docs) plus R71
   step 3 ("zoom never crosses"; changes in `engine.ts`, `stageThresholds.ts`, `kamuiPhases.ts`,
-  `cameraRig.ts`, round18 gauntlet) and uncommitted step-3 transform scripts. Treat all of it
-  as experimental until the author merges it.
+  `cameraRig.ts`, round18 gauntlet) and uncommitted step-3 transform scripts. `r85-the-six-seams`
+  carries R85 (below). Treat all of it as experimental until the author merges it.
+- **R85 (this round, on branch `r85-the-six-seams`):** the R83 decision queue executed at the
+  author's ruling. The six seams: `mapRealityEndpoint` switches on the bare route (the boot
+  photo sky lives on desktop again); the `write-data` desktop twin (`reality_write_data`,
+  the server's resolve→contain→skip-identical semantics in `realities.rs`) makes the reality
+  mirror real and kills the 5-retry burn; the chain-dead `/folders` + `/delete-folder` routes
+  deleted at every layer (`list_folders` kept for the daemon); `releaseBlackHolesUnder`
+  releases every hole visual (listener + LUT + material + dead per-frame bisection) at
+  `syncBodies`, the galaxy-stage rebuild and `Engine.dispose()` — `blackholeRaymarch.ts`
+  untouched (round17 pins it); `eventide-vault-pulse` and `eventide-camera-memory` removed
+  not re-wired (R55 law; camera persistence untouched); the vault facade's stranded tail
+  deleted, `novaScan` calls the real `isNova` (module-private now) and the keyring's shadow
+  is `isBreached`. The sweep: 121 dead exports de-exported (never deleted) and 1147 unused
+  imported names removed across 26 files — near four× the census estimate — to the audit's
+  fixed point: **zero dead value exports, zero dead type exports**. Extras: the MIT notice
+  file restored verbatim from history and `BUILD` = 'R85'. Watch item: `cargo check` still
+  unprovable here (no MSVC toolchain — covers R84's FFI and R85's `reality_write_data`
+  alike); the 3 dead CSS classes and the remaining R83 ledger rows wait for their own
+  rulings.
 - **R72 (this round):** the membrane Kamui arrival is STAGED — the summon holds the traveler's
   stage and dial for the full choreography and the throat hands the multiverse over through the
   dying vortex (the R67 grammar carried to `beginStageWarp`); the eject face is untouched (its
@@ -414,16 +433,21 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   2026-09-30.md`.
 - **Verification status:** `npm run verify` ALL GREEN (typecheck;
   round16/17/18/63/72/73/74/75/76/79/**84** gauntlets; smoke + prod-smoke, zero
-  console errors) — re-verified in R84 on the tilted-sky tree;
-  `npm audit` 0 vulnerabilities; `audit:arch --check` drift unchanged from R83's
-  accounting (the R84 changes add no new dead exports; a conscious re-snapshot remains
-  queued).
+  console errors) — re-verified on the R85 branch tree after the sweep;
+  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the new fixed-point
+  snapshot** (zero dead exports — the "conscious re-snapshot remains queued" debt from
+  R83/R84 is settled, absorbed in-commit three times during R85);
+  `desktop:check` unrunnable on this laptop (no MSVC toolchain — recorded honestly in
+  R84 and R85).
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
-  is planned as its own future round); architecture-audit snapshot drift vs the frozen R52
-  baseline (re-snapshot consciously); the dead-export census is now exactly measured (11
-  value + 48 type exports; see R83 doc) plus ~299 unused imports; the R83 findings queue
-  (desktop sky seam, write-data twin, black hole dispose, license notice) awaits the
-  author's verdict; stale `BUILD` constant (`R52-v15`).
+  is planned as its own future round); `cargo check` proof on a toolchained host (R84's FFI
+  extension + R85's `reality_write_data` twin, both reviewed but never compiled here);
+  the R83 ledger's unruled rows (3 dead CSS classes, the `store_payload_list`/`stats` Rust
+  pair, write-only fields, `window.__ACTIONS__`, orphan PNGs, the `realityDaemon.stop()`
+  adopt-or-cut seam). RESOLVED in R85: the desktop sky seam, the write-data twin, the
+  chain-dead routes, the black hole dispose leak, both void events, the lying facade, the
+  isNova shadow, the dead-export/unused-import census (fixed point), the MIT notice, the
+  stale `BUILD` constant.
 - **Experience baseline:** 8.3/10 overall (see `docs/EXPERIENCE-REPORT-2026-09-29.md` for the
   persona-by-persona audit). The gap to 9+ is *signage*, not capability.
 
@@ -431,16 +455,13 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ## 9. WHERE IT'S GOING
 
-0. **R83 decision queue (the author is thinking; do NOTHING until they rule):** the six
-   real findings + the census in `docs/ROUND-83-THE-DEEP-AUDIT-2026-09-30.md` — proposed
-   order: (1) the one-line desktop sky/status seam fix, (2) ~~testOne's blend → 1.0
-   migration~~ (moot — the test realities were deleted in R84), (3) restore the
-   webgpu-black-hole MIT notice, (4) black hole dispose + the write-data desktop twin,
-   (5) the mechanical de-export/import sweep with a conscious audit re-snapshot,
-   (6) ~~the test realities in the product UI~~ (resolved — R84 deleted them).
-   R84 follow-ups (small, unasked): a `cargo check` pass on the Tauri shell to prove the
-   extended FFI compiles on a host with the C++ toolchain (this laptop has none); an
-   orbit-elements UI (the precedent exists — GalaxyRoster's Ellipse Tilt slider) so the
+0. **R83 decision queue — RULED and EXECUTED (R85, branch `r85-the-six-seams`).** The
+   author ruled on 2026-10-01: "create a new isolated branch … solve all these six bugs
+   … best shape possible," and chose the mechanical sweep when offered the census's fate.
+   All six findings + the sweep + the MIT notice are done on the branch — awaiting only
+   the author's merge. Remaining from the queue's own follow-ups: a `cargo check` pass on
+   a host with the C++ toolchain (now covers R84's FFI **and** R85's `reality_write_data`);
+   an orbit-elements UI (the precedent exists — GalaxyRoster's Ellipse Tilt slider) so the
    author can hand-place nodes; a `syncBodies` orbit-line rebuild hook so editing a
    body's elements re-bakes its ring without a full setReality.
 1. **R79 leftovers (small):** the author should eyeball chasinLove's hinata
