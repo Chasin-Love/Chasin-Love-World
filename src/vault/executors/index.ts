@@ -345,10 +345,7 @@ export async function extractArchiveEntry(blob: Blob, entry: ZipEntry): Promise<
 }
 
 /* ------------------------- engine bridge ------------------------- */
-
-/** Signals the 3D universe that the Vault was used — the black hole reacts. */
-export function pulseVault(intensity = 1): void {
-  try {
-    window.dispatchEvent(new CustomEvent('eventide-vault-pulse', { detail: { intensity } }));
-  } catch { /* engine not mounted — harmless */ }
-}
+/* R85 — pulseVault and its 'eventide-vault-pulse' dispatch rest here. The
+   listener was deliberately erased by Round 55's full-erase (no pulse
+   machinery anywhere — the round17 gauntlet asserts the engine never
+   listens), so every dispatch landed in the void. Removed, not re-wired. */

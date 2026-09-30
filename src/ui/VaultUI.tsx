@@ -21,7 +21,7 @@ import {
   efsChecksumOf, efsChildren as efsChildrenOf, efsDirOf, efsPathString, EFS_ROOT,
   getPayload, hasIdb, hasOpfs, putPayload,
   bundleWebApp, canExecute, detectRunner, extractArchiveEntry, pickAppEntry,
-  pulseVault, readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
+  readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
   parseIsoBlob, extractIsoFile, flattenIsoRecords,
   type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
 } from '../vault';
@@ -150,7 +150,6 @@ export default function VaultUI({ onClose, closing }: { onClose: () => void; clo
     }
     actions.addVaultFiles(added);
     void actions.efsRunDedup();
-    pulseVault(0.6);
     toast(`${added.length} object${added.length === 1 ? '' : 's'} sealed into the Vault`);
   };
 

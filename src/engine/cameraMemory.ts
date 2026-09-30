@@ -10,11 +10,13 @@ import { STORAGE_KEYS } from '../platform/storageKeys';
  * cross-boot half: THE VIEW ITSELF IS NOW PERSISTED.
  *
  * The contract is deliberately identical to blackholeParams/blackholeTier
- * (Round 20.4 / 53): module store + localStorage + a window CustomEvent, no
- * engine plumbing. The engine alone decides WHEN a placement is worth
- * remembering — a mid-Kamui dive or a portal flight must never be saved —
- * and calls capture()/restore() at the same two moments the portal system
- * already uses: beginPortal saves, the boot finalize restores.
+ * (Round 20.4 / 53): module store + localStorage, no engine plumbing. (R85:
+ * the siblings' window announcement never had a twin here — nothing ever
+ * listened to 'eventide-camera-memory', so the vestigial dispatch is gone;
+ * persistence alone is the contract.) The engine alone decides WHEN a
+ * placement is worth remembering — a mid-Kamui dive or a portal flight must
+ * never be saved — and calls capture()/restore() at the same two moments the
+ * portal system already uses: beginPortal saves, the boot finalize restores.
  *
  * The black hole itself is not touched. This is where the camera sits, not
  * what the hole renders.
@@ -45,11 +47,8 @@ export interface CameraMemory {
 }
 
 const STORAGE_KEY = STORAGE_KEYS.cameraView;
-const CAMERA_MEMORY_EVENT = 'eventide-camera-memory';
 
 let cached: CameraMemory | null = null;
-
-export const CAMERA_MEMORY_CHANGE_EVENT = CAMERA_MEMORY_EVENT;
 
 /** The saved placement, or null when this browser/device has none yet. */
 export function getCameraMemory(): CameraMemory | null {
@@ -97,7 +96,6 @@ export function setCameraMemory(m: Omit<CameraMemory, 'savedAt'>): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
   } catch { /* private mode — live session keeps its own memory */ }
-  window.dispatchEvent(new CustomEvent(CAMERA_MEMORY_EVENT, { detail: { ...cached } }));
 }
 
 /** FORGET the saved placement (the reset-view path: the boot default becomes
@@ -107,5 +105,4 @@ export function clearCameraMemory(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch { /* private mode */ }
-  window.dispatchEvent(new CustomEvent(CAMERA_MEMORY_EVENT, { detail: null }));
 }

@@ -1,12 +1,7 @@
 {
-  "generatedAt": "2026-09-30T19:30:01.937Z",
+  "generatedAt": "2026-09-30T19:35:26.237Z",
   "fileCount": 137,
   "deadExports": [
-    {
-      "symbol": "CAMERA_MEMORY_CHANGE_EVENT",
-      "file": "src/engine/cameraMemory.ts",
-      "action": "delete"
-    },
     {
       "symbol": "KAMUI_RAMP",
       "file": "src/engine/systems/kamuiPhases.ts",
@@ -840,10 +835,10 @@
     "src/engine/blackholeParams.ts": 125,
     "src/engine/blackholeRaymarch.ts": 585,
     "src/engine/blackholeTier.ts": 70,
-    "src/engine/cameraMemory.ts": 112,
+    "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 6608,
+    "src/engine/engine.ts": 6633,
     "src/engine/math.ts": 42,
     "src/engine/shaders.ts": 1542,
     "src/engine/surface/UniverseSurfaceManager.ts": 546,
@@ -884,7 +879,7 @@
     "src/ui/PhysicsHUD.tsx": 485,
     "src/ui/UpdaterCard.tsx": 264,
     "src/ui/VaultBits.tsx": 133,
-    "src/ui/VaultUI.tsx": 552,
+    "src/ui/VaultUI.tsx": 551,
     "src/ui/bits.tsx": 144,
     "src/ui/console/BlackHoleTuningCard.tsx": 194,
     "src/ui/console/CommandPalette.tsx": 350,
@@ -924,11 +919,11 @@
     "src/ui/vault/helpers.ts": 305,
     "src/ui/vault/keyring.tsx": 1525,
     "src/ui/vault/monacoSetup.ts": 175,
-    "src/ui/vault/sandbox.tsx": 957,
+    "src/ui/vault/sandbox.tsx": 951,
     "src/ui/vault/shell.tsx": 711,
     "src/ui/vault/viewers.tsx": 838,
     "src/ui/vault/void.tsx": 114,
-    "src/vault/executors/index.ts": 355,
+    "src/vault/executors/index.ts": 352,
     "src/vault/executors/isoExecutor.ts": 257,
     "src/vault/index.ts": 42,
     "src/vault/storage/breaches.ts": 133,
@@ -949,7 +944,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      6608
+      6633
     ],
     [
       "src/ui/diary/DiaryWindow.tsx",
@@ -985,7 +980,7 @@
     ],
     [
       "src/ui/vault/sandbox.tsx",
-      957
+      951
     ],
     [
       "src/ui/CoreMode.tsx",

@@ -22,7 +22,7 @@ import {
   efsChecksumOf, efsChildren as efsChildrenOf, efsDirOf, efsPathString, EFS_ROOT,
   getPayload, hasIdb, hasOpfs, putPayload,
   bundleWebApp, canExecute, detectRunner, extractArchiveEntry, pickAppEntry,
-  pulseVault, readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
+  readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
   parseIsoBlob, extractIsoFile, flattenIsoRecords,
   type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
 } from '../../vault';
@@ -99,7 +99,6 @@ export function WebAppRun({ file, blob }: { file: VaultFile; blob: Blob }) {
         const u = await bundleWebApp(blob, siblings);
         if (!alive) { URL.revokeObjectURL(u); return; }
         made = u; setUrl(u);
-        pulseVault(1);
       } catch (e) { if (alive) setErr(String((e as Error).message ?? e)); }
     })();
     return () => { alive = false; if (made) URL.revokeObjectURL(made); };
@@ -137,7 +136,6 @@ export function JsRun({ blob }: { blob: Blob }) {
       const h = runJavaScript(code, (line, level) => push(line, level));
       handleRef.current = h;
       setRunning(true);
-      pulseVault(1);
     } catch (e) { push(String((e as Error).message ?? e), 'error'); }
   };
   const stop = () => {
@@ -181,7 +179,7 @@ export function PyRun({ blob }: { blob: Blob }) {
       const handle = runPython(code, (line, level) => { if (runId.current === id) push(line, level); });
       handleRef.current = handle;
       await handle.promise;
-      if (runId.current === id) { push('process finished', 'sys'); pulseVault(1); }
+      if (runId.current === id) { push('process finished', 'sys'); }
     } catch (e) {
       if (runId.current === id) push(String((e as Error).message ?? e), 'error');
     } finally {
@@ -226,7 +224,6 @@ export function PdfRun({ file, blob }: { file: VaultFile; blob: Blob }) {
   useEffect(() => {
     const u = URL.createObjectURL(blob);
     setUrl(u);
-    pulseVault(0.5);
     return () => URL.revokeObjectURL(u);
   }, [blob]);
   if (!url) return <p className="font-mono text-[10px] text-slate-dim py-6 text-center">opening document…</p>;
@@ -267,7 +264,6 @@ export function ArchiveRun({ file, blob }: { file: VaultFile; blob: Blob }) {
       const map = new Map(extracted.map((x) => [x.path, x.blob]));
       const u = await bundleWebApp(map.get(entryPath)!, map);
       setAppUrl(u);
-      pulseVault(1);
     } catch (e) { toast(String((e as Error).message ?? e), 'warn'); }
     setBusy('');
   };
@@ -324,7 +320,6 @@ export function ArchiveRun({ file, blob }: { file: VaultFile; blob: Blob }) {
         files.push(vf);
       }
       actions.addVaultFiles(files);
-      pulseVault(0.8);
       toast(`${files.length} objects extracted into the Vault`);
     } catch (e) { toast(String((e as Error).message ?? e), 'warn'); }
     setBusy('');
@@ -395,7 +390,6 @@ export function IsoRun({ file, blob }: { file: VaultFile; blob: Blob }) {
       if (!alive) return;
       setParseResult(res);
       setLoading(false);
-      pulseVault(1.2);
     }).catch((err) => {
       if (!alive) return;
       setParseResult({ valid: false, error: String(err), files: [] });

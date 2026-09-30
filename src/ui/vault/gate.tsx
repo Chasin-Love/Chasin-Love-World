@@ -22,7 +22,7 @@ import {
   efsChecksumOf, efsChildren as efsChildrenOf, efsDirOf, efsPathString, EFS_ROOT,
   getPayload, hasIdb, hasOpfs, putPayload,
   bundleWebApp, canExecute, detectRunner, extractArchiveEntry, pickAppEntry,
-  pulseVault, readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
+  readArchiveListing, resolveBlob, runJavaScript, runPython, unzipAll,
   parseIsoBlob, extractIsoFile, flattenIsoRecords,
   type ImportSource, type CometPacket, type RingEnvelope, type RunnerKind, type IsoParseResult, type IsoDirectoryRecord, type ZipEntry,
 } from '../../vault';
