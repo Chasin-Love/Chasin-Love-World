@@ -1,6 +1,7 @@
 # ROUND 82 — THE VOICE (2026-09-30) · branch `r82-the-voice`
 
 > The Kamui finally speaks. The jutsu sounds like its name.
+> And the return speaks too — the zip-close that seals what was opened.
 
 ## Status: ON A BRANCH, NOT MAIN
 
@@ -69,7 +70,43 @@ graphs.
 ## What this round deliberately does NOT do
 
 - No merge to main, no tag, no release — the author merges when ready.
-- No reverse-Kamui voice (the eject keeps its existing grammar) — noted as a
-  possible R82.5 if the author wants the return trip to speak too.
 - No subtle/cinematic user setting — the cinematic mix is the default voice;
   the setting is a natural follow-up if repeat exposure ever tires.
+
+## R82.1 — THE LATENESS FIX (same day)
+
+The author's first live report: "the audio starts 2–3 seconds late." The mix
+was at fault, not the ears — the riser's gain rode the vortex's cubic ease-in
+from zero (17% at 1.25s), so the first genuinely audible moment was the rip at
+2.25s. The portal now announces itself on frame one: an 80ms attack to a
+presence floor, the swell riding on top, the low lift starting at 65 Hz
+(laptop-reproducible) instead of 46.
+
+## R82.2 — THE EXHALE REMOVED (same day)
+
+Live inside the app, the arrival exhale stacked on the app's OWN arrival
+chimes (`chime(880/760)` fire on every landing in App.tsx) — two arrival
+voices read as misplaced. The exhale was removed (it had sounded right in the
+standalone candidate because nothing else was playing there). The voice now
+ends with the gulp's swallow handing off to the existing arrival grammar.
+Lesson pinned: a candidate is only proven inside the app's own soundscape.
+
+## R82.3 — THE RETURN VOICE, THE KNIT (same day)
+
+The author ran the same research drill for the reverse Kamui (dossier:
+`Desktop/KAMUI RETURN - discussion/`, real LIGO GW150914 chirps from GWOSC +
+synthesized candidates) and chose **THE KNIT — the zip-close**: the tear's
+edges pulling shut, noise descending and tightening (the forward riser
+mirrored), a faint gather rising into the seal.
+
+`playKamuiReturnVoice(1.9)` fills the real reverse timeline:
+- **the knit** — noise 1800→220 Hz while the Q tightens 1.4→4.5, gain riding
+  the mirror envelope (full at the burst, decaying to rest)
+- **the gather** — a tone rising G3→C4 into the seal moment
+- **the whisper-seal** — one soft consonant dyad (C4+G4) landing where the
+  gather arrives, decaying in 0.65s — a period, NOT a bell (the R82.2
+  lesson: never stack on the app's own voice)
+
+Wired in the same `onKamuiTrigger` seam: `reverse ? playKamuiReturnVoice(1.9)
+: playKamuiVoice(5.0, 1.0)` — both directions speak, both obey the mute law.
+Typecheck green; round18 gauntlet green.
