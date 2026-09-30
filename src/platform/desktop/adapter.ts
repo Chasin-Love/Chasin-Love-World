@@ -178,6 +178,13 @@ function mapRealityEndpoint<T = unknown>(path: string, body: unknown): { cmd: st
         },
       };
     }
+    /* The reality-first mirror: a reality's world database lands in its own
+       folder as data.json. The desktop twin of the server's write-data route —
+       without it every mirror write burned the 5-retry queue and died. */
+    case '/api/realities/write-data': {
+      if (!b.data || typeof b.data !== 'object') return null;
+      return { cmd: 'reality_write_data', args: { realityId: b.realityId, folderName: b.folderName, data: JSON.stringify(b.data) } };
+    }
     default:
       return null;
   }

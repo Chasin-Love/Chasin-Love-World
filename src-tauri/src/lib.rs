@@ -249,6 +249,12 @@ fn reality_rename(reality_id: String, new_name: String) -> Result<serde_json::Va
     Ok(serde_json::json!({ "success": true, "newFolderName": folder }))
 }
 
+#[tauri::command]
+fn reality_write_data(reality_id: Option<String>, folder_name: Option<String>, data: String) -> Result<serde_json::Value, String> {
+    let path = realities::write_data(reality_id, folder_name, data)?;
+    Ok(serde_json::json!({ "success": true, "path": path }))
+}
+
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 fn reality_create_folder(
@@ -472,6 +478,7 @@ pub fn run() {
             reality_empty_bin,
             reality_rename,
             reality_create_folder,
+            reality_write_data,
             reality_daemon_status,
             sky_status,
             sky_upload,

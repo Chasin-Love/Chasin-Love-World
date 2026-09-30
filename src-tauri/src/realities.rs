@@ -433,6 +433,63 @@ pub fn create_folder(
     Ok(folder)
 }
 
+/// Write a reality's world database to its own folder (data.json) — the
+/// desktop twin of the server's POST /api/realities/write-data. Same
+/// resolve → contain → skip-identical semantics; `data_json` is the caller's
+/// data object, serialized by the adapter before it crosses the bridge.
+/// (The Node daemon's in-memory markRecentlyWritten has no desktop twin —
+/// the Tauri daemon status carries no operations log.)
+pub fn write_data(
+    reality_id: Option<String>,
+    folder_name: Option<String>,
+    data_json: String,
+) -> Result<String, String> {
+    let data: serde_json::Value =
+        serde_json::from_str(&data_json).map_err(|e| format!("data object is required: {}", e))?;
+    if !data.is_object() {
+        return Err("data object is required".into());
+    }
+
+    let target = resolve_folder(folder_name.as_deref(), reality_id.as_deref())?;
+    let dir = realities_dir()?;
+    let folder = dir.join(&target);
+    if !is_inside(&dir, &folder) || !folder.exists() {
+        return Err("Reality folder does not exist".into());
+    }
+
+    let mut next = data;
+    if let (Some(obj), Some(rid)) = (next.as_object_mut(), reality_id.as_deref()) {
+        obj.insert("realityId".into(), serde_json::Value::String(rid.into()));
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    if let Some(obj) = next.as_object_mut() {
+        obj.insert("mirroredAt".into(), serde_json::Value::Number(now.into()));
+    }
+
+    /* data.json is not a module — Vite ignores it — but keep writes honest:
+       skip when the content is identical (minus the timestamp). */
+    let data_file = folder.join("data.json");
+    let mut skip = false;
+    if let Ok(prev_raw) = fs::read_to_string(&data_file) {
+        if let Ok(mut prev) = serde_json::from_str::<serde_json::Value>(&prev_raw) {
+            if let (Some(prev_obj), Some(next_obj)) = (prev.as_object_mut(), next.as_object()) {
+                prev_obj.remove("mirroredAt");
+                let mut next_rest = next_obj.clone();
+                next_rest.remove("mirroredAt");
+                skip = *prev_obj == next_rest;
+            }
+        }
+    }
+    if !skip {
+        let serialized = serde_json::to_string_pretty(&next).map_err(|e| e.to_string())?;
+        fs::write(&data_file, serialized).map_err(|e| e.to_string())?;
+    }
+    Ok(format!("src/realities/{}/data.json", target))
+}
+
 fn default_bodies_json(clean_id: &str, name: &str, color_a: &str, color_b: &str) -> String {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
