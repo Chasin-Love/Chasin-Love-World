@@ -22,33 +22,6 @@ export function realitiesRouter(): Router {
     res.json(realityDaemon.getStatus());
   });
 
-  // API: List reality folders on disk
-  r.get('/api/realities/folders', (_req, res) => {
-    try {
-      const realitiesDir = path.join(process.cwd(), 'src', 'realities');
-      if (!fs.existsSync(realitiesDir)) {
-        return res.json({ success: true, folders: [] });
-      }
-      const items = fs.readdirSync(realitiesDir, { withFileTypes: true });
-      const folders = items
-        .filter((dirent) => dirent.isDirectory() && dirent.name !== 'bin' && dirent.name !== '.bin')
-        .map((dirent) => {
-          const folderPath = path.join(realitiesDir, dirent.name);
-          const hasIndex = fs.existsSync(path.join(folderPath, 'index.ts'));
-          const hasSurface = fs.existsSync(path.join(folderPath, 'surface.ts'));
-          return {
-            name: dirent.name,
-            path: `src/realities/${dirent.name}`,
-            hasIndex,
-            hasSurface,
-          };
-        });
-      res.json({ success: true, folders });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
   // API: List realities in the recycle bin
   r.get('/api/realities/bin', (_req, res) => {
     try {
@@ -220,40 +193,6 @@ export function realitiesRouter(): Router {
       });
     } catch (err: any) {
       console.error('Error creating reality folder:', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // API: Delete a reality folder on disk (transfers to src/realities/bin/)
-  r.post('/api/realities/delete-folder', (req, res) => {
-    try {
-      const { realityId, folderName } = req.body;
-      if (!realityId && !folderName) {
-        return res.status(400).json({ success: false, error: 'realityId or folderName is required' });
-      }
-
-      // Protect Sol Prime anchor
-      if (realityId === 'sol-prime' || folderName === 'solPrime' || folderName === 'sol-prime') {
-        return res.status(400).json({ success: false, error: 'Sol Prime is protected from deletion.' });
-      }
-
-      // Transfer into bin directory via realityDaemon
-      const binResult = realityDaemon.moveToBin(realityId, folderName);
-      if (binResult.success) {
-        return res.json({
-          success: true,
-          movedToBin: binResult.folderMoved,
-          message: `Reality ${binResult.folderMoved} transferred to Quantum Bin on disk (src/realities/bin/${binResult.folderMoved})`,
-        });
-      }
-
-      // Fallback: if moveToBin couldn't find directory, check and clean
-      res.json({
-        success: true,
-        message: 'Reality purged from active state roster.',
-      });
-    } catch (err: any) {
-      console.error('Error in delete-folder:', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });

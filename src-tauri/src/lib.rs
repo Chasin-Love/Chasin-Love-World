@@ -208,12 +208,6 @@ fn store_payload_stats() -> Result<serde_json::Value, String> {
 /* ---------------------------- realities (daemon) -------------------------- */
 
 #[tauri::command]
-fn reality_list() -> Result<serde_json::Value, String> {
-    let folders = realities::list_folders()?;
-    Ok(serde_json::json!({ "success": true, "folders": folders }))
-}
-
-#[tauri::command]
 fn reality_bin_list() -> Result<serde_json::Value, String> {
     let bin = realities::list_bin()?;
     Ok(serde_json::json!({ "success": true, "bin": bin }))
@@ -470,7 +464,6 @@ pub fn run() {
             store_payload_delete,
             store_payload_list,
             store_payload_stats,
-            reality_list,
             reality_bin_list,
             reality_move_to_bin,
             reality_restore,

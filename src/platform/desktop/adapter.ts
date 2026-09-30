@@ -137,8 +137,6 @@ function mapRealityEndpoint<T = unknown>(path: string, body: unknown): { cmd: st
       return { cmd: 'reality_daemon_status', args: {} };
     case '/api/realities/bin':
       return { cmd: 'reality_bin_list', args: {} };
-    case '/api/realities/folders':
-      return { cmd: 'reality_list', args: {} };
     /* Sky Studio — the desktop twin of server/routes/sky.ts. Status keeps
        the query-param shape of its HTTP twin; mutations keep the body shape.
        The asset route returns RAW BYTES (the webview has no HTTP route into
