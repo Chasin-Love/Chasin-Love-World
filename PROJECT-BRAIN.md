@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-09-30, after R78 (the living spin).
+> **Last updated:** 2026-09-30, after R79 (the one sky).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -228,14 +228,16 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The steady herald & the web door | R76 *(on main)* | The card is now stable enough to ROAM: the disk state is set only by a real disk emission (the old null-erasing write re-anchored the mounted card onto the cursor fallback the moment the rim was crossed — teleport + flicker + vanish), and clearHoverCard stays the only eraser. And clicking a reality sphere is an explicit Kamui: zoomToHierarchy(2) carries the traveler to that reality's COSMIC WEB (dial 0.858) — the old resetView() dove straight into the home stellar system. New round76 gauntlet in the verify chain; R74/R75 checks reconciled to the evolved contract |
 | The tail trim | R77 *(on main)* | The Kamui's mature-vortex plateau — the stretch the author highlighted in R73's telemetry (4.85→5.25s) where the vortex is fully formed and merely stabilizing — is trimmed: the summon ends at 5.0s (was 5.5), the throat beat with it, the vacuum drain compressed to 1.0s (same surge machinery), the R67 hold following to 5.0. The build beats and the eject are untouched. Round18's timing pins reconciled consciously |
 | The living spin | R78 *(on main)* | The mature vortex no longer sits frozen: the tear's twist was a static bend saturating in the first half-second, so between the tear and the throat nothing moved. The engine now integrates the vortex's own rotation (uSpin) for as long as the tear is visible — differential in the shader (inner band winds faster), surging with the gulp, coasting to a stop with the fade — the ripple marches inward on the summon (outward on the eject), and the early bite is a touch sharper (twist 6.5→7.0, pull 0.28/0.22→0.32/0.26). Round18 reconciled + a new living-spin check |
+| The one sky | R79 *(on main)* | The Sky Studio's photo sky becomes THE sky: the vertical barrier died (the vignette sat on the atan branch cut + mipmaps collapsed there — now a camera-relative seam-free vignette and a mip-free texture), the procedural family stands down while a photo owns the view (no ghost floor, no glow tint, blend 1.0 across all three contract tiers), and the dome rides the camera — full-screen at every cosmological stage, the equirect always 1:1. Deactivation rides the crossfade out; uploads rasterize at 4096×2048 when light. New round79 gauntlet in the verify chain |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-09-30, after R78)
+## 8. CURRENT STATE (as of 2026-09-30, after R79)
 
-- **`main` is the blessed reference.** Its tip is the R78 living spin
-  (the vortex's own rotation → its round18 reconciliation) on top of the
-  R77 trim (the Kamui tail → its round18 reconciliation), the R76 work (the steady
+- **`main` is the blessed reference.** Its tip is the R79 one sky
+  (the photo sky's barrier/double-sky/zoom trio → its gauntlet) on top of
+  the R78 living spin
+  (the vortex's own rotation → its round18 reconciliation), the R77 trim (the Kamui tail → its round18 reconciliation), the R76 work (the steady
   herald & the web door → its gauntlet), the R75 pair (the unbroken
   bridge → its gauntlet), the R74 pair (the holographic herald → its
   gauntlet), the R73 pair (the throat-is-not-swallowed guard → its gauntlet)
@@ -299,11 +301,44 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   sharper (twist 6.5→7.0, pull 0.28/0.22→0.32/0.26). The R66b revert boundary is respected:
   that revert was the Universe Surface sky lens — this round touches only the portal pass,
   at the author's explicit request.
+- **R79:** the one sky — the author's three photo-sky complaints, solved as
+  one law: while a photo hangs in a reality's sky, the photo IS the sky. The
+  vertical barrier was TWO defects on the same meridian (the vignette centered
+  on the atan branch cut, jumping 0→full across it; mipmaps collapsing to the
+  1×1 gray average at the derivative spike) — now a camera-relative angular
+  vignette and a mip-free texture. The double sky was by construction (blend
+  0.85, a 6% ghost floor, glow tint, star shells over the photo) — now the
+  one-sky gate stands the whole procedural family down (dome, nebulae, far
+  stars, neighborhood) whenever the photo owns the view at full strength, and
+  returns it for the crossfade, the Kamui tear, the multiverse rest and
+  deactivation (which rides the fade out — no pop). The zooming sky was the
+  static world-sphere dome the camera exits between cluster and web — now the
+  dome rides the camera every frame, the equirect always 1:1 from the eye
+  point, full-screen at every stage. `blend` defaults to 1.0 in all three
+  contract tiers (registry / server / Tauri); chasinLove's sky.json migrated;
+  uploads rasterize at 4096×2048 when the JPEG stays light.
+- **R79 hotfix — THE UNBROKEN BOOT (commits `8bbfacdd` / `9da562bd` / v15.0.4):**
+  the installed 15.0.3 desktop app looped the intro animation forever.
+  `hydrateDesktopSnapshot` compared the desktop state file (mtime 2026-09-27,
+  missing the boot-default keys `loadState` adds every session) against the
+  WebView cache and on any difference clobbered the cache with the file and
+  called `window.location.reload()`. The cache was enriched by `loadState`;
+  the next mount found file ≠ cache; threw the migration away; reloaded — the
+  loop never converged because the reload always fired before the debounced
+  persist could write the file. Fix: a `sessionStorage` one-time guard
+  (`STORAGE_KEYS.hydrateAdopted`). The adoption+reload fires at most once per
+  webview session; the second disagreement (boot after the reload) adopts the
+  cache back into the file instead of clobbering, so both stores converge
+  permanently. The `UNCLAIMED-hydrate-adopted-fix.patch` has been applied,
+  committed as the hotfix, and deleted from the tree. Full verification green
+  (typecheck + all gauntlets + smoke). Pushed to `main`; v15.0.4 installer
+  ready to build from the release pipeline.
 - **Verification status:** `npm run verify` ALL GREEN (typecheck;
-  round16/17/18/63/72/73/74/75/76 gauntlets; smoke + prod-smoke, zero console errors);
-  `npm audit` 0 vulnerabilities; `audit:arch --check` exits 1 with findings identical to
-  the pristine parent commit (the pre-existing R52-baseline drift below — R72–R77 added
-  zero new findings).
+  round16/17/18/63/72/73/74/75/76/**79** gauntlets; smoke + prod-smoke, zero
+  console errors); `npm audit` 0 vulnerabilities; `audit:arch --check` exits 1
+  with findings identical to the pristine parent commit modulo mechanical
+  churn (+6 churn lines from `skyRegistry.ts` line shifts; zero semantic new
+  findings — R72–R79 added zero new findings).
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); architecture-audit snapshot drift vs the frozen R52
   baseline (re-snapshot consciously); 8 dead value exports + 46 dead type exports (including
@@ -315,7 +350,11 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ## 9. WHERE IT'S GOING
 
-1. **R76 watch items (small, user-visible):** the camera memory can save a
+1. **R79 leftovers (small):** the author should eyeball chasinLove's hinata
+   sky at stellar zoom → cosmic web (no barrier, no double sky, the whole
+   photo at every stage). The `UNCLAIMED-hydrate-adopted-fix.patch` has been
+   applied and committed as the R79 hotfix — the patch file can be deleted.
+2. **R76 watch items (small, user-visible):** the camera memory can save a
    mid-dive placement — every reload then boots inside a galaxy disc until
    Reset View forgets it (a save-time guard is its own small round); a
    galaxy dive queued before a reality switch executes on the roster
@@ -326,15 +365,15 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    own zoom (the same same-frame shape R72 fixed at the membrane) — its own
    round; the first summon of a session compiles the vortex pass on its
    first frame (a one-time hitch — a shader warm-up would be its own round).
-2. **Finish R71 "Ten Slices"** — the slice system's consumers: the hierarchy stepper firing
+3. **Finish R71 "Ten Slices"** — the slice system's consumers: the hierarchy stepper firing
    explicit cross-slice Kamui, edge membrane affordances, gauntlet pins for the new law.
-3. **The Signage Wave** (the recommended next theme, from the experience report):
+4. **The Signage Wave** (the recommended next theme, from the experience report):
    first-run guided onboarding (double-click a world → write an entry → see the moon → `?`),
    an in-app legend for click-gestures, a one-click whole-universe backup/restore file,
    a one-line Kamui narrative caption, cross-reality entry search in the palette.
-4. **Desktop as the storage answer** — Tauri file store lifts the web localStorage ~5 MB
+5. **Desktop as the storage answer** — Tauri file store lifts the web localStorage ~5 MB
    ceiling for heavy diarists.
-5. **Deferred (do as their own rounds, unasked):** `engine.ts` decomposition (gauntlets as
+6. **Deferred (do as their own rounds, unasked):** `engine.ts` decomposition (gauntlets as
    guardrails), architecture re-snapshot, dead-export sweep, optional React 19 / Vite 7
    evaluation, optional touch-first HUD pass.
 
