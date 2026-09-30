@@ -3,7 +3,7 @@ import type { InnerWorldInfo, UniverseEngine } from './engine/engine';
 import { actions, getState, newId, hydrateDesktopSnapshot } from './state';
 import { MEANING_LABEL } from './domain/universe';
 import type { CosmicBody, Meaning } from './domain/universe';
-import { chime, initAudio, isMuted, setAudioMode, toggleMute, playKamuiVoice, type KamuiVoiceHandle } from './platform/audio';
+import { chime, initAudio, isMuted, setAudioMode, toggleMute, playKamuiVoice, playKamuiReturnVoice, type KamuiVoiceHandle } from './platform/audio';
 import type { WinRect } from './ui/diary/DiaryWindow';
 import { PhysicsHUD } from './ui/PhysicsHUD';
 import { ErrorBoundary, IcLink, ToastHost, useUniverse } from './ui/bits';
@@ -380,14 +380,17 @@ export default function App() {
           void import('./ui/diary/DiaryWindow');
           void import('./ui/VaultUI');
         }
-        /* THE VOICE (R82) — the Kamui speaks: the cinematic sequence
-           (riser → rip → B♭ drone → sub-drop → exhale) scheduled on the
-           real timeline constants; the reverse (eject) keeps the existing
-           quiet grammar. Only when the audio context is alive (a user
-           gesture has blessed this session) and the master is unmuted. */
-        if (!reverse && !isMuted()) {
+        /* THE VOICE (R82/R82.3) — both directions speak: the forward
+           summon gets the chosen cinematic sequence (riser → rip → B♭
+           drone → sub-drop), the eject gets THE KNIT — the zip-close the
+           author chose from the return dossier. Only when the audio
+           context is alive (a user gesture has blessed this session) and
+           the master is unmuted. */
+        if (!isMuted()) {
           kamuiVoiceRef.current?.stop();
-          kamuiVoiceRef.current = playKamuiVoice(5.0, 1.0);
+          kamuiVoiceRef.current = reverse
+            ? playKamuiReturnVoice(1.9)
+            : playKamuiVoice(5.0, 1.0);
         }
       },
       onFirstFrame: () => setEngineReady(true),

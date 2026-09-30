@@ -237,6 +237,89 @@ export function playKamuiVoice(summonDuration = 5.0, vacuumDuration = 1.0): Kamu
 }
 /* ------------------ end THE KAMUI VOICE (R82) ------------------ */
 
+/* ------------------ THE KAMUI RETURN VOICE (R82.3) ------------------
+   The reverse speaks — and it speaks THE KNIT. From the return dossier
+   (Desktop \"KAMUI RETURN - discussion\"), the author chose the zip-close:
+   the tear's edges pulling shut, noise descending and tightening (the
+   forward riser mirrored), with a faint gather rising into the seal.
+   Where the forward climbs and swallows, the return lands and closes.
+   The knit fills the real 1.9s reverse timeline (KAMUI_REVERSE_DURATION);
+   a whisper-seal (one soft consonant tone where the gather lands) closes
+   the gesture without stacking on the app's own arrival sounds — the
+   lesson of R82.2. Mute law identical to the forward voice. */
+
+/* the REVERSE envelope: the eject starts at full intensity (the burst) and
+   decays as the reality re-forms — the mirror of the forward ease-in */
+function kamuiReturnStrength(t: number): number {
+  if (t < 0.12) { const k = t / 0.12; return 1 - 0.35 * k; }
+  const k = Math.min(1, (t - 0.12) / 0.88);
+  return 1 - k * k * (3 - 2 * k);
+}
+
+export function playKamuiReturnVoice(reverseDuration = 1.9): KamuiVoiceHandle | null {
+  const c = ensure();
+  if (!c || !master) return null;
+  const t0 = c.currentTime + 0.02;
+  const bus = c.createGain(); bus.gain.value = 1.5;
+  bus.connect(master);
+
+  /* THE KNIT — the zip-close: filtered noise descending and tightening */
+  const dur = reverseDuration * 0.82; /* the knit spans most of the 1.9s */
+  const src = kamuiNoise(c, dur + 0.1);
+  src.loop = true;
+  const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 3.2;
+  const g = c.createGain();
+  bp.frequency.setValueAtTime(1800, t0);
+  bp.frequency.exponentialRampToValueAtTime(220, t0 + dur); /* the sweep falls */
+  bp.Q.setValueAtTime(1.4, t0);
+  bp.Q.linearRampToValueAtTime(4.5, t0 + dur);             /* the zip tightens */
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(0.4, t0 + 0.06);
+  for (let i = 1; i <= 20; i++) {
+    const t = t0 + (dur * i) / 20;
+    g.gain.linearRampToValueAtTime(Math.max(0.0001, 0.4 * kamuiReturnStrength(i / 20)), t);
+  }
+  src.connect(bp).connect(g).connect(bus);
+  src.start(t0); src.stop(t0 + dur + 0.05);
+
+  /* the gather: a faint tone rising into the seal (the edges coming together) */
+  const o = c.createOscillator(); o.type = 'sine';
+  const og = c.createGain();
+  o.frequency.setValueAtTime(196, t0);
+  o.frequency.linearRampToValueAtTime(261.63, t0 + dur); /* G3 rises to C4 */
+  og.gain.setValueAtTime(0.0001, t0);
+  og.gain.linearRampToValueAtTime(0.16, t0 + dur * 0.85);
+  og.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(og).connect(bus);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+
+  /* the whisper-seal: where the gather lands, one soft consonant tone —
+     the period at the end of the sentence (NOT a bell; the R82.2 lesson) */
+  const s1 = c.createOscillator(); s1.type = 'sine'; s1.frequency.value = 261.63;
+  const s2 = c.createOscillator(); s2.type = 'sine'; s2.frequency.value = 392.0;
+  const sg = c.createGain();
+  const sealT = t0 + dur;
+  sg.gain.setValueAtTime(0.0001, sealT);
+  sg.gain.linearRampToValueAtTime(0.09, sealT + 0.03);
+  sg.gain.exponentialRampToValueAtTime(0.0001, sealT + 0.65);
+  s1.connect(sg);
+  const sg2 = c.createGain(); sg2.gain.value = 0.35; s2.connect(sg2).connect(sg);
+  sg.connect(bus);
+  s1.start(sealT); s1.stop(sealT + 0.7);
+  s2.start(sealT); s2.stop(sealT + 0.7);
+
+  const end = sealT + 0.8;
+  const watchdog = window.setTimeout(() => { try { bus.disconnect(); } catch { /* */ } }, (end - c.currentTime) * 1000 + 300);
+  return {
+    stop() {
+      window.clearTimeout(watchdog);
+      try { bus.gain.setTargetAtTime(0.0001, c.currentTime, 0.06); } catch { /* */ }
+      window.setTimeout(() => { try { bus.disconnect(); } catch { /* */ } }, 260);
+    },
+  };
+}
+/* ---------------- end THE KAMUI RETURN VOICE (R82.3) ---------------- */
+
 /* ------------------------------ ambience ------------------------------- */
 
 function killDrone() {
