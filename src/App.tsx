@@ -96,6 +96,49 @@ export default function App() {
      the hover cards anchor OUTSIDE it (never on the object) and ride its
      orbit via the engine's ~8 Hz re-emit. */
   const [hoverDisk, setHoverDisk] = useState<{ cx: number; cy: number; r: number } | null>(null);
+  /* THE UNBROKEN BRIDGE (R75) — the herald card lives OUTSIDE the disk now,
+     so the journey from the disk to the card's own buttons crosses empty
+     space. The last disk is kept in a ref for that crossing: while a card
+     is visible, the pointer staying over the card — or in the corridor
+     between the disk and the card — keeps it alive; only leaving both
+     starts the 550 ms goodbye. */
+  const hoverDiskRef = useRef<{ cx: number; cy: number; r: number } | null>(null);
+  /* the pointer's true resting place — a pause emits no events, so the
+     goodbye must be able to re-check where the traveler actually stopped */
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  const clearHoverCard = useCallback(() => {
+    setHoverRealityId(null);
+    setHoverCluster(null);
+    setHoverGalaxy(null);
+    setHoverScreenPos(null);
+    setHoverDisk(null);
+    hoverDiskRef.current = null;
+  }, []);
+  /* THE UNBROKEN BRIDGE (R75) — the two lifelines in one predicate: over
+     the card's rect (±8 px grace) or inside the corridor between the
+     disk's rim and the card. The corridor is rim + 48 because the card's
+     near edge sits at rim + ~26 — a path that cuts the corner must never
+     read as a goodbye. */
+  const pointerOnBridge = useCallback((x: number, y: number): boolean => {
+    const card = document.querySelector('.holo-card');
+    if (!card) return false;
+    const rc = card.getBoundingClientRect();
+    if (x >= rc.left - 8 && x <= rc.right + 8 && y >= rc.top - 8 && y <= rc.bottom + 8) return true;
+    const d = hoverDiskRef.current;
+    return !!d && Math.hypot(x - d.cx, y - d.cy) <= d.r + 48;
+  }, []);
+  /* the goodbye is honest: when its 550 ms elapses it re-checks where the
+     pointer RESTS before killing the card — a traveler paused on the
+     bridge (a stop needs no move) stays alive; still bridged it quietly
+     re-arms, truly gone it takes the one shared clear. */
+  const goodbye = useCallback(() => {
+    const p = pointerRef.current;
+    if (p && pointerOnBridge(p.x, p.y)) {
+      hoverClearTimer.current = setTimeout(goodbye, 550);
+      return;
+    }
+    clearHoverCard();
+  }, [pointerOnBridge, clearHoverCard]);
   const [activeLineageCluster, setActiveLineageCluster] = useState<GalaxyClusterData | null>(null);
   const [lineageGalaxy, setLineageGalaxy] = useState<{ galaxy: GalaxyData; realityName: string } | null>(null);
   /* the advanced reality editor (double-click a reality ring) */
@@ -212,7 +255,10 @@ export default function App() {
       if (cancelled || !canvasRef.current || engineRef.current) return;
       const engine = new UniverseEngine(canvasRef.current, getState().bodies, {
       onHover: (id, x, y, disk) => {
-        /* THE HERALD'S DISK (R74) — the card anchors outside this circle */
+        /* THE HERALD'S DISK (R74) — the card anchors outside this circle.
+           THE UNBROKEN BRIDGE (R75) — a null disk never erases the last one:
+           the ref keeps it so the corridor to the card stays bridged. */
+        if (disk) hoverDiskRef.current = disk;
         setHoverDisk(disk ?? null);
         /* a fresh hover cancels any pending sticky-clear */
         if (id && hoverClearTimer.current) { clearTimeout(hoverClearTimer.current); hoverClearTimer.current = null; }
@@ -252,15 +298,11 @@ export default function App() {
         } else {
           /* sticky hover — the card lingers ~550ms after the pointer leaves
              its object, so reaching the card's own buttons never races the
-             unmount (a plain hover-out used to kill the card mid-click) */
+             unmount (a plain hover-out used to kill the card mid-click).
+             R75: the goodbye is the honest one below — it re-checks the
+             pointer's resting place before clearing. */
           if (hoverClearTimer.current) clearTimeout(hoverClearTimer.current);
-          hoverClearTimer.current = setTimeout(() => {
-            setHoverRealityId(null);
-            setHoverCluster(null);
-            setHoverGalaxy(null);
-            setHoverScreenPos(null);
-            setHoverDisk(null);
-          }, 550);
+          hoverClearTimer.current = setTimeout(goodbye, 550);
         }
       },
       onSelect: (id) => { setSelectId(id); if (id) setInnerWorld(null); },
@@ -428,6 +470,25 @@ export default function App() {
       engineRef.current = null;
     };
   }, []);
+
+  /* THE UNBROKEN BRIDGE (R75) — the window-level keep-alive. While a herald
+     card is visible, every pointer move re-checks the bridge predicate:
+     over the card or corridor any pending goodbye is cancelled; over
+     neither, one 550 ms goodbye is (re)armed. Roaming on the disk never
+     hits this path at all — the engine's hover is still live there. */
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      pointerRef.current = { x: e.clientX, y: e.clientY };
+      if (!document.querySelector('.holo-card')) return;
+      if (pointerOnBridge(e.clientX, e.clientY)) {
+        if (hoverClearTimer.current) { clearTimeout(hoverClearTimer.current); hoverClearTimer.current = null; }
+      } else if (!hoverClearTimer.current) {
+        hoverClearTimer.current = setTimeout(goodbye, 550);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
+  }, [pointerOnBridge, goodbye]);
 
   /* while the vault's own glass scene covers the screen, stop the heavy
      universe composer from drawing a scene nobody can see — kills the lag */
