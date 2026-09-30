@@ -24,8 +24,12 @@ export const KAMUI_PHASE_WEIGHTS: Record<PortalPhase, number> = {
 };
 
 /** The v1 vortex envelope: one slow sin breath over KAMUI_TRIGGER_DURATION
-    seconds (rise → crest → fall), so the summon can actually be watched. */
-export const KAMUI_TRIGGER_DURATION = 5.5; /* seconds */
+    seconds (rise → crest → fall), so the summon can actually be watched.
+    R77 — THE TAIL TRIM: the author found the mature-vortex plateau boring —
+    the stretch where the vortex is fully formed and just stabilizing before
+    the throat lets go. The build beats keep every frame; the summon now
+    ends at 5.0s instead of 5.5s, cutting the plateau, not the show. */
+export const KAMUI_TRIGGER_DURATION = 5.0; /* seconds */
 
 /** THE EJECT (the reverse/return tear) has its own, shorter life: ~0.6s at
     full burst while the open overlay is swallowed (kamui-suck), then the
@@ -49,7 +53,7 @@ export const KAMUI_BEATS: KamuiBeat[] = [
   { kind: 'wind',    t0: 0.35, t1: 2.05, peak: 0.62 },
   { kind: 'flicker', t0: 1.45, t1: 3.05, peak: 0.7 },
   { kind: 'deepen',  t0: 2.55, t1: 4.35, peak: 0.85 },
-  { kind: 'throat',  t0: 3.7,  t1: 5.5,  peak: 1.0 },
+  { kind: 'throat',  t0: 3.7,  t1: 5.0,  peak: 1.0 },
 ];
 
 /* The spans OVERLAP on purpose: the max of neighboring bumps never dips to
@@ -72,7 +76,7 @@ export function kamuiBeatEase(elapsed: number, beat: KamuiBeat): number {
  * rumbles — the universe briefly unstable at the instant the tunnel
  * finishes, like a vacuum ripping its subject in.
  */
-export const KAMUI_VACUUM_WINDOW = 1.5; /* seconds */
+export const KAMUI_VACUUM_WINDOW = 1.0; /* seconds — R77: the same surge, the drain compressed (the plateau the author trimmed) */
 
 /**
  * CAMERA STABILITY — the summon hold.
@@ -86,7 +90,7 @@ export const KAMUI_VACUUM_WINDOW = 1.5; /* seconds */
  * long, and only then hands the focus and the dive to the rig — through the
  * crest, into the fall, so the arrival still feels like falling through it.
  */
-export const KAMUI_ENTRY_HOLD = 5.5; /* seconds — the whole choreography plays on a locked frame; the dive begins as the throat completes */
+export const KAMUI_ENTRY_HOLD = 5.0; /* seconds — the whole choreography plays on a locked frame; the dive begins as the throat completes (R67: hold expiry = last beat completion; R77 follows the trim) */
 
 /** The arrival framing, as a multiple of the body's radius. The old 3.2 put
     the camera almost on the surface by the time the overlay opened; 4.2 keeps

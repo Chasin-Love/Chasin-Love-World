@@ -141,11 +141,15 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
 /* ==== 5. the phases module ==== */
 {
+  /* R77 reconciliation: the author trimmed the mature-vortex plateau — the
+     summon ends at 5.0s, the throat window compressed to 1.0s (same surge
+     machinery, tighter window), the hold follows the trigger per the R67
+     law (expiry = last beat completion). The build beats are untouched. */
   const phases = /export type PortalPhase =/.test(phaseSrc)
     && /KAMUI_PHASE_WEIGHTS/.test(phaseSrc)
-    && /KAMUI_TRIGGER_DURATION = 5\.5/.test(phaseSrc)
+    && /KAMUI_TRIGGER_DURATION = 5\.0/.test(phaseSrc)
     && /KAMUI_REVERSE_DURATION = 1\.9/.test(phaseSrc)
-    && /KAMUI_VACUUM_WINDOW = 1\.5/.test(phaseSrc)
+    && /KAMUI_VACUUM_WINDOW = 1\.0/.test(phaseSrc)
     && /KAMUI_BEATS: KamuiBeat\[\]/.test(phaseSrc)
     && /export function kamuiBeatEase/.test(phaseSrc)
     && !/KamuiPhase/.test(phaseSrc)
@@ -155,7 +159,7 @@ const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', im
 
 /* ==== 6. CAMERA STABILITY — the summon holds the frame ==== */
 {
-  const armed = /export const KAMUI_ENTRY_HOLD = 5\.5;/.test(phaseSrc)
+  const armed = /export const KAMUI_ENTRY_HOLD = 5\.0;/.test(phaseSrc)
     && /export const KAMUI_ENTRY_FRAMING = 4\.2;/.test(phaseSrc)
     && /private portalHold = 0;/.test(engSrc)
     && /private portalFocusPending = false;/.test(engSrc)
