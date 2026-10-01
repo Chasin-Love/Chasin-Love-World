@@ -209,6 +209,20 @@ snapshot):**
   Law 1: total freedom INSIDE a slice; the dial clamps softly at slice edges. Law 2:
   **explicit crossings only** — a Kamui fired by the hierarchy stepper is the ONLY carrier
   between slices. No velocity trigger, no scroll side-effect, ever.
+- **R91 authorial decree — THE REAL UNIVERSE (branch `the-real-universe`):** *"my universe
+  should never be like a music box… make the real physical program the MAIN program."*
+  **The canon seeds; the session drives; the clockwork is the fallback and the heal.**
+  The N-body session (R87's C++/WASM/TS simulator) becomes the main driver of rendered
+  world positions through the single `updateBodies` seam — real mutual gravity, real
+  masses, the vault at its full 10 M☉ ("Newton keeps the peace" is superseded **while
+  the session drives**; it stands unchanged for clockwork mode and the lens). The Kepler
+  canon keeps three jobs: the seed every session is configured from, the automatic
+  fallback whenever a readback is stale or the core is unavailable, and the Restore
+  Ephemeris heal (re-seed from canon). Real chaos is accepted (no hidden guardrails);
+  the simulated state persists and resumes. The R88 hybrid read-only law NARROWS to
+  `simTwin.ts` (the lab stays read-only); the driver lives in `src/physics/sessionDriver.ts`
+  and is gauntleted separately. Safety nets and the R71 container law are untouched —
+  the driver moves bodies, never the camera.
 
 ---
 
@@ -273,7 +287,12 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   step 3 ("zoom never crosses"; changes in `engine.ts`, `stageThresholds.ts`, `kamuiPhases.ts`,
   `cameraRig.ts`, round18 gauntlet) and uncommitted step-3 transform scripts. `r85-the-six-seams`
   and `r88-per-frame-twin` are both **merged to `main` and SHIPPED** (v15.0.9 = R85+R86+R87;
-  v15.0.10 = R88+R89, tagged 2026-10-01). Treat branch work as experimental until
+  v15.0.10 = R88+R89, tagged 2026-10-01). `the-real-universe` (cut from main's R90 tip,
+  2026-10-01) carries the author's R91 decree — **THE REAL UNIVERSE**: the N-body session
+  becomes the main driver of the sky, phased R91 (session memory: batched read,
+  save/restore) → R92 (the driver in shadow, default OFF) → R93 (real moons) → R94 (THE
+  FLIP, default ON, v16.0.0). Main does not move while the arc runs; merges use `--no-ff`
+  on the author's word only. Treat branch work as experimental until
   the author merges it.
 - **R90 (this round, on main):** the author's report — the Native Simulator Twin card
   (Verify Twin with it) could not be scrolled into view in the Core Console — reproduced
