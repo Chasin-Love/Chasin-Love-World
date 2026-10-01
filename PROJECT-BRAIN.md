@@ -241,6 +241,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The ascending nodes | R84 *(on main)* | The author's realism decree: orbits may not all ride one flat sheet. The missing logic was found (every node line was hardwired to +X; no periapsis angle) and added end-to-end: `Orbit.node`/`Orbit.argP`, the exact R(Ω)·R(i)·R(ω) composition in one shared helper used by solver, moons, star-wobble and Living Gravity, C++/WASM/Rust/bridge parity, real J2000 elements pinned into Sol-Prime (JPL Table 1), exoplanet-spice codegen (steep + near-polar tail, full-circle nodes), toroidal asteroid belts. The four test realities deleted at the author's ruling. New round84 gauntlet in the verify chain |
 | The six seams | R85 *(on branch `r85-the-six-seams`, NOT in main — verified 2026-10-01)* | The author's ruling on the R83 decision queue, executed on an isolated branch: the desktop sky/status seam finally matches (one line — the boot photo sky lives again), `/api/realities/write-data` gains its Tauri twin (the reality mirror lands on desktop; the deterministic 5-retry burn dies), both chain-dead routes deleted at every layer (`list_folders` stays — the daemon uses it), `releaseBlackHolesUnder` disposes every hole visual at all three teardown paths (the listener/marcher leak dies), both void events removed (R55's full-erase honored — removal, not re-wiring), the lying vault facade tail deleted and `isNova` adopted by `novaScan` (the keyring shadow renamed `isBreached`); then the mechanical sweep iterated to the audit's fixed point — **zero dead value/type exports, 1147 unused imports removed**; `THIRD-PARTY-NOTICES.md` restored verbatim and `BUILD` → R85. `docs/ROUND-85-THE-SIX-SEAMS-2026-10-01.md` |
 | The full purge | R86 *(on branch `r85-the-six-seams`, NOT in main — verified 2026-10-01)* | The author's three-bucket ruling on the R83 Part III census, executed: Bucket A deleted (two orphaned engine methods, five write-only fields, the false-parity `__ACTIONS__` seam, the dead `subjectBadge` prop, the console-tab CSS family + `--color-danger`, the 512×512 orphan icon, 11 historical verify PNGs, the never-invoked `store_payload_list/stats` pair at both Rust layers). Bucket B wired (persist.ts uses `STORAGE_KEYS.universeStateRecovery` — one source of truth on the locked surface; `realityDaemon.stop()` finally called from SIGINT/SIGTERM; the R83-2 seed guard refuses Sol-Prime mirror writes at client, server and desktop twin). Bucket C kept with reasons (`__MY_UNIVERSE_PERF__`, state timestamps, `note.txt`, `cosmos_sim_*`; `reducedMotion` was kept as a law-gap hook — then the author's same-day decree REJECTED engine-side reduced motion outright and the field was deleted). THE ROUND'S LESSON: `.kamui-disappear`/`kamuiVortexOut` were deleted as audit-dead CSS and round18's gauntlet instantly failed — restored verbatim; the census ledger gains "looks dead but is gauntlet-pinned" (the gauntlets outrank the auditor). `docs/ROUND-86-THE-FULL-PURGE-2026-10-01.md` |
+| The native simulator | R87 *(on branch `r87-native-simulator`, branched from `r85-the-six-seams`, NOT in main — verified 2026-10-01)* | The author accepted the hybrid ruling: Kepler stays the clockwork sky, the stateful N-body simulator (which the C++ core had hosted all along — RK4, SI units, 4096 bodies) becomes the verified interactive layer. The bridge gained `simConfigure/simStep/simBody` on all three tiers (native invoke with the no-args-envelope trap documented, WASM session handle, and a line-faithful TS RK4 twin of the C++ integrator) + `verifyTwinParity()`; the **Native Simulator Twin** card joined the Core Console (button-driven only — the frame loop never touches the session, nothing can move the rendered sky); round87-simulator-gauntlet (14 checks) joined the verify chain. AND A HIDDEN BUG DIED: build-wasm.sh declared no EXPORTED_FUNCTIONS, so -O3 dead-stripped every cosmos_* symbol — the whole WASM tier, batches included, had been silently degrading to TypeScript since the artifact first existed; the script now pins the full bridge surface. `docs/ROUND-87-THE-NATIVE-SIMULATOR-2026-10-01.md` |
 
 ---
 
@@ -264,7 +265,8 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (cameraRig orbit/glide grammar, touch grammar, 3.5 s summon, ROUND-68/69 docs) plus R71
   step 3 ("zoom never crosses"; changes in `engine.ts`, `stageThresholds.ts`, `kamuiPhases.ts`,
   `cameraRig.ts`, round18 gauntlet) and uncommitted step-3 transform scripts. `r85-the-six-seams`
-  carries R85 and R86 (below). Treat all of it as experimental until the author merges it.
+  carries R85 and R86 (below); `r87-native-simulator` (branched from it) carries R87.
+  Treat all of it as experimental until the author merges it.
 - **R85 (this round, on branch `r85-the-six-seams`):** the R83 decision queue executed at the
   author's ruling. The six seams: `mapRealityEndpoint` switches on the bare route (the boot
   photo sky lives on desktop again); the `write-data` desktop twin (`reality_write_data`,
@@ -297,6 +299,20 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   `reducedMotion` probe was deleted with it (§6's law note). The lesson:
   `.kamui-disappear`/`kamuiVortexOut` were deleted as audit-dead CSS, round18's gauntlet
   failed, both restored — the census's new category is "looks dead but is gauntlet-pinned."
+- **R87 (this round, on branch `r87-native-simulator`, branched from `r85-the-six-seams`):**
+  the author accepted the hybrid ruling — Kepler stays the clockwork, the stateful native
+  simulator (RK4, SI, 4096 bodies — hosted by the C++ core since its first build) becomes
+  the verified interactive layer. The bridge speaks the session on all three tiers
+  (`simConfigure/simStep/simBody` + `verifyTwinParity()` with a line-faithful TS RK4 twin),
+  the Native Simulator Twin card joined the Core Console (button-driven only — the frame
+  loop never touches it, the rendered sky cannot move), round87-simulator-gauntlet (14
+  checks) joined the verify chain, and a HIDDEN BUG died: build-wasm.sh had no
+  EXPORTED_FUNCTIONS, so -O3 dead-stripped every cosmos_* symbol and the whole WASM tier
+  (batches included) had been silently degrading to TypeScript since the artifact first
+  existed — the script now pins the full bridge surface. Limits: emsdk absent locally
+  (artifact rebuild is CI), cargo caveat unchanged (no Rust touched), native numeric
+  receipt provable only on a toolchained host. Next gated step: the per-frame twin, then
+  any interactive-layer driving — only after these receipts.
 - **R72 (this round):** the membrane Kamui arrival is STAGED — the summon holds the traveler's
   stage and dial for the full choreography and the throat hands the multiverse over through the
   dying vortex (the R67 grammar carried to `beginStageWarp`); the eject face is untouched (its
