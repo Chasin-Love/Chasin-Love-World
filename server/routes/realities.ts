@@ -205,6 +205,13 @@ export function realitiesRouter(): Router {
     if (!data || typeof data !== 'object') {
       return res.status(400).json({ success: false, error: 'data object is required' });
     }
+    /* R83-2: Sol Prime is the read-only seed — boot truth is index.ts and a
+       stale browser generation must never churn its committed mirror (the
+       Version 17.1 rewrite). Every other mutating route already refuses the
+       anchor; the mirror write was the one hole. */
+    if (realityId === 'sol-prime' || folderName === 'solPrime' || folderName === 'sol-prime') {
+      return res.status(400).json({ success: false, error: 'Sol Prime is the read-only seed — its mirror is not browser-writable.' });
+    }
 
     const realitiesDir = path.join(process.cwd(), 'src', 'realities');
     let folder = sanitizeFolderName(folderName);

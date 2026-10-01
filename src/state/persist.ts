@@ -262,7 +262,7 @@ export function loadState(): UniverseState {
        by hand or by a future migration, THEN fall back to a fresh seed */
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) localStorage.setItem(`${STORAGE_KEY}:recovery`, raw);
+      if (raw) localStorage.setItem(STORAGE_KEYS.universeStateRecovery, raw);
     } catch { /* recovery snapshot best-effort */ }
     console.error('[state] stored universe failed to load — preserved at "my-universe:v4:recovery":', err);
     /* module init runs before React mounts — defer so the toast host exists */
@@ -353,7 +353,7 @@ export function persistState() {
            a healthy store with a fresh seed */
         try {
           const lastGood = localStorage.getItem(STORAGE_KEY);
-          if (lastGood) localStorage.setItem(`${STORAGE_KEY}:recovery`, lastGood);
+          if (lastGood) localStorage.setItem(STORAGE_KEYS.universeStateRecovery, lastGood);
         } catch { /* recovery snapshot best-effort */ }
       }
     }

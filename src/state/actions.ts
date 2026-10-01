@@ -412,6 +412,11 @@ export const actions = {
     const id = realityId || state.activeRealityId || 'sol-prime';
     const b = state.realities?.[id];
     if (!b) return;
+    /* R83-2 — Sol Prime's data.json is the committed seed's mirror; a stale
+       browser generation must never churn it. Skip the write entirely (no
+       queue, no retry burn, no toast) — the server and the desktop twin
+       refuse it too. */
+    if (id === 'sol-prime') return;
     const cfg = REALITIES.find((r) => r.id === id) ?? RAW_REALITIES.find((r) => r.id === id);
     const data = {
       reality: cfg ? {

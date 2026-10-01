@@ -451,6 +451,16 @@ pub fn write_data(
     }
 
     let target = resolve_folder(folder_name.as_deref(), reality_id.as_deref())?;
+    /* R83-2: Sol Prime is the read-only seed — boot truth is index.ts and a
+       stale browser generation must never churn its committed mirror (the
+       server twin refuses too; same guard as move_to_bin). */
+    if target == "solPrime" || target == "sol-prime"
+        || reality_id.as_deref() == Some("sol-prime")
+        || folder_name.as_deref() == Some("solPrime")
+        || folder_name.as_deref() == Some("sol-prime")
+    {
+        return Err("Sol Prime is the read-only seed — its mirror is not browser-writable.".into());
+    }
     let dir = realities_dir()?;
     let folder = dir.join(&target);
     if !is_inside(&dir, &folder) || !folder.exists() {

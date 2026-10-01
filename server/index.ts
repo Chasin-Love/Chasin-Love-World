@@ -76,6 +76,16 @@ async function startServer() {
     }
     process.exit(1);
   });
+
+  /* R86 — the graceful shutdown the daemon always offered and nothing ever
+     called: stop the scan interval on the way out (realityDaemon.stop()). */
+  const shutdown = () => {
+    realityDaemon.stop();
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 2000).unref();
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
 startServer().catch((err) => {
