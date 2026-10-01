@@ -70,7 +70,12 @@ export const driverState = {
       born or lost) reconfigures WITH drift preserved (reconfigure-from-
       current-state) */
   signature: '',
-  realityId: '',
+  /** R94 — the ACTIVE scope: the home reality ('sol-prime'-style id) or a
+      visited galaxy's inner system ('galaxy:${id}'). One session per tier,
+      swapped by proximity — the visible universe is the living one; the
+      resting scope's memory persists and resumes with a bounded catch-up
+      burst on return. */
+  scopeId: '',
   /** sim-days stamp of the freshest readback (the extrapolation anchor) */
   readbackDays: 0,
   accumulatedDays: 0,
@@ -114,8 +119,7 @@ export interface SessionSave {
 
 /** A diary moon as the engine feeds it (RuntimeMoon's physics fields —
  *  mesh excluded). Moons without an id/radius are skipped (ornament-only
- *  fallback), so the contract stays tolerant across engine versions.
- *  Module-private: the engine passes its bodies structurally, no import. */
+ *  fallback), so the contract stays tolerant across engine versions. */
 interface DriverMoonSpec {
   id?: string;
   a: number;
@@ -126,7 +130,11 @@ interface DriverMoonSpec {
   radius?: number;
 }
 
-type DriverBody = { data: CosmicBody; moons?: DriverMoonSpec[] };
+/** What the engine feeds the driver: a canon world plus its moons. */
+export type DriverBody = {
+  data: CosmicBody;
+  moons?: { id?: string; a: number; speed: number; phase: number; incl?: number; node?: number; radius?: number }[];
+};
 
 /* the driver's private roster mirror: element sets + masses, in feed order
    (bodies first, then their moons — the engine's prefix seam reads bodies
@@ -158,7 +166,7 @@ function rosterSignature(bodies: DriverBody[]): string {
     ids.push(b.data.id);
     for (const m of b.moons ?? []) if (m.id) ids.push(m.id);
   }
-  return `${driverState.realityId}::${ids.join('|')}`;
+  return `${driverState.scopeId}::${ids.join('|')}`;
 }
 
 /** Build the full roster (bodies + diary moons) from the engine's bodies. */
@@ -311,7 +319,7 @@ function cacheReadback(states: SimBodyState[], atDays: number): void {
 /** Configure the session from the canon at `atDays` (the seed), cache the
     readback, and clear drift telemetry — the honest "fresh universe". */
 export async function seedFromCanon(bodies: DriverBody[], simDays: number, realityId: string): Promise<void> {
-  driverState.realityId = realityId;
+  driverState.scopeId = realityId;
   syncRoster(bodies, simDays);
   driverTelemetry.clear();
   const res = await cosmosBridge.simConfigure(buildRosterInputs(simDays));
@@ -445,7 +453,7 @@ export function loadSession(realityId: string): SessionSave | null {
     readback at the saved stamp. Returns the sim-days the engine should
     rewind/advance its clock to (the saved universe's own time). */
 export async function restoreSession(save: SessionSave): Promise<number> {
-  driverState.realityId = save.realityId;
+  driverState.scopeId = save.realityId;
   roster = save.roster;
   rebuildParentIndex();
   driverState.signature = save.signature;
@@ -538,7 +546,7 @@ export function driverTick(bodies: DriverBody[], dtDays: number, simDays: number
       /* the universe remembers (cadenced, autonomous — an abrupt close
          loses at most a few seconds of drift) */
       if (driverState.stepsRun % SAVE_EVERY_N_READBACKS === 0) {
-        saveSession(driverState.realityId, atDays, res.backend);
+        saveSession(driverState.scopeId, atDays, res.backend);
       }
     })
     .catch((err) => {
@@ -594,6 +602,71 @@ export function driverMoonReadback(simDays: number): Map<string, [number, number
   return map;
 }
 
+/* ------------------------- scope swap (R94) ----------------------------- */
+
+/** Catch-up pacing: one simStep call of 1000 iterations at 0.25-day RK4
+ *  sub-steps advances the session 250 sim-days — moon orbits stay resolved
+ *  (56+ steps per 14-day orbit) while a long absence costs only a handful
+ *  of calls. Beyond the cap, the memory is too far behind to matter. */
+const CATCHUP_CHUNK_DAYS = 250;
+const CATCHUP_MAX_DAYS = 100000;
+
+function countRosterBodies(bodies: DriverBody[]): number {
+  return bodies.reduce((n, b) => n + 1 + (b.moons ?? []).filter((m) => m.id && m.radius).length, 0);
+}
+
+/** Fast-forward the freshly restored session to the live clock — the burst
+ *  that lets a visited-long-ago scope resume exactly where its story left
+ *  off (the decree: the universe remembers, and time did pass). */
+async function catchUpSession(toDays: number): Promise<void> {
+  while (driverState.readbackDays < toDays - 0.001) {
+    const remaining = toDays - driverState.readbackDays;
+    const chunk = Math.min(CATCHUP_CHUNK_DAYS, remaining);
+    await cosmosBridge.simStep((chunk * SECONDS_PER_DAY) / 1000, 1000);
+    driverState.readbackDays += chunk;
+  }
+  const fresh = await cosmosBridge.simStates();
+  cacheReadback(fresh.states, toDays);
+}
+
+/**
+ * R94 — THE SCOPE SWAP ("everything everywhere"): one session per tier, so
+ * the visible universe is the living one. Activating a scope saves the
+ * resting one (its memory persists), then either resumes the target's own
+ * memory — with a bounded catch-up burst to the live clock — or seeds it
+ * fresh from the canon. The engine calls this when the camera's realm
+ * changes (home ⇄ a galaxy's inner system); the tick only runs for the
+ * active scope.
+ */
+export function activateScope(scopeId: string, bodies: DriverBody[], simDays: number): Promise<void> {
+  if (driverState.scopeId === scopeId && driverState.configured) return Promise.resolve();
+  if (driverState.pending) return Promise.resolve(); /* an activation is in flight */
+  driverState.pending = true;
+  const run = async () => {
+    if (driverState.configured) {
+      saveSession(driverState.scopeId, driverState.readbackDays, 'scope-swap');
+    }
+    driverState.configured = false;
+    readback = [];
+    driverState.scopeId = scopeId;
+    driverTelemetry.clear();
+    const saved = loadSession(scopeId);
+    const absence = saved ? simDays - saved.simDays : Infinity;
+    if (saved && saved.roster.length === countRosterBodies(bodies) && absence >= 0 && absence <= CATCHUP_MAX_DAYS) {
+      await restoreSession(saved);
+      await catchUpSession(simDays);
+    } else {
+      await seedFromCanon(bodies, simDays, scopeId);
+    }
+  };
+  return run()
+    .then(() => { driverState.pending = false; })
+    .catch((err) => {
+      driverState.pending = false;
+      driverState.lastError = err instanceof Error ? err.message : String(err);
+    });
+}
+
 /** Flip the driver on. The engine owns the gate; roster sync + seeding (or
     restore from the saved memory) happen here so the tick hook stays cheap.
     Returns 'restored' | 'seeded' via promise resolution count semantics —
@@ -601,22 +674,11 @@ export function driverMoonReadback(simDays: number): Map<string, [number, number
 export function enableDriver(bodies: DriverBody[], simDays: number, realityId: string): Promise<void> {
   driverState.enabled = true;
   driverState.lastError = null;
-  /* a saved memory for THIS reality resumes the story exactly; otherwise
-     the canon seeds a fresh universe */
-  const saved = loadSession(realityId);
-  if (saved && saved.roster.length === bodies.length) {
-    driverState.pending = true;
-    return restoreSession(saved)
-      .then(() => { driverState.pending = false; })
-      .catch((err) => {
-        driverState.pending = false;
-        driverState.lastError = err instanceof Error ? err.message : String(err);
-        /* the memory lied (roster drift, corrupt states) — re-seed clean */
-        return seedFromCanon(bodies, simDays, realityId).then(() => undefined);
-      });
-  }
+  /* R94: enabling IS activating the home scope — the saved memory for THIS
+     reality resumes the story exactly (with the catch-up burst); otherwise
+     the canon seeds a fresh universe. */
   driverState.pending = true;
-  return seedFromCanon(bodies, simDays, realityId)
+  return activateScope(realityId, bodies, simDays)
     .then(() => { driverState.pending = false; })
     .catch((err) => {
       driverState.pending = false;
@@ -627,7 +689,7 @@ export function enableDriver(bodies: DriverBody[], simDays: number, realityId: s
 export function disableDriver(): void {
   /* the memory outlives the session: one last save before rest */
   if (driverState.enabled && driverState.configured) {
-    saveSession(driverState.realityId, driverState.readbackDays, 'disabled');
+    saveSession(driverState.scopeId, driverState.readbackDays, 'disabled');
   }
   driverState.enabled = false;
   driverState.pending = false;

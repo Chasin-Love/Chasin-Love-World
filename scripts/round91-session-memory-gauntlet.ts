@@ -118,8 +118,12 @@ const pkgSrc = read('../package.json');
     && /seedFromCanon\(bodies, simDays, realityId\)/.test(driverSrc);
   check('R91: the heal wipes the memory and re-seeds from the canon (Restore Ephemeris, driver edition)', heal, 'heal path incomplete');
 
-  const resume = /const saved = loadSession\(realityId\);/.test(driverSrc)
-    && /restoreSession\(saved\)/.test(driverSrc);
+  /* R94 reconciliation: enabling IS activating the home scope — the
+     resume-or-seed decision lives in activateScope (scopeId), with the
+     catch-up burst for a long absence. */
+  const resume = /const saved = loadSession\(scopeId\);/.test(driverSrc)
+    && /await restoreSession\(saved\);/.test(driverSrc)
+    && /await catchUpSession\(simDays\);/.test(driverSrc);
   check('R91: enabling the driver resumes the saved story before seeding fresh', resume, 'boot does not look for the memory');
 }
 

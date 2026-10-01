@@ -32,7 +32,9 @@ export const SimulatorTwinCard: React.FC = () => {
   const [twinOn, setTwinOn] = useState(() => simTwinState.enabled);
   const [tick, setTick] = useState(0);
   const universe = useUniverse();
-  const driverOn = universe.universeDriver === true;
+  /* R94 — THE FLIP: absent flag = ON (the decree's default; the console
+     switch restores the clockwork on demand) */
+  const driverOn = universe.universeDriver !== false;
 
   useEffect(() => {
     let alive = true;

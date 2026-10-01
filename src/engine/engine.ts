@@ -37,7 +37,7 @@ import { simTwinTick, enableSimTwin, disableSimTwin } from '../physics/simTwin';
    engine (the canon seeds, the clockwork falls back, Restore heals). The
    driver module itself never writes rendered state — the updateBodies seam
    below is the only writer, exactly as the round92 gauntlet pins. */
-import { driverTick, driverReadback, driverMoonReadback, enableDriver, disableDriver, healDriver } from '../physics/sessionDriver';
+import { driverTick, driverReadback, driverMoonReadback, driverState, activateScope, enableDriver, disableDriver, healDriver, type DriverBody } from '../physics/sessionDriver';
 import { cosmosBridge } from '../platform/native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../platform/performance';
 import { isDesktop } from '../platform/desktop/adapter';
@@ -438,6 +438,11 @@ export class UniverseEngine {
      updateBodies consumes the extrapolated readback — stale frames fall
      back to the Kepler solve by the freshness law, silently. */
   private universeDriverOn = false;
+  /* R94 — the galaxy scope the camera is visiting this frame (set by
+     updateInnerSystem, consumed by the driver block, cleared each frame).
+     One session per tier: the visible realm is the living one; the resting
+     scope's memory persists and resumes with a catch-up burst on return. */
+  private driverGalaxyScope: { id: string; bodies: DriverBody[] } | null = null;
   /* The traveler's exact camera + framing at the moment a portal opened.
      leavePortal() cuts straight back to this — closing a diary or the vault
      must never slam the camera to the anchor or sweep it sideways. */
@@ -3491,6 +3496,10 @@ void main(){
           g.add(moon);
           ip.moons.push({
             mesh: moon,
+            /* R94 — deterministic id + radius: inner moons join the session
+               when their galaxy's scope is the living one */
+            id: `${data.id}:moon:${mi}`,
+            radius: Math.max(0.09, data.radius * (0.1 + 0.09 * seed)),
             a: data.radius * (1.75 + 0.55 * mi) + data.radius * 1.5,
             speed: (Math.PI * 2) / (14 + mi * 8),
             phase: seed * 6.28,
@@ -3604,6 +3613,24 @@ void main(){
     const sys = node.innerSys;
     if (!sys) return;
 
+    /* R94 — THE SCOPE: while the camera is inside this realm, its inner
+       system is the universe the driver lives in (one session per tier —
+       the swap happens in the tick block; this only declares the want).
+       The STAR leads the roster (the dominant mass — its barycenter wobble
+       is real physics too); drvPos indexes shift by one accordingly. */
+    const scopeId = `galaxy:${node.data.id}`;
+    if (this.universeDriverOn) {
+      this.driverGalaxyScope = { id: scopeId, bodies: [{ data: sys.starData }, ...sys.planets] };
+    }
+    /* the session's frame IS the galaxy-local frame (the canon for these
+       worlds is seeded in it too) — no rotation conversion, ever */
+    const drvPos = this.universeDriverOn && driverState.scopeId === scopeId
+      ? driverReadback(this.simDays)
+      : null;
+    const drvMoons = this.universeDriverOn && driverState.scopeId === scopeId
+      ? driverMoonReadback(this.simDays)
+      : null;
+
     /* the star breathes */
     sys.starUniforms.uTime.value = this.clockT;
     sys.starMesh.rotation.y += dt * 0.15;
@@ -3632,10 +3659,30 @@ void main(){
     /* surface lighting lives in the system's own frame — counter-rotate
        the galaxy node's tilt so the terminators face the local star */
     node.inner.getWorldQuaternion(this._qScratch).invert();
-    for (const p of sys.planets) {
+    for (let pi = 0; pi < sys.planets.length; pi++) {
+      const p = sys.planets[pi];
       const o = p.data.orbit;
-      const phys = calculatePhysics(p.data, this.simDays);
-      const pos = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01, o.node ?? 0, o.argP ?? 0);
+      let pos: { x: number; y: number; z: number };
+      /* R94 — THE INNER SEAM: when this galaxy's scope is the active one
+         and its readback is fresh, the session drives these worlds (the
+         session's frame IS the galaxy-local frame — the canon was seeded
+         in it, so no conversion). Stale → the Kepler solve, as at home.
+         +1: the star leads the roster. */
+      if (drvPos && drvPos.length > pi + 1) {
+        pos = { x: drvPos[pi + 1][0], y: drvPos[pi + 1][1], z: drvPos[pi + 1][2] };
+        if (pi === 0) {
+          /* the star rides its real barycenter wobble — and everything
+             anchored to it follows (a 10 M☉ companion makes this BIG) */
+          sys.starMesh.position.set(drvPos[0][0], drvPos[0][1], drvPos[0][2]);
+          sys.corona.position.copy(sys.starMesh.position);
+          sys.haloA.position.copy(sys.starMesh.position);
+          sys.haloB.position.copy(sys.starMesh.position);
+          sys.belt.position.copy(sys.starMesh.position);
+        }
+      } else {
+        const phys = calculatePhysics(p.data, this.simDays);
+        pos = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01, o.node ?? 0, o.argP ?? 0);
+      }
       p.group.position.set(pos.x, pos.y, pos.z);
 
       /* hover pulse — the pointer's world swells gently, like home */
@@ -3684,6 +3731,19 @@ void main(){
         this.setKamuiLocalCenter(p.ringMat, p.ringMesh);
       }
       p.moons.forEach((m) => {
+        /* R94 — the moon seam, inner-system edition: same world → local
+           subtraction, same ornament fallback (R93's law, galaxy frame) */
+        if (drvMoons && m.id) {
+          const wp = drvMoons.get(m.id);
+          if (wp) {
+            m.mesh.position.set(
+              wp[0] - p.group.position.x,
+              wp[1] - p.group.position.y,
+              wp[2] - p.group.position.z,
+            );
+            return;
+          }
+        }
         const ma = m.phase + this.simDays * m.speed;
         /* same R84 moon planes in the isolated systems — own tilt, own node */
         const mp = tiltInPlaneVector(Math.cos(ma) * m.a, Math.sin(ma) * m.a, m.incl ?? 0, m.node ?? 0);
@@ -4756,6 +4816,10 @@ void main(){
           p.group.add(mesh);
           p.moons.push({
             mesh,
+            /* R94 — deterministic id + radius: diary moons of the inner
+               systems are real bodies in their galaxy's scope */
+            id: `${p.data.id}:moon:${i}`,
+            radius: mr,
             a: p.data.radius * (1.75 + 0.55 * i) + (p.data.rings ? p.data.radius * 1.5 : 0),
             speed: (Math.PI * 2) / (14 + i * 8),
             phase: seed * 6.28,
@@ -5158,6 +5222,9 @@ void main(){
     }
     const dt = Math.min(0.05, this.clock.getDelta());
     this.clockT += dt;
+    /* R94 — the galaxy scope is re-decided every frame by updateLevels
+       (below); clear it here so a camera that left the realm stops wanting it. */
+    this.driverGalaxyScope = null;
 
     /* Round 20 — the geodesic tier's one-way circuit breaker: while a
        raymarched hole is actually on stage, sustained frame overruns stand
@@ -5532,9 +5599,21 @@ this.updateBodies(dt);
     }
     /* R92 — the universe driver: gated (author flips it from the twin
        card), fire-and-forget with its own pending guard; the seam in
-       updateBodies consumes its readback. */
+       updateBodies consumes its readback. R94 — scope-aware: the visible
+       realm is the living one. Inside a galaxy's inner system its scope
+       ticks and the home scope rests (its memory persists); leaving swaps
+       back with a bounded catch-up burst. */
     if (this.universeDriverOn && !this.bootIntro) {
-      driverTick(this.bodies, this.lastSimDelta, this.simDays);
+      /* the cast defeats the top-of-frame null assignment's narrowing —
+         updateInnerSystem (below) re-populates the scope every frame */
+      const gal = this.driverGalaxyScope as { id: string; bodies: DriverBody[] } | null;
+      const wantId = gal ? gal.id : this.activeRealityId;
+      const wantBodies = gal ? gal.bodies : this.bodies;
+      if (driverState.scopeId !== wantId) {
+        void activateScope(wantId, wantBodies, this.simDays);
+      } else if (!driverState.pending) {
+        driverTick(wantBodies, this.lastSimDelta, this.simDays);
+      }
     }
     this.updateSpacetimeLens(dt);
     this.updateMeteors(dt);
@@ -5799,9 +5878,14 @@ this.updateBodies(dt);
        scene, and it flows through the same write below — camera targets,
        hover colliders, diaries, the lens and the surface all read the
        groups and follow for free. */
-    const drvPos = this.universeDriverOn ? driverReadback(this.simDays) : null;
-    /* R93 — the moon seam read: same extrapolation, keyed by moon id */
-    const drvMoons = this.universeDriverOn ? driverMoonReadback(this.simDays) : null;
+    const drvPos = this.universeDriverOn && driverState.scopeId === this.activeRealityId
+      ? driverReadback(this.simDays)
+      : null;
+    /* R93 — the moon seam read: same extrapolation, keyed by moon id.
+       R94 — home-scope only: inside a galaxy the home session rests. */
+    const drvMoons = this.universeDriverOn && driverState.scopeId === this.activeRealityId
+      ? driverMoonReadback(this.simDays)
+      : null;
 
     for (let i = 0; i < this.bodies.length; i++) {
       const b = this.bodies[i];

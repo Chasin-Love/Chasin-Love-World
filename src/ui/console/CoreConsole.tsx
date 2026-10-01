@@ -1202,14 +1202,19 @@ export const CoreConsole: React.FC<Props> = ({
 
               {/* ROUND 14 — PHYSICS LAWS: Einstein's lensing + Newton's living
                   gravity. 8-col beside the radar (under Vitals) so the bento
-                  rows stay packed. */}
+                  rows stay packed. R94: while the session drives the sky,
+                  Living Gravity rests honestly — the session IS the living
+                  gravity now. */}
               <motion.div variants={rise} className="lg:col-span-8 cc-panel p-4 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
                   <span className="cc-panel-title">
                     <Orbit className="w-3.5 h-3.5" />
                     Physics Laws — Relativity &amp; Gravitation
                   </span>
-                  <span className="cc-label text-cyan-300/80">Einstein · Newton · Live</span>
+                  <span className={`cc-label flex items-center gap-1.5 ${state.universeDriver !== false ? 'text-emerald-300/90' : 'text-cyan-300/80'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${state.universeDriver !== false ? 'bg-emerald-400 animate-pulse' : 'bg-cyan-400'}`} />
+                    {state.universeDriver !== false ? 'TRUE GRAVITY · DRIVING' : 'Einstein · Newton · Live'}
+                  </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <TiltButton
@@ -1224,13 +1229,16 @@ export const CoreConsole: React.FC<Props> = ({
                   </TiltButton>
                   <TiltButton
                     onClick={() => onToggleLiving(!livingOn)}
+                    disabled={state.universeDriver !== false}
                     maxTilt={11}
                     lift={16}
-                    style={{ ['--btn' as string]: livingOn ? '167 139 250' : '100 116 139' }}
-                    className={`cc-btn-glass p-2.5 rounded-xl text-[10px] font-mono uppercase tracking-wider cursor-pointer ${livingOn ? 'text-violet-200' : 'text-slate-400'}`}
-                    title="True mutual N-body coupling in osculating elements (Gauss's planetary equations) — bounded forever"
+                    style={{ ['--btn' as string]: state.universeDriver !== false ? '16 185 129' : livingOn ? '167 139 250' : '100 116 139' }}
+                    className={`cc-btn-glass p-2.5 rounded-xl text-[10px] font-mono uppercase tracking-wider ${state.universeDriver !== false ? 'text-emerald-200 cursor-default' : livingOn ? 'text-violet-200 cursor-pointer' : 'text-slate-400 cursor-pointer'}`}
+                    title={state.universeDriver !== false
+                      ? 'True mutual gravity IS the session now — the clockwork coupling rests while the driver owns the sky'
+                      : "True mutual N-body coupling in osculating elements (Gauss's planetary equations) — bounded forever"}
                   >
-                    <Zap className="w-3.5 h-3.5" /> Gravity · {livingOn ? 'Awake' : 'Rested'}
+                    <Zap className="w-3.5 h-3.5" /> {state.universeDriver !== false ? 'Gravity · In the Session' : livingOn ? 'Gravity · Awake' : 'Gravity · Rested'}
                   </TiltButton>
                   <TiltButton
                     onClick={onRestoreEphemeris}
@@ -1238,17 +1246,15 @@ export const CoreConsole: React.FC<Props> = ({
                     lift={16}
                     style={{ ['--btn' as string]: '251 191 36' }}
                     className="cc-btn-glass p-2.5 rounded-xl text-amber-100 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
-                    title="Canonical heal — restore every world's exact divine path in one stroke"
+                    title="Canonical heal — restore every world's exact divine path in one stroke (re-seeds the driving session too)"
                   >
                     <Compass className="w-3.5 h-3.5" /> Restore Ephemeris
                   </TiltButton>
                 </div>
                 <p className="text-[10px] font-mono leading-relaxed text-slate-400/90">
-                  The real universe has no grid — so curvature is shown the only way it can be seen:
-                  light bending. Every mass lenses the starlight passing it (strongest around the star,
-                  a deep ring around the Vault), and Living Gravity lets worlds tug each other through
-                  Gauss's planetary equations in osculating elements — orbits breathe and precess, never
-                  wander. Restore Ephemeris heals every path instantly; the divine plan is never lost.
+                  {state.universeDriver !== false
+                    ? 'TRUE GRAVITY DRIVES THE SKY — every world and every moon follows real mutual N-body gravity. The canon is the seed, the Kepler clockwork renders any frame the session cannot deliver, and Restore Ephemeris re-seeds the divine plan. Chaos is honest; the story persists across restarts.'
+                    : 'The real universe has no grid — so curvature is shown the only way it can be seen: light bending. Every mass lenses the starlight passing it (strongest around the star, a deep ring around the Vault), and Living Gravity lets worlds tug each other through Gauss\'s planetary equations in osculating elements — orbits breathe and precess, never wander. Restore Ephemeris heals every path instantly; the divine plan is never lost.'}
                 </p>
               </motion.div>
 

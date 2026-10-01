@@ -695,10 +695,11 @@ export default function App() {
      persisted one, not its default. */
   const spacetimeLensOn = state.spacetimeLensing !== false;
   const livingGravityOn = state.livingGravity !== false;
-  /* R92 — the universe driver (the R91 decree, in shadow): absent = OFF this
-     round, so nothing changes until the author flips the switch; R94 flips
-     the default to ON. */
-  const universeDriverOn = state.universeDriver === true;
+  /* R94 — THE FLIP (the R91 decree lands): absent flag = ON. From this
+     round the universe boots with true N-body gravity driving the sky;
+     a device where the core can't run gets the clockwork automatically
+     (the freshness law), and the console switch can always restore it. */
+  const universeDriverOn = state.universeDriver !== false;
   useEffect(() => {
     const eng = engineRef.current;
     if (!eng) return;

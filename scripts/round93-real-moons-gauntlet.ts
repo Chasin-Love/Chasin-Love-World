@@ -78,8 +78,10 @@ const pkgSrc = read('../package.json');
     && /Math\.abs\(dtDays\) > TRUST_WINDOW_DAYS\) return null;/.test(driverSrc);
   check('R93: the moon seam read exists and obeys the same trust window', read, 'no freshness law for moons');
 
-  const once = (engineSrc.match(/driverMoonReadback/g) || []).length === 2; /* the import + the one seam call */
-  check('R93: the engine consumes the moon readback exactly once (the seam)', once, 'more than one consumer');
+  /* R94 reconciliation: the inner-system moon seam is the second consumer —
+     the import + the home seam + the inner seam. */
+  const once = (engineSrc.match(/driverMoonReadback/g) || []).length === 3;
+  check('R93: the engine consumes the moon readback only through seams (home + inner)', once, 'an unaccounted consumer');
 
   const local = /wp\[0\] - b\.group\.position\.x,/.test(engineSrc)
     && /wp\[1\] - b\.group\.position\.y,/.test(engineSrc)

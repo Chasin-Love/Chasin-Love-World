@@ -52,8 +52,8 @@ const pkgSrc = read('../package.json');
   const ownership = /if \(this\.simTwinOn\) \{\s*this\.simTwinOn = false;\s*disableSimTwin\(\);/.test(engineSrc);
   check('R92: turning the driver on stops the twin lab (one session, one owner)', ownership, 'session tug-of-war');
 
-  const hook = /if \(this\.universeDriverOn && !this\.bootIntro\) \{\s*driverTick\(this\.bodies, this\.lastSimDelta, this\.simDays\);\s*\}/.test(engineSrc);
-  check('R92: the tick hook is gated (driver on, boot intro over)', hook, 'ungated per-frame session calls');
+  const hook = /if \(this\.universeDriverOn && !this\.bootIntro\) \{[\s\S]*?const wantId = gal \? gal\.id : this\.activeRealityId;[\s\S]*?driverTick\(wantBodies, this\.lastSimDelta, this\.simDays\);/.test(engineSrc);
+  check('R92: the tick hook is gated (driver on, boot intro over) — R94: scope-aware', hook, 'ungated per-frame session calls');
 
   const dispose = /disableDriver\(\); \/\* R92 — one last save of the session memory before rest \*\//.test(engineSrc);
   check('R92: engine dispose saves the session memory one last time', dispose, 'the story would die with the engine');
@@ -61,13 +61,17 @@ const pkgSrc = read('../package.json');
 
 /* ==== 2. THE SEAM IS THE ONLY WRITER ==== */
 {
-  const seam = /const drvPos = this\.universeDriverOn \? driverReadback\(this\.simDays\) : null;/.test(engineSrc)
+  /* R94 reconciliation: the home seam is scope-checked now (inside a
+     galaxy, the home session rests). */
+  const seam = /const drvPos = this\.universeDriverOn && driverState\.scopeId === this\.activeRealityId\s*\? driverReadback\(this\.simDays\)\s*: null;/.test(engineSrc)
     && /if \(drvPos && drvPos\.length > i\) \{/.test(engineSrc)
     && /px = drvPos\[i\]\[0\];/.test(engineSrc);
   check('R92: the seam consumes the readback inside updateBodies only', seam, 'driver positions escape the seam');
 
-  const singleConsumer = (engineSrc.match(/driverReadback/g) || []).length === 2; /* the import + the one seam call */
-  check('R92: driverReadback is consumed exactly once in the engine (the seam)', singleConsumer, 'more than one consumer');
+  /* R94 reconciliation: the inner-system seam is the second consumer —
+     the import + the home seam + the inner seam. */
+  const singleConsumer = (engineSrc.match(/driverReadback/g) || []).length === 3;
+  check('R92: driverReadback is consumed only through seams (home + inner)', singleConsumer, 'an unaccounted consumer');
 
   const fallback = /\} else if \(accelActive && this\.keplerCache\.xyz\.length >= \(i \+ 1\) \* 3\) \{/.test(engineSrc);
   check('R92: a stale readback falls back to the Kepler solve (the freshness law)', fallback, 'no clockwork fallback in the seam');
@@ -93,10 +97,11 @@ const pkgSrc = read('../package.json');
   const action = /setUniverseDriver\(on: boolean\) \{\s*state\.universeDriver = on;\s*audit\(/.test(actionsSrc);
   check('R92: the action mutates through the single mutation surface (flag + audit)', action, 'the switch bypasses actions.ts');
 
-  const appRide = /const universeDriverOn = state\.universeDriver === true;/.test(appSrc)
+  /* R94 reconciliation: absent = ON — the flip is the decree's default. */
+  const appRide = /const universeDriverOn = state\.universeDriver !== false;/.test(appSrc)
     && /eng\.setUniverseDriver\(universeDriverOn\);/.test(appSrc)
     && /universeDriverOn, engineReady\]/.test(appSrc);
-  check('R92: App rides the persisted flag into the engine (absent = OFF this round)', appRide, 'the flag never reaches the engine');
+  check('R92: App rides the persisted flag into the engine (R94: absent = ON)', appRide, 'the flag never reaches the engine');
 }
 
 /* ==== 5. THE CARD — the driver's honest face ==== */
