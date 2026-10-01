@@ -101,10 +101,22 @@ async function loadWasm(): Promise<WasmModule | null> {
     /* the WASM artifact is optional (built by CI / scripts/build-wasm.sh into
        public/wasm/, served at the site root in dev and prod alike — R89 moved
        it there from the in-source folder, which the bundled dist could never
-       serve). Root-relative so the probe survives the module's relocation. */
-    const wasmSpec = '/wasm/' + 'cosmos_engine.js';
+       serve). */
+    /* Absolute and computed at runtime — Vite's dev transform wraps dynamic
+       imports in __vite__injectQuery(spec, 'import'), whose helper passes
+       through only specifiers that do NOT start with '.' or '/'; a
+       root-relative path arrived as '/wasm/...?import' and the dev server
+       404s public-dir files under that query. Absolute URLs sail through in
+       dev and resolve identically in prod and Tauri. @vite-ignore still
+       guards the build-time resolver (the artifact may not exist at build). */
+    const wasmSpec = new URL('/wasm/cosmos_engine.js', window.location.origin).href;
     const probe = await fetch(wasmSpec, { method: 'HEAD' });
     if (!probe.ok) return null;
+    /* Vite's dev SPA fallback answers missing paths with 200 text/html —
+       importing that would throw a loud console error for a perfectly
+       normal "no artifact yet" host. The artifact is optional; only a real
+       JavaScript response may be imported (the silent-fallback contract). */
+    if (!(probe.headers.get('content-type') || '').includes('javascript')) return null;
     /* @vite-ignore — the artifact is optional and may not exist at build time */
     const mod = await import(/* @vite-ignore */ wasmSpec);
     /* EXPORT_ES6 gives a default export; older glue assigns the global name —
@@ -146,6 +158,7 @@ class CosmosBridge {
   private wasm: WasmModule | null = null;
   /* R87 sim session state — one handle on the wasm tier, one twin on TS */
   private wasmSimHandle: number | null = null;
+  private wasmSimBodyCount = 0; /* R91 — roster size of the wasm session (the C++ core does not report it back) */
   private readonly tsSim = new TsNBodySim();
 
   /* ------------------------------ lifecycle ------------------------------ */
@@ -338,6 +351,7 @@ class CosmosBridge {
       if (this.wasmSimHandle !== null) {
         w.ccall('cosmos_destroy_simulator', null, ['number'], [this.wasmSimHandle]);
         this.wasmSimHandle = null;
+        this.wasmSimBodyCount = 0;
       }
       const handle = w.ccall('cosmos_create_simulator', 'number', [], []) as number;
       if (!handle) throw new Error('simulator unavailable in this build');
@@ -347,6 +361,7 @@ class CosmosBridge {
           [handle, b.id >>> 0, b.mass, b.radius, b.px, b.py, b.pz, b.vx, b.vy, b.vz]);
       }
       this.wasmSimHandle = handle;
+      this.wasmSimBodyCount = bodies.length;
       return { configured: bodies.length, backend: 'wasm' };
     }
     return { configured: this.tsSim.configure(bodies), backend: 'typescript' };
@@ -392,6 +407,53 @@ class CosmosBridge {
     const st = this.tsSim.bodyState(index);
     if (!st) throw new Error(`sim body index out of range: ${index}`);
     return { ...st, backend: 'typescript' };
+  }
+
+  /* R91 — batched session read: EVERY body's pos+vel in one call (the
+     wide eye the driver needs; reading 10–50 bodies must never cost one
+     round-trip each). An empty session is a valid answer, not an error:
+     { count: 0, states: [] } — the driver's freshness law decides what
+     to do with it, the bridge never throws for "nothing configured". */
+  async simStates(): Promise<{ count: number; states: SimBodyState[]; backend: CosmosBackend }> {
+    await this.init();
+    if (this.statusValue.backend === 'native-cpp' && this.invokeFn) {
+      const res = await this.invokeFn<{ count: number; states: number[] }>('cosmos_sim_states');
+      const states: SimBodyState[] = [];
+      for (let i = 0; i < res.count; i++) {
+        const row = res.states;
+        states.push({
+          pos: [row[i * 6], row[i * 6 + 1], row[i * 6 + 2]],
+          vel: [row[i * 6 + 3], row[i * 6 + 4], row[i * 6 + 5]],
+        });
+      }
+      return { count: res.count, states, backend: 'native-cpp' };
+    }
+    if (this.statusValue.backend === 'wasm' && this.wasm) {
+      const w = this.wasm;
+      if (this.wasmSimHandle === null || this.wasmSimBodyCount === 0) {
+        return { count: 0, states: [], backend: 'wasm' };
+      }
+      const n = this.wasmSimBodyCount;
+      const buf = w._malloc!(n * 6 * 8);
+      try {
+        const written = w.ccall('cosmos_get_body_states', 'number',
+          ['number', 'number', 'number'], [this.wasmSimHandle, n, buf]) as number;
+        const count = Math.min(written, n);
+        const heap = w.HEAPF64!;
+        const base = buf / 8;
+        const states: SimBodyState[] = [];
+        for (let i = 0; i < count; i++) {
+          states.push({
+            pos: [heap[base + i * 6], heap[base + i * 6 + 1], heap[base + i * 6 + 2]],
+            vel: [heap[base + i * 6 + 3], heap[base + i * 6 + 4], heap[base + i * 6 + 5]],
+          });
+        }
+        return { count, states, backend: 'wasm' };
+      } finally {
+        w._free!(buf);
+      }
+    }
+    return { count: this.tsSim.bodyCount, states: this.tsSim.allStates(), backend: 'typescript' };
   }
 
   /**
@@ -614,13 +676,16 @@ function keplerPositionTS(
 /* R87 — the TS reference tier of the stateful simulator: a line-faithful
    port of NBodySimulator (cosmos_engine.cpp computeAccelerations + stepRK4).
    SI units (m/kg/s); mutual Newtonian gravity over all pairs with the same
-   1e4 m² softening; the same 4-stage RK4 with the same stage composition.
+   softening; the same 4-stage RK4 with the same stage composition.
    NOT Living Gravity (scene units, element perturbations — a different job):
    this exists so the native simulator can be verified anywhere, on any tier.
    Constants must mirror cosmos_engine.hpp (G_CONST, SOLAR_MASS, AU_METERS). */
 class TsNBodySim {
   private static readonly G = 6.67430e-11;           /* m^3 kg^-1 s^-2 */
-  private static readonly SOFTENING = 1e4;           /* m^2 */
+  /* R95 — 1e12 m² (ε = 1000 km, a planetary scale), mirrored from
+     cosmos_engine.cpp in lockstep (the old 1e4 let encounters sling
+     bodies out of the session). */
+  private static readonly SOFTENING = 1e12;          /* m^2 */
   private px: number[] = []; private py: number[] = []; private pz: number[] = [];
   private vx: number[] = []; private vy: number[] = []; private vz: number[] = [];
   private mass: number[] = [];
@@ -737,6 +802,20 @@ class TsNBodySim {
       pos: [this.px[index], this.py[index], this.pz[index]],
       vel: [this.vx[index], this.vy[index], this.vz[index]],
     };
+  }
+
+  /* R91 — batched read: every body in one allocation pass (the driver's
+     per-readback fetch; mirrors cosmos_get_body_states). */
+  allStates(): SimBodyState[] {
+    const n = this.mass.length;
+    const out: SimBodyState[] = new Array(n);
+    for (let i = 0; i < n; ++i) {
+      out[i] = {
+        pos: [this.px[i], this.py[i], this.pz[i]],
+        vel: [this.vx[i], this.vy[i], this.vz[i]],
+      };
+    }
+    return out;
   }
 }
 

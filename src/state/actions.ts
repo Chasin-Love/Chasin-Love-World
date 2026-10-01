@@ -7,6 +7,7 @@ import type { VaultFile, VfsNode, FileVersion, VaultSecrets, VfsShadow, EfsScrub
 import { VAULT_HOME_FOLDERS } from '../vault/storage/seeds';
 import { state, bucket, ensureBucket, newId, listeners, refreshSnapshot, EMPTY_DISK_SYNC, rebindState } from './store';
 import { persistState, externalizeLargeDiaryAttachments, STORAGE_KEY, primeState, sanitizeDiaryEntries, normalizeVaultFiles, normalizeLegacyLock } from './persist';
+import { STORAGE_KEYS } from '../platform/storageKeys';
 import { getReality, REALITIES, RAW_REALITIES, computeAllRealities, setRuntimeRealities, createGalaxyData, folderNameForReality, deriveFolderName, RealityMetaOverride, RealityConfig, inclinedOrbitElements } from '../realities';
 import {
   delLocalPayload, delPayload, getPayload, 
@@ -165,6 +166,15 @@ export const actions = {
   setLivingGravity(on: boolean) {
     state.livingGravity = on;
     audit(`[Universal Gravitation] Living Gravity ${on ? 'awakened' : 'rested — canonical ephemeris healed'}`);
+    notify();
+  },
+
+  /* R92 — the universe driver (the R91 decree, in shadow). The switch the
+     twin card flips: the N-body session takes the rendered sky (real mutual
+     gravity, the canon as seed), and the clockwork becomes fallback + heal. */
+  setUniverseDriver(on: boolean) {
+    state.universeDriver = on;
+    audit(`[The Real Universe] True N-body gravity ${on ? 'now drives the sky — the clockwork rests as seed, fallback and heal' : 'stands down — the Kepler clockwork takes the sky back'}`);
     notify();
   },
 
@@ -1051,6 +1061,10 @@ export const actions = {
   resetUniverse() {
     try {
       localStorage.removeItem(STORAGE_KEY);
+      /* R95 — a reset must also forget the driving session's memory: the
+         old drifted states would otherwise outlive the reset (the seedLaw
+         stamp re-seeds them anyway, but a reset means reset). */
+      localStorage.removeItem(STORAGE_KEYS.simSession);
     } catch {
       /* ignore */
     }

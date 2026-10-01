@@ -29,7 +29,11 @@ static void computeAccelerations(const std::vector<Vector3>& positions,
                                  std::vector<Vector3>& outAccels) {
     size_t n = positions.size();
     outAccels.assign(n, Vector3{0, 0, 0});
-    constexpr double softening = 1e4; // gravitational softening parameter (m^2)
+    // R95: softening ε = 1000 km (1e12 m²) — a planetary scale. The old 1e4
+    // (100 m) let close encounters reach near-singular accelerations and
+    // sling bodies out of the session at extreme velocity. Mirrored by the
+    // TS twin (cpp_bridge.ts TsNBodySim.SOFTENING) in lockstep.
+    constexpr double softening = 1e12; // gravitational softening parameter (m^2)
 
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = i + 1; j < n; ++j) {
@@ -193,6 +197,23 @@ void cosmos_get_body_state(void* handle, uint32_t index, double* outPos, double*
         outVel[1] = bodies[index].velocity.y;
         outVel[2] = bodies[index].velocity.z;
     }
+}
+
+uint32_t cosmos_get_body_states(void* handle, uint32_t count, double* out) {
+    if (!handle || !out || count == 0) return 0;
+    auto* sim = static_cast<Cosmos::NBodySimulator*>(handle);
+    const auto& bodies = sim->getBodies();
+    const uint32_t n = (bodies.size() < count) ? static_cast<uint32_t>(bodies.size()) : count;
+    for (uint32_t i = 0; i < n; ++i) {
+        double* row = out + static_cast<size_t>(i) * 6;
+        row[0] = bodies[i].position.x;
+        row[1] = bodies[i].position.y;
+        row[2] = bodies[i].position.z;
+        row[3] = bodies[i].velocity.x;
+        row[4] = bodies[i].velocity.y;
+        row[5] = bodies[i].velocity.z;
+    }
+    return n;
 }
 
 double cosmos_compute_fractal_potential(double x, double y, double z, int octaves) {

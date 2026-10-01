@@ -30,9 +30,14 @@ import type { CosmicBody, DiaryEntry } from '../domain/universe';
 import { REALITIES, RealityConfig, GalaxyClusterData, GalaxyData } from '../realities';
 import { HIERARCHY_DIALS } from '../realities/hierarchyStages';
 import { generateStellarSystemForGalaxy } from '../realities/galaxyGenerator';
-import { calculateKeplerPosition, calculatePhysics, tiltInPlaneVector } from '../physics/physicsEngine';
+import { calculateKeplerPosition, calculatePhysics, tiltInPlaneVector, CONSTANTS } from '../physics/physicsEngine';
 import { LivingGravityField, lensHaloFor, dynamicMassKg, gravityTelemetry, SCENE_UNITS_PER_AU } from '../physics/nbody';
 import { simTwinTick, enableSimTwin, disableSimTwin } from '../physics/simTwin';
+/* R91 decree — the session driver: the N-body session becomes the sky's
+   engine (the canon seeds, the clockwork falls back, Restore heals). The
+   driver module itself never writes rendered state — the updateBodies seam
+   below is the only writer, exactly as the round92 gauntlet pins. */
+import { driverTick, driverReadback, driverVelReadback, driverState, activateScope, enableDriver, disableDriver, healDriver, setScopeStar, type DriverBody } from '../physics/sessionDriver';
 import { cosmosBridge } from '../platform/native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../platform/performance';
 import { isDesktop } from '../platform/desktop/adapter';
@@ -157,7 +162,7 @@ interface RuntimeBody {
   streakRing?: THREE.Mesh;
   streakTarget?: number;
   streakDays?: number;
-  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number; node?: number }[];
+  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number; node?: number; id?: string; radius?: number }[];
   extras?: THREE.ShaderMaterial[];
   orbitLine?: THREE.LineLoop;
   ghost: number;
@@ -187,7 +192,7 @@ interface InnerPlanet {
   spinMesh?: THREE.Mesh;
   spinRate?: number;
   cloudSpinRate?: number;
-  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number; node?: number }[];
+  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number; node?: number; id?: string; radius?: number }[];
   orbitLine?: THREE.LineLoop;
   streakRing?: THREE.Mesh;
   streakTarget?: number;
@@ -210,6 +215,9 @@ interface InnerSystem {
   belt: THREE.Group;
   beltInst: { mesh: THREE.InstancedMesh; tumbles: BeltRock[] }[];
   beltDustMat: THREE.ShaderMaterial;
+  /* R95 — the living rings' pacing + canon-restore flag (inner edition) */
+  oscAt?: number;
+  oscCanonDirty?: boolean;
 }
 
 const DAY = 86400000;
@@ -426,6 +434,33 @@ export class UniverseEngine {
      author flips it from the twin card. simTwin.ts is read-only against the
      rendered sky (the hybrid ruling holds in every round). */
   private simTwinOn = false;
+  /* R92 — the universe driver gate (the R91 decree, in shadow). OFF by law
+     this round: the N-body session drives the rendered sky only when the
+     author flips it from the twin card. The flip owns the session (the
+     twin lab and Verify Twin rest while the driver runs) and the seam in
+     updateBodies consumes the extrapolated readback — stale frames fall
+     back to the Kepler solve by the freshness law, silently. */
+  private universeDriverOn = false;
+  /* R94 — the galaxy scope the camera is visiting this frame (set by
+     updateInnerSystem, consumed by the driver block, cleared each frame).
+     One session per tier: the visible realm is the living one; the resting
+     scope's memory persists and resumes with a catch-up burst on return. */
+  private driverGalaxyScope: { id: string; bodies: DriverBody[] } | null = null;
+  /* R95 — THE STEADY SEAM state. The crossfade keeps the session⇄clockwork
+     source switch invisible (a snap here was the visible flicker); the
+     frozen array is what the fade eases away from when a readback goes
+     stale. */
+  private drvBlend = 0;
+  private drvLastPos: Array<[number, number, number]> | null = null;
+  /* R95 — the living rings: last clockT an osculating orbit-line rebuild ran. */
+  private oscRebuildAt = 0;
+  private oscCanonDirty = false;
+  /* R95 — the galaxy inner system the camera is diving (hysteresis gate:
+     enter <1600, leave >2000). While set, the home realm eases out of view
+     — the home vault's geodesic quad used to render beside the visited
+     galaxy's own hole (the "three black holes" bug). */
+  private galaxyDiveId: string | null = null;
+  private homeRealmW = 1;
   /* The traveler's exact camera + framing at the moment a portal opened.
      leavePortal() cuts straight back to this — closing a diary or the vault
      must never slam the camera to the anchor or sweep it sideways. */
@@ -1777,14 +1812,44 @@ export class UniverseEngine {
      canon. Read-only by construction (simTwin.ts never touches rendered
      state); inert unless the author flips it from the twin card. */
   setSimTwin(on: boolean): void {
+    /* R95 — one session per tier, engine-side: the card refuses too, but the
+       seam must never be stealable by a stray call while the session drives. */
+    if (on && this.universeDriverOn) {
+      console.info('[universe] the driving session owns the simulator — the twin lab rests (one session per tier)');
+      return;
+    }
     this.simTwinOn = on;
     if (on) enableSimTwin(this.bodies, this.simDays);
     else disableSimTwin();
   }
 
-  /** CANONICAL HEAL — restore the exact canonical paths in one stroke. */
+  /* R92 — THE UNIVERSE DRIVER GATE (the R91 decree, in shadow). When it
+     turns on, the driver owns the simulator session: the twin lab is
+     stopped first (one session per tier — last writer wins, so the driver
+     must be it). When it turns off, the session memory is saved one last
+     time (disableDriver) and the clockwork takes the sky back. */
+  setUniverseDriver(on: boolean): void {
+    this.universeDriverOn = on;
+    if (on) {
+      if (this.simTwinOn) {
+        this.simTwinOn = false;
+        disableSimTwin();
+      }
+      void enableDriver(this.bodies, this.simDays, this.activeRealityId);
+    } else {
+      disableDriver();
+    }
+  }
+
+  /** CANONICAL HEAL — restore the exact canonical paths in one stroke.
+      R91 decree: when the driver owns the sky, the heal also re-seeds the
+      driving session from the canon and wipes its saved memory — chaos
+      resets to the divine plan, exactly as the clockwork heal does. */
   healLivingGravity(): void {
     this.livingField.heal();
+    if (this.universeDriverOn) {
+      void healDriver(this.bodies, this.simDays, this.activeRealityId);
+    }
   }
 
   /** Per-frame lensing driver — each massive body's direction from the
@@ -3455,6 +3520,10 @@ void main(){
           g.add(moon);
           ip.moons.push({
             mesh: moon,
+            /* R94 — deterministic id + radius: inner moons join the session
+               when their galaxy's scope is the living one */
+            id: `${data.id}:moon:${mi}`,
+            radius: Math.max(0.09, data.radius * (0.1 + 0.09 * seed)),
             a: data.radius * (1.75 + 0.55 * mi) + data.radius * 1.5,
             speed: (Math.PI * 2) / (14 + mi * 8),
             phase: seed * 6.28,
@@ -3568,6 +3637,24 @@ void main(){
     const sys = node.innerSys;
     if (!sys) return;
 
+    /* R94 — THE SCOPE: while the camera is inside this realm, its inner
+       system is the universe the driver lives in (one session per tier —
+       the swap happens in the tick block; this only declares the want).
+       The STAR leads the roster (the dominant mass — its barycenter wobble
+       is real physics too); drvPos indexes shift by one accordingly. */
+    const scopeId = `galaxy:${node.data.id}`;
+    if (this.universeDriverOn) {
+      this.driverGalaxyScope = { id: scopeId, bodies: [{ data: sys.starData }, ...sys.planets] };
+    }
+    /* the session's frame IS the galaxy-local frame (the canon for these
+       worlds is seeded in it too) — no rotation conversion, ever */
+    const drvPos = this.universeDriverOn && driverState.scopeId === scopeId
+      ? driverReadback(this.simDays)
+      : null;
+    const drvVel = this.universeDriverOn && driverState.scopeId === scopeId
+      ? driverVelReadback(this.simDays)
+      : null;
+
     /* the star breathes */
     sys.starUniforms.uTime.value = this.clockT;
     sys.starMesh.rotation.y += dt * 0.15;
@@ -3596,10 +3683,30 @@ void main(){
     /* surface lighting lives in the system's own frame — counter-rotate
        the galaxy node's tilt so the terminators face the local star */
     node.inner.getWorldQuaternion(this._qScratch).invert();
-    for (const p of sys.planets) {
+    for (let pi = 0; pi < sys.planets.length; pi++) {
+      const p = sys.planets[pi];
       const o = p.data.orbit;
-      const phys = calculatePhysics(p.data, this.simDays);
-      const pos = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01, o.node ?? 0, o.argP ?? 0);
+      let pos: { x: number; y: number; z: number };
+      /* R94 — THE INNER SEAM: when this galaxy's scope is the active one
+         and its readback is fresh, the session drives these worlds (the
+         session's frame IS the galaxy-local frame — the canon was seeded
+         in it, so no conversion). Stale → the Kepler solve, as at home.
+         +1: the star leads the roster. */
+      if (drvPos && drvPos.length > pi + 1) {
+        pos = { x: drvPos[pi + 1][0], y: drvPos[pi + 1][1], z: drvPos[pi + 1][2] };
+        if (pi === 0) {
+          /* the star rides its real barycenter wobble — and everything
+             anchored to it follows (a 10 M☉ companion makes this BIG) */
+          sys.starMesh.position.set(drvPos[0][0], drvPos[0][1], drvPos[0][2]);
+          sys.corona.position.copy(sys.starMesh.position);
+          sys.haloA.position.copy(sys.starMesh.position);
+          sys.haloB.position.copy(sys.starMesh.position);
+          sys.belt.position.copy(sys.starMesh.position);
+        }
+      } else {
+        const phys = calculatePhysics(p.data, this.simDays);
+        pos = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01, o.node ?? 0, o.argP ?? 0);
+      }
       p.group.position.set(pos.x, pos.y, pos.z);
 
       /* hover pulse — the pointer's world swells gently, like home */
@@ -3648,6 +3755,9 @@ void main(){
         this.setKamuiLocalCenter(p.ringMat, p.ringMesh);
       }
       p.moons.forEach((m) => {
+        /* R95 — MOONS RIDE PARENTS (the R93 amendment, galaxy frame): the
+           closed-form ornament is the permanent moon law — each moon rides
+           its planet's session position with its own inclined plane. */
         const ma = m.phase + this.simDays * m.speed;
         /* same R84 moon planes in the isolated systems — own tilt, own node */
         const mp = tiltInPlaneVector(Math.cos(ma) * m.a, Math.sin(ma) * m.a, m.incl ?? 0, m.node ?? 0);
@@ -3675,6 +3785,27 @@ void main(){
         const breath = 1 + 0.022 * Math.sin(this.clockT * 1.8 + p.data.id.length);
         p.streakRing.scale.setScalar(breath);
         p.streakRing.visible = mat.opacity > 0.02;
+      }
+    }
+
+    /* R95 — the living rings, inner edition: 1 Hz osculating rebuild while
+       this scope drives fresh (rings follow the session); canon restore
+       once when the scope rests on the clockwork. */
+    if (drvPos) {
+      if (drvVel && this.clockT - (sys.oscAt ?? 0) > 1) {
+        sys.oscAt = this.clockT;
+        sys.oscCanonDirty = true;
+        for (let pi = 0; pi < sys.planets.length; pi++) {
+          const p = sys.planets[pi];
+          if (!p.orbitLine || !p.orbitLine.visible) continue;
+          if (drvPos.length <= pi + 1 || drvVel.length <= pi + 1) continue;
+          this.rebuildOrbitLineFromState(p.orbitLine, drvPos[pi + 1], drvVel[pi + 1], drvPos[0]);
+        }
+      }
+    } else if (sys.oscCanonDirty) {
+      sys.oscCanonDirty = false;
+      for (const p of sys.planets) {
+        if (p.orbitLine) this.rebuildOrbitLineToCanon(p.orbitLine, p.data);
       }
     }
 
@@ -4669,6 +4800,10 @@ void main(){
         b.group.add(mesh);
         b.moons.push({
           mesh,
+          /* R93 — deterministic id + radius: the session driver's churn keys
+             (surviving moons carry their states) and the moon mass law's input */
+          id: `${b.data.id}:moon:${i}`,
+          radius: mr,
           a: b.data.radius * (1.75 + 0.55 * i) + (b.data.rings ? b.data.radius * 1.5 : 0),
           speed: (Math.PI * 2) / (14 + i * 8),
           phase: seed * 6.28,
@@ -4716,6 +4851,10 @@ void main(){
           p.group.add(mesh);
           p.moons.push({
             mesh,
+            /* R94 — deterministic id + radius: diary moons of the inner
+               systems are real bodies in their galaxy's scope */
+            id: `${p.data.id}:moon:${i}`,
+            radius: mr,
             a: p.data.radius * (1.75 + 0.55 * i) + (p.data.rings ? p.data.radius * 1.5 : 0),
             speed: (Math.PI * 2) / (14 + i * 8),
             phase: seed * 6.28,
@@ -4788,6 +4927,13 @@ void main(){
     perfMark('reality-rebuild-start');
     this.activeRealityId = reality.id;
     this.activeReality = reality;
+
+    /* R95 — the session's star: buildBody never renders the anchor (early
+       return), so the driver must seed it — register it as the home scope's
+       leading mass. Galaxy scopes need no registration (their roster
+       already leads with sys.starData). */
+    const anchor = reality.bodies.find((b) => b.id === 'anchor') ?? reality.bodies.find((b) => b.kind === 'star');
+    if (anchor) setScopeStar(reality.id, anchor);
 
     // Synchronize Universe Surface (Cosmic Background Canvas)
     if (this.surfaceManager) {
@@ -5118,6 +5264,9 @@ void main(){
     }
     const dt = Math.min(0.05, this.clock.getDelta());
     this.clockT += dt;
+    /* R94 — the galaxy scope is re-decided every frame by updateLevels
+       (below); clear it here so a camera that left the realm stops wanting it. */
+    this.driverGalaxyScope = null;
 
     /* Round 20 — the geodesic tier's one-way circuit breaker: while a
        raymarched hole is actually on stage, sustained frame overruns stand
@@ -5478,11 +5627,43 @@ void main(){
     });
 this.updateBodies(dt);
     this.applyKamuiFrame(dt);
-    this.updateLivingGravity();
+    /* R92 decree law: while the driver owns the sky, Living Gravity's
+       osculating-element writer stands down — the session IS the living
+       gravity now (mutual, real, the vault at its full 10 M☉). The toggle
+       keeps working the moment the clockwork takes the sky back. */
+    if (this.livingGravityOn && !this.universeDriverOn) {
+      this.updateLivingGravity();
+    }
     /* R88 — the per-frame twin: gated (author flips it from the twin card),
        fire-and-forget, read-only against the rendered sky. */
     if (this.simTwinOn && !this.bootIntro) {
       simTwinTick(this.bodies, this.lastSimDelta, this.simDays);
+    }
+    /* R92 — the universe driver: gated (author flips it from the twin
+       card), fire-and-forget with its own pending guard; the seam in
+       updateBodies consumes its readback. R94 — scope-aware: the visible
+       realm is the living one. Inside a galaxy's inner system its scope
+       ticks and the home scope rests (its memory persists); leaving swaps
+       back with a bounded catch-up burst. */
+    if (this.universeDriverOn && !this.bootIntro) {
+      /* the cast defeats the top-of-frame null assignment's narrowing —
+         updateInnerSystem (below) re-populates the scope every frame */
+      const gal = this.driverGalaxyScope as { id: string; bodies: DriverBody[] } | null;
+      const wantId = gal ? gal.id : this.activeRealityId;
+      const wantBodies = gal ? gal.bodies : this.bodies;
+      if (driverState.scopeId !== wantId) {
+        /* R95 — the activation may adopt a saved memory whose story sits
+           ahead of this boot's clock (the universe remembers): set the
+           engine clock to the memory's time. */
+        void activateScope(wantId, wantBodies, this.simDays).then((adopted) => {
+          if (adopted != null) {
+            this.simDays = adopted;
+            driverState.accumulatedDays = 0;
+          }
+        });
+      } else if (!driverState.pending) {
+        driverTick(wantBodies, this.lastSimDelta, this.simDays);
+      }
     }
     this.updateSpacetimeLens(dt);
     this.updateMeteors(dt);
@@ -5727,29 +5908,72 @@ this.updateBodies(dt);
 
 
   private updateBodies(dt: number) {
-    const sysW = 1 - smoothstep(430, 860, this.currentDist());
+    /* R95 — REALM HIDING: while the camera dives a galaxy's inner system,
+       the home system is not part of the visible realm — ease it out (a
+       hard cut would pop; the ease keeps the fade silky). This is what
+       hides the home vault's geodesic quad from rendering beside the
+       visited galaxy's own hole (the "three black holes" bug). */
+    this.homeRealmW += ((this.galaxyDiveId ? 0 : 1) - this.homeRealmW) * Math.min(1, dt * 4);
+    const sysW = (1 - smoothstep(430, 860, this.currentDist())) * this.homeRealmW;
+
+    /* R92 — THE SEAM (the R91 decree): when the driver owns the sky and its
+       readback is fresh, the session's extrapolated positions ARE the
+       universe — real mutual gravity driving every world. A stale or absent
+       readback returns null and the Kepler solve renders the frame instead
+       (the freshness law: the same trust-window rule the keplerCache
+       obeys). This is the ONLY place the driver's positions reach the
+       scene, and it flows through the same write below — camera targets,
+       hover colliders, diaries, the lens and the surface all read the
+       groups and follow for free. */
+    const drvPos = this.universeDriverOn && driverState.scopeId === this.activeRealityId
+      ? driverReadback(this.simDays)
+      : null;
+    if (drvPos) this.drvLastPos = drvPos;
+    /* R95 — THE CROSSFADE: the source switch (session ⇄ clockwork) eases
+       over a breath instead of snapping — the visible flicker was this
+       switch happening per frame. Rising while the readback is fresh;
+       falling from the frozen last session positions when it goes stale. */
+    this.drvBlend = drvPos
+      ? Math.min(1, this.drvBlend + dt / 0.4)
+      : Math.max(0, this.drvBlend - dt / 0.15);
+    const drvArr = drvPos ?? this.drvLastPos;
 
     /* C++ accelerator refresh — every other frame, non-blocking. The native
        core batch-evaluates every orbit; results land one tick later, which is
-       visually seamless. Web without WASM never enters this path. */
+       visually seamless. Web without WASM never enters this path. R95 — a
+       fully-fresh session retires it for the interim (the cache is the
+       fallback's accelerator, not the driven sky's). */
     const accelActive = this.keplerCache.valid && Math.abs(this.keplerCache.simDays - this.simDays) < 0.25;
     this.keplerFrame++;
-    if (this.keplerFrame % 2 === 0 && !this.keplerCache.inflight) {
+    if (this.keplerFrame % 2 === 0 && !this.keplerCache.inflight && !(drvPos && this.drvBlend >= 1)) {
       void this.refreshKeplerCache();
     }
 
     for (let i = 0; i < this.bodies.length; i++) {
       const b = this.bodies[i];
       const o = b.data.orbit;
-      let px: number, py: number, pz: number;
+      /* the clockwork anchor — cache or exact Kepler solve — computed every
+         frame: the blend's other end, and the fallback when stale */
+      let kx: number, ky: number, kz: number;
       if (accelActive && this.keplerCache.xyz.length >= (i + 1) * 3) {
-        px = this.keplerCache.xyz[3 * i];
-        py = this.keplerCache.xyz[3 * i + 1];
-        pz = this.keplerCache.xyz[3 * i + 2];
+        kx = this.keplerCache.xyz[3 * i];
+        ky = this.keplerCache.xyz[3 * i + 1];
+        kz = this.keplerCache.xyz[3 * i + 2];
       } else {
         const phys = calculatePhysics(b.data, this.simDays);
         const pos = calculateKeplerPosition(o.a, phys.eccentricity, o.phase, o.incl, this.simDays, o.speed || 0.01, o.node ?? 0, o.argP ?? 0);
-        px = pos.x; py = pos.y; pz = pos.z;
+        kx = pos.x; ky = pos.y; kz = pos.z;
+      }
+      let px = kx, py = ky, pz = kz;
+      /* R95 — THE STEADY SEAM: the session drives through the blend, +1 —
+         the star leads the roster at index 0 (its readback steers the
+         anchor group below); a stale readback eases back to the clockwork. */
+      if (drvArr && drvArr.length > i + 1 && this.drvBlend > 0) {
+        const s = drvArr[i + 1];
+        const t = this.drvBlend;
+        px = kx + (s[0] - kx) * t;
+        py = ky + (s[1] - ky) * t;
+        pz = kz + (s[2] - kz) * t;
       }
       b.group.position.set(px, py, pz);
       /* THE BIRTH — during the ejection every world flies outward from the
@@ -5820,6 +6044,13 @@ this.updateBodies(dt);
       }
 
       b.moons.forEach((m) => {
+        /* R95 — MOONS RIDE PARENTS (the R93 amendment): the canon moon
+           table (14–30-day laps skimming the planet) is physically
+           impossible — at real gravity moons escape ~200× over, at
+           physics-true speeds they blur. The closed-form ornament below is
+           the PERMANENT moon law now: each moon rides its planet's session
+           position with its own inclined plane (the body groups never
+           rotate, so the local write is exact whatever drives the parent). */
         const ma = m.phase + this.simDays * m.speed;
         /* each moon rides its OWN inclined plane at its OWN node — no shared
            moon-sheet, and no shared crossing line either (R84) */
@@ -5867,13 +6098,39 @@ this.updateBodies(dt);
          so a per-body call here read a matrix seconds stale. */
     }
 
+    /* R95 — THE LIVING RINGS: while the session drives fresh, each world's
+       hover ellipse is rebuilt ~1 Hz from its session state's osculating
+       elements (the rings follow the living sky instead of stranding on
+       their clockwork paths). Stale → the canon ellipses are restored. */
+    if (drvPos) {
+      const drvVel = this.universeDriverOn && driverState.scopeId === this.activeRealityId
+        ? driverVelReadback(this.simDays)
+        : null;
+      if (drvVel && this.clockT - this.oscRebuildAt > 1) {
+        this.oscRebuildAt = this.clockT;
+        this.oscCanonDirty = true;
+        for (let i = 0; i < this.bodies.length; i++) {
+          const b = this.bodies[i];
+          if (!b.orbitLine || !b.orbitLine.visible) continue;
+          if (drvPos.length <= i + 1 || drvVel.length <= i + 1) continue;
+          this.rebuildOrbitLineFromState(b.orbitLine, drvPos[i + 1], drvVel[i + 1], drvPos[0]);
+        }
+      }
+    } else if (this.oscCanonDirty) {
+      /* back on the clockwork — every ring returns to its canon ellipse */
+      this.oscCanonDirty = false;
+      for (const b of this.bodies) {
+        if (b.orbitLine) this.rebuildOrbitLineToCanon(b.orbitLine, b.data);
+      }
+    }
+
     /* anchor — axial spin, then GRAVITY MADE VISIBLE: the star's barycentric
        wobble, the real radial-velocity method used to find exoplanets. Every
        major world tugs the star with amplitude ∝ m_p/a, each tug advancing at
        that world's own orbital rate — quasi-periodic drift, not a loop. */
     this.anchorGroup.rotation.y += dt * 0.08; /* Axial rotation around polar axis */
+    let wobbleX = 0, wobbleY = 0, wobbleZ = 0;
     if (!this.coreActive) {
-      let wobbleX = 0, wobbleY = 0, wobbleZ = 0;
       for (let i = 0; i < this.bodies.length; i++) {
         const wb = this.bodies[i];
         /* planets, dwarfs AND the vault black hole — every mass tugs the star */
@@ -5890,9 +6147,21 @@ this.updateBodies(dt);
         wobbleY += tug.y;
         wobbleZ += tug.z;
       }
+    }
+    /* R95 — THE HOME STAR LEADS: the session's star (roster index 0) drives
+       the anchor group through the same crossfade — its real barycenter
+       wobble replaces the cosmetic formula while the session owns the sky
+       (the galaxy scopes' seam, home edition). */
+    if (drvArr && drvArr.length > 0 && this.drvBlend > 0) {
+      const s = drvArr[0];
+      const t = this.drvBlend;
+      this.anchorGroup.position.set(
+        wobbleX + (s[0] - wobbleX) * t,
+        wobbleY + (s[1] - wobbleY) * t,
+        wobbleZ + (s[2] - wobbleZ) * t,
+      );
+    } else if (!this.coreActive) {
       this.anchorGroup.position.set(wobbleX, wobbleY, wobbleZ);
-
-
     }
     const starMesh = this.anchorGroup.userData.starMesh as THREE.Mesh;
     if (starMesh) starMesh.rotation.y += dt * 0.15;
@@ -5951,6 +6220,89 @@ this.updateBodies(dt);
         mesh.instanceMatrix.needsUpdate = true;
       });
     }
+  }
+
+  /* R95 — THE LIVING RINGS: rebuild a world's hover ellipse from an
+     explicit state (session readback: pos + vel in scene units/day) around
+     a focus (the session star), via the standard osculating two-body
+     elements. Returns false when the state is unbound or near-parabolic —
+     the canon ring stays (a fixed ring for an escaping world would be a
+     lie; the canon ellipse is the clockwork's honest answer). */
+  private rebuildOrbitLineFromState(
+    line: THREE.Line,
+    posS: [number, number, number],
+    velS: [number, number, number],
+    focusS: [number, number, number],
+  ): boolean {
+    const mPerU = CONSTANTS.AU / 52;
+    const mu = CONSTANTS.G * CONSTANTS.M_sun; /* the star is 1 M☉ by the physicsEngine law */
+    const rx = (posS[0] - focusS[0]) * mPerU;
+    const ry = (posS[1] - focusS[1]) * mPerU;
+    const rz = (posS[2] - focusS[2]) * mPerU;
+    const vx = (velS[0] * mPerU) / 86400;
+    const vy = (velS[1] * mPerU) / 86400;
+    const vz = (velS[2] * mPerU) / 86400;
+    const r = Math.hypot(rx, ry, rz);
+    const v2 = vx * vx + vy * vy + vz * vz;
+    const energy = v2 / 2 - mu / r;
+    if (!(energy < -1e-9) || r < 1) return false; /* unbound — keep the canon ring */
+    const hx = ry * vz - rz * vy;
+    const hy = rz * vx - rx * vz;
+    const hz = rx * vy - ry * vx;
+    const hm = Math.hypot(hx, hy, hz);
+    if (hm < 1) return false;
+    const rv = rx * vx + ry * vy + rz * vz;
+    const shrink = v2 - mu / r;
+    const ex = (shrink * rx - rv * vx) / mu;
+    const ey = (shrink * ry - rv * vy) / mu;
+    const ez = (shrink * rz - rv * vz) / mu;
+    const e = Math.hypot(ex, ey, ez);
+    if (e >= 0.995) return false; /* near-parabolic — the canon ring stays */
+    /* the orbital plane basis: periapsis direction + transverse */
+    let px = ex, py = ey, pz = ez;
+    if (e < 1e-6) { px = rx / r; py = ry / r; pz = rz / r; }
+    else { px /= e; py /= e; pz /= e; }
+    const wx = hx / hm, wy = hy / hm, wz = hz / hm;
+    const qx = wy * pz - wz * py;
+    const qy = wz * px - wx * pz;
+    const qz = wx * py - wy * px;
+    const pSemi = (hm * hm) / mu; /* the semi-latus rectum */
+    const attr = line.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!attr) return false;
+    const segs = attr.count - 1; /* LineLoop: the last point repeats the first */
+    for (let s = 0; s <= segs; s++) {
+      const th = (s / segs) * Math.PI * 2;
+      const rr = pSemi / (1 + e * Math.cos(th));
+      attr.setXYZ(
+        s,
+        focusS[0] + (Math.cos(th) * px + Math.sin(th) * qx) * rr / mPerU,
+        focusS[1] + (Math.cos(th) * py + Math.sin(th) * qy) * rr / mPerU,
+        focusS[2] + (Math.cos(th) * pz + Math.sin(th) * qz) * rr / mPerU,
+      );
+    }
+    attr.needsUpdate = true;
+    line.geometry.computeBoundingSphere();
+    return true;
+  }
+
+  /** R95 — restore a world's hover ellipse to its canon clockwork geometry
+      (the buildBody sampling, replayed in place; home + inner systems). */
+  private rebuildOrbitLineToCanon(line: THREE.Line, data: CosmicBody): void {
+    if (!(data.kind === 'planet' || data.kind === 'dwarf' || data.kind === 'vault')) return;
+    const phys = calculatePhysics(data);
+    const e = phys.eccentricity;
+    const speed = data.orbit.speed || 0.01;
+    const attr = line.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!attr) return;
+    const segs = attr.count - 1;
+    const periodDays = (Math.PI * 2) / speed;
+    for (let s = 0; s <= segs; s++) {
+      const step = (s / segs) * periodDays;
+      const pos = calculateKeplerPosition(data.orbit.a, e, data.orbit.phase, data.orbit.incl, step, speed, data.orbit.node ?? 0, data.orbit.argP ?? 0);
+      attr.setXYZ(s, pos.x, pos.y, pos.z);
+    }
+    attr.needsUpdate = true;
+    line.geometry.computeBoundingSphere();
   }
 
   /**
@@ -6292,6 +6644,17 @@ this.updateBodies(dt);
       /* the isolated inner system lives only when you dive within its disc */
       const near = nodeDist < 1600;
       if (n.inner.visible !== near) n.inner.visible = near;
+      /* R95 — THE DIVE GATE with hysteresis: enter within 1600, leave only
+         beyond 2000 — hovering the boundary must not churn the scope swap
+         (save/restore/seed on every crossing) nor flicker the home realm.
+         Only real inner systems dive: the home galaxy's realm IS the anchor
+         star system at the origin — it can never be a dive. */
+      const dive = !!n.innerSys && nodeDist < (this.galaxyDiveId === n.data.id ? 2000 : 1600);
+      if (dive) {
+        this.galaxyDiveId = n.data.id;
+      } else if (this.galaxyDiveId === n.data.id) {
+        this.galaxyDiveId = null;
+      }
       if (near) this.updateInnerSystem(n, dt, nodeDist);
       /* INNER DISSOLVE — while inside the focused realm its disc and core
          glare fade away (the surface-landing grammar), so the star and its
@@ -6584,6 +6947,7 @@ this.updateBodies(dt);
     this.renderer.setAnimationLoop(null);
     gravityTelemetry.clear();
     disableSimTwin();
+    disableDriver(); /* R92 — one last save of the session memory before rest */
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
     this.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.canvas.removeEventListener('pointerup', this.onPointerUp);

@@ -695,12 +695,18 @@ export default function App() {
      persisted one, not its default. */
   const spacetimeLensOn = state.spacetimeLensing !== false;
   const livingGravityOn = state.livingGravity !== false;
+  /* R94 — THE FLIP (the R91 decree lands): absent flag = ON. From this
+     round the universe boots with true N-body gravity driving the sky;
+     a device where the core can't run gets the clockwork automatically
+     (the freshness law), and the console switch can always restore it. */
+  const universeDriverOn = state.universeDriver !== false;
   useEffect(() => {
     const eng = engineRef.current;
     if (!eng) return;
     eng.setSpacetimeLens(spacetimeLensOn);
     eng.setLivingGravity(livingGravityOn);
-  }, [spacetimeLensOn, livingGravityOn, engineReady]);
+    eng.setUniverseDriver(universeDriverOn);
+  }, [spacetimeLensOn, livingGravityOn, universeDriverOn, engineReady]);
 
   /* EXISTENCE SYNC — the 3D multiverse is rebuilt from the live reality list
      whenever a reality or galaxy is created/edited/deleted, so the scene is

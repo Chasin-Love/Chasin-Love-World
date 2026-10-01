@@ -22,6 +22,10 @@ export const STORAGE_KEYS = {
   cameraView: 'my-universe:camera:v1',
   /** Audio mute flag */
   muted: 'my-universe:muted',
+  /** R91 — the N-body session's saved memory (physics/sessionDriver): roster
+      + states + simDays of the driven universe, so real-gravity drift resumes
+      exactly across close/reopen (the decree: the universe remembers) */
+  simSession: 'my-universe:sim-session:v1',
   /** Vault auto-lock minutes */
   vaultAutolock: 'eventide:autolock',
   /** One-shot comet courier marker */
