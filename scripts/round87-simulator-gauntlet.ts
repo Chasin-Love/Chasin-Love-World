@@ -34,7 +34,7 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 {
   const core = /void NBodySimulator::stepRK4\(\)/.test(cppSrc)
     && /static void computeAccelerations\(/.test(cppSrc)
-    && /constexpr double softening = 1e4; \/\/ gravitational softening parameter \(m\^2\)/.test(cppSrc)
+    && /constexpr double softening = 1e12; \/\/ gravitational softening parameter \(m\^2\)/.test(cppSrc)
     && /void\* cosmos_create_simulator\(\)/.test(cppSrc)
     && /void cosmos_step_simulation\(void\* handle, double dt, int iterations\)/.test(cppSrc);
   check('R87: the C++ core hosts the stateful RK4 N-body simulator', core, 'simulator core incomplete');
@@ -96,7 +96,7 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 {
   const twin = /class TsNBodySim \{/.test(bridgeSrc)
     && /private static readonly G = 6\.67430e-11;/.test(bridgeSrc)
-    && /private static readonly SOFTENING = 1e4;/.test(bridgeSrc)
+    && /private static readonly SOFTENING = 1e12;/.test(bridgeSrc)
     && /private accelerations\(ax: number\[\], ay: number\[\], az: number\[\]\): void/.test(bridgeSrc)
     && /for \(let j = i \+ 1; j < n; \+\+j\)/.test(bridgeSrc)
     && /\(vx0\[i\] \+ vx1\[i\] \* 2\.0 \+ vx2\[i\] \* 2\.0 \+ vx3\[i\]\) \* \(dt \/ 6\.0\)/.test(bridgeSrc);

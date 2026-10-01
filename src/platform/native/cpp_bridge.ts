@@ -101,8 +101,15 @@ async function loadWasm(): Promise<WasmModule | null> {
     /* the WASM artifact is optional (built by CI / scripts/build-wasm.sh into
        public/wasm/, served at the site root in dev and prod alike — R89 moved
        it there from the in-source folder, which the bundled dist could never
-       serve). Root-relative so the probe survives the module's relocation. */
-    const wasmSpec = '/wasm/' + 'cosmos_engine.js';
+       serve). */
+    /* Absolute and computed at runtime — Vite's dev transform wraps dynamic
+       imports in __vite__injectQuery(spec, 'import'), whose helper passes
+       through only specifiers that do NOT start with '.' or '/'; a
+       root-relative path arrived as '/wasm/...?import' and the dev server
+       404s public-dir files under that query. Absolute URLs sail through in
+       dev and resolve identically in prod and Tauri. @vite-ignore still
+       guards the build-time resolver (the artifact may not exist at build). */
+    const wasmSpec = new URL('/wasm/cosmos_engine.js', window.location.origin).href;
     const probe = await fetch(wasmSpec, { method: 'HEAD' });
     if (!probe.ok) return null;
     /* Vite's dev SPA fallback answers missing paths with 200 text/html —
@@ -669,13 +676,16 @@ function keplerPositionTS(
 /* R87 — the TS reference tier of the stateful simulator: a line-faithful
    port of NBodySimulator (cosmos_engine.cpp computeAccelerations + stepRK4).
    SI units (m/kg/s); mutual Newtonian gravity over all pairs with the same
-   1e4 m² softening; the same 4-stage RK4 with the same stage composition.
+   softening; the same 4-stage RK4 with the same stage composition.
    NOT Living Gravity (scene units, element perturbations — a different job):
    this exists so the native simulator can be verified anywhere, on any tier.
    Constants must mirror cosmos_engine.hpp (G_CONST, SOLAR_MASS, AU_METERS). */
 class TsNBodySim {
   private static readonly G = 6.67430e-11;           /* m^3 kg^-1 s^-2 */
-  private static readonly SOFTENING = 1e4;           /* m^2 */
+  /* R95 — 1e12 m² (ε = 1000 km, a planetary scale), mirrored from
+     cosmos_engine.cpp in lockstep (the old 1e4 let encounters sling
+     bodies out of the session). */
+  private static readonly SOFTENING = 1e12;          /* m^2 */
   private px: number[] = []; private py: number[] = []; private pz: number[] = [];
   private vx: number[] = []; private vy: number[] = []; private vz: number[] = [];
   private mass: number[] = [];

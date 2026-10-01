@@ -52,9 +52,12 @@ const pkgSrc = read('../package.json');
 
 /* ==== 2. THE SCOPE SWAP ==== */
 {
+  /* R95 reconciliation: activateScope resolves the adopted sim-days (the
+     boot resume — the engine clock restarts at 0 while the memory's story
+     sits ahead; the universe remembers). */
   const scope = /scopeId: '',/.test(driverSrc)
-    && /export function activateScope\(scopeId: string, bodies: DriverBody\[\], simDays: number\): Promise<void> \{/.test(driverSrc);
-  check('R94: activateScope exists over the driverState scope', scope, 'no scope machinery');
+    && /export function activateScope\(scopeId: string, bodies: DriverBody\[\], simDays: number\): Promise<number \| null> \{/.test(driverSrc);
+  check('R94: activateScope exists over the driverState scope (R95: resolves the adopted clock)', scope, 'no scope machinery');
 
   const swap = /saveSession\(driverState\.scopeId, driverState\.readbackDays, 'scope-swap'\);/.test(driverSrc)
     && /await restoreSession\(saved\);/.test(driverSrc)
@@ -66,9 +69,11 @@ const pkgSrc = read('../package.json');
     && /cosmosBridge\.simStep\(\(chunk \* SECONDS_PER_DAY\) \/ 1000, 1000\)/.test(driverSrc);
   check('R94: the catch-up burst is bounded and moon-resolving (0.25-day sub-steps)', catchup, 'catch-up would either crawl or skip moons');
 
+  /* R95 reconciliation: the activation adopts a saved memory whose story
+     sits ahead of the boot clock (this.simDays = adopted). */
   const tickWants = /driverState\.scopeId !== wantId/.test(engineSrc)
-    && /void activateScope\(wantId, wantBodies, this\.simDays\);/.test(engineSrc);
-  check('R94: the engine activates the wanted scope and ticks the active one', tickWants, 'the tick would drive a sleeping realm');
+    && /void activateScope\(wantId, wantBodies, this\.simDays\)\.then\(\(adopted\) => \{/.test(engineSrc);
+  check('R94: the engine activates the wanted scope and ticks the active one (R95: adopts the remembered clock)', tickWants, 'the tick would drive a sleeping realm');
 }
 
 /* ==== 3. THE INNER SEAM ==== */
@@ -82,10 +87,13 @@ const pkgSrc = read('../package.json');
     && /sys\.corona\.position\.copy\(sys\.starMesh\.position\);/.test(engineSrc);
   check('R94: the inner seam consumes the readback (+1 for the star) and the star ensemble follows its wobble', seam, 'planets would detach from the visual star');
 
-  const innerMoons = /wp\[0\] - p\.group\.position\.x,/.test(engineSrc)
-    && /id: `\$\{data\.id\}:moon:\$\{mi\}`,/.test(engineSrc)
-    && /id: `\$\{p\.data\.id\}:moon:\$\{i\}`,/.test(engineSrc);
-  check('R94: inner moons carry deterministic ids and the world→local seam', innerMoons, 'inner moons stay ornaments');
+  /* R95 reconciliation: MOONS RIDE PARENTS (the R93 amendment) — the inner
+     moons keep their deterministic ids and their closed-form orbits around
+     the parent's session-driven position; the world→local seam retired. */
+  const innerMoons = /id: `\$\{data\.id\}:moon:\$\{mi\}`,/.test(engineSrc)
+    && /id: `\$\{p\.data\.id\}:moon:\$\{i\}`,/.test(engineSrc)
+    && /R95 — MOONS RIDE PARENTS \(the R93 amendment, galaxy frame\)/.test(engineSrc);
+  check('R94: inner moons carry deterministic ids and ride their planet (R95: the ride-parent law)', innerMoons, 'inner moons stay ornaments');
 
   const scopeCheck = /driverState\.scopeId === this\.activeRealityId/.test(engineSrc);
   check('R94: the home seam renders only home-scope readbacks', scopeCheck, 'a galaxy readback would drive the home sky');

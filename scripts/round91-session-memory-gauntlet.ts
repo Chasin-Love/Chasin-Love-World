@@ -88,10 +88,16 @@ const pkgSrc = read('../package.json');
 
 /* ==== 3. THE CANON SEEDS — real masses, SI units ==== */
 {
-  const realMasses = /massKg: phys\.massKg,/.test(driverSrc)
-    && /METERS_PER_SCENE_UNIT = CONSTANTS\.AU \/ 52/.test(driverSrc)
-    && /calculateKeplerPosition\(r\.a, r\.ecc, r\.phase, r\.incl, atDays, r\.speed, r\.node, r\.argP\)/.test(driverSrc);
-  check('R91: the seeding math is the canon (real kg masses, 52 units/AU, exact Kepler solve)', realMasses, 'seeding deviates from the canon');
+  /* R95 reconciliation: the seed is the canon Kepler solve with the
+     orbit-true law on top — the star leads the roster (its own physicsEngine
+     mass), bodies keep phys.massKg except the vault, whose in-session mass
+     is the one its own canon orbit implies (the 10 M☉ display law is
+     untouched elsewhere). */
+  const realMasses = /METERS_PER_SCENE_UNIT = CONSTANTS\.AU \/ 52/.test(driverSrc)
+    && /calculateKeplerPosition\(r\.a, r\.ecc, r\.phase, r\.incl, atDays, r\.speed, r\.node, r\.argP\)/.test(driverSrc)
+    && /massKg: starPhys\.massKg,/.test(driverSrc)
+    && /const vMs = \(vmag \* METERS_PER_SCENE_UNIT\) \/ SECONDS_PER_DAY;/.test(driverSrc);
+  check('R91: the seeding math is the canon solve (52 units/AU, exact Kepler) — R95: star-led roster + orbit-true vault temper', realMasses, 'seeding deviates from the canon');
 
   const cap = /SESSION_BODY_CAP = 4096/.test(driverSrc);
   check('R91: the roster honors the 4096 session cap (the Rust law mirrored)', cap, 'no cap');
@@ -133,7 +139,10 @@ const pkgSrc = read('../package.json');
     && /r\.pos\[0\] \+ r\.vel\[0\] \* dtDays/.test(driverSrc);
   check('R91: the seam read extrapolates position + velocity × Δt', seam, 'no extrapolation');
 
-  const trust = /TRUST_WINDOW_DAYS = 2\.5/.test(driverSrc)
+  /* R95 reconciliation: 2.5 → 8 — with accumulate-before-pending the
+     readback never chronically lags, and the wider window removes the
+     ~83 ms staleness margin that flickered the sky. */
+  const trust = /TRUST_WINDOW_DAYS = 8/.test(driverSrc)
     && /Math\.abs\(dtDays\) > TRUST_WINDOW_DAYS\) return null/.test(driverSrc);
   check('R91: stale readbacks are refused beyond the trust window (null → Kepler fallback)', trust, 'the freshness law is missing');
 

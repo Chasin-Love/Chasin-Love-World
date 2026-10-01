@@ -41,6 +41,15 @@ command -v em++ >/dev/null 2>&1 || { echo "em++ not found — is emsdk active?";
 # silently degrades to TypeScript. Every function the bridge calls must
 # appear here, prefixed with _. The simulator session functions joined
 # the list with R87 (cosmos_create/add/step/get/destroy_simulator).
+#
+# HEAPF64 is load-bearing too: newer emscripten (4.0+) no longer attaches
+# the memory views to the module object by default, and the bridge reads
+# every batch (kepler, physics, body states) straight through HEAPF64.
+# Without this export the whole wasm batch surface throws "Cannot read
+# properties of undefined" on first read — found by the first
+# locally-built artifact (R95); the tier then silently fell back to
+# TypeScript and the session never drove. ccall/cwrap were pinned for the
+# same reason in R87.
 em++ "$SRC/cosmos_engine.cpp" \
   -O3 -ffast-math -msimd128 \
   -std=c++20 \
@@ -48,7 +57,7 @@ em++ "$SRC/cosmos_engine.cpp" \
   -s EXPORT_ES6=1 \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s ENVIRONMENT=web,worker \
-  -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+  -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF64"]' \
   -s EXPORTED_FUNCTIONS='["_cosmos_version","_cosmos_orbit_position","_cosmos_kepler_batch","_cosmos_physics_batch","_cosmos_terrain_fbm","_cosmos_benchmark_rk4","_cosmos_time_dilation","_cosmos_create_simulator","_cosmos_destroy_simulator","_cosmos_add_body","_cosmos_step_simulation","_cosmos_get_body_state","_cosmos_get_body_states","_malloc","_free"]' \
   -o "$OUT/cosmos_engine.js"
 

@@ -62,19 +62,26 @@ const pkgSrc = read('../package.json');
 /* ==== 2. THE SEAM IS THE ONLY WRITER ==== */
 {
   /* R94 reconciliation: the home seam is scope-checked now (inside a
-     galaxy, the home session rests). */
+     galaxy, the home session rests). R95 reconciliation: THE STEADY SEAM —
+     the readback drives through a crossfade (drvBlend) with the star at
+     index 0, so bodies consume drvArr[i + 1] and a source switch eases
+     instead of snapping (the visible flicker was the snap). */
   const seam = /const drvPos = this\.universeDriverOn && driverState\.scopeId === this\.activeRealityId\s*\? driverReadback\(this\.simDays\)\s*: null;/.test(engineSrc)
-    && /if \(drvPos && drvPos\.length > i\) \{/.test(engineSrc)
-    && /px = drvPos\[i\]\[0\];/.test(engineSrc);
-  check('R92: the seam consumes the readback inside updateBodies only', seam, 'driver positions escape the seam');
+    && /const drvArr = drvPos \?\? this\.drvLastPos;/.test(engineSrc)
+    && /if \(drvArr && drvArr\.length > i \+ 1 && this\.drvBlend > 0\) \{/.test(engineSrc)
+    && /b\.group\.position\.set\(px, py, pz\);/.test(engineSrc);
+  check('R92: the seam consumes the readback inside updateBodies only (R95: crossfaded, star-led)', seam, 'driver positions escape the seam');
 
   /* R94 reconciliation: the inner-system seam is the second consumer —
      the import + the home seam + the inner seam. */
   const singleConsumer = (engineSrc.match(/driverReadback/g) || []).length === 3;
   check('R92: driverReadback is consumed only through seams (home + inner)', singleConsumer, 'an unaccounted consumer');
 
-  const fallback = /\} else if \(accelActive && this\.keplerCache\.xyz\.length >= \(i \+ 1\) \* 3\) \{/.test(engineSrc);
-  check('R92: a stale readback falls back to the Kepler solve (the freshness law)', fallback, 'no clockwork fallback in the seam');
+  /* R95 reconciliation: the clockwork anchor (cache → solve) is computed
+     every frame as the blend's other end and the stale fallback. */
+  const fallback = /if \(accelActive && this\.keplerCache\.xyz\.length >= \(i \+ 1\) \* 3\) \{/.test(engineSrc)
+    && /const pos = calculateKeplerPosition\(o\.a, phys\.eccentricity, o\.phase, o\.incl, this\.simDays, o\.speed \|\| 0\.01, o\.node \?\? 0, o\.argP \?\? 0\);/.test(engineSrc);
+  check('R92: a stale readback eases back to the Kepler solve (the freshness law, crossfaded)', fallback, 'no clockwork fallback in the seam');
 
   const noDirectWrites = !/driverReadback\([\s\S]*?\.position\.set/.test(engineSrc.replace(/const drvPos[\s\S]*?b\.group\.position\.set\(px, py, pz\);/, ''));
   check('R92: no driver position write exists outside the single updateBodies write', noDirectWrites, 'a second writer would fight the canon');

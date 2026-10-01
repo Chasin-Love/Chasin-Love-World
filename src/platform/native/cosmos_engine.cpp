@@ -29,7 +29,11 @@ static void computeAccelerations(const std::vector<Vector3>& positions,
                                  std::vector<Vector3>& outAccels) {
     size_t n = positions.size();
     outAccels.assign(n, Vector3{0, 0, 0});
-    constexpr double softening = 1e4; // gravitational softening parameter (m^2)
+    // R95: softening ε = 1000 km (1e12 m²) — a planetary scale. The old 1e4
+    // (100 m) let close encounters reach near-singular accelerations and
+    // sling bodies out of the session at extreme velocity. Mirrored by the
+    // TS twin (cpp_bridge.ts TsNBodySim.SOFTENING) in lockstep.
+    constexpr double softening = 1e12; // gravitational softening parameter (m^2)
 
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = i + 1; j < n; ++j) {
