@@ -23,6 +23,13 @@ emcmake cmake -B "$SRC/build-wasm" -S "$SRC" \
 cmake --build "$SRC/build-wasm" -j "$(nproc 2>/dev/null || echo 4)"
 
 # Produce the Emscripten module the bridge expects (glue JS + .wasm)
+#
+# R87 — EXPORTED_FUNCTIONS is load-bearing: without it the -O3 linker
+# dead-strips every cosmos_* symbol (they have no callers inside the
+# module), and the bridge's ccall() calls throw — the whole WASM tier
+# silently degrades to TypeScript. Every function the bridge calls must
+# appear here, prefixed with _. The simulator session functions joined
+# the list with R87 (cosmos_create/add/step/get/destroy_simulator).
 em++ "$SRC/cosmos_engine.cpp" \
   -O3 -ffast-math -msimd128 \
   -std=c++20 \
@@ -30,6 +37,7 @@ em++ "$SRC/cosmos_engine.cpp" \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s ENVIRONMENT=web,worker \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+  -s EXPORTED_FUNCTIONS='["_cosmos_version","_cosmos_orbit_position","_cosmos_kepler_batch","_cosmos_physics_batch","_cosmos_terrain_fbm","_cosmos_benchmark_rk4","_cosmos_time_dilation","_cosmos_create_simulator","_cosmos_destroy_simulator","_cosmos_add_body","_cosmos_step_simulation","_cosmos_get_body_state","_malloc","_free"]' \
   -o "$OUT/cosmos_engine.js"
 
 echo "wasm module written to $OUT/cosmos_engine.js"
