@@ -32,6 +32,7 @@ import { HIERARCHY_DIALS } from '../realities/hierarchyStages';
 import { generateStellarSystemForGalaxy } from '../realities/galaxyGenerator';
 import { calculateKeplerPosition, calculatePhysics, tiltInPlaneVector } from '../physics/physicsEngine';
 import { LivingGravityField, lensHaloFor, dynamicMassKg, gravityTelemetry, SCENE_UNITS_PER_AU } from '../physics/nbody';
+import { simTwinTick, enableSimTwin, disableSimTwin } from '../physics/simTwin';
 import { cosmosBridge } from '../platform/native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../platform/performance';
 import { isDesktop } from '../platform/desktop/adapter';
@@ -421,6 +422,10 @@ export class UniverseEngine {
   private livingField = new LivingGravityField();
   private livingGravityOn = true;     /* real mutual gravity — ON by default */
   private lastSimDelta = 0;           /* sim-days advanced last frame (element-rate dt) */
+  /* R88 — the per-frame twin gate. OFF by law: the twin runs only when the
+     author flips it from the twin card. simTwin.ts is read-only against the
+     rendered sky (the hybrid ruling holds in every round). */
+  private simTwinOn = false;
   /* The traveler's exact camera + framing at the moment a portal opened.
      leavePortal() cuts straight back to this — closing a diary or the vault
      must never slam the camera to the anchor or sweep it sideways. */
@@ -1765,6 +1770,16 @@ export class UniverseEngine {
   setLivingGravity(on: boolean): void {
     this.livingGravityOn = on;
     if (!on) this.livingField.heal();
+  }
+
+  /* R88 — the per-frame twin gate. The stateful native simulator runs on its
+     own clock alongside the universe, measuring N-body drift from the Kepler
+     canon. Read-only by construction (simTwin.ts never touches rendered
+     state); inert unless the author flips it from the twin card. */
+  setSimTwin(on: boolean): void {
+    this.simTwinOn = on;
+    if (on) enableSimTwin(this.bodies, this.simDays);
+    else disableSimTwin();
   }
 
   /** CANONICAL HEAL — restore the exact canonical paths in one stroke. */
@@ -5464,6 +5479,11 @@ void main(){
 this.updateBodies(dt);
     this.applyKamuiFrame(dt);
     this.updateLivingGravity();
+    /* R88 — the per-frame twin: gated (author flips it from the twin card),
+       fire-and-forget, read-only against the rendered sky. */
+    if (this.simTwinOn && !this.bootIntro) {
+      simTwinTick(this.bodies, this.lastSimDelta, this.simDays);
+    }
     this.updateSpacetimeLens(dt);
     this.updateMeteors(dt);
     this.updateAurora(dt);
@@ -6563,6 +6583,7 @@ this.updateBodies(dt);
     }
     this.renderer.setAnimationLoop(null);
     gravityTelemetry.clear();
+    disableSimTwin();
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
     this.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.canvas.removeEventListener('pointerup', this.onPointerUp);
