@@ -588,6 +588,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | Quality baseline + upgrade roadmap | `docs/EXPERIENCE-REPORT-2026-09-29.md` |
 | Kamui's canon, physics and visual grammar | `docs/KAMUI-RESEARCH.md` |
 | The ported black hole's spec | `docs/PORT-SPEC-webgpu-black-hole.md` |
+| "Why is this leftover code still here?" | `docs/LEFTOVER-CODES-WHY-KEPT-2026-10-01.md` — the standing verdict on every kept item from the R83 census |
 
 ---
 
