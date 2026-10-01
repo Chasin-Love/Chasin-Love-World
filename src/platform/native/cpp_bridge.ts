@@ -53,6 +53,30 @@ interface PhysicsBatchInput {
   simTimeSec: number;
 }
 
+/* R87 — the stateful simulator tier. SI units (m/kg/s): the C++
+ * NBodySimulator's own system (cosmos_engine.hpp G_CONST/AU_METERS). A body
+ * crosses as a plain object; the session lives on the tier itself — the
+ * Rust SIM static, a WASM handle, or the TS twin instance below. */
+export interface SimBodyInput {
+  id: number;
+  mass: number;   /* kg */
+  radius: number; /* meters (informational — gravity uses mass only) */
+  px: number; py: number; pz: number;  /* meters */
+  vx: number; vy: number; vz: number;  /* m/s */
+}
+
+export interface SimBodyState {
+  pos: [number, number, number];
+  vel: [number, number, number];
+}
+
+export interface TwinParityReceipt {
+  maxDelta: number;
+  steps: number;
+  bodies: number;
+  backend: CosmosBackend;
+}
+
 /** Field layout — must stay in lockstep with COSMOS_PHYSICS_FIELD_COUNT in
  * cosmos_engine.hpp and BodyPhysicsData in physicsEngine.ts. */
 export const PHYSICS_FIELD_COUNT = 41;
@@ -118,6 +142,9 @@ class CosmosBridge {
   private initPromise: Promise<CosmosStatus> | null = null;
   private invokeFn: TauriInvoke | null = null;
   private wasm: WasmModule | null = null;
+  /* R87 sim session state — one handle on the wasm tier, one twin on TS */
+  private wasmSimHandle: number | null = null;
+  private readonly tsSim = new TsNBodySim();
 
   /* ------------------------------ lifecycle ------------------------------ */
 
@@ -286,6 +313,118 @@ class CosmosBridge {
     this.tsRk4Burn(nBodies, iterations);
     const seconds = Math.max(0.0001, (performance.now() - t0) / 1000);
     return { opsPerSec: (nBodies * nBodies * iterations) / seconds, backend: this.statusValue.backend };
+  }
+
+  /* ------------------------ stateful simulator session ------------------- */
+  /* R87 — the cosmos_sim_* commands finally get their frontend voice. The
+     session lives on the tier (Rust SIM static / WASM handle / TS twin);
+     configure always resets for a clean deterministic run — the same
+     contract as cosmos_sim_configure in lib.rs. Button-driven consumers
+     only: nothing in the frame loop touches this session. */
+
+  async simConfigure(bodies: SimBodyInput[]): Promise<{ configured: number; backend: CosmosBackend }> {
+    await this.init();
+    if (this.statusValue.backend === 'native-cpp' && this.invokeFn) {
+      /* signature trap: cosmos_sim_configure takes the bodies array
+         directly (Vec<serde_json::Value>) — NO args envelope, and a wrong
+         field name would silently become 0.0 via as_f64().unwrap_or(0.0). */
+      const res = await this.invokeFn<{ configured: number }>('cosmos_sim_configure', { bodies });
+      return { configured: res.configured, backend: 'native-cpp' };
+    }
+    if (this.statusValue.backend === 'wasm' && this.wasm) {
+      const w = this.wasm;
+      if (this.wasmSimHandle !== null) {
+        w.ccall('cosmos_destroy_simulator', null, ['number'], [this.wasmSimHandle]);
+        this.wasmSimHandle = null;
+      }
+      const handle = w.ccall('cosmos_create_simulator', 'number', [], []) as number;
+      if (!handle) throw new Error('simulator unavailable in this build');
+      for (const b of bodies) {
+        w.ccall('cosmos_add_body', null,
+          ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+          [handle, b.id >>> 0, b.mass, b.radius, b.px, b.py, b.pz, b.vx, b.vy, b.vz]);
+      }
+      this.wasmSimHandle = handle;
+      return { configured: bodies.length, backend: 'wasm' };
+    }
+    return { configured: this.tsSim.configure(bodies), backend: 'typescript' };
+  }
+
+  async simStep(dt: number, iterations: number): Promise<{ stepped: number; dt: number; backend: CosmosBackend }> {
+    await this.init();
+    /* mirror the Rust clamp (lib.rs: iterations.clamp(1, 1000)) */
+    const iters = Math.max(1, Math.min(1000, Math.floor(iterations)));
+    if (this.statusValue.backend === 'native-cpp' && this.invokeFn) {
+      const res = await this.invokeFn<{ stepped: number; dt: number }>('cosmos_sim_step', { dt, iterations: iters });
+      return { stepped: res.stepped, dt: res.dt, backend: 'native-cpp' };
+    }
+    if (this.statusValue.backend === 'wasm' && this.wasm && this.wasmSimHandle !== null) {
+      this.wasm.ccall('cosmos_step_simulation', null, ['number', 'number', 'number'], [this.wasmSimHandle, dt, iters]);
+      return { stepped: iters, dt, backend: 'wasm' };
+    }
+    if (this.tsSim.bodyCount === 0) throw new Error('no simulator session — call simConfigure first');
+    this.tsSim.step(dt, iters);
+    return { stepped: iters, dt, backend: 'typescript' };
+  }
+
+  async simBody(index: number): Promise<SimBodyState & { backend: CosmosBackend }> {
+    await this.init();
+    if (this.statusValue.backend === 'native-cpp' && this.invokeFn) {
+      const res = await this.invokeFn<{ pos: number[]; vel: number[] }>('cosmos_sim_body', { index });
+      return { pos: [res.pos[0], res.pos[1], res.pos[2]], vel: [res.vel[0], res.vel[1], res.vel[2]], backend: 'native-cpp' };
+    }
+    if (this.statusValue.backend === 'wasm' && this.wasm && this.wasmSimHandle !== null) {
+      const w = this.wasm;
+      const pp = w._malloc!(3 * 8);
+      const pv = w._malloc!(3 * 8);
+      try {
+        w.ccall('cosmos_get_body_state', null, ['number', 'number', 'number'], [this.wasmSimHandle, index, pp, pv]);
+        const pos = Array.from(w.HEAPF64!.subarray(pp / 8, pp / 8 + 3)) as [number, number, number];
+        const vel = Array.from(w.HEAPF64!.subarray(pv / 8, pv / 8 + 3)) as [number, number, number];
+        return { pos, vel, backend: 'wasm' };
+      } finally {
+        w._free!(pp);
+        w._free!(pv);
+      }
+    }
+    const st = this.tsSim.bodyState(index);
+    if (!st) throw new Error(`sim body index out of range: ${index}`);
+    return { ...st, backend: 'typescript' };
+  }
+
+  /**
+   * R87 — the simulator twin receipt: configure a fixed seeded system on
+   * the active tier, step it, read every body back, and compare against
+   * the TS twin running the identical run. Relative-scaled delta like
+   * verifyParity — both compilers run -ffast-math, so the contract is
+   * agreement to tolerance, never bit-exactness. On the typescript tier
+   * the twin IS the reference, so the receipt reports the trivial 0.
+   */
+  async verifyTwinParity(steps = 120, dt = 86400): Promise<TwinParityReceipt> {
+    await this.init();
+    const bodies = seededSimSystem();
+    const active = await this.simConfigure(bodies);
+    await this.simStep(dt, steps);
+    const states: SimBodyState[] = [];
+    for (let i = 0; i < bodies.length; i++) {
+      const s = await this.simBody(i);
+      states.push({ pos: s.pos, vel: s.vel });
+    }
+    if (active.backend === 'typescript') {
+      return { maxDelta: 0, steps, bodies: bodies.length, backend: 'typescript' };
+    }
+    const reference = new TsNBodySim();
+    reference.configure(bodies);
+    reference.step(dt, steps);
+    let maxDelta = 0;
+    for (let i = 0; i < bodies.length; i++) {
+      const ref = reference.bodyState(i)!;
+      for (let k = 0; k < 3; k++) {
+        maxDelta = Math.max(maxDelta, Math.abs(states[i].pos[k] - ref.pos[k]) / Math.max(1, Math.abs(ref.pos[k])));
+        maxDelta = Math.max(maxDelta, Math.abs(states[i].vel[k] - ref.vel[k]) / Math.max(1, Math.abs(ref.vel[k])));
+      }
+    }
+    return { maxDelta, steps, bodies: bodies.length, backend: active.backend };
   }
 
   /* ------------------------- TS reference implementations ---------------- */
@@ -468,6 +607,166 @@ function keplerPositionTS(
     trueAnomaly,
     currentRadius,
   };
+}
+
+/* R87 — the TS reference tier of the stateful simulator: a line-faithful
+   port of NBodySimulator (cosmos_engine.cpp computeAccelerations + stepRK4).
+   SI units (m/kg/s); mutual Newtonian gravity over all pairs with the same
+   1e4 m² softening; the same 4-stage RK4 with the same stage composition.
+   NOT Living Gravity (scene units, element perturbations — a different job):
+   this exists so the native simulator can be verified anywhere, on any tier.
+   Constants must mirror cosmos_engine.hpp (G_CONST, SOLAR_MASS, AU_METERS). */
+class TsNBodySim {
+  private static readonly G = 6.67430e-11;           /* m^3 kg^-1 s^-2 */
+  private static readonly SOFTENING = 1e4;           /* m^2 */
+  private px: number[] = []; private py: number[] = []; private pz: number[] = [];
+  private vx: number[] = []; private vy: number[] = []; private vz: number[] = [];
+  private mass: number[] = [];
+
+  get bodyCount(): number {
+    return this.mass.length;
+  }
+
+  configure(bodies: SimBodyInput[]): number {
+    /* destroy + recreate semantics: a fresh, deterministic session */
+    this.px = bodies.map((b) => b.px);
+    this.py = bodies.map((b) => b.py);
+    this.pz = bodies.map((b) => b.pz);
+    this.vx = bodies.map((b) => b.vx);
+    this.vy = bodies.map((b) => b.vy);
+    this.vz = bodies.map((b) => b.vz);
+    this.mass = bodies.map((b) => b.mass);
+    return bodies.length;
+  }
+
+  /* computeAccelerations — pairwise i<j pass, Newton's third law, exactly
+     as the C++ static of the same name (softening inside distSq). */
+  private accelerations(ax: number[], ay: number[], az: number[]): void {
+    const n = this.mass.length;
+    for (let i = 0; i < n; ++i) { ax[i] = 0; ay[i] = 0; az[i] = 0; }
+    for (let i = 0; i < n; ++i) {
+      for (let j = i + 1; j < n; ++j) {
+        const dx = this.px[j] - this.px[i];
+        const dy = this.py[j] - this.py[i];
+        const dz = this.pz[j] - this.pz[i];
+        const distSq = dx * dx + dy * dy + dz * dz + TsNBodySim.SOFTENING;
+        const dist = Math.sqrt(distSq);
+        const invDistCube = 1.0 / (distSq * dist);
+        const fi = TsNBodySim.G * this.mass[j] * invDistCube;
+        const fj = TsNBodySim.G * this.mass[i] * invDistCube;
+        ax[i] += dx * fi; ay[i] += dy * fi; az[i] += dz * fi;
+        ax[j] -= dx * fj; ay[j] -= dy * fj; az[j] -= dz * fj;
+      }
+    }
+  }
+
+  /* stepRK4 — the same 4-stage composition: pos_k derives from the previous
+     stage's velocities, vel_k from the previous stage's accelerations, and
+     the combination weights both by dt/6 (1, 2, 2, 1). */
+  step(dt: number, iterations: number): void {
+    const n = this.mass.length;
+    if (n === 0) return;
+    for (let it = 0; it < iterations; ++it) {
+      const px0 = this.px.slice(), py0 = this.py.slice(), pz0 = this.pz.slice();
+      const vx0 = this.vx.slice(), vy0 = this.vy.slice(), vz0 = this.vz.slice();
+      const ax0 = new Array<number>(n).fill(0), ay0 = new Array<number>(n).fill(0), az0 = new Array<number>(n).fill(0);
+      const ax1 = new Array<number>(n).fill(0), ay1 = new Array<number>(n).fill(0), az1 = new Array<number>(n).fill(0);
+      const ax2 = new Array<number>(n).fill(0), ay2 = new Array<number>(n).fill(0), az2 = new Array<number>(n).fill(0);
+      const ax3 = new Array<number>(n).fill(0), ay3 = new Array<number>(n).fill(0), az3 = new Array<number>(n).fill(0);
+      const px1 = new Array<number>(n), py1 = new Array<number>(n), pz1 = new Array<number>(n);
+      const vx1 = new Array<number>(n), vy1 = new Array<number>(n), vz1 = new Array<number>(n);
+      const px2 = new Array<number>(n), py2 = new Array<number>(n), pz2 = new Array<number>(n);
+      const vx2 = new Array<number>(n), vy2 = new Array<number>(n), vz2 = new Array<number>(n);
+      const px3 = new Array<number>(n), py3 = new Array<number>(n), pz3 = new Array<number>(n);
+      const vx3 = new Array<number>(n), vy3 = new Array<number>(n), vz3 = new Array<number>(n);
+
+      this.accelerations(ax0, ay0, az0);
+
+      for (let i = 0; i < n; ++i) {
+        px1[i] = px0[i] + vx0[i] * (0.5 * dt);
+        py1[i] = py0[i] + vy0[i] * (0.5 * dt);
+        pz1[i] = pz0[i] + vz0[i] * (0.5 * dt);
+        vx1[i] = vx0[i] + ax0[i] * (0.5 * dt);
+        vy1[i] = vy0[i] + ay0[i] * (0.5 * dt);
+        vz1[i] = vz0[i] + az0[i] * (0.5 * dt);
+      }
+      this.px = px1.slice(); this.py = py1.slice(); this.pz = pz1.slice();
+      this.accelerations(ax1, ay1, az1);
+      this.px = px0.slice(); this.py = py0.slice(); this.pz = pz0.slice();
+
+      for (let i = 0; i < n; ++i) {
+        px2[i] = px0[i] + vx1[i] * (0.5 * dt);
+        py2[i] = py0[i] + vy1[i] * (0.5 * dt);
+        pz2[i] = pz0[i] + vz1[i] * (0.5 * dt);
+        vx2[i] = vx0[i] + ax1[i] * (0.5 * dt);
+        vy2[i] = vy0[i] + ay1[i] * (0.5 * dt);
+        vz2[i] = vz0[i] + az1[i] * (0.5 * dt);
+      }
+      this.px = px2.slice(); this.py = py2.slice(); this.pz = pz2.slice();
+      this.accelerations(ax2, ay2, az2);
+      this.px = px0.slice(); this.py = py0.slice(); this.pz = pz0.slice();
+
+      for (let i = 0; i < n; ++i) {
+        px3[i] = px0[i] + vx2[i] * dt;
+        py3[i] = py0[i] + vy2[i] * dt;
+        pz3[i] = pz0[i] + vz2[i] * dt;
+        vx3[i] = vx0[i] + ax2[i] * dt;
+        vy3[i] = vy0[i] + ay2[i] * dt;
+        vz3[i] = vz0[i] + az2[i] * dt;
+      }
+      this.px = px3.slice(); this.py = py3.slice(); this.pz = pz3.slice();
+      this.accelerations(ax3, ay3, az3);
+      this.px = px0.slice(); this.py = py0.slice(); this.pz = pz0.slice();
+
+      for (let i = 0; i < n; ++i) {
+        this.px[i] += (vx0[i] + vx1[i] * 2.0 + vx2[i] * 2.0 + vx3[i]) * (dt / 6.0);
+        this.py[i] += (vy0[i] + vy1[i] * 2.0 + vy2[i] * 2.0 + vy3[i]) * (dt / 6.0);
+        this.pz[i] += (vz0[i] + vz1[i] * 2.0 + vz2[i] * 2.0 + vz3[i]) * (dt / 6.0);
+        this.vx[i] += (ax0[i] + ax1[i] * 2.0 + ax2[i] * 2.0 + ax3[i]) * (dt / 6.0);
+        this.vy[i] += (ay0[i] + ay1[i] * 2.0 + ay2[i] * 2.0 + ay3[i]) * (dt / 6.0);
+        this.vz[i] += (az0[i] + az1[i] * 2.0 + az2[i] * 2.0 + az3[i]) * (dt / 6.0);
+      }
+    }
+  }
+
+  bodyState(index: number): SimBodyState | null {
+    if (index < 0 || index >= this.mass.length) return null;
+    return {
+      pos: [this.px[index], this.py[index], this.pz[index]],
+      vel: [this.vx[index], this.vy[index], this.vz[index]],
+    };
+  }
+}
+
+/** R87 — deterministic seeded system for twin parity: the same bodies on
+ * every tier, every call. A 1 M☉ star at the origin and five planets on
+ * near-circular AU-scale orbits with exact circular velocities (SI). */
+function seededSimSystem(): SimBodyInput[] {
+  let seed = 0x5f3759df >>> 0;
+  const rnd = (): number => {
+    seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+    seed >>>= 0;
+    return seed / 0xffffffff;
+  };
+  const G = 6.67430e-11;
+  const M_SUN = 1.98847e30;
+  const AU = 1.495978707e11;
+  const bodies: SimBodyInput[] = [
+    { id: 0, mass: M_SUN, radius: 6.9634e8, px: 0, py: 0, pz: 0, vx: 0, vy: 0, vz: 0 },
+  ];
+  for (let i = 1; i <= 5; i++) {
+    const r = AU * (0.7 + 0.6 * i) * (0.95 + 0.1 * rnd());
+    const v = Math.sqrt((G * M_SUN) / r);
+    const theta = rnd() * Math.PI * 2;
+    bodies.push({
+      id: i,
+      mass: (0.3 + 3 * rnd()) * 5.972e24,
+      radius: 6.371e6,
+      px: r * Math.cos(theta), py: 0, pz: r * Math.sin(theta),
+      vx: -v * Math.sin(theta), vy: 0, vz: v * Math.cos(theta),
+    });
+  }
+  return bodies;
 }
 
 export const cosmosBridge = new CosmosBridge();
