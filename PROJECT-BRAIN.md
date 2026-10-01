@@ -235,6 +235,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The deep audit | R83 *(on main)* | The author's decree: report-only census of every bug, orphan, dead end and hidden seam, plus a deep debug of their own changes (testOne sky swap, the Version 17.1 mirror churn, the Version 18 license deletion). Six real findings — headline: the desktop `sky/status` seam can never match (exact-path switch vs query-bearing caller), so desktop never shows a boot sky. NOTHING in the app changed. `docs/ROUND-83-THE-DEEP-AUDIT-2026-09-30.md` is the decision queue |
 | The ascending nodes | R84 *(on main)* | The author's realism decree: orbits may not all ride one flat sheet. The missing logic was found (every node line was hardwired to +X; no periapsis angle) and added end-to-end: `Orbit.node`/`Orbit.argP`, the exact R(Ω)·R(i)·R(ω) composition in one shared helper used by solver, moons, star-wobble and Living Gravity, C++/WASM/Rust/bridge parity, real J2000 elements pinned into Sol-Prime (JPL Table 1), exoplanet-spice codegen (steep + near-polar tail, full-circle nodes), toroidal asteroid belts. The four test realities deleted at the author's ruling. New round84 gauntlet in the verify chain |
 | The six seams | R85 *(on branch `r85-the-six-seams`, NOT in main — verified 2026-10-01)* | The author's ruling on the R83 decision queue, executed on an isolated branch: the desktop sky/status seam finally matches (one line — the boot photo sky lives again), `/api/realities/write-data` gains its Tauri twin (the reality mirror lands on desktop; the deterministic 5-retry burn dies), both chain-dead routes deleted at every layer (`list_folders` stays — the daemon uses it), `releaseBlackHolesUnder` disposes every hole visual at all three teardown paths (the listener/marcher leak dies), both void events removed (R55's full-erase honored — removal, not re-wiring), the lying vault facade tail deleted and `isNova` adopted by `novaScan` (the keyring shadow renamed `isBreached`); then the mechanical sweep iterated to the audit's fixed point — **zero dead value/type exports, 1147 unused imports removed**; `THIRD-PARTY-NOTICES.md` restored verbatim and `BUILD` → R85. `docs/ROUND-85-THE-SIX-SEAMS-2026-10-01.md` |
+| The full purge | R86 *(on branch `r85-the-six-seams`, NOT in main — verified 2026-10-01)* | The author's three-bucket ruling on the R83 Part III census, executed: Bucket A deleted (two orphaned engine methods, five write-only fields, the false-parity `__ACTIONS__` seam, the dead `subjectBadge` prop, the console-tab CSS family + `--color-danger`, the 512×512 orphan icon, 11 historical verify PNGs, the never-invoked `store_payload_list/stats` pair at both Rust layers). Bucket B wired (persist.ts uses `STORAGE_KEYS.universeStateRecovery` — one source of truth on the locked surface; `realityDaemon.stop()` finally called from SIGINT/SIGTERM; the R83-2 seed guard refuses Sol-Prime mirror writes at client, server and desktop twin). Bucket C kept with reasons (`reducedMotion` as the law-gap hook, `__MY_UNIVERSE_PERF__`, state timestamps, `note.txt`, `cosmos_sim_*`). THE ROUND'S LESSON: `.kamui-disappear`/`kamuiVortexOut` were deleted as audit-dead CSS and round18's gauntlet instantly failed — restored verbatim; the census ledger gains "looks dead but is gauntlet-pinned" (the gauntlets outrank the auditor). `docs/ROUND-86-THE-FULL-PURGE-2026-10-01.md` |
 
 ---
 
@@ -258,7 +259,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (cameraRig orbit/glide grammar, touch grammar, 3.5 s summon, ROUND-68/69 docs) plus R71
   step 3 ("zoom never crosses"; changes in `engine.ts`, `stageThresholds.ts`, `kamuiPhases.ts`,
   `cameraRig.ts`, round18 gauntlet) and uncommitted step-3 transform scripts. `r85-the-six-seams`
-  carries R85 (below). Treat all of it as experimental until the author merges it.
+  carries R85 and R86 (below). Treat all of it as experimental until the author merges it.
 - **R85 (this round, on branch `r85-the-six-seams`):** the R83 decision queue executed at the
   author's ruling. The six seams: `mapRealityEndpoint` switches on the bare route (the boot
   photo sky lives on desktop again); the `write-data` desktop twin (`reality_write_data`,
@@ -277,6 +278,18 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   unprovable here (no MSVC toolchain — covers R84's FFI and R85's `reality_write_data`
   alike); the 3 dead CSS classes and the remaining R83 ledger rows wait for their own
   rulings.
+- **R86 (this round, same branch):** the R83 Part III census settled by the author's
+  three-bucket ruling. Deleted: `zoomToDemonCore`, `portalBodyRadiusForReverse`,
+  `scripts/test-upload.ts`, the five write-only engine fields (`arrivalZoom`,
+  `_camMemStable`, `echoShowerClock`, `skyApplying`, `timeScale`), `__ACTIONS__`,
+  `subjectBadge`, the console-tab CSS + `--color-danger`, the 512×512 icon, 11 historical
+  verify PNGs, the dead `store_payload_list/stats` Rust pair. Wired: the recovery-key
+  constant in persist.ts, `realityDaemon.stop()` on shutdown signals, and the R83-2 seed
+  guard (Sol-Prime mirror writes refused at client/server/desktop — the Version 17.1
+  churn is now impossible). Kept with reasons: `reducedMotion` (law-gap hook),
+  `__MY_UNIVERSE_PERF__`, the state timestamps, `note.txt`, `cosmos_sim_*`. The lesson:
+  `.kamui-disappear`/`kamuiVortexOut` were deleted as audit-dead CSS, round18's gauntlet
+  failed, both restored — the census's new category is "looks dead but is gauntlet-pinned."
 - **R72 (this round):** the membrane Kamui arrival is STAGED — the summon holds the traveler's
   stage and dial for the full choreography and the throat hands the multiverse over through the
   dying vortex (the R67 grammar carried to `beginStageWarp`); the eject face is untouched (its
@@ -441,13 +454,16 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   R84 and R85).
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); `cargo check` proof on a toolchained host (R84's FFI
-  extension + R85's `reality_write_data` twin, both reviewed but never compiled here);
-  the R83 ledger's unruled rows (3 dead CSS classes, the `store_payload_list`/`stats` Rust
-  pair, write-only fields, `window.__ACTIONS__`, orphan PNGs, the `realityDaemon.stop()`
-  adopt-or-cut seam). RESOLVED in R85: the desktop sky seam, the write-data twin, the
-  chain-dead routes, the black hole dispose leak, both void events, the lying facade, the
-  isNova shadow, the dead-export/unused-import census (fixed point), the MIT notice, the
-  stale `BUILD` constant.
+  extension + R85's `reality_write_data` twin + R86's seed guard, all reviewed but never
+  compiled here); the engine-side reduced-motion law gap (the portal beats don't honor
+  `prefers-reduced-motion` at the engine level — `engine.reducedMotion` is the waiting
+  hook). RESOLVED in R85: the desktop sky seam, the write-data twin, the chain-dead
+  routes, the black hole dispose leak, both void events, the lying facade, the isNova
+  shadow, the dead-export/unused-import census (fixed point), the MIT notice, the stale
+  `BUILD` constant. RESOLVED in R86: the never-called code, the write-only engine fields,
+  the `__ACTIONS__`/`subjectBadge` dead seams, the dead CSS rows, the orphan assets, the
+  dead Rust pair, the recovery-key dual source, the unwired `realityDaemon.stop()`, the
+  R83-2 seed-write churn risk.
 - **Experience baseline:** 8.3/10 overall (see `docs/EXPERIENCE-REPORT-2026-09-29.md` for the
   persona-by-persona audit). The gap to 9+ is *signage*, not capability.
 

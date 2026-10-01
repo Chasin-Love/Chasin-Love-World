@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-30T20:28:48.423Z",
+  "generatedAt": "2026-10-01T03:26:04.938Z",
   "fileCount": 136,
   "deadExports": [],
   "deadTypes": [],
@@ -509,11 +509,11 @@
     "scripts/round79-sky-gauntlet.ts": 81,
     "scripts/round84-inclination-gauntlet.ts": 160,
     "scripts/smoke.ts": 233,
-    "server/index.ts": 85,
+    "server/index.ts": 95,
     "server/paths.ts": 35,
     "server/realityDaemon.ts": 464,
     "server/realityTemplates.ts": 153,
-    "server/routes/realities.ts": 255,
+    "server/routes/realities.ts": 262,
     "server/routes/sky.ts": 94,
     "server/skyStore.ts": 251,
     "src/App.tsx": 1544,
@@ -556,7 +556,7 @@
     "src/realities/index.ts": 361,
     "src/realities/solPrime/index.ts": 52,
     "src/realities/types.ts": 55,
-    "src/state/actions.ts": 1257,
+    "src/state/actions.ts": 1262,
     "src/state/index.ts": 12,
     "src/state/persist.ts": 398,
     "src/state/store.ts": 146,
@@ -663,7 +663,7 @@
     ],
     [
       "src/state/actions.ts",
-      1257
+      1262
     ],
     [
       "src/ui/vault/sandbox.tsx",
@@ -710,7 +710,7 @@
       "server/skyStore.ts:7",
       "server/skyStore.ts:64",
       "src-tauri/src/realities.rs:3",
-      "src-tauri/src/realities.rs:490"
+      "src-tauri/src/realities.rs:500"
     ],
     "generated-code imports": [
       "server/realityTemplates.ts:44",
@@ -806,8 +806,8 @@
       "src/state/actions.ts:354",
       "src/state/actions.ts:377",
       "src/state/actions.ts:399",
-      "src/state/actions.ts:432",
-      "src/state/actions.ts:480",
+      "src/state/actions.ts:437",
+      "src/state/actions.ts:485",
       "src/ui/reality/CreateRealityModal.tsx:69",
       "src-tauri/src/realities.rs:437"
     ],
