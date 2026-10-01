@@ -61,6 +61,11 @@ warning, and the census ledger gains a new category: **"looks dead but is gauntl
   hook, and reduced-motion variants for every portal beat are LAW. Wiring the portal
   beats to honor it is its own small round if wanted; deleting it would amputate the
   fix-point.
+  **Addendum, same day — the author's ruling:** after reading this ledger, the author
+  REJECTED engine-side reduced motion outright: "I make the Kamui violent — that makes
+  the Kamui the Kamui." The probe was deleted with the decree and the portal beats will
+  never honor `prefers-reduced-motion` (§6 carries the law note; do not resurrect
+  unasked). The CSS-level handling for console UI stays as shipped.
 - `window.__MY_UNIVERSE_PERF__` — opt-in (`?perf`) console diagnostic. Tooling, not
   weight.
 - The four write-only state timestamps (`visitedAt`, `lastSyncTime`, `lastScrubAt`,

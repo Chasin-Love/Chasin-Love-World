@@ -29,29 +29,33 @@ and the auditor ever disagree with a gauntlet, the gauntlet wins.
 
 ---
 
-## The reduced-motion story (the author's question, answered)
+## The reduced-motion story (the author's question, answered — and then RULED)
 
 **The analogy, confirmed with one word fixed:** imagine you enable your system's
-"reduce animations" setting — then yes, the Kamui becomes **less violent**: the screen
-bend, the vortex spin, the shakes all calm down. But **not less powerful** — the one word
-to fix in the analogy. The jutsu still completes: the tear still opens, the throat still
-hands off, you still arrive where you were going. Reduced motion is an accessibility
-promise: **the function stays, the violence of the presentation calms.** Nothing is lost;
-the journey just stops throwing the traveler around.
+"reduce animations" setting — then yes, the Kamui would become **less violent**: the
+screen bend, the vortex spin, the shakes all calm down. But **not less powerful** — the
+one word to fix in the analogy. Reduced motion is an accessibility promise: **the
+function stays, the violence of the presentation calms.** The jutsu still completes.
 
-**And yes — "reduced-motion variants for every portal beat" is talking about the Kamui.**
-The "portal beats" are the beats of the portal choreography: the summon hold, the tear,
-the vortex, the throat handoff, the eject — plus the other big motion beats (galaxy
-dives, the multiverse crossing).
+**And yes — "reduced-motion variants for every portal beat" was talking about the
+Kamui.** The "portal beats" are the beats of the portal choreography: the summon hold,
+the tear, the vortex, the throat handoff, the eject.
 
-**The honest current state (the law-gap):** if you turned on "reduce animations" in
-Windows today, the calm reaches only the CSS layer — some console animations, a tilt
-button, the scenic backdrop. The big 3D beats — the Kamui itself, the camera dives —
-would **not** obey it yet. `engine.reducedMotion` is the field that already reads the
-setting and waits: it is the hook that future round plugs into the portal beats. That
-round, if you want it, would look like: reduced motion ON → shorter summon, no screen
-bend, gentler vortex, faster handoff — same destination, same result, calm ride. Say the
-word and it becomes a round.
+**THE AUTHOR'S RULING (same day):** after reading this explanation, the author rejected
+the feature outright: *"I make the Kamui violent — that makes the Kamui the Kamui. I do
+not need it."* That is a creative decree, and it is final:
+
+- The `engine.reducedMotion` probe was **deleted** (it existed only as the hook for this
+  feature — with the feature rejected it was pure waste, as the census originally said).
+- The portal beats will **never** honor `prefers-reduced-motion`. This is recorded as a
+  law note in PROJECT-BRAIN §6, in the same standing as the R66b revert: **do not
+  resurrect it unasked.**
+- What stays: the CSS-level `prefers-reduced-motion` handling for the *console UI*
+  (some settings animations) — that shipped long ago, calms no Kamui beat, and was never
+  part of this question.
+
+So the verdict on this row flipped from "kept as a hook" to "deleted by decree" — and
+that is the correct end for it: the author built the violence on purpose.
 
 ---
 
@@ -59,8 +63,7 @@ word and it becomes a round.
 
 | Leftover | What it actually is | Why it stays |
 | :-- | :-- | :-- |
-| `engine.reducedMotion` | The engine's one read of your OS "reduce animations" setting — currently a hook with nothing attached | The reduced-motion law needs a fix-point in the engine; this is it (see the story above) |
-| `prefers-reduced-motion` (in CSS + two console components) | The law's *living implementation* — it already calms the CSS-level animations | It is not leftover code at all; it is active law. Listed here only so nobody "cleans it up" by mistake |
+| `prefers-reduced-motion` (in CSS + two console components) | The law's *living implementation* for the console UI — it calms settings animations | It is not leftover code at all; it is active code. Listed here only so nobody "cleans it up" by mistake. (The Kamui itself will never honor it — author's decree, see the story above) |
 | `window.__MY_UNIVERSE_PERF__` | A hidden diagnostic port: launch with `?perf` in the URL, read performance numbers in the browser console (F12) | Costs nothing unless asked for; a mechanic's flashlight, not an engine part |
 | `visitedAt`, `lastSyncTime`, `lastScrubAt`, `startedAt` | Maintenance stickers written into saved data: when you last visited, when the disk mirror last synced, when the encrypted storage last had its integrity scrub, when that scrub started | Written into everyone's save files; removing them reshapes every user's saved data for zero visible gain |
 | `note.txt` | The author's own hand-written folder map of the repo | It's yours; accurate; not an AI's file to delete |
@@ -101,10 +104,10 @@ twin). What that means in practice:
 
 ## When to revisit this list
 
-- **You want the reduced-motion round** — the Kamui honoring the OS setting (calm ride,
-  same arrival). The hook is already in place.
 - **You build a storage browser** — the deleted `store_payload_list/stats` Rust pair is
   one `git show` away from history; resurrection is trivial.
 - **You fold `note.txt` into `docs/`** — your call someday; the map is accurate.
 - **A future audit flags any of these items again** — this document is the standing
   verdict; update it rather than re-litigating each item from scratch.
+- **One closed door, permanently:** engine-side reduced motion for the Kamui is rejected
+  by decree ("the violence IS the Kamui") — it is not a revisit candidate.

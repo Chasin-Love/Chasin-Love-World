@@ -356,7 +356,9 @@ export class UniverseEngine {
   /* Inner-galaxy worlds are synthetic runtime bodies, so their portal target
      must be resolved from the isolated system rather than the home body list. */
   private portalTargetInnerId: string | null = null;
-  private reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  /* R86 authorial decree: the engine-side reduced-motion probe is DELETED and
+     the portal beats will never honor prefers-reduced-motion — the violence
+     IS the Kamui. Do not resurrect this field unasked (see §6's law note). */
   private portalWasInner = false;
   /* The dial value the entry zoom lands at / eases back to. */
   private portalEnterDial = 0;
