@@ -26,7 +26,7 @@
  * R92's engine gate arbitrates: while the driver is enabled, the card's
  * Verify rests (the ownership pattern the twin card already implements).
  */
-import { calculatePhysics, calculateKeplerPosition, CONSTANTS } from './physicsEngine';
+import { calculatePhysics, calculateKeplerPosition, tiltInPlaneVector, CONSTANTS } from './physicsEngine';
 import type { CosmicBody } from '../domain/universe';
 import { cosmosBridge, type SimBodyInput, type SimBodyState } from '../platform/native/cpp_bridge';
 import { STORAGE_KEYS } from '../platform/storageKeys';
@@ -50,6 +50,9 @@ const TRUST_WINDOW_DAYS = 2.5;
 const SAVE_EVERY_N_READBACKS = 8;
 /** Mirror of the Rust session cap (lib.rs cosmos_sim_configure). */
 const SESSION_BODY_CAP = 4096;
+/** R93 — the moon mass law: diary moons are rock at the BODY_PROFILES
+ *  fallback density (the same 3.5 g/cm³ physicsEngine gives unknown ids). */
+const MOON_DENSITY_KG_M3 = 3500;
 
 export interface DriverDrift {
   deviationAU: number;
@@ -63,8 +66,9 @@ export const driverState = {
   enabled: false,
   configured: false,
   pending: false,
-  /** roster signature — a change (reality switch, body edit) reconfigures
-      WITH drift preserved (reconfigure-from-current-state) */
+  /** roster signature — a change (reality switch, body edit, diary moons
+      born or lost) reconfigures WITH drift preserved (reconfigure-from-
+      current-state) */
   signature: '',
   realityId: '',
   /** sim-days stamp of the freshest readback (the extrapolation anchor) */
@@ -79,6 +83,11 @@ export const driverState = {
 
 export interface DriverRosterEntry {
   id: string;
+  /** 'body' = a canon world (Kepler elements); 'moon' = a diary moon whose
+   *  canon is the PARENT's state plus its own inclined local orbit (R93). */
+  kind: 'body' | 'moon';
+  /** for moons: the parent body's roster id */
+  parentId?: string;
   a: number;
   ecc: number;
   phase: number;
@@ -103,29 +112,63 @@ export interface SessionSave {
   backend: string;
 }
 
-type DriverBody = { data: CosmicBody };
+/** A diary moon as the engine feeds it (RuntimeMoon's physics fields —
+ *  mesh excluded). Moons without an id/radius are skipped (ornament-only
+ *  fallback), so the contract stays tolerant across engine versions.
+ *  Module-private: the engine passes its bodies structurally, no import. */
+interface DriverMoonSpec {
+  id?: string;
+  a: number;
+  speed: number;
+  phase: number;
+  incl?: number;
+  node?: number;
+  radius?: number;
+}
 
-/* the driver's private roster mirror: element sets + masses, in feed order.
-   The eccentricity is physicsEngine-derived (the Orbit contract doesn't
-   carry it) — the same value Living Gravity's nodes use. */
+type DriverBody = { data: CosmicBody; moons?: DriverMoonSpec[] };
+
+/* the driver's private roster mirror: element sets + masses, in feed order
+   (bodies first, then their moons — the engine's prefix seam reads bodies
+   by index; moons are looked up by id). The eccentricity is physicsEngine-
+   derived (the Orbit contract doesn't carry it) — the same value Living
+   Gravity's nodes use. */
 let roster: DriverRosterEntry[] = [];
+
+/** Moon ids are DETERMINISTIC (parentId + index), so surviving moons carry
+ *  their states across churn and the story never resets. */
+function moonId(planetId: string, index: number): string {
+  return `${planetId}:moon:${index}`;
+}
+
+/** The moon's mass: rock at the profile-fallback density, from its radius
+ *  (the same radiusKm = (r/2.05)·6371 law every body obeys). */
+function moonMassKg(radiusScene: number): number {
+  const radiusM = (radiusScene / 2.05) * 6.371e6;
+  return (4 / 3) * Math.PI * radiusM * radiusM * radiusM * MOON_DENSITY_KG_M3;
+}
 
 /* the freshest readback, already converted to scene space: positions at
    driverState.readbackDays + velocities in scene-units per day. */
 let readback: Array<{ pos: [number, number, number]; vel: [number, number, number] }> = [];
 
 function rosterSignature(bodies: DriverBody[]): string {
-  return `${driverState.realityId}::${bodies.map((b) => b.data.id).join('|')}`;
+  const ids: string[] = [];
+  for (const b of bodies) {
+    ids.push(b.data.id);
+    for (const m of b.moons ?? []) if (m.id) ids.push(m.id);
+  }
+  return `${driverState.realityId}::${ids.join('|')}`;
 }
 
-/** Build the driver roster from the engine's runtime bodies. Physical masses
-    come from physicsEngine (star = 1 M☉, hole/vault = 10 M☉, planets from
-    radius³ × profile density) — the same law the twin lab obeys. */
-function syncRoster(bodies: DriverBody[], simDays: number): void {
-  roster = bodies.slice(0, SESSION_BODY_CAP).map((b) => {
+/** Build the full roster (bodies + diary moons) from the engine's bodies. */
+function buildRoster(bodies: DriverBody[], simDays: number): DriverRosterEntry[] {
+  const entries: DriverRosterEntry[] = [];
+  for (const b of bodies) {
     const phys = calculatePhysics(b.data, simDays);
-    return {
+    entries.push({
       id: b.data.id,
+      kind: 'body',
       a: b.data.orbit.a,
       ecc: phys.eccentricity,
       phase: b.data.orbit.phase,
@@ -135,14 +178,67 @@ function syncRoster(bodies: DriverBody[], simDays: number): void {
       argP: b.data.orbit.argP ?? 0,
       radius: b.data.radius,
       massKg: phys.massKg,
-    };
-  });
+    });
+  }
+  for (const b of bodies) {
+    (b.moons ?? []).forEach((m, i) => {
+      if (!m.id || !m.radius) return; /* ornament-only moon — not a body yet */
+      if (m.id !== moonId(b.data.id, i)) return; /* stale mesh — next sync fixes it */
+      entries.push({
+        id: m.id,
+        kind: 'moon',
+        parentId: b.data.id,
+        a: m.a,
+        ecc: 0, /* moons ride circular inclined orbits (the engine's own law) */
+        phase: m.phase,
+        incl: m.incl ?? 0,
+        speed: m.speed,
+        node: m.node ?? 0,
+        argP: 0,
+        radius: m.radius,
+        massKg: moonMassKg(m.radius),
+      });
+    });
+  }
+  return entries.slice(0, SESSION_BODY_CAP);
+}
+
+/** Build the driver roster from the engine's runtime bodies — bodies first,
+ *  then their diary moons (R93: every moon is a real body, rock at the
+ *  profile-fallback density). The 4096 cap still rules the whole roster. */
+function syncRoster(bodies: DriverBody[], simDays: number): void {
+  roster = buildRoster(bodies, simDays);
+  rebuildParentIndex();
   driverState.signature = rosterSignature(bodies);
 }
 
-/** Canonical scene-space position of a roster entry at a given sim-day. */
+/** Index lookup for moon→parent composition (rebuilt with the roster). */
+const parentIndex = new Map<string, number>();
+function rebuildParentIndex(): void {
+  parentIndex.clear();
+  roster.forEach((r, i) => {
+    if (r.kind === 'body') parentIndex.set(r.id, i);
+  });
+}
+
+/** Canonical scene-space position of a roster entry at a given sim-day.
+ *  Bodies solve Kepler; moons compose the PARENT's canon position with
+ *  their own inclined local orbit — including the engine's vertical bob,
+ *  so the session seeds EXACTLY what the ornament sky shows (the flip is
+ *  seamless at t=0 and diverges honestly after). */
 function canonPos(index: number, atDays: number): [number, number, number] {
   const r = roster[index];
+  if (r.kind === 'moon') {
+    const pIdx = parentIndex.get(r.parentId ?? '');
+    const base = pIdx !== undefined ? canonPos(pIdx, atDays) : [0, 0, 0] as [number, number, number];
+    const ma = r.phase + atDays * r.speed;
+    const mp = tiltInPlaneVector(Math.cos(ma) * r.a, Math.sin(ma) * r.a, r.incl, r.node);
+    return [
+      base[0] + mp.x,
+      base[1] + mp.y + Math.sin(ma * 0.7) * r.a * 0.12 * Math.cos(r.incl),
+      base[2] + mp.z,
+    ];
+  }
   const p = calculateKeplerPosition(r.a, r.ecc, r.phase, r.incl, atDays, r.speed, r.node, r.argP);
   return [p.x, p.y, p.z];
 }
@@ -251,22 +347,9 @@ async function reconfigurePreserving(bodies: DriverBody[], simDays: number): Pro
     });
   }
 
-  const newRoster = bodies.slice(0, SESSION_BODY_CAP).map((b) => {
-    const phys = calculatePhysics(b.data, simDays);
-    return {
-      id: b.data.id,
-      a: b.data.orbit.a,
-      ecc: phys.eccentricity,
-      phase: b.data.orbit.phase,
-      incl: b.data.orbit.incl,
-      speed: b.data.orbit.speed,
-      node: b.data.orbit.node ?? 0,
-      argP: b.data.orbit.argP ?? 0,
-      radius: b.data.radius,
-      massKg: phys.massKg,
-    };
-  });
+  const newRoster = buildRoster(bodies, simDays);
   roster = newRoster;
+  rebuildParentIndex();
   driverState.signature = rosterSignature(bodies);
   driverTelemetry.clear();
 
@@ -364,6 +447,7 @@ export function loadSession(realityId: string): SessionSave | null {
 export async function restoreSession(save: SessionSave): Promise<number> {
   driverState.realityId = save.realityId;
   roster = save.roster;
+  rebuildParentIndex();
   driverState.signature = save.signature;
   driverTelemetry.clear();
   const res = await cosmosBridge.simConfigure(inputsFromStates(save.states));
@@ -483,6 +567,31 @@ export function driverReadback(simDays: number): Array<[number, number, number]>
     r.pos[1] + r.vel[1] * dtDays,
     r.pos[2] + r.vel[2] * dtDays,
   ]);
+}
+
+/**
+ * R93 — THE MOON SEAM READ: the same extrapolation as driverReadback, keyed
+ * by moon id (`${planetId}:moon:${index}`). The engine converts world →
+ * local per moon (session world − parent group position; the body groups
+ * never rotate, so the subtraction is exact). Same freshness law: null when
+ * the driver has nothing trustworthy — the ornament closed-form renders.
+ */
+export function driverMoonReadback(simDays: number): Map<string, [number, number, number]> | null {
+  if (!driverState.enabled || !driverState.configured || readback.length === 0) return null;
+  const dtDays = simDays - driverState.readbackDays;
+  if (!Number.isFinite(dtDays) || Math.abs(dtDays) > TRUST_WINDOW_DAYS) return null;
+  const map = new Map<string, [number, number, number]>();
+  roster.forEach((r, i) => {
+    if (r.kind !== 'moon') return;
+    const st = readback[i];
+    if (!st) return;
+    map.set(r.id, [
+      st.pos[0] + st.vel[0] * dtDays,
+      st.pos[1] + st.vel[1] * dtDays,
+      st.pos[2] + st.vel[2] * dtDays,
+    ]);
+  });
+  return map;
 }
 
 /** Flip the driver on. The engine owns the gate; roster sync + seeding (or

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-01T07:48:21.872Z",
-  "fileCount": 144,
+  "generatedAt": "2026-10-01T08:57:45.252Z",
+  "fileCount": 146,
   "deadExports": [
     {
       "symbol": "buildRosterInputs",
@@ -551,10 +551,12 @@
     "scripts/round79-sky-gauntlet.ts": 81,
     "scripts/round84-inclination-gauntlet.ts": 160,
     "scripts/round87-simulator-gauntlet.ts": 137,
-    "scripts/round88-per-frame-twin-gauntlet.ts": 103,
+    "scripts/round88-per-frame-twin-gauntlet.ts": 105,
     "scripts/round90-reachable-twin-gauntlet.ts": 83,
     "scripts/round91-session-memory-gauntlet.ts": 154,
     "scripts/round92-driver-shadow-gauntlet.ts": 142,
+    "scripts/round92-live-check.ts": 138,
+    "scripts/round93-real-moons-gauntlet.ts": 116,
     "scripts/smoke.ts": 233,
     "server/index.ts": 95,
     "server/paths.ts": 35,
@@ -572,7 +574,7 @@
     "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 6684,
+    "src/engine/engine.ts": 6708,
     "src/engine/math.ts": 42,
     "src/engine/shaders.ts": 1542,
     "src/engine/surface/UniverseSurfaceManager.ts": 546,
@@ -587,11 +589,11 @@
     "src/main.tsx": 17,
     "src/physics/nbody.ts": 321,
     "src/physics/physicsEngine.ts": 438,
-    "src/physics/sessionDriver.ts": 528,
+    "src/physics/sessionDriver.ts": 637,
     "src/physics/simTwin.ts": 233,
     "src/platform/audio.ts": 536,
     "src/platform/desktop/adapter.ts": 275,
-    "src/platform/native/cpp_bridge.ts": 839,
+    "src/platform/native/cpp_bridge.ts": 844,
     "src/platform/performance.ts": 115,
     "src/platform/sentiment/sentiment.ts": 117,
     "src/platform/simClock.ts": 27,
@@ -681,7 +683,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      6684
+      6708
     ],
     [
       "src/ui/diary/DiaryWindow.tsx",
@@ -725,7 +727,7 @@
     ],
     [
       "src/platform/native/cpp_bridge.ts",
-      839
+      844
     ],
     [
       "src/ui/vault/viewers.tsx",
@@ -736,8 +738,8 @@
       704
     ],
     [
-      "src/ui/hud/MultiverseBar.tsx",
-      616
+      "src/physics/sessionDriver.ts",
+      637
     ]
   ],
   "pathEncode": {

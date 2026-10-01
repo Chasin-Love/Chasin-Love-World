@@ -37,7 +37,7 @@ import { simTwinTick, enableSimTwin, disableSimTwin } from '../physics/simTwin';
    engine (the canon seeds, the clockwork falls back, Restore heals). The
    driver module itself never writes rendered state — the updateBodies seam
    below is the only writer, exactly as the round92 gauntlet pins. */
-import { driverTick, driverReadback, enableDriver, disableDriver, healDriver } from '../physics/sessionDriver';
+import { driverTick, driverReadback, driverMoonReadback, enableDriver, disableDriver, healDriver } from '../physics/sessionDriver';
 import { cosmosBridge } from '../platform/native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../platform/performance';
 import { isDesktop } from '../platform/desktop/adapter';
@@ -162,7 +162,7 @@ interface RuntimeBody {
   streakRing?: THREE.Mesh;
   streakTarget?: number;
   streakDays?: number;
-  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number; node?: number }[];
+  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number; node?: number; id?: string; radius?: number }[];
   extras?: THREE.ShaderMaterial[];
   orbitLine?: THREE.LineLoop;
   ghost: number;
@@ -192,7 +192,7 @@ interface InnerPlanet {
   spinMesh?: THREE.Mesh;
   spinRate?: number;
   cloudSpinRate?: number;
-  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number; node?: number }[];
+  moons: { mesh: THREE.Mesh; a: number; speed: number; phase: number; incl?: number; node?: number; id?: string; radius?: number }[];
   orbitLine?: THREE.LineLoop;
   streakRing?: THREE.Mesh;
   streakTarget?: number;
@@ -4705,6 +4705,10 @@ void main(){
         b.group.add(mesh);
         b.moons.push({
           mesh,
+          /* R93 — deterministic id + radius: the session driver's churn keys
+             (surviving moons carry their states) and the moon mass law's input */
+          id: `${b.data.id}:moon:${i}`,
+          radius: mr,
           a: b.data.radius * (1.75 + 0.55 * i) + (b.data.rings ? b.data.radius * 1.5 : 0),
           speed: (Math.PI * 2) / (14 + i * 8),
           phase: seed * 6.28,
@@ -5796,6 +5800,8 @@ this.updateBodies(dt);
        hover colliders, diaries, the lens and the surface all read the
        groups and follow for free. */
     const drvPos = this.universeDriverOn ? driverReadback(this.simDays) : null;
+    /* R93 — the moon seam read: same extrapolation, keyed by moon id */
+    const drvMoons = this.universeDriverOn ? driverMoonReadback(this.simDays) : null;
 
     for (let i = 0; i < this.bodies.length; i++) {
       const b = this.bodies[i];
@@ -5883,6 +5889,24 @@ this.updateBodies(dt);
       }
 
       b.moons.forEach((m) => {
+        /* R93 — THE MOON SEAM: when the driver owns the sky and its readback
+           is fresh, the session's world position IS the moon (real gravity,
+           the planet's real motion included); local = world − parent (the
+           body groups never rotate, so the subtraction is exact). A stale
+           readback leaves the ornament closed-form below — the freshness
+           law, moon edition. */
+        if (drvMoons && m.id) {
+          const wp = drvMoons.get(m.id);
+          if (wp) {
+            m.mesh.position.set(
+              wp[0] - b.group.position.x,
+              wp[1] - b.group.position.y,
+              wp[2] - b.group.position.z,
+            );
+            m.mesh.visible = b.fade * sysW * (1 - b.ghost) > 0.05;
+            return;
+          }
+        }
         const ma = m.phase + this.simDays * m.speed;
         /* each moon rides its OWN inclined plane at its OWN node — no shared
            moon-sheet, and no shared crossing line either (R84) */
