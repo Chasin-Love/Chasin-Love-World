@@ -695,12 +695,17 @@ export default function App() {
      persisted one, not its default. */
   const spacetimeLensOn = state.spacetimeLensing !== false;
   const livingGravityOn = state.livingGravity !== false;
+  /* R92 — the universe driver (the R91 decree, in shadow): absent = OFF this
+     round, so nothing changes until the author flips the switch; R94 flips
+     the default to ON. */
+  const universeDriverOn = state.universeDriver === true;
   useEffect(() => {
     const eng = engineRef.current;
     if (!eng) return;
     eng.setSpacetimeLens(spacetimeLensOn);
     eng.setLivingGravity(livingGravityOn);
-  }, [spacetimeLensOn, livingGravityOn, engineReady]);
+    eng.setUniverseDriver(universeDriverOn);
+  }, [spacetimeLensOn, livingGravityOn, universeDriverOn, engineReady]);
 
   /* EXISTENCE SYNC — the 3D multiverse is rebuilt from the live reality list
      whenever a reality or galaxy is created/edited/deleted, so the scene is

@@ -133,6 +133,10 @@ export interface UniverseState {
   /* Round 14 — physics toggles (persisted; absent flag = ON, no migration) */
   spacetimeLensing?: boolean;  /* Einstein lensing — masses bend the light passing them */
   livingGravity?: boolean;     /* true mutual N-body coupling (osculating elements) */
+  /* R92 — the universe driver (the R91 decree, in shadow). Absent flag =
+      OFF this round (nothing changes until the author flips the switch);
+      R94 flips the default to ON (absent = the session drives). */
+  universeDriver?: boolean;   /* true N-body gravity drives the rendered sky */
   customRealityDescriptions?: Record<string, string>;
   customRealities?: any[];
   deletedRealityIds?: string[];

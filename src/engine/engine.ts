@@ -33,6 +33,11 @@ import { generateStellarSystemForGalaxy } from '../realities/galaxyGenerator';
 import { calculateKeplerPosition, calculatePhysics, tiltInPlaneVector } from '../physics/physicsEngine';
 import { LivingGravityField, lensHaloFor, dynamicMassKg, gravityTelemetry, SCENE_UNITS_PER_AU } from '../physics/nbody';
 import { simTwinTick, enableSimTwin, disableSimTwin } from '../physics/simTwin';
+/* R91 decree — the session driver: the N-body session becomes the sky's
+   engine (the canon seeds, the clockwork falls back, Restore heals). The
+   driver module itself never writes rendered state — the updateBodies seam
+   below is the only writer, exactly as the round92 gauntlet pins. */
+import { driverTick, driverReadback, enableDriver, disableDriver, healDriver } from '../physics/sessionDriver';
 import { cosmosBridge } from '../platform/native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../platform/performance';
 import { isDesktop } from '../platform/desktop/adapter';
@@ -426,6 +431,13 @@ export class UniverseEngine {
      author flips it from the twin card. simTwin.ts is read-only against the
      rendered sky (the hybrid ruling holds in every round). */
   private simTwinOn = false;
+  /* R92 — the universe driver gate (the R91 decree, in shadow). OFF by law
+     this round: the N-body session drives the rendered sky only when the
+     author flips it from the twin card. The flip owns the session (the
+     twin lab and Verify Twin rest while the driver runs) and the seam in
+     updateBodies consumes the extrapolated readback — stale frames fall
+     back to the Kepler solve by the freshness law, silently. */
+  private universeDriverOn = false;
   /* The traveler's exact camera + framing at the moment a portal opened.
      leavePortal() cuts straight back to this — closing a diary or the vault
      must never slam the camera to the anchor or sweep it sideways. */
@@ -1782,9 +1794,33 @@ export class UniverseEngine {
     else disableSimTwin();
   }
 
-  /** CANONICAL HEAL — restore the exact canonical paths in one stroke. */
+  /* R92 — THE UNIVERSE DRIVER GATE (the R91 decree, in shadow). When it
+     turns on, the driver owns the simulator session: the twin lab is
+     stopped first (one session per tier — last writer wins, so the driver
+     must be it). When it turns off, the session memory is saved one last
+     time (disableDriver) and the clockwork takes the sky back. */
+  setUniverseDriver(on: boolean): void {
+    this.universeDriverOn = on;
+    if (on) {
+      if (this.simTwinOn) {
+        this.simTwinOn = false;
+        disableSimTwin();
+      }
+      void enableDriver(this.bodies, this.simDays, this.activeRealityId);
+    } else {
+      disableDriver();
+    }
+  }
+
+  /** CANONICAL HEAL — restore the exact canonical paths in one stroke.
+      R91 decree: when the driver owns the sky, the heal also re-seeds the
+      driving session from the canon and wipes its saved memory — chaos
+      resets to the divine plan, exactly as the clockwork heal does. */
   healLivingGravity(): void {
     this.livingField.heal();
+    if (this.universeDriverOn) {
+      void healDriver(this.bodies, this.simDays, this.activeRealityId);
+    }
   }
 
   /** Per-frame lensing driver — each massive body's direction from the
@@ -5478,11 +5514,23 @@ void main(){
     });
 this.updateBodies(dt);
     this.applyKamuiFrame(dt);
-    this.updateLivingGravity();
+    /* R92 decree law: while the driver owns the sky, Living Gravity's
+       osculating-element writer stands down — the session IS the living
+       gravity now (mutual, real, the vault at its full 10 M☉). The toggle
+       keeps working the moment the clockwork takes the sky back. */
+    if (this.livingGravityOn && !this.universeDriverOn) {
+      this.updateLivingGravity();
+    }
     /* R88 — the per-frame twin: gated (author flips it from the twin card),
        fire-and-forget, read-only against the rendered sky. */
     if (this.simTwinOn && !this.bootIntro) {
       simTwinTick(this.bodies, this.lastSimDelta, this.simDays);
+    }
+    /* R92 — the universe driver: gated (author flips it from the twin
+       card), fire-and-forget with its own pending guard; the seam in
+       updateBodies consumes its readback. */
+    if (this.universeDriverOn && !this.bootIntro) {
+      driverTick(this.bodies, this.lastSimDelta, this.simDays);
     }
     this.updateSpacetimeLens(dt);
     this.updateMeteors(dt);
@@ -5738,11 +5786,26 @@ this.updateBodies(dt);
       void this.refreshKeplerCache();
     }
 
+    /* R92 — THE SEAM (the R91 decree): when the driver owns the sky and its
+       readback is fresh, the session's extrapolated positions ARE the
+       universe — real mutual gravity driving every world. A stale or absent
+       readback returns null and the Kepler solve renders the frame instead
+       (the freshness law: the same trust-window rule the keplerCache
+       obeys). This is the ONLY place the driver's positions reach the
+       scene, and it flows through the same write below — camera targets,
+       hover colliders, diaries, the lens and the surface all read the
+       groups and follow for free. */
+    const drvPos = this.universeDriverOn ? driverReadback(this.simDays) : null;
+
     for (let i = 0; i < this.bodies.length; i++) {
       const b = this.bodies[i];
       const o = b.data.orbit;
       let px: number, py: number, pz: number;
-      if (accelActive && this.keplerCache.xyz.length >= (i + 1) * 3) {
+      if (drvPos && drvPos.length > i) {
+        px = drvPos[i][0];
+        py = drvPos[i][1];
+        pz = drvPos[i][2];
+      } else if (accelActive && this.keplerCache.xyz.length >= (i + 1) * 3) {
         px = this.keplerCache.xyz[3 * i];
         py = this.keplerCache.xyz[3 * i + 1];
         pz = this.keplerCache.xyz[3 * i + 2];
@@ -6584,6 +6647,7 @@ this.updateBodies(dt);
     this.renderer.setAnimationLoop(null);
     gravityTelemetry.clear();
     disableSimTwin();
+    disableDriver(); /* R92 — one last save of the session memory before rest */
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
     this.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.canvas.removeEventListener('pointerup', this.onPointerUp);

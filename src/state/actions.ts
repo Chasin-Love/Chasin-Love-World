@@ -168,6 +168,15 @@ export const actions = {
     notify();
   },
 
+  /* R92 — the universe driver (the R91 decree, in shadow). The switch the
+     twin card flips: the N-body session takes the rendered sky (real mutual
+     gravity, the canon as seed), and the clockwork becomes fallback + heal. */
+  setUniverseDriver(on: boolean) {
+    state.universeDriver = on;
+    audit(`[The Real Universe] True N-body gravity ${on ? 'now drives the sky — the clockwork rests as seed, fallback and heal' : 'stands down — the Kepler clockwork takes the sky back'}`);
+    notify();
+  },
+
   resetRealityDescription(realityId: string) {
     if (state.customRealityDescriptions) {
       delete state.customRealityDescriptions[realityId];

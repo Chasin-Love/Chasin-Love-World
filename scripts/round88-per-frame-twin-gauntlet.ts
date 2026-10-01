@@ -77,7 +77,9 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 
 /* ==== 4. THE CARD — ownership discipline ==== */
 {
-  const ownership = /disabled=\{busy \|\| twinOn\}/.test(cardSrc)
+  /* R92 reconciliation: the driver (the R91 decree) also owns the session
+     when it drives — Verify rests for EITHER owner. */
+  const ownership = /disabled=\{busy \|\| twinOn( \|\| driverOn)?\}/.test(cardSrc)
     && /The per-frame twin owns the session/.test(cardSrc);
   check('R88: Verify Twin rests while the per-frame twin owns the session', ownership, 'session collision possible');
 

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-01T07:32:43.752Z",
-  "fileCount": 143,
+  "generatedAt": "2026-10-01T07:48:21.872Z",
+  "fileCount": 144,
   "deadExports": [
     {
       "symbol": "buildRosterInputs",
@@ -11,21 +11,6 @@
       "symbol": "saveSession",
       "file": "src/physics/sessionDriver.ts",
       "action": "de-export"
-    },
-    {
-      "symbol": "driverTick",
-      "file": "src/physics/sessionDriver.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "enableDriver",
-      "file": "src/physics/sessionDriver.ts",
-      "action": "delete"
-    },
-    {
-      "symbol": "disableDriver",
-      "file": "src/physics/sessionDriver.ts",
-      "action": "delete"
     }
   ],
   "deadTypes": [
@@ -75,6 +60,7 @@
     "src/engine/systems/stageThresholds.ts": 1,
     "src/physics/nbody.ts": 2,
     "src/physics/physicsEngine.ts": 6,
+    "src/physics/sessionDriver.ts": 2,
     "src/physics/simTwin.ts": 2,
     "src/platform/audio.ts": 4,
     "src/platform/desktop/adapter.ts": 6,
@@ -93,7 +79,7 @@
     "src/realities/solPrime/index.ts": 1,
     "src/realities/types.ts": 4,
     "src/state/actions.ts": 1,
-    "src/state/index.ts": 23,
+    "src/state/index.ts": 24,
     "src/state/persist.ts": 2,
     "src/state/store.ts": 3,
     "src/ui/CoreMode.tsx": 1,
@@ -230,6 +216,7 @@
     "src/engine/engine.ts → src/engine/systems/stageThresholds.ts",
     "src/engine/engine.ts → src/physics/nbody.ts",
     "src/engine/engine.ts → src/physics/physicsEngine.ts",
+    "src/engine/engine.ts → src/physics/sessionDriver.ts",
     "src/engine/engine.ts → src/physics/simTwin.ts",
     "src/engine/engine.ts → src/platform/desktop/adapter.ts",
     "src/engine/engine.ts → src/platform/native/cpp_bridge.ts",
@@ -380,8 +367,10 @@
     "src/ui/console/QuantumBinTab.tsx → src/platform/sync/realitySync.ts",
     "src/ui/console/QuantumBinTab.tsx → src/state/index.ts",
     "src/ui/console/QuantumBinTab.tsx → src/ui/toast.ts",
+    "src/ui/console/SimulatorTwinCard.tsx → src/physics/sessionDriver.ts",
     "src/ui/console/SimulatorTwinCard.tsx → src/physics/simTwin.ts",
     "src/ui/console/SimulatorTwinCard.tsx → src/platform/native/cpp_bridge.ts",
+    "src/ui/console/SimulatorTwinCard.tsx → src/state/index.ts",
     "src/ui/console/SimulatorTwinCard.tsx → src/ui/toast.ts",
     "src/ui/diary/AttachmentEditor.tsx → src/ui/toast.ts",
     "src/ui/diary/Book.tsx → src/platform/audio.ts",
@@ -565,6 +554,7 @@
     "scripts/round88-per-frame-twin-gauntlet.ts": 103,
     "scripts/round90-reachable-twin-gauntlet.ts": 83,
     "scripts/round91-session-memory-gauntlet.ts": 154,
+    "scripts/round92-driver-shadow-gauntlet.ts": 142,
     "scripts/smoke.ts": 233,
     "server/index.ts": 95,
     "server/paths.ts": 35,
@@ -573,8 +563,8 @@
     "server/routes/realities.ts": 262,
     "server/routes/sky.ts": 94,
     "server/skyStore.ts": 251,
-    "src/App.tsx": 1544,
-    "src/domain/universe.ts": 167,
+    "src/App.tsx": 1549,
+    "src/domain/universe.ts": 171,
     "src/domain/vault.ts": 176,
     "src/engine/blackholeParams.ts": 125,
     "src/engine/blackholeRaymarch.ts": 585,
@@ -582,7 +572,7 @@
     "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 6620,
+    "src/engine/engine.ts": 6684,
     "src/engine/math.ts": 42,
     "src/engine/shaders.ts": 1542,
     "src/engine/surface/UniverseSurfaceManager.ts": 546,
@@ -615,7 +605,7 @@
     "src/realities/index.ts": 361,
     "src/realities/solPrime/index.ts": 52,
     "src/realities/types.ts": 55,
-    "src/state/actions.ts": 1262,
+    "src/state/actions.ts": 1271,
     "src/state/index.ts": 12,
     "src/state/persist.ts": 398,
     "src/state/store.ts": 146,
@@ -634,7 +624,7 @@
     "src/ui/console/CppNativeEngineCard.tsx": 269,
     "src/ui/console/QuantumBinTab.tsx": 342,
     "src/ui/console/ScenicBackdrop.tsx": 354,
-    "src/ui/console/SimulatorTwinCard.tsx": 215,
+    "src/ui/console/SimulatorTwinCard.tsx": 305,
     "src/ui/console/TiltButton.tsx": 83,
     "src/ui/console/backdropStore.ts": 142,
     "src/ui/diary/AttachmentEditor.tsx": 495,
@@ -691,7 +681,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      6620
+      6684
     ],
     [
       "src/ui/diary/DiaryWindow.tsx",
@@ -699,7 +689,7 @@
     ],
     [
       "src/App.tsx",
-      1544
+      1549
     ],
     [
       "src/engine/shaders.ts",
@@ -718,12 +708,12 @@
       1280
     ],
     [
-      "src/ui/diary/MediaPlates.tsx",
+      "src/state/actions.ts",
       1271
     ],
     [
-      "src/state/actions.ts",
-      1262
+      "src/ui/diary/MediaPlates.tsx",
+      1271
     ],
     [
       "src/ui/vault/sandbox.tsx",
@@ -858,16 +848,16 @@
       "src/platform/sync/realitySync.ts:65",
       "src/platform/sync/realitySync.ts:66",
       "src/platform/sync/realitySync.ts:120",
-      "src/state/actions.ts:204",
-      "src/state/actions.ts:211",
-      "src/state/actions.ts:249",
-      "src/state/actions.ts:257",
-      "src/state/actions.ts:324",
-      "src/state/actions.ts:354",
-      "src/state/actions.ts:377",
-      "src/state/actions.ts:399",
-      "src/state/actions.ts:437",
-      "src/state/actions.ts:485",
+      "src/state/actions.ts:213",
+      "src/state/actions.ts:220",
+      "src/state/actions.ts:258",
+      "src/state/actions.ts:266",
+      "src/state/actions.ts:333",
+      "src/state/actions.ts:363",
+      "src/state/actions.ts:386",
+      "src/state/actions.ts:408",
+      "src/state/actions.ts:446",
+      "src/state/actions.ts:494",
       "src/ui/reality/CreateRealityModal.tsx:69",
       "src-tauri/src/realities.rs:437"
     ],

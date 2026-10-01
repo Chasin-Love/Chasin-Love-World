@@ -105,6 +105,11 @@ async function loadWasm(): Promise<WasmModule | null> {
     const wasmSpec = '/wasm/' + 'cosmos_engine.js';
     const probe = await fetch(wasmSpec, { method: 'HEAD' });
     if (!probe.ok) return null;
+    /* Vite's dev SPA fallback answers missing paths with 200 text/html —
+       importing that would throw a loud console error for a perfectly
+       normal "no artifact yet" host. The artifact is optional; only a real
+       JavaScript response may be imported (the silent-fallback contract). */
+    if (!(probe.headers.get('content-type') || '').includes('javascript')) return null;
     /* @vite-ignore — the artifact is optional and may not exist at build time */
     const mod = await import(/* @vite-ignore */ wasmSpec);
     /* EXPORT_ES6 gives a default export; older glue assigns the global name —
