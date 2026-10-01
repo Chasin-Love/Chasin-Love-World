@@ -244,12 +244,17 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | The native simulator | R87 *(merged to main and SHIPPED in v15.0.9 — verified 2026-10-01)* | The author accepted the hybrid ruling: Kepler stays the clockwork sky, the stateful N-body simulator (which the C++ core had hosted all along — RK4, SI units, 4096 bodies) becomes the verified interactive layer. The bridge gained `simConfigure/simStep/simBody` on all three tiers (native invoke with the no-args-envelope trap documented, WASM session handle, and a line-faithful TS RK4 twin of the C++ integrator) + `verifyTwinParity()`; the **Native Simulator Twin** card joined the Core Console (button-driven only — the frame loop never touches the session, nothing can move the rendered sky); round87-simulator-gauntlet (14 checks) joined the verify chain. AND A HIDDEN BUG DIED: build-wasm.sh declared no EXPORTED_FUNCTIONS, so -O3 dead-stripped every cosmos_* symbol — the whole WASM tier, batches included, had been silently degrading to TypeScript since the artifact first existed; the script now pins the full bridge surface. `docs/ROUND-87-THE-NATIVE-SIMULATOR-2026-10-01.md` |
 | The per-frame twin | R88 *(on branch `r88-per-frame-twin`, branched from main at v15.0.9, NOT merged — verified 2026-10-01)* | The author's "yeah please": the stateful simulator now runs ALONGSIDE the live universe — `src/physics/simTwin.ts` accumulates the live clock, fires the shared native session every ~2 sim-days (fire-and-forget, never blocking the frame), reads every body back, and publishes per-body drift-from-Kepler-canon in AU to its own module map (real physical masses — the vault is 10 M☉ here). The engine hook is one gated call (OFF by law, flipped from the twin card through `__ENGINE__`); the card gains the RUN/STOP toggle and a 1 Hz live drift readout; session ownership explicit (Verify Twin rests while the twin runs). round88-per-frame-twin-gauntlet (12 checks) machine-enforces the hybrid law: simTwin.ts must never write rendered state. The drift curve is the evidence base for any future round that lets the simulator drive. `docs/ROUND-88-THE-PER-FRAME-TWIN-2026-10-01.md` |
 | The everywhere core | R89 *(same branch as R88 — verified 2026-10-01)* | The author's "build the best, at once": the browser tier comes alive automatically, forever. The WASM artifact moves to `public/wasm/` (Vite serves it at root in dev AND copies it into dist — the old in-source probe path could NEVER load in the bundled app), the build gains EXPORT_ES6 (a true importable module; the bridge accepts default-export or global glue), build-wasm.sh tolerates the AVX2 CMake stage and hard-gates on em++, and CI gains a `wasm` job: pinned cached emsdk, builds + uploads the artifact, **commits it back to the tree on main pushes** (bot, `[skip ci]`, on-change only) and the release job attaches it to every v* release. After the first green run the compiled C++ core ships everywhere — the browser badge reads WASM KERNEL and the twin card runs compiled physics in a plain tab. `docs/ROUND-89-THE-EVERYWHERE-CORE-2026-10-01.md` |
+| The reachable twin | R90 *(on main, on top of v15.0.10 — verified 2026-10-01)* | The author's report that the Native Simulator Twin card (and Verify Twin with it) could not be scrolled into view reproduced as a **cascade-layer trap**: `.cc-root { position: relative }` — unlayered author CSS — silently defeated the markup's Tailwind v4 `fixed inset-0` (unlayered beats layered, always), the deck fell into document flow at 2023 px inside an `overflow: hidden` page, its internal scroller engaged only 26 px, and the twin card sat at y=1059 of an 800 px viewport, unreachable. Fix: `.cc-root` declares `position: fixed; inset: 0` in CSS itself (utilities now only agree) — scroll range 26 px → 1249 px. Plus the Twin Jump: an always-visible top-bar seal that lands the dashboard tab, scrolls `#simulator-twin-card` into view and flashes it — with a measured safety net (a frame-starved window advances no smooth scroll, so the jump snaps instantly if the card hasn't arrived in 900 ms) and `overscroll-contain` on the deck's scroll body. Live-verified end-to-end: seal click → card in view → Verify Twin → receipt. `docs/ROUND-90-THE-REACHABLE-TWIN-2026-10-01.md` |
 
 ---
 
-## 8. CURRENT STATE (as of 2026-10-01, after R85 — on branch; main's tip is R84 / v15.0.8)
+## 8. CURRENT STATE (as of 2026-10-01, after R90 — main's tip is v15.0.10 / R88+R89, now carrying R90)
 
-- **`main` is the blessed reference.** Its tip is the R84 ascending nodes
+- **`main` is the blessed reference.** Its tip is R90 on top of **v15.0.10**
+  (R88 the per-frame twin + R89 the everywhere core, merged from `r88-per-frame-twin`
+  and shipped 2026-10-01 — CI commits the WASM artifact back and attaches it to releases)
+  on top of **v15.0.9** (R85 the six seams → R86 the full purge → R87 the native
+  simulator) on top of the R84 ascending nodes
   on top of the R82 voice chain
   (R82 the Kamui speaks → R82.2 exhale removed → R82.3 return voice → R82.4 the time
   mirror → R82.5 the prewarmed mirror) on top of the R79 one sky
@@ -267,11 +272,24 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (cameraRig orbit/glide grammar, touch grammar, 3.5 s summon, ROUND-68/69 docs) plus R71
   step 3 ("zoom never crosses"; changes in `engine.ts`, `stageThresholds.ts`, `kamuiPhases.ts`,
   `cameraRig.ts`, round18 gauntlet) and uncommitted step-3 transform scripts. `r85-the-six-seams`
-  carries R85, R86 and R87 — **merged to `main` and SHIPPED as v15.0.9 (tag pushed
-  2026-10-01; CI builds the installers; the updater card delivers them)**. `r88-per-frame-twin`
-  (branched from main at the tag) carries R88 and R89 (the everywhere core — CI compiles the
-  C++ core to WASM and commits the artifact back). Treat branch work as experimental until
+  and `r88-per-frame-twin` are both **merged to `main` and SHIPPED** (v15.0.9 = R85+R86+R87;
+  v15.0.10 = R88+R89, tagged 2026-10-01). Treat branch work as experimental until
   the author merges it.
+- **R90 (this round, on main):** the author's report — the Native Simulator Twin card
+  (Verify Twin with it) could not be scrolled into view in the Core Console — reproduced
+  by live measurement and traced to a **Tailwind v4 cascade-layer trap**: `.cc-root`'s
+  unlayered `position: relative` silently beat the markup's layered `fixed inset-0`, so
+  the deck rendered as a 2023 px in-flow block inside an `overflow: hidden` page, its
+  internal scroller engaged only 26 px, and the twin card sat 259 px below the fold —
+  unreachable. The fix is load-bearing and in CSS itself: `.cc-root` declares
+  `position: fixed; inset: 0` (scroll range 26 px → 1249 px). On top of it, the **Twin
+  Jump**: an always-visible top-bar seal (`#cc-twin-jump-btn`) that lands the dashboard
+  tab, scrolls `#simulator-twin-card` into view, flashes it (2.2 s violet ring, instant
+  under reduced motion), and carries a measured safety net — a frame-starved window
+  (0 rAF ticks in 2 s, measured) never advances a smooth scroll, so the jump snaps
+  instantly if the card hasn't arrived in 900 ms. `overscroll-contain` on the deck's
+  scroll body. Full verify chain green twice; live end-to-end: seal click → card in
+  view → Verify Twin → verified receipt.
 - **R85 (this round, on branch `r85-the-six-seams`):** the R83 decision queue executed at the
   author's ruling. The six seams: `mapRealityEndpoint` switches on the bare route (the boot
   photo sky lives on desktop again); the `write-data` desktop twin (`reality_write_data`,

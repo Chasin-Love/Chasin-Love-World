@@ -1315,7 +1315,16 @@ input[type='range'].pw-range::-webkit-slider-thumb {
    reads the --cc variable, so the deck recolors per tab with zero JS. */
 
 .cc-root {
-  position: relative;
+  /* Viewport-locked, in CSS itself. The markup also carries Tailwind's
+     `fixed inset-0`, but Tailwind v4 layers its utilities BELOW unlayered
+     author CSS — this rule's `position: relative` used to win the cascade,
+     the deck fell back into document flow, grew to its content height
+     (2× the viewport) with html/body overflow hidden, and everything below
+     the fold — the Native Simulator Twin card among it — became
+     unreachable. Declaring fixed+inset here is the load-bearing fix; the
+     utilities now only agree with it. */
+  position: fixed;
+  inset: 0;
   --cc: 34 211 238; /* fallback = dashboard teal */
 
   /* elevation scale — tunable depth in one place */

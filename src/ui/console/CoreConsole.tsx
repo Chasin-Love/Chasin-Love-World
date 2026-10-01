@@ -780,6 +780,69 @@ export const CoreConsole: React.FC<Props> = ({
   const backdrop = useConsoleBackdrop();
   const [studioOpen, setStudioOpen] = useState(false);
 
+  /* TWIN JUMP — the Native Simulator Twin card (and its Verify Twin button)
+     sits deep in the dashboard bento, below the fold on short viewports, so
+     the deck carries a one-click way to reach it from anywhere: land on the
+     dashboard, scroll the card into view, flash it so the eye catches it.
+     Honors the reduced-motion safety net. */
+  const twinCardRef = useRef<HTMLDivElement>(null);
+  const [twinJumpArmed, setTwinJumpArmed] = useState(false);
+  const [twinFlashed, setTwinFlashed] = useState(false);
+  const twinFlashTimerRef = useRef<number | null>(null);
+
+  const revealTwinCard = (el: HTMLDivElement | null) => {
+    if (!el) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+    /* SAFETY NET — a frame-starved window (occluded/minimized, some embedded
+       webviews) never advances a smooth scroll: it silently stays put. If the
+       card hasn't arrived a beat later, snap it there instantly. */
+    if (!reduced) {
+      window.setTimeout(() => {
+        const scroller = el.closest('.overflow-y-auto');
+        if (!scroller) return;
+        const gap = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+        if (Math.abs(gap) > 80) el.scrollIntoView({ block: 'start' });
+      }, 900);
+    }
+    setTwinFlashed(true);
+    if (twinFlashTimerRef.current !== null) clearTimeout(twinFlashTimerRef.current);
+    twinFlashTimerRef.current = window.setTimeout(() => setTwinFlashed(false), 2200);
+  };
+
+  const scrollToTwin = () => {
+    /* already in view of the dashboard? scroll now; otherwise arm the jump —
+       AnimatePresence mode="wait" remounts the bento after the exit beat, so
+       the armed effect below waits for the card to exist */
+    if (tab === 'dashboard' && twinCardRef.current) {
+      revealTwinCard(twinCardRef.current);
+      return;
+    }
+    setTwinJumpArmed(true);
+    setTab('dashboard');
+  };
+
+  useEffect(() => {
+    if (!twinJumpArmed) return;
+    let tries = 0;
+    const iv = window.setInterval(() => {
+      tries += 1;
+      if (twinCardRef.current) {
+        window.clearInterval(iv);
+        revealTwinCard(twinCardRef.current);
+        setTwinJumpArmed(false);
+      } else if (tries > 24) {
+        window.clearInterval(iv);
+        setTwinJumpArmed(false);
+      }
+    }, 60);
+    return () => window.clearInterval(iv);
+  }, [twinJumpArmed]);
+
+  useEffect(() => () => {
+    if (twinFlashTimerRef.current !== null) clearTimeout(twinFlashTimerRef.current);
+  }, []);
+
   /* Backdrop Studio — hang the user's own image / GIF / muted video on the wall */
   const handleBackdropFile = async (file: File) => {
     const err = await backdrop.set(file);
@@ -974,6 +1037,19 @@ export const CoreConsole: React.FC<Props> = ({
               ))}
             </div>
 
+            {/* TWIN JUMP — always visible even when the twin card rests
+                below the fold: one click lands on the Native Simulator Twin */}
+            <ThinkingCloudTooltip
+              onClick={scrollToTwin}
+              icon={<Orbit className="w-4 h-4" />}
+              label="Native Simulator Twin"
+              subtitle="Scroll straight to the twin verification card"
+              hint="Jump"
+              position="bottom"
+              size="sm"
+              id="cc-twin-jump-btn"
+            />
+
             {/* BACKDROP STUDIO — the user's own night: image, GIF or muted video */}
             <span className="relative inline-flex">
               <ThinkingCloudTooltip
@@ -1060,8 +1136,9 @@ export const CoreConsole: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* MAIN BODY AREA — cards resting directly on the night */}
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scroll pt-5">
+        {/* MAIN BODY AREA — cards resting directly on the night.
+            overscroll-contain keeps the wheel inside the deck (no chaining). */}
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scroll overscroll-contain pt-5">
           <AnimatePresence mode="wait">
           {tab === 'dashboard' && (
             /* 12-col bento: radar(4×2 rows) · vitals(8) · physics(8) ·
@@ -1223,8 +1300,19 @@ export const CoreConsole: React.FC<Props> = ({
                 <CppNativeEngineCard />
               </motion.div>
 
-              {/* R87 NATIVE SIMULATOR TWIN — 4-col twin-verification card */}
-              <motion.div variants={rise} className="lg:col-span-4">
+              {/* R87 NATIVE SIMULATOR TWIN — 4-col twin-verification card.
+                  This bento cell is the Twin Jump target: the top-bar seal
+                  scrolls here from anywhere and flashes the card on arrival. */}
+              <motion.div
+                variants={rise}
+                ref={twinCardRef}
+                id="simulator-twin-card"
+                className={`lg:col-span-4 rounded-2xl transition-shadow duration-500 ${
+                  twinFlashed
+                    ? 'shadow-[0_0_0_2px_rgba(167,139,250,0.65),0_0_34px_rgba(139,92,246,0.4)]'
+                    : ''
+                }`}
+              >
                 <SimulatorTwinCard />
               </motion.div>
 
