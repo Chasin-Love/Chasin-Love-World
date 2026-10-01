@@ -1,8 +1,13 @@
 {
-  "generatedAt": "2026-10-01T03:26:04.938Z",
-  "fileCount": 136,
+  "generatedAt": "2026-10-01T04:40:55.585Z",
+  "fileCount": 138,
   "deadExports": [],
-  "deadTypes": [],
+  "deadTypes": [
+    {
+      "name": "SimBodyState",
+      "file": "src/platform/native/cpp_bridge.ts"
+    }
+  ],
   "deadCss": [
     "kamui-disappear"
   ],
@@ -38,7 +43,7 @@
     "src/physics/physicsEngine.ts": 4,
     "src/platform/audio.ts": 4,
     "src/platform/desktop/adapter.ts": 6,
-    "src/platform/native/cpp_bridge.ts": 2,
+    "src/platform/native/cpp_bridge.ts": 3,
     "src/platform/performance.ts": 4,
     "src/platform/sentiment/sentiment.ts": 2,
     "src/platform/simClock.ts": 2,
@@ -70,6 +75,7 @@
     "src/ui/console/CppNativeEngineCard.tsx": 1,
     "src/ui/console/QuantumBinTab.tsx": 1,
     "src/ui/console/ScenicBackdrop.tsx": 1,
+    "src/ui/console/SimulatorTwinCard.tsx": 1,
     "src/ui/console/TiltButton.tsx": 1,
     "src/ui/console/backdropStore.ts": 1,
     "src/ui/diary/AttachmentEditor.tsx": 1,
@@ -93,7 +99,7 @@
     "src/ui/reality/RealityAdvancedModal.tsx": 1,
     "src/ui/reality/RealityAdvancedPanel.tsx": 2,
     "src/ui/syntax.ts": 2,
-    "src/ui/toast.ts": 28,
+    "src/ui/toast.ts": 29,
     "src/ui/vault/MonacoCodeEditor.tsx": 10,
     "src/ui/vault/atmosphere.tsx": 1,
     "src/ui/vault/avatars.tsx": 3,
@@ -317,6 +323,7 @@
     "src/ui/console/CoreConsole.tsx → src/ui/console/CppNativeEngineCard.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/QuantumBinTab.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/ScenicBackdrop.tsx",
+    "src/ui/console/CoreConsole.tsx → src/ui/console/SimulatorTwinCard.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/TiltButton.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/backdropStore.ts",
     "src/ui/console/CoreConsole.tsx → src/ui/lineage/ThinkingCloudTooltip.tsx",
@@ -330,6 +337,8 @@
     "src/ui/console/QuantumBinTab.tsx → src/platform/sync/realitySync.ts",
     "src/ui/console/QuantumBinTab.tsx → src/state/index.ts",
     "src/ui/console/QuantumBinTab.tsx → src/ui/toast.ts",
+    "src/ui/console/SimulatorTwinCard.tsx → src/platform/native/cpp_bridge.ts",
+    "src/ui/console/SimulatorTwinCard.tsx → src/ui/toast.ts",
     "src/ui/diary/AttachmentEditor.tsx → src/ui/toast.ts",
     "src/ui/diary/Book.tsx → src/platform/audio.ts",
     "src/ui/diary/Book.tsx → src/ui/bits.tsx",
@@ -508,6 +517,7 @@
     "scripts/round76-gauntlet.ts": 66,
     "scripts/round79-sky-gauntlet.ts": 81,
     "scripts/round84-inclination-gauntlet.ts": 160,
+    "scripts/round87-simulator-gauntlet.ts": 137,
     "scripts/smoke.ts": 233,
     "server/index.ts": 95,
     "server/paths.ts": 35,
@@ -525,7 +535,7 @@
     "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 6597,
+    "src/engine/engine.ts": 6599,
     "src/engine/math.ts": 42,
     "src/engine/shaders.ts": 1542,
     "src/engine/surface/UniverseSurfaceManager.ts": 546,
@@ -542,7 +552,7 @@
     "src/physics/physicsEngine.ts": 438,
     "src/platform/audio.ts": 536,
     "src/platform/desktop/adapter.ts": 275,
-    "src/platform/native/cpp_bridge.ts": 474,
+    "src/platform/native/cpp_bridge.ts": 773,
     "src/platform/performance.ts": 115,
     "src/platform/sentiment/sentiment.ts": 117,
     "src/platform/simClock.ts": 27,
@@ -570,11 +580,12 @@
     "src/ui/bits.tsx": 144,
     "src/ui/console/BlackHoleTuningCard.tsx": 194,
     "src/ui/console/CommandPalette.tsx": 350,
-    "src/ui/console/CoreConsole.tsx": 1369,
+    "src/ui/console/CoreConsole.tsx": 1375,
     "src/ui/console/CoreSigil.tsx": 226,
     "src/ui/console/CppNativeEngineCard.tsx": 269,
     "src/ui/console/QuantumBinTab.tsx": 342,
     "src/ui/console/ScenicBackdrop.tsx": 354,
+    "src/ui/console/SimulatorTwinCard.tsx": 130,
     "src/ui/console/TiltButton.tsx": 83,
     "src/ui/console/backdropStore.ts": 142,
     "src/ui/diary/AttachmentEditor.tsx": 495,
@@ -631,7 +642,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      6597
+      6599
     ],
     [
       "src/ui/diary/DiaryWindow.tsx",
@@ -651,7 +662,7 @@
     ],
     [
       "src/ui/console/CoreConsole.tsx",
-      1369
+      1375
     ],
     [
       "src/ui/FileManager.tsx",
@@ -678,16 +689,16 @@
       833
     ],
     [
+      "src/platform/native/cpp_bridge.ts",
+      773
+    ],
+    [
       "src/ui/vault/shell.tsx",
       704
     ],
     [
       "src/ui/hud/MultiverseBar.tsx",
       616
-    ],
-    [
-      "src/engine/blackholeRaymarch.ts",
-      585
     ]
   ],
   "pathEncode": {
