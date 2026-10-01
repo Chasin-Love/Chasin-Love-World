@@ -86,6 +86,14 @@ pub(crate) mod ffi {
             out_pos: *mut c_double,
             out_vel: *mut c_double,
         );
+        /* R91 — batched session read (one call for every body):
+           out holds 6*count doubles row-major (px,py,pz,vx,vy,vz);
+           returns the number of bodies written (<= count). */
+        pub fn cosmos_get_body_states(
+            handle: *mut c_void,
+            count: u32,
+            out: *mut c_double,
+        ) -> u32;
         pub fn cosmos_time_dilation(radius: c_double, mass: c_double) -> c_double;
     }
 }
@@ -141,6 +149,16 @@ pub(crate) mod ffi {
     ) {
         if !out_pos.is_null() { std::slice::from_raw_parts_mut(out_pos, 3).fill(0.0); }
         if !out_vel.is_null() { std::slice::from_raw_parts_mut(out_vel, 3).fill(0.0); }
+    }
+    pub unsafe fn cosmos_get_body_states(
+        _h: *mut c_void, _count: u32, out: *mut c_double,
+    ) -> u32 {
+        /* the stub owns no session: zero the offered capacity (defensive —
+           callers honor the returned count, which is 0) and claim nothing */
+        if !out.is_null() && _count > 0 {
+            std::slice::from_raw_parts_mut(out, _count as usize * 6).fill(0.0);
+        }
+        0
     }
     pub unsafe fn cosmos_time_dilation(_radius: c_double, _mass: c_double) -> c_double { 0.0 }
 }

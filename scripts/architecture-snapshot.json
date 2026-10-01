@@ -1,15 +1,45 @@
 {
-  "generatedAt": "2026-10-01T05:18:55.504Z",
-  "fileCount": 140,
-  "deadExports": [],
+  "generatedAt": "2026-10-01T07:32:43.752Z",
+  "fileCount": 143,
+  "deadExports": [
+    {
+      "symbol": "buildRosterInputs",
+      "file": "src/physics/sessionDriver.ts",
+      "action": "de-export"
+    },
+    {
+      "symbol": "saveSession",
+      "file": "src/physics/sessionDriver.ts",
+      "action": "de-export"
+    },
+    {
+      "symbol": "driverTick",
+      "file": "src/physics/sessionDriver.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "enableDriver",
+      "file": "src/physics/sessionDriver.ts",
+      "action": "delete"
+    },
+    {
+      "symbol": "disableDriver",
+      "file": "src/physics/sessionDriver.ts",
+      "action": "delete"
+    }
+  ],
   "deadTypes": [
+    {
+      "name": "DriverDrift",
+      "file": "src/physics/sessionDriver.ts"
+    },
+    {
+      "name": "DriverRosterEntry",
+      "file": "src/physics/sessionDriver.ts"
+    },
     {
       "name": "SimTwinDrift",
       "file": "src/physics/simTwin.ts"
-    },
-    {
-      "name": "SimBodyState",
-      "file": "src/platform/native/cpp_bridge.ts"
     }
   ],
   "deadCss": [
@@ -23,7 +53,7 @@
     "server/routes/sky.ts": 1,
     "server/skyStore.ts": 1,
     "src/App.tsx": 1,
-    "src/domain/universe.ts": 23,
+    "src/domain/universe.ts": 24,
     "src/domain/vault.ts": 16,
     "src/engine/blackholeParams.ts": 4,
     "src/engine/blackholeRaymarch.ts": 3,
@@ -44,16 +74,16 @@
     "src/engine/systems/levelSystem.ts": 1,
     "src/engine/systems/stageThresholds.ts": 1,
     "src/physics/nbody.ts": 2,
-    "src/physics/physicsEngine.ts": 5,
+    "src/physics/physicsEngine.ts": 6,
     "src/physics/simTwin.ts": 2,
     "src/platform/audio.ts": 4,
     "src/platform/desktop/adapter.ts": 6,
-    "src/platform/native/cpp_bridge.ts": 4,
+    "src/platform/native/cpp_bridge.ts": 5,
     "src/platform/performance.ts": 4,
     "src/platform/sentiment/sentiment.ts": 2,
     "src/platform/simClock.ts": 2,
     "src/platform/sky/skyRegistry.ts": 3,
-    "src/platform/storageKeys.ts": 8,
+    "src/platform/storageKeys.ts": 9,
     "src/platform/sync/realitySync.ts": 2,
     "src/realities/clusterGenerator.ts": 1,
     "src/realities/galaxyGenerator.ts": 2,
@@ -229,6 +259,10 @@
     "src/physics/nbody.ts → src/domain/universe.ts",
     "src/physics/nbody.ts → src/physics/physicsEngine.ts",
     "src/physics/physicsEngine.ts → src/domain/universe.ts",
+    "src/physics/sessionDriver.ts → src/domain/universe.ts",
+    "src/physics/sessionDriver.ts → src/physics/physicsEngine.ts",
+    "src/physics/sessionDriver.ts → src/platform/native/cpp_bridge.ts",
+    "src/physics/sessionDriver.ts → src/platform/storageKeys.ts",
     "src/physics/simTwin.ts → src/domain/universe.ts",
     "src/physics/simTwin.ts → src/physics/physicsEngine.ts",
     "src/physics/simTwin.ts → src/platform/native/cpp_bridge.ts",
@@ -529,6 +563,8 @@
     "scripts/round84-inclination-gauntlet.ts": 160,
     "scripts/round87-simulator-gauntlet.ts": 137,
     "scripts/round88-per-frame-twin-gauntlet.ts": 103,
+    "scripts/round90-reachable-twin-gauntlet.ts": 83,
+    "scripts/round91-session-memory-gauntlet.ts": 154,
     "scripts/smoke.ts": 233,
     "server/index.ts": 95,
     "server/paths.ts": 35,
@@ -561,15 +597,16 @@
     "src/main.tsx": 17,
     "src/physics/nbody.ts": 321,
     "src/physics/physicsEngine.ts": 438,
+    "src/physics/sessionDriver.ts": 528,
     "src/physics/simTwin.ts": 233,
     "src/platform/audio.ts": 536,
     "src/platform/desktop/adapter.ts": 275,
-    "src/platform/native/cpp_bridge.ts": 775,
+    "src/platform/native/cpp_bridge.ts": 839,
     "src/platform/performance.ts": 115,
     "src/platform/sentiment/sentiment.ts": 117,
     "src/platform/simClock.ts": 27,
     "src/platform/sky/skyRegistry.ts": 288,
-    "src/platform/storageKeys.ts": 30,
+    "src/platform/storageKeys.ts": 34,
     "src/platform/sync/realitySync.ts": 145,
     "src/realities/clusterGenerator.ts": 358,
     "src/realities/galaxyGenerator.ts": 436,
@@ -592,7 +629,7 @@
     "src/ui/bits.tsx": 144,
     "src/ui/console/BlackHoleTuningCard.tsx": 194,
     "src/ui/console/CommandPalette.tsx": 350,
-    "src/ui/console/CoreConsole.tsx": 1375,
+    "src/ui/console/CoreConsole.tsx": 1463,
     "src/ui/console/CoreSigil.tsx": 226,
     "src/ui/console/CppNativeEngineCard.tsx": 269,
     "src/ui/console/QuantumBinTab.tsx": 342,
@@ -674,7 +711,7 @@
     ],
     [
       "src/ui/console/CoreConsole.tsx",
-      1375
+      1463
     ],
     [
       "src/ui/FileManager.tsx",
@@ -697,12 +734,12 @@
       921
     ],
     [
-      "src/ui/vault/viewers.tsx",
-      833
+      "src/platform/native/cpp_bridge.ts",
+      839
     ],
     [
-      "src/platform/native/cpp_bridge.ts",
-      775
+      "src/ui/vault/viewers.tsx",
+      833
     ],
     [
       "src/ui/vault/shell.tsx",
@@ -835,6 +872,7 @@
       "src-tauri/src/realities.rs:437"
     ],
     "localStorage keys": [
+      "scripts/round91-session-memory-gauntlet.ts:102",
       "src/platform/storageKeys.ts:6",
       "src/platform/storageKeys.ts:8",
       "src/platform/storageKeys.ts:11",
@@ -844,8 +882,9 @@
       "src/platform/storageKeys.ts:19",
       "src/platform/storageKeys.ts:22",
       "src/platform/storageKeys.ts:24",
-      "src/platform/storageKeys.ts:26",
       "src/platform/storageKeys.ts:28",
+      "src/platform/storageKeys.ts:30",
+      "src/platform/storageKeys.ts:32",
       "src/state/persist.ts:267"
     ],
     "window seams": [

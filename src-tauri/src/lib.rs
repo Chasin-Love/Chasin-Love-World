@@ -393,6 +393,28 @@ fn cosmos_sim_body(index: i32) -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({ "pos": pos, "vel": vel }))
 }
 
+/* R91 — batched session read: every body's pos+vel in ONE round-trip.
+   Flat row-major layout, 6 doubles per body (px,py,pz,vx,vy,vz), `count`
+   rows actually written by the core. The empty-session read creates
+   nothing and owes nothing — an empty universe is a valid answer. */
+#[tauri::command]
+fn cosmos_sim_states() -> Result<serde_json::Value, String> {
+    let bodies = {
+        let guard = SIM.lock().map_err(|_| "sim session poisoned".to_string())?;
+        guard.as_ref().map(|s| s.bodies).unwrap_or(0)
+    };
+    if bodies == 0 {
+        return Ok(serde_json::json!({ "count": 0, "states": [] }));
+    }
+    let mut buf = vec![0f64; bodies as usize * 6];
+    let written = with_sim(|h| unsafe {
+        cosmos::ffi::cosmos_get_body_states(h, bodies, buf.as_mut_ptr())
+    })?;
+    let written = (written as usize).min(bodies as usize);
+    buf.truncate(written * 6);
+    Ok(serde_json::json!({ "count": written, "states": buf }))
+}
+
 #[tauri::command]
 fn cosmos_orbit_position(a: f64, eccentricity: f64, phase: f64, inclination: f64, sim_days: f64, speed: f64) -> Result<serde_json::Value, String> {
     let mut out = [0f64; 5];
@@ -444,6 +466,7 @@ pub fn run() {
             cosmos_sim_configure,
             cosmos_sim_step,
             cosmos_sim_body,
+            cosmos_sim_states,
             cosmos_orbit_position,
             cosmos_time_dilation,
             store_state_read,

@@ -146,6 +146,7 @@ class CosmosBridge {
   private wasm: WasmModule | null = null;
   /* R87 sim session state — one handle on the wasm tier, one twin on TS */
   private wasmSimHandle: number | null = null;
+  private wasmSimBodyCount = 0; /* R91 — roster size of the wasm session (the C++ core does not report it back) */
   private readonly tsSim = new TsNBodySim();
 
   /* ------------------------------ lifecycle ------------------------------ */
@@ -338,6 +339,7 @@ class CosmosBridge {
       if (this.wasmSimHandle !== null) {
         w.ccall('cosmos_destroy_simulator', null, ['number'], [this.wasmSimHandle]);
         this.wasmSimHandle = null;
+        this.wasmSimBodyCount = 0;
       }
       const handle = w.ccall('cosmos_create_simulator', 'number', [], []) as number;
       if (!handle) throw new Error('simulator unavailable in this build');
@@ -347,6 +349,7 @@ class CosmosBridge {
           [handle, b.id >>> 0, b.mass, b.radius, b.px, b.py, b.pz, b.vx, b.vy, b.vz]);
       }
       this.wasmSimHandle = handle;
+      this.wasmSimBodyCount = bodies.length;
       return { configured: bodies.length, backend: 'wasm' };
     }
     return { configured: this.tsSim.configure(bodies), backend: 'typescript' };
@@ -392,6 +395,53 @@ class CosmosBridge {
     const st = this.tsSim.bodyState(index);
     if (!st) throw new Error(`sim body index out of range: ${index}`);
     return { ...st, backend: 'typescript' };
+  }
+
+  /* R91 — batched session read: EVERY body's pos+vel in one call (the
+     wide eye the driver needs; reading 10–50 bodies must never cost one
+     round-trip each). An empty session is a valid answer, not an error:
+     { count: 0, states: [] } — the driver's freshness law decides what
+     to do with it, the bridge never throws for "nothing configured". */
+  async simStates(): Promise<{ count: number; states: SimBodyState[]; backend: CosmosBackend }> {
+    await this.init();
+    if (this.statusValue.backend === 'native-cpp' && this.invokeFn) {
+      const res = await this.invokeFn<{ count: number; states: number[] }>('cosmos_sim_states');
+      const states: SimBodyState[] = [];
+      for (let i = 0; i < res.count; i++) {
+        const row = res.states;
+        states.push({
+          pos: [row[i * 6], row[i * 6 + 1], row[i * 6 + 2]],
+          vel: [row[i * 6 + 3], row[i * 6 + 4], row[i * 6 + 5]],
+        });
+      }
+      return { count: res.count, states, backend: 'native-cpp' };
+    }
+    if (this.statusValue.backend === 'wasm' && this.wasm) {
+      const w = this.wasm;
+      if (this.wasmSimHandle === null || this.wasmSimBodyCount === 0) {
+        return { count: 0, states: [], backend: 'wasm' };
+      }
+      const n = this.wasmSimBodyCount;
+      const buf = w._malloc!(n * 6 * 8);
+      try {
+        const written = w.ccall('cosmos_get_body_states', 'number',
+          ['number', 'number', 'number'], [this.wasmSimHandle, n, buf]) as number;
+        const count = Math.min(written, n);
+        const heap = w.HEAPF64!;
+        const base = buf / 8;
+        const states: SimBodyState[] = [];
+        for (let i = 0; i < count; i++) {
+          states.push({
+            pos: [heap[base + i * 6], heap[base + i * 6 + 1], heap[base + i * 6 + 2]],
+            vel: [heap[base + i * 6 + 3], heap[base + i * 6 + 4], heap[base + i * 6 + 5]],
+          });
+        }
+        return { count, states, backend: 'wasm' };
+      } finally {
+        w._free!(buf);
+      }
+    }
+    return { count: this.tsSim.bodyCount, states: this.tsSim.allStates(), backend: 'typescript' };
   }
 
   /**
@@ -737,6 +787,20 @@ class TsNBodySim {
       pos: [this.px[index], this.py[index], this.pz[index]],
       vel: [this.vx[index], this.vy[index], this.vz[index]],
     };
+  }
+
+  /* R91 — batched read: every body in one allocation pass (the driver's
+     per-readback fetch; mirrors cosmos_get_body_states). */
+  allStates(): SimBodyState[] {
+    const n = this.mass.length;
+    const out: SimBodyState[] = new Array(n);
+    for (let i = 0; i < n; ++i) {
+      out[i] = {
+        pos: [this.px[i], this.py[i], this.pz[i]],
+        vel: [this.vx[i], this.vy[i], this.vz[i]],
+      };
+    }
+    return out;
   }
 }
 

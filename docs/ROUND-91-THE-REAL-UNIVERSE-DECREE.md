@@ -64,3 +64,70 @@ carrying its own life (image 1), not the stacked look a fast-forward merge produ
 while the arc runs; every future merge of `the-real-universe` into `main` uses
 `--no-ff` so the parallel history is drawn forever; nothing merges until the author
 says so.
+
+---
+
+## R91.1 — WHAT SHIPPED: THE SESSION GETS A MEMORY AND A WIDE EYE
+
+No rendered behavior changed this round — the engine does not know the driver exists
+yet (that is R92's gate). What shipped is the machinery everything else stands on:
+
+**The wide eye (batched session read, end to end).** One new C++ export,
+`cosmos_get_body_states(handle, count, out)` — every body's position+velocity in ONE
+call, 6 doubles per body row-major, returning the number written. Wired through the
+Rust FFI (real `cosmos_cpp` declaration + the `cosmos_stub` twin kept in lockstep),
+a new `cosmos_sim_states` Tauri command (empty session = `count: 0`, never an error),
+the WASM `EXPORTED_FUNCTIONS` pin (the R87 gauntlet's dead-strip regex consciously
+taught the new symbol), and a `simStates()` method on the bridge speaking all three
+tiers — native invoke, WASM `ccall` with a malloc'd buffer + freed in `finally`, and
+the TS twin's new `allStates()`. Reading 10–50 bodies must never cost one round-trip
+per body; now it costs one.
+
+**The driver module (`src/physics/sessionDriver.ts`).** The session's new owner,
+under the narrowed hybrid law: it holds no scene objects, never imports the store,
+and publishes to its own module-level map (`driverTelemetry`/`driverState` — the
+simTwin.ts purity rules, enforced by the round91 gauntlet). Inside:
+
+- **The canon seeds.** `buildRosterInputs`/`seedFromCanon` reproduce the twin lab's
+  seeding math line-faithfully: real kg masses from physicsEngine (the vault at its
+  full 10 M☉ — nature, per the decree), SI positions from the exact Kepler solve,
+  velocities from the same 0.05-day central finite difference. The 4096 session cap
+  is mirrored (`SESSION_BODY_CAP`).
+- **The freshness law.** The readback is cached in scene space with a sim-days stamp;
+  `driverReadback(simDays)` extrapolates position + velocity × Δt to the LIVE clock
+  and returns null beyond a 2.5-day trust window — the engine seam (R92) will render
+  the Kepler solve for any stale frame, exactly like the keplerCache rule.
+- **The universe remembers.** `saveSession`/`loadSession`/`restoreSession` over the
+  locked key `my-universe:sim-session:v1` (registered in `storageKeys.ts`): roster
+  metadata + SI states + simDays, per reality. Restore configures FROM SAVED STATES
+  (configure-always-resets is the contract — the states ARE the new seed). Saving is
+  cadenced inside the tick (every 8 readbacks ≈ 2.7 real seconds) plus on disable;
+  corrupt or absent memory falls back to a fresh canon seed.
+- **Churn without losing the story.** `reconfigurePreserving`: on any roster change
+  (reality switch, body added/removed) the current states are read, mapped onto the
+  new roster BY ID (newcomers get canon states), and the session is reconfigured from
+  those states — drift survives, the universe never resets unless the author heals.
+- **The heal.** `healDriver` deletes the reality's memory and re-seeds from canon —
+  Restore Ephemeris, driver edition (the engine wiring lands with R92's gate).
+- **The tick.** `driverTick` accumulates the live clock and advances the session
+  fire-and-forget with the pending guard at the same 2-sim-day cadence, stepping in
+  24 sub-steps (~6-hour RK4 resolution), then refreshes the batched readback and the
+  per-body drift telemetry.
+
+**round91-session-memory-gauntlet (21 checks)** joined the verify chain: the batched
+read at every layer, the driver's purity, the canon seeding, the locked key, the
+save/restore round-trip, churn preservation, the heal, resume-before-seed, the
+extrapolation + trust window, fire-and-forget discipline, chain membership.
+
+## Verification of this round
+
+- `npx tsc --noEmit` green; round91 gauntlet ALL GREEN; round87 gauntlet ALL GREEN
+  (the export-pin edit); R88 lab gauntlet untouched and green; full `npm run verify`
+  green (typecheck + 13 gauntlets + smoke + prod smoke).
+- `npm run audit:arch -- --check` consciously refreshed (`--snapshot` in the same
+  commit) for the new module's imports — the R72 precedent.
+- Honest limits: this machine has no emsdk/MSVC, so the C++/WASM numeric behavior of
+  `cosmos_get_body_states` certifies on CI (the R89 pipeline builds and commits the
+  artifact); locally the TS tier carries the path, and the stub-tier lockstep keeps
+  `cargo check` hosts type-correct. The engine remains Kepler-driven this round —
+  the seam is R92's whole job.

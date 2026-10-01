@@ -91,6 +91,13 @@ extern "C" {
     void cosmos_add_body(void* handle, uint32_t id, double mass, double radius, double px, double py, double pz, double vx, double vy, double vz);
     void cosmos_step_simulation(void* handle, double dt, int iterations);
     void cosmos_get_body_state(void* handle, uint32_t index, double* outPos, double* outVel);
+
+    /* R91 — batched session read: every body's position+velocity in ONE call
+     * (the per-frame driver must not pay one IPC round-trip per body).
+     * out: 6 * count doubles, row-major per body (px, py, pz, vx, vy, vz).
+     * Returns the number of bodies actually written (<= count; extra capacity
+     * in `out` is left untouched). */
+    uint32_t cosmos_get_body_states(void* handle, uint32_t count, double* out);
     double cosmos_compute_fractal_potential(double x, double y, double z, int octaves);
     double cosmos_time_dilation(double radius, double mass);
 }

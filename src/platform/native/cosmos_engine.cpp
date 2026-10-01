@@ -195,6 +195,23 @@ void cosmos_get_body_state(void* handle, uint32_t index, double* outPos, double*
     }
 }
 
+uint32_t cosmos_get_body_states(void* handle, uint32_t count, double* out) {
+    if (!handle || !out || count == 0) return 0;
+    auto* sim = static_cast<Cosmos::NBodySimulator*>(handle);
+    const auto& bodies = sim->getBodies();
+    const uint32_t n = (bodies.size() < count) ? static_cast<uint32_t>(bodies.size()) : count;
+    for (uint32_t i = 0; i < n; ++i) {
+        double* row = out + static_cast<size_t>(i) * 6;
+        row[0] = bodies[i].position.x;
+        row[1] = bodies[i].position.y;
+        row[2] = bodies[i].position.z;
+        row[3] = bodies[i].velocity.x;
+        row[4] = bodies[i].velocity.y;
+        row[5] = bodies[i].velocity.z;
+    }
+    return n;
+}
+
 double cosmos_compute_fractal_potential(double x, double y, double z, int octaves) {
     return Cosmos::ProceduralUniverseGenerator::computeOctaveNoise(x, y, z, octaves, 0.5, 2.0);
 }

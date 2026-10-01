@@ -111,7 +111,7 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 /* ==== 5. THE WASM EXPORT LIST — R87.2's dead-strip fix ==== */
 {
   const exports = /-s EXPORTED_FUNCTIONS='\["_cosmos_version","_cosmos_orbit_position","_cosmos_kepler_batch","_cosmos_physics_batch"/.test(wasmBuildSrc)
-    && /"_cosmos_create_simulator","_cosmos_destroy_simulator","_cosmos_add_body","_cosmos_step_simulation","_cosmos_get_body_state"/.test(wasmBuildSrc)
+    && /"_cosmos_create_simulator","_cosmos_destroy_simulator","_cosmos_add_body","_cosmos_step_simulation","_cosmos_get_body_state","_cosmos_get_body_states"/.test(wasmBuildSrc)
     && /"_malloc","_free"\]/.test(wasmBuildSrc);
   check('R87: build-wasm exports the full bridge surface (the dead-strip fix)', exports, 'EXPORTED_FUNCTIONS incomplete');
 }
