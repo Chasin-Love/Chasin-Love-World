@@ -98,21 +98,23 @@ async function loadTauriInvoke(): Promise<TauriInvoke | null> {
 
 async function loadWasm(): Promise<WasmModule | null> {
   try {
-    /* the WASM artifact is optional (built on demand via scripts/build-wasm.sh)
-       — the path is built through a variable so the bundler leaves this probe
-       alone instead of trying to resolve it at build time (@vite-ignore is not
-       honored for new URL() asset probes, only for dynamic import()). */
-    const wasmSpec = './wasm/' + 'cosmos_engine.js';
-    const url = new URL(wasmSpec, import.meta.url);
-    const probe = await fetch(url.href, { method: 'HEAD' });
+    /* the WASM artifact is optional (built by CI / scripts/build-wasm.sh into
+       public/wasm/, served at the site root in dev and prod alike — R89 moved
+       it there from the in-source folder, which the bundled dist could never
+       serve). Root-relative so the probe survives the module's relocation. */
+    const wasmSpec = '/wasm/' + 'cosmos_engine.js';
+    const probe = await fetch(wasmSpec, { method: 'HEAD' });
     if (!probe.ok) return null;
     /* @vite-ignore — the artifact is optional and may not exist at build time */
-    const mod = await import(/* @vite-ignore */ url.href);
-    const factory = (mod.default ?? mod.cosmos_engine) as
+    const mod = await import(/* @vite-ignore */ wasmSpec);
+    /* EXPORT_ES6 gives a default export; older glue assigns the global name —
+       accept both so either artifact shape loads */
+    const w = window as unknown as { cosmos_engine?: unknown };
+    const factory = (mod.default ?? mod.cosmos_engine ?? w.cosmos_engine) as
       | ((init?: unknown) => Promise<WasmModule>)
       | null;
     if (!factory) return null;
-    return await factory({ locateFile: (f: string) => new URL(`./wasm/${f}`, import.meta.url).href });
+    return await factory({ locateFile: (f: string) => `/wasm/${f}` });
   } catch {
     return null;
   }

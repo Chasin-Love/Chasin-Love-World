@@ -102,10 +102,51 @@ jobs:
             src-tauri/target/release/bundle/appimage/*.AppImage.sig
           if-no-files-found: error
 
+  # R89 — THE EVERYWHERE CORE: the same C++ physics compiled to WebAssembly,
+  # so the browser tier runs compiled physics instead of the TS fallback.
+  # The artifact is committed back to the source tree on main pushes (only
+  # when it actually changed; [skip ci] prevents a rebuild loop), uploaded
+  # on every run, and attached to v* releases by the release job below.
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install emsdk (pinned)
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.74'
+          actions-cache-folder: 'emsdk-cache'
+
+      - name: Build the WASM core (scripts/build-wasm.sh)
+        run: bash scripts/build-wasm.sh
+
+      - name: Upload the WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmos-engine-wasm
+          path: |
+            public/wasm/cosmos_engine.js
+            public/wasm/cosmos_engine.wasm
+          if-no-files-found: error
+
+      - name: Commit the artifact back to the source tree
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/wasm/
+          if git diff --cached --quiet; then
+            echo "WASM artifact unchanged — nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore(wasm): rebuild the C++ core artifact [skip ci]"
+          git push
+
   # Publishes the built installers as a GitHub Release when a v* tag is pushed.
   # Pull-request and plain-push runs stop after the build matrix above.
   release:
-    needs: build
+    needs: [build, wasm]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -119,6 +160,15 @@ jobs:
           pattern: my-universe-*
           merge-multiple: true
           path: release-assets
+
+      # the C++ core as WASM — attached to the release so the browser tier of
+      # any checkout/deploy can run compiled physics (the tree also carries it
+      # via the wasm job's commit-back on main)
+      - name: Collect the WASM core
+        uses: actions/download-artifact@v4
+        with:
+          name: cosmos-engine-wasm
+          path: release-assets/wasm
 
       # upload-artifact@v4 preserves each build's directory structure, so the
       # installers land at varying depths — recurse instead of a flat glob.
@@ -143,6 +193,8 @@ jobs:
             release-assets/**/*.AppImage
             release-assets/**/*.AppImage.sig
             release-assets/latest.json
+            release-assets/wasm/cosmos_engine.js
+            release-assets/wasm/cosmos_engine.wasm
           generate_release_notes: true
           # unmatched patterns are expected on unsigned builds (no .sig /
           # latest.json); the "did installers even build" safety lives in

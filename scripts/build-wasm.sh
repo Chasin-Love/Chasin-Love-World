@@ -10,17 +10,28 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="$ROOT/src/platform/native/wasm"
+# R89 — public/wasm/: Vite serves public/ at the site root in dev AND copies
+# it into dist/ for production, so one location serves both. The bridge
+# probes /wasm/cosmos_engine.js root-relative (cpp_bridge.ts loadWasm).
+OUT="$ROOT/public/wasm"
 SRC="$ROOT/src/platform/native"
 
 mkdir -p "$OUT"
 
+# R89 — the CMake stage is the NATIVE shared-library build (AVX2/FMA flags —
+# invalid under Emscripten). Under emcmake it is a tolerated probe only:
+# its output is NOT the artifact. The real WASM module is the standalone
+# em++ build below, which is the hard gate of this script.
 emcmake cmake -B "$SRC/build-wasm" -S "$SRC" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_FLAGS="-O3 -ffast-math -msimd128" \
-  || { echo "emcmake failed — is emsdk active?"; exit 1; }
+  || echo "⚠ emcmake configure failed (tolerated — the em++ build below is the WASM artifact)"
 
-cmake --build "$SRC/build-wasm" -j "$(nproc 2>/dev/null || echo 4)"
+cmake --build "$SRC/build-wasm" -j "$(nproc 2>/dev/null || echo 4)" \
+  || echo "⚠ cmake build failed (tolerated — see above)"
+
+# Hard gate: the Emscripten compiler must exist (emsdk active).
+command -v em++ >/dev/null 2>&1 || { echo "em++ not found — is emsdk active?"; exit 1; }
 
 # Produce the Emscripten module the bridge expects (glue JS + .wasm)
 #
@@ -34,6 +45,7 @@ em++ "$SRC/cosmos_engine.cpp" \
   -O3 -ffast-math -msimd128 \
   -std=c++20 \
   --bind -s MODULARIZE=1 -s EXPORT_NAME=cosmos_engine \
+  -s EXPORT_ES6=1 \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s ENVIRONMENT=web,worker \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \

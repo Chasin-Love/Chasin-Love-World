@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-01T05:06:34.373Z",
+  "generatedAt": "2026-10-01T05:18:55.504Z",
   "fileCount": 140,
   "deadExports": [],
   "deadTypes": [
@@ -564,7 +564,7 @@
     "src/physics/simTwin.ts": 233,
     "src/platform/audio.ts": 536,
     "src/platform/desktop/adapter.ts": 275,
-    "src/platform/native/cpp_bridge.ts": 773,
+    "src/platform/native/cpp_bridge.ts": 775,
     "src/platform/performance.ts": 115,
     "src/platform/sentiment/sentiment.ts": 117,
     "src/platform/simClock.ts": 27,
@@ -702,7 +702,7 @@
     ],
     [
       "src/platform/native/cpp_bridge.ts",
-      773
+      775
     ],
     [
       "src/ui/vault/shell.tsx",
