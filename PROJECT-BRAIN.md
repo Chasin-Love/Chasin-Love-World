@@ -267,9 +267,9 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ---
 
-## 8. CURRENT STATE (as of 2026-10-01, after R90 — main's tip is v15.0.10 / R88+R89, now carrying R90)
+## 8. CURRENT STATE (as of 2026-10-02 — main's tip is **v16.0.0**: the R91–R95 REAL UNIVERSE arc merged from `the-real-universe`)
 
-- **`main` is the blessed reference.** Its tip is R90 on top of **v15.0.10**
+- **`main` is the blessed reference.** Its tip is the merged R91–R95 REAL UNIVERSE arc on top of **v16.0.0** (merged --no-ff and tagged on the author's word, 2026-10-02) on top of R90 on top of **v15.0.10**
   (R88 the per-frame twin + R89 the everywhere core, merged from `r88-per-frame-twin`
   and shipped 2026-10-01 — CI commits the WASM artifact back and attaches it to releases)
   on top of **v15.0.9** (R85 the six seams → R86 the full purge → R87 the native
@@ -298,10 +298,10 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   save/restore) → R92 (the driver in shadow, default OFF) → R93 (real moons) → R94 (THE
   FLIP, default ON, v16.0.0) → **R95 (THE STEADY SKY — the stability round: the
   flip detonated; star-led rosters, the orbit-true seed, the vault temper, the
-  crossfade seam, 1e12 softening; the arc's arc ends in a sky that holds)**. Main
-  does not move while the arc runs; merges use `--no-ff`
-  on the author's word only. Treat branch work as experimental until
-  the author merges it.
+  crossfade seam, 1e12 softening; the arc's arc ends in a sky that holds)**. MERGED 2026-10-02 on the author's word: `--no-ff` into main, tagged
+  **v16.0.0** — the real universe is the blessed reference now. (The older
+  in-flight branches — `r71-ten-slices` and friends — remain exactly as they
+  were, awaiting their own rulings.)
 - **R90 (this round, on main):** the author's report — the Native Simulator Twin card
   (Verify Twin with it) could not be scrolled into view in the Core Console — reproduced
   by live measurement and traced to a **Tailwind v4 cascade-layer trap**: `.cc-root`'s
