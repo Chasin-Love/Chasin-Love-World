@@ -1,5 +1,5 @@
 /* R52b — THE ARCHITECTURE DIAGRAM GENERATOR.
-   Run: npx tsx scripts/generate-architecture-diagram.ts
+   Run: npx tsx scripts/tools/generate-architecture-diagram.ts
    Reads scripts/architecture-snapshot.json (the auditor's output — never
    hand-written data) and renders:
      1. docs/architecture-diagram.html — self-contained interactive diagram
@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const snap = JSON.parse(readFileSync(path.join(ROOT, 'scripts/architecture-snapshot.json'), 'utf8'));
 
 /* ---------- classify ---------- */

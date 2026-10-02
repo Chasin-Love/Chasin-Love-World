@@ -20,8 +20,8 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
-const thrSrc = readFileSync(new URL('../src/engine/systems/stageThresholds.ts', import.meta.url), 'utf8');
+const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const thrSrc = readFileSync(new URL('../../src/engine/systems/stageThresholds.ts', import.meta.url), 'utf8');
 
 /* ==== 1. the staged stage-warp machine ==== */
 {

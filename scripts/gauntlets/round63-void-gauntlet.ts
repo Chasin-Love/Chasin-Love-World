@@ -14,7 +14,7 @@
  * whole flow out at close focus). Checked without a GPU.
  */
 import { readFileSync } from 'node:fs';
-import { criticalImpactParam } from '../src/engine/blackholeRaymarch';
+import { criticalImpactParam } from '../../src/engine/blackholeRaymarch';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown) {
@@ -22,10 +22,10 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const marchSrc = readFileSync(new URL('../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
-const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
-const shSrc = readFileSync(new URL('../src/engine/shaders.ts', import.meta.url), 'utf8');
-const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
+const marchSrc = readFileSync(new URL('../../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
+const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const shSrc = readFileSync(new URL('../../src/engine/shaders.ts', import.meta.url), 'utf8');
+const pkgSrc = readFileSync(new URL('../../package.json', import.meta.url), 'utf8');
 
 /* ==== 1. the marcher's void is sealed at the source ==== */
 {
@@ -122,8 +122,8 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
   /* the user's selected panel knobs: his appearance trio (Inner/Outer
      Softness, Sharpness) is live — store, ranges (his ui.js verbatim),
      uniforms and panel sliders all wired */
-  const pSrc = readFileSync(new URL('../src/engine/blackholeParams.ts', import.meta.url), 'utf8');
-  const cardSrc = readFileSync(new URL('../src/ui/console/BlackHoleTuningCard.tsx', import.meta.url), 'utf8');
+  const pSrc = readFileSync(new URL('../../src/engine/blackholeParams.ts', import.meta.url), 'utf8');
+  const cardSrc = readFileSync(new URL('../../src/ui/console/BlackHoleTuningCard.tsx', import.meta.url), 'utf8');
   const knobs = /softInner: number;/.test(pSrc) && /softOuter: number;/.test(pSrc) && /arcSharpness: number;/.test(pSrc)
     && /diskTemp: number;/.test(pSrc) && /tempFalloff: number;/.test(pSrc)
     && /softInner: \{ min: 0\.0, max: 0\.5, step: 0\.01 \}/.test(pSrc)
@@ -140,7 +140,7 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 
 /* ==== 5. the gate runs in npm run verify ==== */
 {
-  const wired = pkgSrc.includes('scripts/round63-void-gauntlet.ts');
+  const wired = pkgSrc.includes('scripts/gauntlets/round63-void-gauntlet.ts');
   check('R63: the gauntlet is wired into the verify chain', wired, 'not in package.json verify');
 }
 

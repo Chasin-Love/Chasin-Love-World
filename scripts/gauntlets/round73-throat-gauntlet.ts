@@ -19,7 +19,7 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
+const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
 
 /* ==== 1. the throat refuses to drain itself ==== */
 {

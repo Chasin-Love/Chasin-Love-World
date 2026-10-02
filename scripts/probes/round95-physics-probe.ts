@@ -8,8 +8,8 @@
    its seed radius. A plunge or an ejection fails loudly and immediately
    instead of three minutes later in a browser.
 */
-import { solPrimeReality } from '../src/realities/solPrime';
-import { enableDriver, driverTick, driverState, driverReadback, type DriverBody } from '../src/physics/sessionDriver';
+import { solPrimeReality } from '../../src/realities/solPrime';
+import { enableDriver, driverTick, driverState, driverReadback, type DriverBody } from '../../src/physics/sessionDriver';
 
 const DAYS = Number(process.argv[2]) || 400;
 const DT_DAYS = 2;
@@ -59,7 +59,7 @@ async function main() {
      A star that gets flung means the barycenter frame handed it a huge
      velocity, which only happens if some mass rivaled it. */
   {
-    const { buildRosterInputs } = await import('../src/physics/sessionDriver');
+    const { buildRosterInputs } = await import('../../src/physics/sessionDriver');
     const inputs = buildRosterInputs(0);
     const MSUN = 1.98847e30;
     let px = 0, py = 0, pz = 0, mtot = 0;

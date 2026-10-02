@@ -28,8 +28,8 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const cssSrc = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
-const consoleSrc = readFileSync(new URL('../src/ui/console/CoreConsole.tsx', import.meta.url), 'utf8');
+const cssSrc = readFileSync(new URL('../../src/index.css', import.meta.url), 'utf8');
+const consoleSrc = readFileSync(new URL('../../src/ui/console/CoreConsole.tsx', import.meta.url), 'utf8');
 
 /* ==== 1. THE VIEWPORT LOCK — .cc-root is fixed in the unlayered rule ==== */
 {
@@ -69,7 +69,7 @@ const consoleSrc = readFileSync(new URL('../src/ui/console/CoreConsole.tsx', imp
 
 /* ==== 4. THE CHAIN — the gauntlet rides the verify chain ==== */
 {
-  const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
+  const pkgSrc = readFileSync(new URL('../../package.json', import.meta.url), 'utf8');
   const chained = pkgSrc.includes('round90-reachable-twin-gauntlet');
   check('R90: the gauntlet sits in the verify chain', chained, 'add scripts/round90-reachable-twin-gauntlet.ts to npm run verify');
 }

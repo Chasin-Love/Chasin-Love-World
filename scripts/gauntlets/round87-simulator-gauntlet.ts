@@ -21,14 +21,14 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const bridgeSrc = readFileSync(new URL('../src/platform/native/cpp_bridge.ts', import.meta.url), 'utf8');
-const cppSrc = readFileSync(new URL('../src/platform/native/cosmos_engine.cpp', import.meta.url), 'utf8');
-const hppSrc = readFileSync(new URL('../src/platform/native/cosmos_engine.hpp', import.meta.url), 'utf8');
-const rustFfiSrc = readFileSync(new URL('../src-tauri/src/cosmos.rs', import.meta.url), 'utf8');
-const libSrc = readFileSync(new URL('../src-tauri/src/lib.rs', import.meta.url), 'utf8');
-const wasmBuildSrc = readFileSync(new URL('../scripts/build-wasm.sh', import.meta.url), 'utf8');
-const cardSrc = readFileSync(new URL('../src/ui/console/SimulatorTwinCard.tsx', import.meta.url), 'utf8');
-const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
+const bridgeSrc = readFileSync(new URL('../../src/platform/native/cpp_bridge.ts', import.meta.url), 'utf8');
+const cppSrc = readFileSync(new URL('../../src/platform/native/cosmos_engine.cpp', import.meta.url), 'utf8');
+const hppSrc = readFileSync(new URL('../../src/platform/native/cosmos_engine.hpp', import.meta.url), 'utf8');
+const rustFfiSrc = readFileSync(new URL('../../src-tauri/src/cosmos.rs', import.meta.url), 'utf8');
+const libSrc = readFileSync(new URL('../../src-tauri/src/lib.rs', import.meta.url), 'utf8');
+const wasmBuildSrc = readFileSync(new URL('../../scripts/tools/build-wasm.sh', import.meta.url), 'utf8');
+const cardSrc = readFileSync(new URL('../../src/ui/console/SimulatorTwinCard.tsx', import.meta.url), 'utf8');
+const pkgSrc = readFileSync(new URL('../../package.json', import.meta.url), 'utf8');
 
 /* ==== 1. THE C++ CORE — the simulator and its v1 handle API ==== */
 {

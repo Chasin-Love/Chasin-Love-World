@@ -39,13 +39,13 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-const engineSrc = read('../src/engine/engine.ts');
-const driverSrc = read('../src/physics/sessionDriver.ts');
-const cppSrc = read('../src/platform/native/cosmos_engine.cpp');
-const bridgeSrc = read('../src/platform/native/cpp_bridge.ts');
-const actionsSrc = read('../src/state/actions.ts');
-const keysSrc = read('../src/platform/storageKeys.ts');
-const pkgSrc = read('../package.json');
+const engineSrc = read('../../src/engine/engine.ts');
+const driverSrc = read('../../src/physics/sessionDriver.ts');
+const cppSrc = read('../../src/platform/native/cosmos_engine.cpp');
+const bridgeSrc = read('../../src/platform/native/cpp_bridge.ts');
+const actionsSrc = read('../../src/state/actions.ts');
+const keysSrc = read('../../src/platform/storageKeys.ts');
+const pkgSrc = read('../../package.json');
 
 /* ==== 1. THE STAR LEADS EVERY ROSTER ==== */
 {
@@ -91,7 +91,7 @@ const pkgSrc = read('../package.json');
     && /const starMassKg = star/.test(driverSrc);
   check('R95: the vault is also Hill-tempered (≤1/1000 of the star — 0.1 M☉ scattered the sky in ~600 days)', hill, 'a tenth-solar companion still demolishes the inner system');
 
-  const displayUntouched = /if \(body\.kind === 'hole' \|\| body\.kind === 'vault'\) massKg = 10 \* CONSTANTS\.M_sun;/.test(read('../src/physics/physicsEngine.ts'));
+  const displayUntouched = /if \(body\.kind === 'hole' \|\| body\.kind === 'vault'\) massKg = 10 \* CONSTANTS\.M_sun;/.test(read('../../src/physics/physicsEngine.ts'));
   check('R95: the 10 M☉ display/UI law in physicsEngine is untouched', displayUntouched, 'the display law was disturbed');
 }
 
@@ -105,7 +105,7 @@ const pkgSrc = read('../package.json');
 
   /* the receipt that would have caught it: a headless probe that drives the
      REAL driverTick and holds the sky for thousands of sim-days, in seconds. */
-  const probe = read('../scripts/round95-physics-probe.ts');
+  const probe = read('../../scripts/probes/round95-physics-probe.ts');
   const probeReal = /driverTick\(bodies, DT_DAYS, simDays\)/.test(probe)
     && /enableDriver\(bodies, 0, 'sol-prime'\)/.test(probe);
   check('R95: the physics probe drives the REAL driverTick (no regex standing in for physics)', probeReal, 'the probe does not exercise the physics');

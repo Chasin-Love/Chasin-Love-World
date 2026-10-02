@@ -19,13 +19,13 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const domeSrc = readFileSync(new URL('../src/engine/surface/photoDome.ts', import.meta.url), 'utf8');
-const surfaceSrc = readFileSync(new URL('../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
-const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
-const registrySrc = readFileSync(new URL('../src/platform/sky/skyRegistry.ts', import.meta.url), 'utf8');
-const storeSrc = readFileSync(new URL('../server/skyStore.ts', import.meta.url), 'utf8');
-const rustSrc = readFileSync(new URL('../src-tauri/src/sky.rs', import.meta.url), 'utf8');
-const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
+const domeSrc = readFileSync(new URL('../../src/engine/surface/photoDome.ts', import.meta.url), 'utf8');
+const surfaceSrc = readFileSync(new URL('../../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
+const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const registrySrc = readFileSync(new URL('../../src/platform/sky/skyRegistry.ts', import.meta.url), 'utf8');
+const storeSrc = readFileSync(new URL('../../server/skyStore.ts', import.meta.url), 'utf8');
+const rustSrc = readFileSync(new URL('../../src-tauri/src/sky.rs', import.meta.url), 'utf8');
+const pkgSrc = readFileSync(new URL('../../package.json', import.meta.url), 'utf8');
 
 /* ==== 1. THE SEAM DIES — no UV-space vignette, no mip collapse ==== */
 {

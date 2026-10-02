@@ -31,12 +31,12 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-const engineSrc = read('../src/engine/engine.ts');
-const driverSrc = read('../src/physics/sessionDriver.ts');
-const appSrc = read('../src/App.tsx');
-const cardSrc = read('../src/ui/console/SimulatorTwinCard.tsx');
-const consoleSrc = read('../src/ui/console/CoreConsole.tsx');
-const pkgSrc = read('../package.json');
+const engineSrc = read('../../src/engine/engine.ts');
+const driverSrc = read('../../src/physics/sessionDriver.ts');
+const appSrc = read('../../src/App.tsx');
+const cardSrc = read('../../src/ui/console/SimulatorTwinCard.tsx');
+const consoleSrc = read('../../src/ui/console/CoreConsole.tsx');
+const pkgSrc = read('../../package.json');
 
 /* ==== 1. THE FLIP — absent flag = ON ==== */
 {

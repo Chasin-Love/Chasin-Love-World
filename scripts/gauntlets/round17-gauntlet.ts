@@ -5,7 +5,7 @@
    his background on the escaped bent rays, the seam law, the silhouette. */
 
 import { readFileSync, existsSync } from 'fs';
-import { blackbodyColorOf } from '../src/engine/blackholeRaymarch';
+import { blackbodyColorOf } from '../../src/engine/blackholeRaymarch';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: string): void {
@@ -102,7 +102,7 @@ function inv(d: [number, number, number]): [number, number] {
 
   /* ROUND 64 — the verbatim port: his exact physics and the multi-crossing
      halo (docs/PORT-SPEC-webgpu-black-hole.md is the contract) */
-  const rmSrc = readFileSync(new URL('../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
+  const rmSrc = readFileSync(new URL('../../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
   const multiCrossing = /EVERY disk-plane crossing/.test(rmSrc) && /remaining = 1\.0 - alpha/.test(rmSrc);
   const hisConstants = /r < uRs \* 1\.01\)/.test(rmSrc) && /r > 100\.0/.test(rmSrc)
     && /pow\(uDiskInner \/ hitR, uTempFalloff\)/.test(rmSrc)
@@ -123,10 +123,10 @@ function inv(d: [number, number, number]): [number, number] {
 
 /* ==== 4. ROUND 20/53 — the presentation fixes + the reference camera ==== */
 {
-  const rmSrc = readFileSync(new URL('../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
-  const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
-  const capSrc = readFileSync(new URL('../src/engine/capability.ts', import.meta.url), 'utf8');
-  const bpSrc = readFileSync(new URL('../src/engine/blackholeParams.ts', import.meta.url), 'utf8');
+  const rmSrc = readFileSync(new URL('../../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
+  const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+  const capSrc = readFileSync(new URL('../../src/engine/capability.ts', import.meta.url), 'utf8');
+  const bpSrc = readFileSync(new URL('../../src/engine/blackholeParams.ts', import.meta.url), 'utf8');
 
   /* ROUND 64 — the port is live again: the renderer-internal pins return.
      SIN 1 — the quad must billboard EVERY frame, inside the per-frame
@@ -216,10 +216,10 @@ function inv(d: [number, number, number]): [number, number] {
 
 /* ==== 5. ROUND 52 — spacetime bending of the BACKGROUND (the star clouds) ==== */
 {
-  const shSrc = readFileSync(new URL('../src/engine/shaders.ts', import.meta.url), 'utf8');
-  const ssSrc = readFileSync(new URL('../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
-  const enSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
-  const mgrSrc = readFileSync(new URL('../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
+  const shSrc = readFileSync(new URL('../../src/engine/shaders.ts', import.meta.url), 'utf8');
+  const ssSrc = readFileSync(new URL('../../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
+  const enSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+  const mgrSrc = readFileSync(new URL('../../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
 
   /* The sky's discrete stars are point clouds. Until R52 their materials
      carried no lens uniforms at all, so only the procedural canvas and the
@@ -256,7 +256,7 @@ function inv(d: [number, number, number]): [number, number] {
 
 /* ==== ROUND 62 — system objects never bend ==== */
 {
-  const enSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
+  const enSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
 
   /* THE RIGIDITY LAW — the belt-tear fix: point clouds default to the plain
      vertex shader (no lens defines, no bend) and only the cosmic sky clouds
@@ -283,7 +283,7 @@ function inv(d: [number, number, number]): [number, number] {
      was really orbiting the hole 250 units away. The record must persist the
      focused body id, the boot restore must re-bind it (roster-checked), and
      legacy records without a focus must be discarded, never replayed. */
-  const cmSrc = readFileSync(new URL('../src/engine/cameraMemory.ts', import.meta.url), 'utf8');
+  const cmSrc = readFileSync(new URL('../../src/engine/cameraMemory.ts', import.meta.url), 'utf8');
   const focusMemory = /focusId\?: string \| null/.test(cmSrc)
     && /if \(p\.focusId === undefined\) \{ clearCameraMemory\(\); return null; \}/.test(cmSrc)
     && /focusId: this\.focusId,/.test(enSrc)
@@ -294,10 +294,10 @@ function inv(d: [number, number, number]): [number, number] {
 
 /* ==== 6. ROUND 53 — the tier that STAYS: policy fixes + the user's switch ==== */
 {
-  const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
-  const capSrc = readFileSync(new URL('../src/engine/capability.ts', import.meta.url), 'utf8');
-  const btSrc = readFileSync(new URL('../src/engine/blackholeTier.ts', import.meta.url), 'utf8');
-  const skSrc = readFileSync(new URL('../src/platform/storageKeys.ts', import.meta.url), 'utf8');
+  const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+  const capSrc = readFileSync(new URL('../../src/engine/capability.ts', import.meta.url), 'utf8');
+  const btSrc = readFileSync(new URL('../../src/engine/blackholeTier.ts', import.meta.url), 'utf8');
+  const skSrc = readFileSync(new URL('../../src/platform/storageKeys.ts', import.meta.url), 'utf8');
 
   /* THE POLICY FIX — the quality handler tore the geodesic tier down at any
      tier below cinematic (a Version-3 leftover): touching the quality dial
@@ -345,11 +345,11 @@ function inv(d: [number, number, number]): [number, number] {
 
 /* ==== 7. ROUND 54 — the single-renderer rebuild ==== */
 {
-  const rmSrc = readFileSync(new URL('../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
-  const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
+  const rmSrc = readFileSync(new URL('../../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
+  const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
 
   /* THE OLD VERSION IS GONE — one renderer, no painted fakes anywhere. */
-  const oldGone = !existsSync(new URL('../src/engine/blackhole.ts', import.meta.url));
+  const oldGone = !existsSync(new URL('../../src/engine/blackhole.ts', import.meta.url));
   check('R54: the flat composite black hole (blackhole.ts) is deleted', oldGone, `${oldGone}`);
 
   /* ROUND 56/58/64 — escaped rays exit TRANSPARENT: the live sky shows
@@ -372,7 +372,7 @@ function inv(d: [number, number, number]): [number, number] {
      march's lensing factor, and — the user's R66 verdict — LOCAL: unity
      through the quad's coverage, exactly zero at 6·b_c (the vast whole-sky
      arcs are gone; the whirlpool hugs the hole). */
-  const ssSrc = readFileSync(new URL('../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
+  const ssSrc = readFileSync(new URL('../../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
   const skyLens = ssSrc.includes('uniform float uLensScale;')
     && !/smoothstep\(m \* 0\.62, m, ang \/ rim\)/.test(ssSrc)
     && /\) \* uLensScale \* uLensBend \* confine;/.test(ssSrc)
@@ -421,10 +421,10 @@ function inv(d: [number, number, number]): [number, number] {
 
 /* ==== ROUND 61 — the hole is a hole in the surface; the one-law well ==== */
 {
-  const rmSrc = readFileSync(new URL('../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
-  const ssSrc = readFileSync(new URL('../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
-  const usmSrc = readFileSync(new URL('../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
-  const pdSrc = readFileSync(new URL('../src/engine/surface/photoDome.ts', import.meta.url), 'utf8');
+  const rmSrc = readFileSync(new URL('../../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
+  const ssSrc = readFileSync(new URL('../../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
+  const usmSrc = readFileSync(new URL('../../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
+  const pdSrc = readFileSync(new URL('../../src/engine/surface/photoDome.ts', import.meta.url), 'utf8');
 
   /* THE SURFACE LAW — the hole paints in the sky band (after the domes at
      -100/-99 and the sky shells at -98, before every stellar-system object
@@ -454,7 +454,7 @@ function inv(d: [number, number, number]): [number, number] {
 
 /* ==== ROUND 61 — the whole universe bends (lensing is not Sol-Prime-only) ==== */
 {
-  const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
+  const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
 
   /* ONE LENS LAW — every lens (home roster and other galaxies alike) is
      written through the single slot writer: same asin(R/d) rim, same halo

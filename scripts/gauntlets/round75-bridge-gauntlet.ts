@@ -23,12 +23,12 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const appSrc = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
-const shellSrc = readFileSync(new URL('../src/ui/hud/HoloCard.tsx', import.meta.url), 'utf8');
+const appSrc = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const shellSrc = readFileSync(new URL('../../src/ui/hud/HoloCard.tsx', import.meta.url), 'utf8');
 const cards: [string, string][] = [
-  ['galaxy card', readFileSync(new URL('../src/ui/hud/GalaxyHoverCard.tsx', import.meta.url), 'utf8')],
-  ['reality card', readFileSync(new URL('../src/ui/hud/RealityHoverCard.tsx', import.meta.url), 'utf8')],
-  ['cluster card', readFileSync(new URL('../src/ui/hud/ClusterHoverCard.tsx', import.meta.url), 'utf8')],
+  ['galaxy card', readFileSync(new URL('../../src/ui/hud/GalaxyHoverCard.tsx', import.meta.url), 'utf8')],
+  ['reality card', readFileSync(new URL('../../src/ui/hud/RealityHoverCard.tsx', import.meta.url), 'utf8')],
+  ['cluster card', readFileSync(new URL('../../src/ui/hud/ClusterHoverCard.tsx', import.meta.url), 'utf8')],
 ];
 
 /* ==== 1. THE BRIDGE — the crossing survives, even a full stop ==== */

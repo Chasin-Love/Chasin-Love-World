@@ -24,7 +24,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.SMOKE_PORT) || 3000;
 const BASE = `http://127.0.0.1:${PORT}`;
 const VERIFY_DIR = path.join(ROOT, 'scripts/verify');

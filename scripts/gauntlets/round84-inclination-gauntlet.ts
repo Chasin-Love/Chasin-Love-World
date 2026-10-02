@@ -22,22 +22,22 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const physSrc = readFileSync(new URL('../src/physics/physicsEngine.ts', import.meta.url), 'utf8');
-const domainSrc = readFileSync(new URL('../src/domain/universe.ts', import.meta.url), 'utf8');
-const nbodySrc = readFileSync(new URL('../src/physics/nbody.ts', import.meta.url), 'utf8');
-const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
-const bridgeSrc = readFileSync(new URL('../src/platform/native/cpp_bridge.ts', import.meta.url), 'utf8');
-const cppSrc = readFileSync(new URL('../src/platform/native/cosmos_engine.cpp', import.meta.url), 'utf8');
-const hppSrc = readFileSync(new URL('../src/platform/native/cosmos_engine.hpp', import.meta.url), 'utf8');
-const rustFfiSrc = readFileSync(new URL('../src-tauri/src/cosmos.rs', import.meta.url), 'utf8');
-const libSrc = readFileSync(new URL('../src-tauri/src/lib.rs', import.meta.url), 'utf8');
-const seedsSrc = readFileSync(new URL('../src/vault/storage/seeds.ts', import.meta.url), 'utf8');
-const genSrc = readFileSync(new URL('../src/realities/galaxyGenerator.ts', import.meta.url), 'utf8');
-const realitiesSrc = readFileSync(new URL('../src/realities/index.ts', import.meta.url), 'utf8');
-const actionsSrc = readFileSync(new URL('../src/state/actions.ts', import.meta.url), 'utf8');
-const templatesSrc = readFileSync(new URL('../server/realityTemplates.ts', import.meta.url), 'utf8');
-const readmeSrc = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
+const physSrc = readFileSync(new URL('../../src/physics/physicsEngine.ts', import.meta.url), 'utf8');
+const domainSrc = readFileSync(new URL('../../src/domain/universe.ts', import.meta.url), 'utf8');
+const nbodySrc = readFileSync(new URL('../../src/physics/nbody.ts', import.meta.url), 'utf8');
+const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const bridgeSrc = readFileSync(new URL('../../src/platform/native/cpp_bridge.ts', import.meta.url), 'utf8');
+const cppSrc = readFileSync(new URL('../../src/platform/native/cosmos_engine.cpp', import.meta.url), 'utf8');
+const hppSrc = readFileSync(new URL('../../src/platform/native/cosmos_engine.hpp', import.meta.url), 'utf8');
+const rustFfiSrc = readFileSync(new URL('../../src-tauri/src/cosmos.rs', import.meta.url), 'utf8');
+const libSrc = readFileSync(new URL('../../src-tauri/src/lib.rs', import.meta.url), 'utf8');
+const seedsSrc = readFileSync(new URL('../../src/vault/storage/seeds.ts', import.meta.url), 'utf8');
+const genSrc = readFileSync(new URL('../../src/realities/galaxyGenerator.ts', import.meta.url), 'utf8');
+const realitiesSrc = readFileSync(new URL('../../src/realities/index.ts', import.meta.url), 'utf8');
+const actionsSrc = readFileSync(new URL('../../src/state/actions.ts', import.meta.url), 'utf8');
+const templatesSrc = readFileSync(new URL('../../server/realityTemplates.ts', import.meta.url), 'utf8');
+const readmeSrc = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
+const pkgSrc = readFileSync(new URL('../../package.json', import.meta.url), 'utf8');
 
 /* ==== 1. THE CONTRACT — node/argP exist, optional, defaulted ==== */
 {
@@ -96,7 +96,7 @@ const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
     && /node: \(200\.0 \* Math\.PI\) \/ 180/.test(seedsSrc);         /* the vault */
   check('R84: seeds.ts pins the real J2000 node/argP values (JPL Table 1)', j2000, 'real elements missing');
 
-  const configTwin = /node: \(48\.33076593 \* Math\.PI\) \/ 180/.test(readFileSync(new URL('../src/realities/solPrime/index.ts', import.meta.url), 'utf8'));
+  const configTwin = /node: \(48\.33076593 \* Math\.PI\) \/ 180/.test(readFileSync(new URL('../../src/realities/solPrime/index.ts', import.meta.url), 'utf8'));
   check('R84: the Sol-Prime RealityConfig twin carries the same elements', configTwin, 'config twin stale');
 }
 

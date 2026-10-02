@@ -29,7 +29,7 @@ import { chromium } from 'playwright';
 import { spawn, type ChildProcess } from 'child_process';
 import { fileURLToPath } from 'url';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.SMOKE_PORT) || 3000;
 const BASE = `http://127.0.0.1:${PORT}`;
 const HOLD_MS = Number(process.env.R95_HOLD_MS) || 180_000; /* three real minutes */

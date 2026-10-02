@@ -24,10 +24,10 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const twinSrc = readFileSync(new URL('../src/physics/simTwin.ts', import.meta.url), 'utf8');
-const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
-const cardSrc = readFileSync(new URL('../src/ui/console/SimulatorTwinCard.tsx', import.meta.url), 'utf8');
-const pkgSrc = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
+const twinSrc = readFileSync(new URL('../../src/physics/simTwin.ts', import.meta.url), 'utf8');
+const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const cardSrc = readFileSync(new URL('../../src/ui/console/SimulatorTwinCard.tsx', import.meta.url), 'utf8');
+const pkgSrc = readFileSync(new URL('../../package.json', import.meta.url), 'utf8');
 
 /* ==== 1. THE HYBRID LAW — the twin is read-only against the sky ==== */
 {

@@ -9,7 +9,7 @@
 # implementation serves. CI builds this artifact when emsdk is configured.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # R89 — public/wasm/: Vite serves public/ at the site root in dev AND copies
 # it into dist/ for production, so one location serves both. The bridge
 # probes /wasm/cosmos_engine.js root-relative (cpp_bridge.ts loadWasm).

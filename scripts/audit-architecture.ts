@@ -183,8 +183,8 @@ const ENCODE_GROUPS: EncodeGroup[] = [
     files: ['server/realityTemplates.ts', 'src-tauri/src/realities.rs'] },
   { name: 'disk surface.ts imports', pattern: /^import\s[^'"]*?from\s+['"][^'"]+['"]/gm, files: [] }, // filled below
   { name: 'native build path', pattern: /src\/native|wasm\/cosmos_engine/g,
-    files: ['src-tauri/build.rs', 'src/platform/native/cpp_bridge.ts', 'scripts/build-wasm.sh'] },
-  { name: 'gauntlet readFileSync targets', pattern: /readFileSync\(new URL\('([^']+)'/g, files: ['scripts/round17-gauntlet.ts'] },
+    files: ['src-tauri/build.rs', 'src/platform/native/cpp_bridge.ts', 'scripts/tools/build-wasm.sh'] },
+  { name: 'gauntlet readFileSync targets', pattern: /readFileSync\(new URL\('([^']+)'/g, files: ['scripts/gauntlets/round17-gauntlet.ts'] },
   { name: 'public roots', pattern: /\/fonts\/|\/pyodide\//g, files: ['index.html', 'src/vault/executors/index.ts'] },
   { name: 'route↔command strings', pattern: /\/api\/realities[\w/-]*/g, scanAll: true },
   { name: 'localStorage keys', pattern: /['"](my-universe:[\w:-]+|eventide:[\w-]+)['"]/g, scanAll: true },

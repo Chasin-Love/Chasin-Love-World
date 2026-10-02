@@ -32,15 +32,15 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-const hppSrc = read('../src/platform/native/cosmos_engine.hpp');
-const cppSrc = read('../src/platform/native/cosmos_engine.cpp');
-const rustRealSrc = read('../src-tauri/src/cosmos.rs');
-const libSrc = read('../src-tauri/src/lib.rs');
-const wasmBuildSrc = read('../scripts/build-wasm.sh');
-const bridgeSrc = read('../src/platform/native/cpp_bridge.ts');
-const driverSrc = read('../src/physics/sessionDriver.ts');
-const keysSrc = read('../src/platform/storageKeys.ts');
-const pkgSrc = read('../package.json');
+const hppSrc = read('../../src/platform/native/cosmos_engine.hpp');
+const cppSrc = read('../../src/platform/native/cosmos_engine.cpp');
+const rustRealSrc = read('../../src-tauri/src/cosmos.rs');
+const libSrc = read('../../src-tauri/src/lib.rs');
+const wasmBuildSrc = read('../../scripts/tools/build-wasm.sh');
+const bridgeSrc = read('../../src/platform/native/cpp_bridge.ts');
+const driverSrc = read('../../src/physics/sessionDriver.ts');
+const keysSrc = read('../../src/platform/storageKeys.ts');
+const pkgSrc = read('../../package.json');
 
 /* ==== 1. THE WIDE EYE — batched read at every layer ==== */
 {
@@ -82,7 +82,7 @@ const pkgSrc = read('../package.json');
     && !/from '\.\.\/state/.test(driverSrc);
   check('R91: the driver publishes to its own module map, never the UI store', ownTelemetry, 'store coupling or missing telemetry map');
 
-  const labUntouched = /export function simTwinTick\(/.test(read('../src/physics/simTwin.ts'));
+  const labUntouched = /export function simTwinTick\(/.test(read('../../src/physics/simTwin.ts'));
   check('R91: simTwin.ts remains the untouched read-only lab (R88 law intact)', labUntouched, 'the lab was disturbed');
 }
 

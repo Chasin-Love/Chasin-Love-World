@@ -21,7 +21,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.SMOKE_PORT) || 3000;
 const BASE = `http://127.0.0.1:${PORT}`;
 

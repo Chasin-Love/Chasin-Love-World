@@ -28,9 +28,9 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-const engineSrc = read('../src/engine/engine.ts');
-const driverSrc = read('../src/physics/sessionDriver.ts');
-const pkgSrc = read('../package.json');
+const engineSrc = read('../../src/engine/engine.ts');
+const driverSrc = read('../../src/physics/sessionDriver.ts');
+const pkgSrc = read('../../package.json');
 
 /* ==== 1. DETERMINISTIC MOON IDS (mesh churn identity — unchanged) ==== */
 {

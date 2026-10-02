@@ -17,13 +17,13 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
-const shellSrc = readFileSync(new URL('../src/ui/hud/HoloCard.tsx', import.meta.url), 'utf8');
-const cssSrc = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
-const appSrc = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
-const galaxyCard = readFileSync(new URL('../src/ui/hud/GalaxyHoverCard.tsx', import.meta.url), 'utf8');
-const realityCard = readFileSync(new URL('../src/ui/hud/RealityHoverCard.tsx', import.meta.url), 'utf8');
-const clusterCard = readFileSync(new URL('../src/ui/hud/ClusterHoverCard.tsx', import.meta.url), 'utf8');
+const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const shellSrc = readFileSync(new URL('../../src/ui/hud/HoloCard.tsx', import.meta.url), 'utf8');
+const cssSrc = readFileSync(new URL('../../src/index.css', import.meta.url), 'utf8');
+const appSrc = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const galaxyCard = readFileSync(new URL('../../src/ui/hud/GalaxyHoverCard.tsx', import.meta.url), 'utf8');
+const realityCard = readFileSync(new URL('../../src/ui/hud/RealityHoverCard.tsx', import.meta.url), 'utf8');
+const clusterCard = readFileSync(new URL('../../src/ui/hud/ClusterHoverCard.tsx', import.meta.url), 'utf8');
 
 /* ==== 1. THE HONEST DISK — colliders match the visible object ==== */
 {

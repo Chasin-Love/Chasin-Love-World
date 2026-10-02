@@ -30,13 +30,13 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-const engineSrc = read('../src/engine/engine.ts');
-const domainSrc = read('../src/domain/universe.ts');
-const actionsSrc = read('../src/state/actions.ts');
-const appSrc = read('../src/App.tsx');
-const cardSrc = read('../src/ui/console/SimulatorTwinCard.tsx');
-const driverSrc = read('../src/physics/sessionDriver.ts');
-const pkgSrc = read('../package.json');
+const engineSrc = read('../../src/engine/engine.ts');
+const domainSrc = read('../../src/domain/universe.ts');
+const actionsSrc = read('../../src/state/actions.ts');
+const appSrc = read('../../src/App.tsx');
+const cardSrc = read('../../src/ui/console/SimulatorTwinCard.tsx');
+const driverSrc = read('../../src/physics/sessionDriver.ts');
+const pkgSrc = read('../../package.json');
 
 /* ==== 1. THE GATE IS OFF BY LAW ==== */
 {

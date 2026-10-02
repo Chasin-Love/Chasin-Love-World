@@ -18,12 +18,12 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
-const shSrc = readFileSync(new URL('../src/engine/shaders.ts', import.meta.url), 'utf8');
-const appSrc = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
-const cssSrc = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
-const mbSrc = readFileSync(new URL('../src/ui/hud/MultiverseBar.tsx', import.meta.url), 'utf8');
-const phaseSrc = readFileSync(new URL('../src/engine/systems/kamuiPhases.ts', import.meta.url), 'utf8');
+const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const shSrc = readFileSync(new URL('../../src/engine/shaders.ts', import.meta.url), 'utf8');
+const appSrc = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const cssSrc = readFileSync(new URL('../../src/index.css', import.meta.url), 'utf8');
+const mbSrc = readFileSync(new URL('../../src/ui/hud/MultiverseBar.tsx', import.meta.url), 'utf8');
+const phaseSrc = readFileSync(new URL('../../src/engine/systems/kamuiPhases.ts', import.meta.url), 'utf8');
 
 /* ==== 1. the vortex pass ==== */
 {

@@ -18,8 +18,8 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const appSrc = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
-const engSrc = readFileSync(new URL('../src/engine/engine.ts', import.meta.url), 'utf8');
+const appSrc = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
 
 /* ==== 1. THE STEADY HERALD — the anchor survives the crossing ==== */
 {
