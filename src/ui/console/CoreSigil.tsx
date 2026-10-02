@@ -31,8 +31,11 @@ export function CoreSigil({ size = 44 }: { size?: number }) {
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 50);
     camera.position.set(0, 0, 10.5);
 
-    /* tab accent (rgb triplet) — retint the whole instrument live */
-    const plate = host.closest('.core-plate') as HTMLElement | null;
+    /* tab accent (rgb triplet) — retint the whole instrument live.
+       The console carries data-accent on .cc-root itself (the old
+       '.core-plate' ancestor never existed inside the deck, so the
+       sigil silently sat on the teal fallback forever). */
+    const plate = host.closest('.cc-root') as HTMLElement | null;
     const accent = () => {
       const v = plate ? getComputedStyle(plate).getPropertyValue('--cc').trim() : '';
       return v || '34 211 238';

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-02T18:51:33.396Z",
-  "fileCount": 166,
+  "generatedAt": "2026-10-02T20:18:01.808Z",
+  "fileCount": 167,
   "deadExports": [
     {
       "symbol": "shadowReferencesFiles",
@@ -686,6 +686,7 @@
     "scripts/gauntlets/round98-backend-conformance-gauntlet.ts": 300,
     "scripts/gauntlets/round98-physics-conformance-gauntlet.ts": 485,
     "scripts/gauntlets/stateSource.ts": 26,
+    "scripts/probes/round101-frost-visual.ts": 104,
     "scripts/probes/round63-void-probe.ts": 280,
     "scripts/probes/round92-live-check.ts": 132,
     "scripts/probes/round95-physics-probe.ts": 134,
@@ -770,8 +771,8 @@
     "src/ui/bits.tsx": 144,
     "src/ui/console/BlackHoleTuningCard.tsx": 194,
     "src/ui/console/CommandPalette.tsx": 350,
-    "src/ui/console/CoreConsole.tsx": 1469,
-    "src/ui/console/CoreSigil.tsx": 226,
+    "src/ui/console/CoreConsole.tsx": 1559,
+    "src/ui/console/CoreSigil.tsx": 229,
     "src/ui/console/CppNativeEngineCard.tsx": 289,
     "src/ui/console/QuantumBinTab.tsx": 342,
     "src/ui/console/ScenicBackdrop.tsx": 354,
@@ -843,6 +844,10 @@
       1659
     ],
     [
+      "src/ui/console/CoreConsole.tsx",
+      1559
+    ],
+    [
       "src/App.tsx",
       1550
     ],
@@ -853,10 +858,6 @@
     [
       "src/ui/vault/keyring.tsx",
       1521
-    ],
-    [
-      "src/ui/console/CoreConsole.tsx",
-      1469
     ],
     [
       "src/ui/FileManager.tsx",
@@ -1028,6 +1029,7 @@
       "src/state/persist.ts:267"
     ],
     "window seams": [
+      "scripts/probes/round101-frost-visual.ts:50",
       "scripts/probes/round63-void-probe.ts:73",
       "scripts/probes/round63-void-probe.ts:88",
       "scripts/probes/round63-void-probe.ts:178",

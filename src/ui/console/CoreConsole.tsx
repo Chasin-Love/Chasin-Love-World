@@ -39,6 +39,15 @@ interface Props {
 
 type Tab = 'dashboard' | 'realities' | 'hierarchy' | 'bin';
 
+/* THE VIEW DOCK — the bottom pill bar's registry. Full names for the cloud
+   chips, short names for the pill faces. */
+const TABS: Array<{ id: Tab; label: string; pill: string; sub: string; icon: React.ReactNode }> = [
+  { id: 'dashboard', label: 'Command Matrix', pill: 'Matrix', sub: 'Live multiverse telemetry & controls', icon: <Cpu className="w-3.5 h-3.5" /> },
+  { id: 'realities', label: 'Realities Grid', pill: 'Realities', sub: 'One card per parallel reality', icon: <Globe className="w-3.5 h-3.5" /> },
+  { id: 'hierarchy', label: 'Deep Hierarchy', pill: 'Hierarchy', sub: 'The 11-stage cosmological ladder', icon: <Layers className="w-3.5 h-3.5" /> },
+  { id: 'bin', label: 'Quantum Bin', pill: 'Bin', sub: 'Deleted realities rest in stasis', icon: <Trash2 className="w-3.5 h-3.5" /> },
+];
+
 /* Quantum Glass motion system — staggered deck entrance + tab transitions.
    Transform/opacity only; MotionConfig reducedMotion="user" in the main
    component disables it for users who prefer reduced motion. */
@@ -292,11 +301,11 @@ function VitalTile({
   color: string;
 }) {
   return (
-    <div className="cc-vital p-2.5 flex flex-col items-center gap-1" style={{ ['--tile' as string]: color }}>
+    <div className="cc-vital p-3.5 flex flex-col items-center justify-center gap-1.5" style={{ ['--tile' as string]: color }}>
       {typeof value === 'number' ? (
-        <AnimatedNumber className="cc-num text-lg leading-none" style={{ color }} value={value} />
+        <AnimatedNumber className="cc-num text-[26px] sm:text-3xl leading-none" style={{ color }} value={value} />
       ) : (
-        <span className="cc-num text-lg leading-none" style={{ color }}>{value}</span>
+        <span className="cc-num text-[26px] sm:text-3xl leading-none" style={{ color }}>{value}</span>
       )}
       <span className="cc-label">{label}</span>
     </div>
@@ -310,14 +319,80 @@ function SimClockTile() {
   const label = simDate
     ? new Date(simDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     : '—';
-  return <VitalTile label="Universe Epoch" value={label} color="#38bdf8" />;
+  return (
+    <div className="cc-vital px-3.5 py-2.5 flex items-center justify-between gap-2">
+      <span className="cc-label">Universe Epoch</span>
+      <span className="cc-num text-sm leading-none" style={{ color: '#38bdf8' }}>{label}</span>
+    </div>
+  );
+}
+
+/* THE CLOCK CHIP — the screenshot's "10:02 PM": the traveler's wall clock
+   wearing the light frost, with the universe's own epoch beneath it. */
+function ClockChip() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const iv = window.setInterval(() => setNow(new Date()), 15_000);
+    return () => window.clearInterval(iv);
+  }, []);
+  const simDate = useSyncExternalStore(subscribeSimDate, getSimDate);
+  const epoch = simDate
+    ? new Date(simDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    : '—';
+  return (
+    <span className="cc-clockchip hidden md:inline-flex" title={`Universe epoch: ${epoch}`}>
+      <span className="font-body text-sm font-semibold leading-none text-white tabular-nums">
+        {now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+      </span>
+      <span className="cc-label">Epoch · {epoch}</span>
+    </span>
+  );
+}
+
+/* WORLDS PER REALITY — one real bar per reality (its live body count); the
+   anchored reality burns in the tab accent. Real data only — the counts are
+   the rosters themselves, never invented. */
+function WorldsPerRealityBars({ realities, activeId }: { realities: RealityConfig[]; activeId: string }) {
+  const max = Math.max(1, ...realities.map((r) => r.bodies.length));
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="cc-label">Worlds per reality</span>
+        <span className="cc-label text-slate-500">{realities.reduce((n, r) => n + r.bodies.length, 0)} total</span>
+      </div>
+      <div className="flex items-end gap-1.5 h-14">
+        {realities.map((r) => {
+          const n = r.bodies.length;
+          const active = r.id === activeId;
+          const hPct = Math.max(6, Math.round((n / max) * 100));
+          return (
+            <span key={r.id} className="group/bar relative flex-1 h-full flex items-end justify-center min-w-0">
+              <span className="cc-cloud-card pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap opacity-0 translate-y-1 group-hover/bar:opacity-100 group-hover/bar:translate-y-0 transition-all duration-200 z-50">
+                {r.name} · {n} world{n === 1 ? '' : 's'}
+              </span>
+              <span
+                className="w-full max-w-[16px] rounded-full transition-[height] duration-500"
+                style={{
+                  height: `${hPct}%`,
+                  background: active
+                    ? 'linear-gradient(180deg, rgb(var(--cc)), rgb(var(--cc) / 0.30))'
+                    : 'linear-gradient(180deg, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0.10))',
+                  boxShadow: active ? '0 0 14px rgb(var(--cc) / 0.45)' : undefined,
+                }}
+              />
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function DiskSyncStatusTile({ diskSync }: { diskSync?: DiskSyncState }) {  const connected = diskSync?.connected ?? false;
   const pending = diskSync?.pendingOps ?? 0;
   return (
     <div
-      className={`p-2.5 rounded-xl border backdrop-blur-md flex items-center gap-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] ${
+      className={`p-2.5 rounded-xl border flex items-center gap-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] ${
         connected
           ? 'bg-emerald-500/8 border-emerald-400/30'
           : 'bg-rose-500/10 border-rose-400/40'
@@ -412,7 +487,7 @@ function BentoRealityCard({
     <motion.div
       variants={rise}
       whileHover={{ y: -3 }}
-      className={`group relative rounded-2xl border transition-[border-color,box-shadow] duration-300 flex flex-col justify-between overflow-hidden ${
+      className={`group relative rounded-[22px] border transition-[border-color,box-shadow] duration-300 flex flex-col justify-between overflow-hidden ${
         active
           ? 'cc-glass-card border-cyan-400/45 shadow-[0_16px_40px_rgba(0,0,0,0.42)]'
           : 'cc-glass-card hover:border-cyan-400/35 hover:shadow-[0_16px_40px_rgba(0,0,0,0.42)]'
@@ -437,7 +512,7 @@ function BentoRealityCard({
               title="Click to recolor this reality"
             >
               <Sparkles className="w-4 h-4 text-white/90 drop-shadow" />
-              <span className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-abyss/85 backdrop-blur-md border border-white/20">
+              <span className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-abyss/85 border border-white/20">
                 <Palette className="w-2.5 h-2.5 text-cyan-300" />
               </span>
             </div>
@@ -454,7 +529,7 @@ function BentoRealityCard({
                       if (e.key === 'Escape') setIsEditingName(false);
                     }}
                     autoFocus
-                    className="px-2 py-0.5 rounded bg-white/10 backdrop-blur-md border border-cyan-400 text-xs text-white font-semibold focus:outline-none"
+                    className="px-2 py-0.5 rounded bg-white/10 border border-cyan-400 text-xs text-white font-semibold focus:outline-none"
                   />
                   <button
                     onClick={handleSaveName}
@@ -494,7 +569,7 @@ function BentoRealityCard({
 
         {/* Color Palette Popover */}
         {showColorPicker && (
-          <div className="p-2.5 rounded-xl bg-abyss/70 backdrop-blur-xl border border-cyan-500/30 flex flex-wrap gap-1.5 shadow-xl">
+          <div className="p-2.5 rounded-xl bg-abyss/60 backdrop-blur-2xl border border-cyan-500/30 flex flex-wrap gap-1.5 shadow-xl">
             {[
               { label: 'Cyan / Violet', a: '#00f5d4', b: '#8b5cf6' },
               { label: 'Solar Gold', a: '#f59e0b', b: '#fbbf24' },
@@ -575,7 +650,7 @@ function BentoRealityCard({
       </div>
 
       {/* Card Action Footer Bar */}
-      <div className="px-4 py-3 bg-white/4 backdrop-blur-md border-t border-white/10 flex items-center justify-between gap-2">
+      <div className="px-4 py-3 bg-white/5 border-t border-white/12 flex items-center justify-between gap-2">
         <button
           onClick={onWarp}
           disabled={active}
@@ -619,7 +694,7 @@ function BentoRealityCard({
 
       {/* Expanded Deep Advanced Reality Workbench */}
       {isExpanded && (
-        <div className="p-4 bg-abyss/55 backdrop-blur-2xl border-t border-cyan-500/30">
+        <div className="p-4 bg-black/25 border-t border-white/12">
           <RealityAdvancedPanel realityId={reality.id} onEnterGalaxy={onEnterGalaxy} />
         </div>
       )}
@@ -850,6 +925,21 @@ export const CoreConsole: React.FC<Props> = ({
     else toast(`Backdrop hung — ${file.name} is the night now`);
   };
 
+  /* STUDIO OUTSIDE-CLOSE — the popover lives in the left rail, whose
+     backdrop-filter makes it the containing block for `fixed` descendants
+     (a `fixed inset-0` catcher inside the rail would only cover the rail).
+     So dismissal is a document-level press outside the studio root. */
+  useEffect(() => {
+    if (!studioOpen) return;
+    const close = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[data-studio-root]')) return;
+      setStudioOpen(false);
+    };
+    window.addEventListener('mousedown', close);
+    return () => window.removeEventListener('mousedown', close);
+  }, [studioOpen]);
+
   const activeRealityId = state.activeRealityId || 'sol-prime';
   const realities: RealityConfig[] = REALITIES;
   const activeReality = getReality(activeRealityId, state.customRealityDescriptions);
@@ -913,9 +1003,106 @@ export const CoreConsole: React.FC<Props> = ({
       {/* readability breath — a hint of dark behind the floating top bar */}
       <div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-black/45 to-transparent pointer-events-none" />
 
+      {/* THE RAIL — the deck's tools as a slim frost sliver on the left edge
+          (the screenshot's left icon column). stopPropagation: the rail sits
+          outside the deck, so clicks here must not close the console. */}
+      <div
+        className="cc-rail absolute left-4 top-1/2 z-40 -translate-y-1/2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* TWIN JUMP — always visible even when the twin card rests
+            below the fold: one click lands on the Native Simulator Twin */}
+        <ThinkingCloudTooltip
+          onClick={scrollToTwin}
+          icon={<Orbit className="w-4 h-4" />}
+          label="Native Simulator Twin"
+          subtitle="Scroll straight to the twin verification card"
+          hint="Jump"
+          position="right"
+          size="sm"
+          id="cc-twin-jump-btn"
+        />
+        <span className="cc-rail-sep" aria-hidden="true" />
+        {/* BACKDROP STUDIO — the user's own night: image, GIF or muted video */}
+        <span className="relative inline-flex" data-studio-root>
+          <ThinkingCloudTooltip
+            onClick={() => setStudioOpen((v) => !v)}
+            icon={<Wallpaper className="w-4 h-4" />}
+            label="Backdrop Studio"
+            subtitle="Hang your own picture, GIF or muted video"
+            hint={backdrop.kind === 'shader' ? 'Open' : 'Your night is up'}
+            position="right"
+            size="sm"
+            id="cc-backdrop-btn"
+          />
+          {studioOpen && (
+            <div
+              className="cc-cloud-rise absolute left-full top-0 z-50 ml-3 w-64 rounded-2xl bg-[#0a0d16]/85 border border-white/15 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+                <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400 mb-3">Backdrop Studio</div>
+                <label className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400">
+                  <span>Night veil</span>
+                  <span className="text-slate-200">{Math.round(backdrop.dim * 100)}%</span>
+                </label>
+                <input
+                  type="range" min={0} max={0.7} step={0.05} value={backdrop.dim}
+                  onChange={(e) => backdrop.setDim(Number(e.target.value))}
+                  className="w-full accent-cyan-400 mt-1 mb-3 cursor-pointer"
+                />
+                <label className="cc-btn-glass block text-center rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-200 cursor-pointer hover:text-white transition-colors">
+                  Choose image / GIF
+                  <input
+                    type="file" accept="image/*" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleBackdropFile(f); e.target.value = ''; }}
+                  />
+                </label>
+                <label className="cc-btn-glass mt-2 block text-center rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-200 cursor-pointer hover:text-white transition-colors">
+                  Choose video (muted)
+                  <input
+                    type="file" accept="video/*" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleBackdropFile(f); e.target.value = ''; }}
+                  />
+                </label>
+                {backdrop.kind !== 'shader' && (
+                  <button
+                    onClick={() => { backdrop.clear(); toast('The Crimson Watch returns — shader night restored'); setStudioOpen(false); }}
+                    className="w-full mt-2 rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-rose-200 border border-rose-400/30 hover:bg-rose-500/10 cursor-pointer transition-colors"
+                  >
+                    Reset to Crimson Night
+                  </button>
+                )}
+                <p className="font-mono text-[8px] text-slate-500 mt-3 leading-relaxed">
+                  Stored offline in this browser only — or drop a file anywhere on the deck.
+                </p>
+            </div>
+          )}
+        </span>
+        <ThinkingCloudTooltip
+          onClick={() => setShowCreate(true)}
+          label="Forge Reality Continuum"
+          subtitle="Manifest a new parallel realm & disk directory"
+          position="right"
+          size="sm"
+          iconType="forge"
+          id="core-forge-reality-btn"
+        />
+        <span className="cc-rail-sep" aria-hidden="true" />
+        <ThinkingCloudTooltip
+          onClick={onClose}
+          icon={<X className="w-4 h-4" />}
+          label="Close Console"
+          subtitle="Return to the cosmos — Esc works too"
+          hint="Close"
+          position="right"
+          size="sm"
+          id="cc-close-btn"
+        />
+      </div>
+
       {/* THE FLOATING DECK — a slim bar and cards resting directly on the night */}
       <div
-        className="relative h-full flex flex-col px-4 sm:px-8 lg:px-12 pt-3 pb-4"
+        className="relative h-full flex flex-col pl-20 pr-4 sm:pr-8 lg:pr-12 pt-3 pb-3"
         onClick={(e) => e.stopPropagation()}
       >
 
@@ -960,42 +1147,8 @@ export const CoreConsole: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* ICON TABS — symbols only; full names rise in the thought cloud */}
-          <nav className="flex items-center gap-2">
-            {([
-              { id: 'dashboard' as Tab, label: 'Command Matrix', sub: 'Live multiverse telemetry & controls', icon: <Cpu className="w-4 h-4" /> },
-              { id: 'realities' as Tab, label: 'Realities Grid', sub: `${realities.length} parallel realities, one card each`, icon: <Globe className="w-4 h-4" /> },
-              { id: 'hierarchy' as Tab, label: 'Deep Hierarchy', sub: 'The 11-stage cosmological ladder', icon: <Layers className="w-4 h-4" /> },
-              {
-                id: 'bin' as Tab,
-                label: 'Quantum Bin',
-                sub: 'Deleted realities rest in stasis',
-                icon: <Trash2 className="w-4 h-4" />,
-                badge: (state.binRealities || []).length > 0 ? (state.binRealities || []).length : undefined,
-              },
-            ]).map((t) => (
-              <span key={t.id} className="relative inline-flex">
-                <ThinkingCloudTooltip
-                  onClick={() => setTab(t.id)}
-                  icon={t.icon}
-                  active={tab === t.id}
-                  label={t.label}
-                  subtitle={t.sub}
-                  hint={tab === t.id ? 'Current view' : 'Switch view'}
-                  position="bottom"
-                  size="sm"
-                  id={`cc-tab-${t.id}`}
-                />
-                {t.badge !== undefined && (
-                  <span className="absolute -top-1 -right-1 z-10 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center pointer-events-none shadow-[0_0_10px_rgba(251,113,133,0.6)]">
-                    {t.badge}
-                  </span>
-                )}
-              </span>
-            ))}
-          </nav>
-
-          {/* TOOLS — search · filters · forge · close */}
+          {/* TOOLS — search · filters · the clock. The twin / studio / forge /
+              close seals live on the left rail; the views live in the pill bar. */}
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="relative hidden md:block w-44 lg:w-60">
               <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1004,7 +1157,7 @@ export const CoreConsole: React.FC<Props> = ({
                 placeholder="Search realities..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-black/45 border border-white/12 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white/35 font-mono"
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-black/35 backdrop-blur-md border border-white/14 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white/35 font-mono"
               />
               {searchQuery && (
                 <button
@@ -1037,102 +1190,8 @@ export const CoreConsole: React.FC<Props> = ({
               ))}
             </div>
 
-            {/* TWIN JUMP — always visible even when the twin card rests
-                below the fold: one click lands on the Native Simulator Twin */}
-            <ThinkingCloudTooltip
-              onClick={scrollToTwin}
-              icon={<Orbit className="w-4 h-4" />}
-              label="Native Simulator Twin"
-              subtitle="Scroll straight to the twin verification card"
-              hint="Jump"
-              position="bottom"
-              size="sm"
-              id="cc-twin-jump-btn"
-            />
-
-            {/* BACKDROP STUDIO — the user's own night: image, GIF or muted video */}
-            <span className="relative inline-flex">
-              <ThinkingCloudTooltip
-                onClick={() => setStudioOpen((v) => !v)}
-                icon={<Wallpaper className="w-4 h-4" />}
-                label="Backdrop Studio"
-                subtitle="Hang your own picture, GIF or muted video"
-                hint={backdrop.kind === 'shader' ? 'Open' : 'Your night is up'}
-                position="bottom"
-                size="sm"
-                id="cc-backdrop-btn"
-              />
-              {studioOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40 cursor-default"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setStudioOpen(false);
-                    }}
-                  />
-                  <div
-                    className="cc-cloud-rise absolute right-0 top-full z-50 mt-3 w-64 rounded-2xl bg-[#0a0d16]/95 border border-white/15 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.6)]"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400 mb-3">Backdrop Studio</div>
-                    <label className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400">
-                      <span>Night veil</span>
-                      <span className="text-slate-200">{Math.round(backdrop.dim * 100)}%</span>
-                    </label>
-                    <input
-                      type="range" min={0} max={0.7} step={0.05} value={backdrop.dim}
-                      onChange={(e) => backdrop.setDim(Number(e.target.value))}
-                      className="w-full accent-cyan-400 mt-1 mb-3 cursor-pointer"
-                    />
-                    <label className="cc-btn-glass block text-center rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-200 cursor-pointer hover:text-white transition-colors">
-                      Choose image / GIF
-                      <input
-                        type="file" accept="image/*" className="hidden"
-                        onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleBackdropFile(f); e.target.value = ''; }}
-                      />
-                    </label>
-                    <label className="cc-btn-glass mt-2 block text-center rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-200 cursor-pointer hover:text-white transition-colors">
-                      Choose video (muted)
-                      <input
-                        type="file" accept="video/*" className="hidden"
-                        onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleBackdropFile(f); e.target.value = ''; }}
-                      />
-                    </label>
-                    {backdrop.kind !== 'shader' && (
-                      <button
-                        onClick={() => { backdrop.clear(); toast('The Crimson Watch returns — shader night restored'); setStudioOpen(false); }}
-                        className="w-full mt-2 rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-rose-200 border border-rose-400/30 hover:bg-rose-500/10 cursor-pointer transition-colors"
-                      >
-                        Reset to Crimson Night
-                      </button>
-                    )}
-                    <p className="font-mono text-[8px] text-slate-500 mt-3 leading-relaxed">
-                      Stored offline in this browser only — or drop a file anywhere on the deck.
-                    </p>
-                  </div>
-                </>
-              )}
-            </span>
-            <ThinkingCloudTooltip
-              onClick={() => setShowCreate(true)}
-              label="Forge Reality Continuum"
-              subtitle="Manifest a new parallel realm & disk directory"
-              position="bottom"
-              size="sm"
-              iconType="forge"
-              id="core-forge-reality-btn"
-            />
-            <ThinkingCloudTooltip
-              onClick={onClose}
-              icon={<X className="w-4 h-4" />}
-              label="Close Console"
-              subtitle="Return to the cosmos — Esc works too"
-              hint="Close"
-              position="bottom"
-              size="sm"
-              id="cc-close-btn"
-            />
+            {/* THE CLOCK CHIP — the traveler's wall clock over the universe's epoch */}
+            <ClockChip />
           </div>
         </div>
 
@@ -1196,6 +1255,7 @@ export const CoreConsole: React.FC<Props> = ({
                   <VitalTile label="Galaxies" value={totalGalaxies} color="#a78bfa" />
                   <VitalTile label="Clusters" value={totalClusters} color="#f472b6" />
                 </div>
+                <WorldsPerRealityBars realities={realities} activeId={activeRealityId} />
                 <SimClockTile />
                 <DiskSyncStatusTile diskSync={state.diskSync} />
               </motion.div>
@@ -1451,6 +1511,36 @@ export const CoreConsole: React.FC<Props> = ({
           )}
           </AnimatePresence>
         </div>
+
+        {/* THE PILL BAR — the view dock floating at the bottom of the deck
+            (the screenshot's Living-Room dock). The active pill reads the
+            tab accent through [data-active]; the Bin wears its live badge. */}
+        <nav className="shrink-0 self-center pt-3" aria-label="Console views">
+          <div className="cc-pillbar">
+            {TABS.map((t) => {
+              const binCount = t.id === 'bin' ? (state.binRealities || []).length : 0;
+              return (
+                <button
+                  key={t.id}
+                  id={`cc-tab-${t.id}`}
+                  data-active={tab === t.id}
+                  onClick={() => setTab(t.id)}
+                  title={t.sub}
+                  aria-label={t.label}
+                  className="cc-pill"
+                >
+                  {t.icon}
+                  <span className="hidden sm:inline">{t.pill}</span>
+                  {binCount > 0 && (
+                    <span className="absolute -top-1 -right-1 z-10 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center pointer-events-none shadow-[0_0_10px_rgba(251,113,133,0.6)]">
+                      {binCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
       </div>
 
       <CreateRealityModal

@@ -116,7 +116,7 @@ export const QuantumBinTab: React.FC = () => {
 
       {/* REALITY DAEMON — HONEST LIVE HEALTH */}
       <div className="p-4 cc-panel">
-        <div className="flex items-center justify-between mb-3 border-b border-white/8 pb-2 flex-wrap gap-2">
+        <div className="flex items-center justify-between mb-3 border-b border-white/12 pb-2 flex-wrap gap-2">
           <div className="cc-panel-title">
             <Activity className="w-4 h-4 animate-pulse" />
             <span>Reality Disk Daemon — Live Telemetry</span>
@@ -183,7 +183,7 @@ export const QuantumBinTab: React.FC = () => {
 
         {/* Operations Activity Log */}
         {connected && diskSync?.operationsLog && diskSync.operationsLog.length > 0 && (
-          <div className="mt-1 p-2.5 rounded-xl bg-abyss/45 backdrop-blur-md border border-white/10 font-mono text-[10px] text-slate-400 max-h-24 overflow-y-auto custom-scroll">
+          <div className="mt-1 p-2.5 rounded-xl bg-black/25 border border-white/10 font-mono text-[10px] text-slate-400 max-h-24 overflow-y-auto custom-scroll">
             <div className="text-[9px] uppercase tracking-wider text-cyan-400/80 mb-1">Daemon Audit Stream:</div>
             {diskSync.operationsLog.map((log, idx) => (
               <div key={`${log.timestamp}-${idx}`} className="flex items-center gap-2 truncate py-0.5">

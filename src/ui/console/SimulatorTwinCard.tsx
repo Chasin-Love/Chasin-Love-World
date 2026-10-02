@@ -116,7 +116,7 @@ export const SimulatorTwinCard: React.FC = () => {
   return (
     <div className="cc-panel p-4 sm:p-5 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-white/8 pb-3 flex-wrap">
+      <div className="flex items-center justify-between gap-3 border-b border-white/12 pb-3 flex-wrap">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-violet-500/15 border border-violet-400/35 text-violet-300">
             <Orbit className="w-4 h-4" />
@@ -183,7 +183,7 @@ export const SimulatorTwinCard: React.FC = () => {
 
       {/* Twin receipt — the TS tier is its own reference, so it always reads verified */}
       {receipt !== null && (
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-abyss/45 backdrop-blur-md border border-white/10 font-mono text-[11px]">
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-black/25 border border-white/10 font-mono text-[11px]">
           {(receipt.maxDelta < 1e-9 || receipt.backend === 'typescript')
             ? <BadgeCheck className="w-4 h-4 text-emerald-400" />
             : <BadgeX className="w-4 h-4 text-amber-400" />}

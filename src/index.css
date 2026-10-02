@@ -1306,13 +1306,18 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 .fx-tree-glyph { display: grid; place-items: center; }
 
 /* ===================== MULTIVERSE CORE CONSOLE ===================== */
-/* THE CRIMSON WATCH — the deck floats directly on the living night:
-   no plate, no border, no backdrop blur anywhere. Panels are solid
-   smoked glass (fill, hairline, deep shadow) so type stays crisp while
-   the scene glows between them. Typography: Space Grotesk for voice,
-   Space Mono for micro-labels, Unbounded reserved for big numerals.
-   The deck carries data-accent={tab} on .cc-root; every .cc-* primitive
-   reads the --cc variable, so the deck recolors per tab with zero JS. */
+/* R101 THE FROST DECK — the author's call: the deck wears true frosted
+   glass in the visionOS manner — heavy backdrop blur over the living
+   Crimson Watch night, layered light-and-dark panes, generous radii.
+   This consciously reverses the old "no blur anywhere" smoked-glass law.
+   THE GPU LAW that keeps it honest: ONLY top-level panes (ones floating
+   directly on the night) carry backdrop-filter — one blur layer per
+   floating surface. Tiles nested INSIDE a frosted pane use translucent
+   fills only; a blur inside a blur is wasted GPU and can shimmer.
+   Typography: Space Grotesk for voice, Space Mono for micro-labels,
+   Unbounded reserved for big numerals. The deck carries data-accent={tab}
+   on .cc-root; every .cc-* primitive reads --cc, so the deck recolors
+   per tab with zero JS. */
 
 .cc-root {
   /* Viewport-locked, in CSS itself. The markup also carries Tailwind's
@@ -1371,13 +1376,16 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   font-variant-numeric: tabular-nums;
 }
 
-/* smoked cloud chip — hover names for stats & status dots */
+/* frosted cloud chip — hover names for stats & status dots (a small
+   top-level floater, so it carries its own blur) */
 .cc-cloud-card {
   padding: 0.3rem 0.6rem;
-  border-radius: 10px;
-  background: rgba(8, 10, 18, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(10, 13, 22, 0.78);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   font-family: var(--font-mono);
   font-size: 9px;
   text-transform: uppercase;
@@ -1385,19 +1393,33 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   color: #e2e8f0;
 }
 
-/* quantum pane — solid smoked glass (no blur): type stays crisp, the
-   night glows between the panes. Hierarchy via hairline + elevation. */
+/* quantum pane — true frosted glass: the living night blurs THROUGH the
+   pane while type stays crisp on the white wash. Top-level floater, so it
+   carries the deck's blur. The ::before sweep is the glassmaker's light —
+   a diagonal sheen like pane-polish, pointer-transparent. */
 .cc-panel {
   position: relative;
-  background: linear-gradient(165deg, rgba(9, 11, 19, 0.80), rgba(6, 7, 12, 0.87));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  box-shadow: var(--elev-1);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.03) 38%, rgba(255, 255, 255, 0.015)),
+    rgba(7, 9, 16, 0.38);
+  -webkit-backdrop-filter: blur(26px) saturate(1.35);
+  backdrop-filter: blur(26px) saturate(1.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.14);
   transition: border-color 0.35s ease, box-shadow 0.35s ease;
 }
+.cc-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.07), transparent 30%, transparent 72%, rgba(255, 255, 255, 0.045));
+  pointer-events: none;
+}
 .cc-panel:hover {
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: var(--elev-2);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 30px 64px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 /* mono micro-label — premium dashboards keep these tight (9px · 0.14em) */
@@ -1468,14 +1490,17 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   box-shadow: none;
 }
 
-/* vital tile — a smoked metric pane whose only ornament is a short
-   accent dash resting on its top border (--tile) */
+/* vital tile — THE HERO STAT (the screenshot's "1,5 kWh" card): a LIGHTER
+   frost against the dark panes around it — the layered luminance rhythm is
+   the point. Nested inside a frosted panel, so it carries NO blur of its
+   own (GPU law); its only ornament stays the short accent dash (--tile). */
 .cc-vital {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(165deg, rgba(9, 11, 19, 0.78), rgba(6, 7, 12, 0.85));
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 12px;
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.08) 55%, rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(255, 255, 255, 0.21);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 12px 28px rgba(0, 0, 0, 0.26);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 .cc-vital::before {
@@ -1489,16 +1514,26 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   background: var(--tile, rgb(var(--cc)));
   opacity: 0.85;
 }
+.cc-vital::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.10), transparent 34%, transparent 74%, rgba(255, 255, 255, 0.06));
+  pointer-events: none;
+}
 .cc-vital:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 16px 34px rgba(0, 0, 0, 0.34);
 }
 
-/* glass action button — smoked pill that warms on hover (--btn, rgb triplet) */
+/* glass action button — a nested translucent keycap (no blur — it lives
+   inside a frosted pane); warms on hover (--btn, rgb triplet) */
 .cc-btn-glass {
-  background: rgba(10, 12, 20, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.04)), rgba(8, 10, 18, 0.30);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   transition: border-color 0.3s ease, background 0.3s ease;
 }
 .cc-btn-glass:hover {
@@ -1506,16 +1541,109 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   background: rgb(var(--btn, var(--cc)) / 0.10);
 }
 
-/* radar frame — a calm instrument grid over smoked glass (no extra blur —
-   it nests inside the already-blurred plate; keep the GPU budget) */
+/* radar frame — a calm instrument grid over translucent glass (nested inside
+   the frosted radar pane; no blur of its own — keep the GPU budget) */
 .cc-radar-frame {
   background:
-    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px) 0 0 / 100% 25%,
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px) 0 0 / 25% 100%,
-    radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.05), transparent 70%),
-    rgba(8, 10, 15, 0.50);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 100% 25%,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 25% 100%,
+    radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.06), transparent 70%),
+    rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* ---- R101 frost layout primitives (all float directly on the night → blur) */
+
+/* THE PILL BAR — the screenshot's bottom dock: one floating glass pill
+   holding the console's view tabs. Active pill reads the tab accent. */
+.cc-pillbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem;
+  border-radius: 9999px;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04) 50%),
+    rgba(8, 10, 18, 0.42);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  animation: ccPillIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes ccPillIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.cc-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(203, 213, 225, 0.85);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: color 0.25s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.cc-pill:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+.cc-pill[data-active='true'] {
+  color: rgb(var(--cc));
+  background: rgb(var(--cc) / 0.16);
+  border-color: rgb(var(--cc) / 0.45);
+  box-shadow: 0 0 18px rgb(var(--cc) / 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* THE RAIL — the screenshot's left icon column: the deck's tools as a slim
+   vertical frost sliver with hairline separators. */
+.cc-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.45rem;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03) 50%),
+    rgba(8, 10, 18, 0.42);
+  -webkit-backdrop-filter: blur(26px) saturate(1.35);
+  backdrop-filter: blur(26px) saturate(1.35);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  animation: ccPillIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.cc-rail-sep {
+  width: 20px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* THE CLOCK CHIP — the screenshot's "10:02 PM", wearing the LIGHT frost of
+   the hero tiles so the top corners carry the luminance rhythm. */
+.cc-clockchip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  padding: 0.42rem 0.9rem;
+  border-radius: 16px;
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.07) 55%, rgba(255, 255, 255, 0.05));
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 12px 28px rgba(0, 0, 0, 0.32);
 }
 
 /* real keyframes for the animate-in / animate-fade-in utility classes that
@@ -1538,8 +1666,10 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   }
   .tilt-btn { transform: none !important; }
   .cc-cloud-rise, .cc-thought-dot { animation: none; }
+  .cc-pillbar, .cc-rail { animation: none; }
   .cc-vital,
-  .cc-btn-glass {
+  .cc-btn-glass,
+  .cc-pill {
     transition: none;
   }
 }
@@ -1601,15 +1731,20 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 .forge-seal:hover .forge-ring-outer { animation-duration: 9s; }
 @keyframes forgeSpin { to { transform: rotate(360deg); } }
 
-/* THE GLASS CARD — the shared smoked pane for console sub-surfaces (reality
-   cards, hierarchy columns). Flat smoke + hairline: it nests inside the
-   plate's single blur, so it carries no backdrop-filter of its own. */
+/* THE GLASS CARD — the shared FROSTED pane for console sub-surfaces (reality
+   cards, hierarchy columns). These float directly on the night, so they carry
+   the blur; tiles nested inside THEM use translucent fills only. */
 .cc-glass-card {
-  background: linear-gradient(165deg, rgba(9, 11, 19, 0.80), rgba(6, 7, 12, 0.86));
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.02) 45%),
+    rgba(7, 9, 16, 0.36);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 22px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.10),
-    0 12px 32px rgba(0, 0, 0, 0.35);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 18px 40px rgba(0, 0, 0, 0.4);
 }
 .custom-scroll { scrollbar-width: thin; scrollbar-color: rgb(148 163 184 / 0.30) transparent; }
 .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }

@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-10-03, after R100 (the self-contained exe).
+> **Last updated:** 2026-10-03, after R101 (the frost deck).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -351,6 +351,46 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (`r82-the-voice`, `r85-the-six-seams`, `r87-native-simulator`,
   `r88-per-frame-twin`, `the-real-universe`) are historical signposts, fully
   contained in main.)
+- **R101 (this round, on branch `r101-the-frost-deck`):** THE FROST DECK — the author's
+  decree, with a visionOS-manner frosted-glass dashboard screenshot: *"time to upgrade our
+  core console to these style & manner"*. The Core Console consciously REVERSES its R8-era
+  "no blur anywhere" smoked-glass law: true frosted glass over the Crimson Watch night, with
+  the new GPU law written into the CSS header — only top-level panes carry backdrop-filter;
+  tiles nested inside a frosted pane use translucent fills. MIXED luminance per the author's
+  pick: dark frost panes, LIGHT frost hero tiles + clock chip. The screenshot's layout manner
+  adopted: a bottom pill view dock (`.cc-pillbar`/`.cc-pill`, active pill reading the per-tab
+  `--cc` accent via `[data-active]`), a left tool rail (`.cc-rail`: Twin Jump / Backdrop
+  Studio / Forge / Close as seals with right-positioned thought clouds), a ClockChip (the
+  traveler's wall clock over the live Universe Epoch), hero VitalTiles (26–30px Unbounded
+  numerals), and **WorldsPerRealityBars** — one real bar per reality (live body counts, the
+  anchored reality burning in the tab accent); real data only, nothing invented. The rail
+  move surfaced and killed a real bug: the studio popover's `fixed inset-0` catcher stopped
+  covering the viewport because the rail's `backdrop-filter` makes the rail the containing
+  block for fixed descendants (it only covered the rail; the popover could not be dismissed
+  by clicking elsewhere) — replaced with a document-level mousedown outside-close on
+  `[data-studio-root]`. CoreSigil's silent accent failure fixed: it read `closest('.core-plate')`
+  (an ancestor that exists only on the Command Palette, never in the console), so the sigil
+  sat on its teal fallback forever — it now reads `.cc-root` under the existing
+  MutationObserver. `.cc-root`'s load-bearing `position: fixed; inset: 0` block kept
+  BYTE-VERBATIM (round90 passes unchanged); every gauntlet-pinned literal survived (twin ids,
+  snap logic, R94 badge strings + disabled attr, R92 driver comment, R87 receipt, R63 slider
+  labels); nested `backdrop-blur` purged from all now-frosted interiors (GPU law in the
+  markup); the Forge Reality modal was already glassmorphic and stayed untouched. Receipts:
+  typecheck + full verify ALL GREEN TWICE (21 gauntlets, `SMOKE TIER — wasm`, frame unmoved —
+  histL1 0.0699–0.0720 vs the 0.12 pin, zero console errors, prod smoke green);
+  `audit:arch --check` clean after an in-commit snapshot refresh (the new probe's
+  `window.__ENGINE__` reference — the same boot-contract seam smoke.ts consumes). VISUAL
+  RECEIPT: `scripts/probes/round101-frost-visual.ts` (NEW hand-run probe) drives a real
+  headless Chromium through the author's keyboard door (Ctrl+K → "Open Core Console" — the
+  MultiverseBar CORE badge only exists after a demon-core interaction) through all four pill
+  views, the Twin Jump (card flashed, live driver telemetry: steps 12 · clock 25d · max drift
+  0.2393 AU — the session was DRIVING during capture), the Studio popover and the Forge
+  modal → seven PNGs in `scripts/verify/frost/`, reviewed against the reference manner; the
+  pass produced two legibility fixes (cloud chip 0.55→0.78, studio popover 0.60→0.85),
+  re-captured green. Scope lines: HUD + hover cards + Command Palette untouched (HoloCard
+  CSS is gauntlet-pinned); ScenicBackdrop untouched (it is what the frost blurs); zero new
+  deps, zero engine/physics/state changes.
+  `docs/ROUND-101-THE-FROST-DECK-2026-10-03.md`
 - **R96 (this round, on branch `r96-the-tidy-house`):** the author's verdict on
   the tree — "the frontend looks genuinely good, but the backend is total mess"
   — audited and answered. THE AUDIT: there is no backend (offline-first is the
@@ -776,8 +816,9 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 - **Verification status:** `npm run verify` ALL GREEN (typecheck; all **21
   gauntlets** — the R98 physics gate now carries 91 checks including the
   executed-artifact numerical half and the wiring pins — smoke + prod-smoke,
-  zero console errors) — re-verified per round, most recently at R99 (a clean
-  single run: every gauntlet green, `SMOKE TIER — wasm`, histL1 0.0712 against
+  zero console errors) — re-verified per round, most recently at R101 (the
+  frost deck: a clean single run after the legibility fixes — every gauntlet
+  green, `SMOKE TIER — wasm`, histL1 0.0699 against
   the 0.12 pin);
   `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R100
   snapshot** (zero dead exports; absorbed in-commit on every structural change);
@@ -861,7 +902,9 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    ceiling for heavy diarists.
 6. **Deferred (do as their own rounds, unasked):** the UI giants
    (`DiaryWindow`/`App.tsx`/`keyring`/`CoreConsole`/`FileManager`/`MediaPlates`)
-   — each its own round with gauntlet guardrails; `src/types/` fold-in;
+   — each its own round with gauntlet guardrails (R101 gave CoreConsole its
+   frost RESKIN — the structural decomposition of the 1.5k-line file is still
+   open); `src/types/` fold-in;
    dead-export sweep, optional React 19 / Vite 7 evaluation, optional
    touch-first HUD pass. (The architecture re-snapshot is DONE at R96; R97
    EXECUTED the engine decomposition and the actions domaining — §5/§8 carry it.)

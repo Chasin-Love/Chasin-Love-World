@@ -332,7 +332,7 @@ export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGal
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[11px] font-mono uppercase tracking-wider border transition-all backdrop-blur-md ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[11px] font-mono uppercase tracking-wider border transition-all ${
               tab === t.id
                 ? 'bg-cyan-500/20 text-white border-cyan-400/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
                 : 'bg-white/4 text-slate-300 border-white/10 hover:border-cyan-400/30 hover:text-white'
@@ -356,7 +356,7 @@ export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGal
               <input
                 value={identity.name ?? ''}
                 onChange={(e) => setIdentity((d) => ({ ...d, name: e.target.value }))}
-                className="w-full rounded-xl bg-white/6 border border-white/15 focus:border-cyan-400 px-3 py-2 text-sm text-white outline-none backdrop-blur-md"
+                className="w-full rounded-xl bg-white/6 border border-white/15 focus:border-cyan-400 px-3 py-2 text-sm text-white outline-none"
               />
             </label>
             <label className="block">
@@ -364,7 +364,7 @@ export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGal
               <input
                 value={identity.codeName ?? ''}
                 onChange={(e) => setIdentity((d) => ({ ...d, codeName: e.target.value }))}
-                className="w-full rounded-xl bg-white/6 border border-white/15 focus:border-cyan-400 px-3 py-2 text-sm text-white font-mono outline-none backdrop-blur-md"
+                className="w-full rounded-xl bg-white/6 border border-white/15 focus:border-cyan-400 px-3 py-2 text-sm text-white font-mono outline-none"
               />
             </label>
           </div>
@@ -374,7 +374,7 @@ export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGal
             <input
               value={identity.spectral ?? ''}
               onChange={(e) => setIdentity((d) => ({ ...d, spectral: e.target.value }))}
-              className="w-full rounded-xl bg-white/6 border border-white/15 focus:border-cyan-400 px-3 py-2 text-sm text-white font-mono outline-none backdrop-blur-md"
+              className="w-full rounded-xl bg-white/6 border border-white/15 focus:border-cyan-400 px-3 py-2 text-sm text-white font-mono outline-none"
             />
           </label>
 
@@ -471,14 +471,14 @@ export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGal
             onChange={(e) => setLore(e.target.value)}
             rows={6}
             placeholder="Write the history, physics, civilizations and anomalies of this reality…"
-            className="w-full rounded-2xl bg-white/5 border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 p-4 text-sm text-slate-100 placeholder-slate-400 outline-none leading-relaxed resize-y min-h-32.5 backdrop-blur-md shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]"
+            className="w-full rounded-2xl bg-white/5 border border-white/15 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 p-4 text-sm text-slate-100 placeholder-slate-400 outline-none leading-relaxed resize-y min-h-32.5 shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {LORE_INSPIRATIONS.map((insp) => (
               <button
                 key={insp.title}
                 onClick={() => setLore((prev) => (prev.trim() ? `${prev.trim()}\n\n${insp.snippet}` : insp.snippet))}
-                className="text-left p-2.5 rounded-xl bg-white/4 hover:bg-cyan-500/15 border border-white/10 hover:border-cyan-400/40 transition-all text-[11px] group backdrop-blur-sm"
+                className="text-left p-2.5 rounded-xl bg-white/4 hover:bg-cyan-500/15 border border-white/10 hover:border-cyan-400/40 transition-all text-[11px] group"
               >
                 <div className="font-medium text-slate-200 group-hover:text-cyan-200 flex items-center justify-between">
                   <span>{insp.title}</span>
@@ -498,7 +498,7 @@ export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGal
             </button>
             <button
               onClick={resetLore}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-slate-300 hover:text-white text-[11px] font-medium backdrop-blur-md transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-slate-300 hover:text-white text-[11px] font-medium transition-all"
             >
               <RotateCcw className="w-3.5 h-3.5 text-slate-400" /> Reset to Canon
             </button>

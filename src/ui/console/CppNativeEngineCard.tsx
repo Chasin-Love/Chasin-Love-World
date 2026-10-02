@@ -115,7 +115,7 @@ export const CppNativeEngineCard: React.FC = () => {
   return (
     <div className="cc-panel p-4 sm:p-5 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-white/8 pb-3 flex-wrap">
+      <div className="flex items-center justify-between gap-3 border-b border-white/12 pb-3 flex-wrap">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-400/35 text-cyan-300">
             <Cpu className="w-4 h-4" />
@@ -209,7 +209,7 @@ export const CppNativeEngineCard: React.FC = () => {
       {/* Parity receipt — same criterion as the toast: the TS reference tier
           trivially matches itself, so it always reads as verified */}
       {parity !== null && (
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-abyss/45 backdrop-blur-md border border-white/10 font-mono text-[11px]">
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-black/25 border border-white/10 font-mono text-[11px]">
           {(parity < 1e-9 || parityBackend === 'typescript')
             ? <BadgeCheck className="w-4 h-4 text-emerald-400" />
             : <BadgeX className="w-4 h-4 text-amber-400" />}
@@ -262,7 +262,7 @@ export const CppNativeEngineCard: React.FC = () => {
             ['linux', 'Standalone C++ Core (Linux .so)', commands.linux, 'text-cyan-400'],
             ['win', 'Standalone C++ Core (Windows .dll)', commands.windows, 'text-amber-400'],
           ] as const).map(([key, label, cmd, color]) => (
-            <div key={key} className="flex items-center justify-between p-2 rounded-xl bg-abyss/45 backdrop-blur-md border border-white/10 gap-2">
+            <div key={key} className="flex items-center justify-between p-2 rounded-xl bg-black/25 border border-white/10 gap-2">
               <div className="truncate">
                 <span className={`${color} font-bold mr-2`}>[{label}]:</span>
                 <code className="text-slate-300">{cmd}</code>

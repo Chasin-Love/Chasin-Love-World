@@ -102,7 +102,7 @@ export const BlackHoleTuningCard: React.FC = () => {
   return (
     <div className="cc-panel p-4 sm:p-5 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-white/8 pb-3 flex-wrap">
+      <div className="flex items-center justify-between gap-3 border-b border-white/12 pb-3 flex-wrap">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-400/35 text-cyan-300">
             <Orbit className="w-4 h-4" />
@@ -131,7 +131,7 @@ export const BlackHoleTuningCard: React.FC = () => {
       </div>
 
       {/* Cinematic lensing switch + live status */}
-      <div className="flex items-center justify-between gap-3 flex-wrap border border-white/8 rounded-xl px-3 py-2.5 bg-white/[0.03]">
+      <div className="flex items-center justify-between gap-3 flex-wrap border border-white/12 rounded-xl px-3 py-2.5 bg-white/5">
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${live ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]' : 'bg-amber-400/80'}`} />
           <span className="font-mono text-[11px] text-slate-300">{statusLine(status)}</span>
