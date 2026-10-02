@@ -59,8 +59,10 @@ export interface CosmosStatus {
    *  Empty means the FIRST tier won (nothing was given up). */
   degraded: TierDegradation[];
   /** R98 — true only when a tier above `typescript` was tried and lost. The
-   *  browser normally lands here (no emsdk on the author's machine is not a
-   *  defect); the desktop shell landing here IS. */
+   *  browser normally lands on wasm (the artifact is committed at
+   *  public/wasm/); landing here means that artifact could not be fetched or
+   *  instantiated, or the page predates it. The desktop shell landing here
+   *  IS a defect. */
   fellBack: boolean;
 }
 
@@ -387,21 +389,22 @@ class CosmosBridge {
    *
    * This is the ONLY consumer of the C++ BODY PROFILE TABLE (the per-body
    * eccentricity / density / albedo / axial-tilt law), and therefore the only
-   * path that can observe that table's numbers. Two consequences:
+   * path that can observe that table's numbers. The law that governs it:
    *
-   *  1. THE SHIPPED WASM ARTIFACT IS CURRENTLY STALE. public/wasm/cosmos_engine.wasm
-   *     predates the R98 tilt/goliath fix — it still carries goliath's old 0.0489
-   *     eccentricity and has no tiltDeg column at all. It is harmless today ONLY
-   *     because nothing in production calls this method; the Kepler path takes its
-   *     eccentricity from TypeScript and passes it in as an argument.
-   *  2. The desktop tier compiles cosmos_engine.cpp directly and is already
-   *     correct, so this same call returns DIFFERENT numbers on web vs desktop
-   *     until the artifact is rebuilt with `npm run wasm:build` (needs emsdk).
+   *  THE ARTIFACT AND THE SOURCE MUST AGREE WHILE THIS METHOD IS REACHABLE.
+   *  R98 found the committed public/wasm/cosmos_engine.wasm carrying pre-fix
+   *  physics (goliath 0.0489, no tiltDeg) while the source had moved on, and
+   *  refused to wire this method rather than ship per-tier divergence. R99
+   *  rebuilt the artifact — the author's emsdk lives at ~/Desktop/emsdk,
+   *  off the PATH, which is how R98 missed it (build-wasm.sh now activates
+   *  it itself) — and the round98 physics gauntlet checks the binary's
+   *  BYTES, not mtimes: a stale artifact is a WARN while nothing calls this
+   *  method and a hard FAIL the moment one does. `npm run wasm:build` after
+   *  EVERY cosmos_engine.cpp edit — editing C++ changes nothing for the web
+   *  tier until then (PROJECT-BRAIN trap 11).
    *
-   * So: rebuild the artifact FIRST, then wire this into production — not the
-   * other way round. round98-physics-conformance-gauntlet.ts enforces exactly
-   * that ordering: while this method has no production caller the stale artifact
-   * is a WARN, and the moment one appears the same fact becomes a hard FAIL.
+   * The desktop tier compiles cosmos_engine.cpp directly and is always as
+   * fresh as the source.
    */
   async physicsBatch(input: PhysicsBatchInput): Promise<Float64Array> {
     await this.init();
