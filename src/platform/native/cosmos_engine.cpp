@@ -263,12 +263,15 @@ struct BodyProfile {
 
 /* physicsEngine.ts BODY_PROFILES — the ids, the ecc/density/albedo values and
    the unknown-body default are identical across the two tiers, and
-   round98-physics-conformance-gauntlet.ts now proves it by parsing both tables
+   round98-physics-conformance-gauntlet.ts proves it by parsing both tables
    and comparing them value for value. That claim was NOT true before R98:
-   goliath read 0.0489 here against 0.0453 in the law table (fixed below).
-   One honest gap remains and the gauntlet pins it explicitly: for a body with
-   NO profile row the TS law derives a SEEDED tilt from its id, so the two
-   tiers can only be equal for a NAMED body. */
+   goliath read 0.0489 here against 0.0453 in the law table (fixed in R98).
+   R99 — the last gap is closed too: for a body with NO profile row the law
+   derives a SEEDED tilt from the id, and this API always carried that seed's
+   three ingredients (the id, the radius and the kind — see the batch
+   signature), so the same derivation runs in seededDefaultTilt below instead
+   of a constant. Returns nullptr for an unknown id; the batch derives the
+   default profile and the seeded tilt itself. */
 const BodyProfile* bodyProfileOf(const char* id) {
     static const struct { const char* id; BodyProfile p; } TABLE[] = {
         {"anchor",  {0.0,    1.41,  0.00, 7.25}},
@@ -285,13 +288,22 @@ const BodyProfile* bodyProfileOf(const char* id) {
     for (const auto& row : TABLE) {
         if (std::strcmp(row.id, id) == 0) return &row.p;
     }
-    /* Unknown body: TS falls back to {0.05, 3.5, 0.3} with no tiltDeg, then
-       derives 8 + tiltSeed*55 (7.25 for a star). There is no seed in a C API
-       that receives only the id string, so the C++ side returns the same three
-       profile numbers and Earth's default obliquity. Named bodies — every
-       body in every roster — are exact. */
-    static const BodyProfile DEFAULT{0.05, 3.5, 0.3, 23.44};
-    return &DEFAULT;
+    return nullptr;
+}
+
+/* R99 — the unknown-body obliquity, derived line-for-line as physicsEngine.ts
+   derives it:  seed = (firstCharCode + id.length * 31 + radius * 7.3) % 97 / 97,
+   tilt = 8 + seed * 55, or 7.25 for a star. R98 recorded this as a permanent
+   divergence because the C API "has no seed" — but the seed's inputs were in
+   the batch signature all along. An empty id mirrors TS's charCodeAt(0) NaN:
+   a NaN tilt, for input both tiers reject. */
+inline double seededDefaultTilt(const char* id, double radius, int kind) {
+    if (kind == COSMOS_KIND_STAR) return 7.25;
+    if (!id || !id[0]) return std::numeric_limits<double>::quiet_NaN();
+    const double seed = std::fmod((double)(unsigned char)id[0] +
+                                      (double)std::strlen(id) * 31.0 + radius * 7.3,
+                                  97.0) / 97.0;
+    return 8.0 + seed * 55.0;
 }
 
 /* Kepler solver shared by the single and batch ports. node/argP carry the
@@ -372,9 +384,16 @@ void cosmos_physics_batch(const char* const* ids, const double* orbitA,
     constexpr int F = COSMOS_PHYSICS_FIELD_COUNT;
     const double PI = 3.14159265358979323846;
 
+    /* R99 — the default profile for a body with no law-table row: the three
+       numbers are the TS fallback, gauntlet-pinned. The tilt is NOT carried
+       here — seededDefaultTilt derives it per body, exactly as the law does. */
+    static const BodyProfile DEFAULT{0.05, 3.5, 0.3, 0.0};
+
     for (int b = 0; b < n; ++b) {
-        const BodyProfile& profile = *bodyProfileOf(ids[b]);
         const int kind = kinds[b];
+        const BodyProfile* row = bodyProfileOf(ids[b]);
+        const BodyProfile& profile = row ? *row : DEFAULT;
+        const double tiltDeg = row ? row->tiltDeg : seededDefaultTilt(ids[b], radius[b], kind);
         const double aRaw = orbitA[b];
 
         double* o = out + (size_t)b * F;
@@ -472,6 +491,11 @@ void cosmos_physics_batch(const char* const* ids, const double* orbitA,
             set(32, 3.0 * rsKm);
             set(33, std::sqrt(1.0 - 1.0 / 2.0));
         } else {
+            /* R99 — NaN here is SOURCE intent, not a wire guarantee: the
+               artifact builds with -ffast-math, which does not preserve NaN
+               stores and may deliver 0. Consumers must key off field 29
+               (isRel), never off NaN-ness — the numerical half of the
+               round98 gauntlet caught exactly this. */
             set(30, std::numeric_limits<double>::quiet_NaN());
             set(31, std::numeric_limits<double>::quiet_NaN());
             set(32, std::numeric_limits<double>::quiet_NaN());
@@ -482,10 +506,12 @@ void cosmos_physics_batch(const char* const* ids, const double* orbitA,
         const double axialDays = kind == COSMOS_KIND_STAR ? 25.05 : 1.0 + (radiusKm / 6371.0) * 0.5;
         set(34, axialDays);
         set(35, (2.0 * PI * radiusKm) / (axialDays * 86400.0));
-        /* R98 — the profile's own obliquity, not a kind-derived constant. This
-           is what keeps veil / hollow / mirror retrograde on the compiled tier
-           instead of every non-star body reporting Earth's 23.44. */
-        set(36, profile.tiltDeg);
+        /* R98/R99 — the profile's own obliquity; for an unnamed body the
+           seeded derivation, the same number physicsEngine.ts derives. This
+           keeps veil / hollow / mirror retrograde AND two freshly-minted
+           worlds tilted differently — on the compiled tier exactly as the
+           law does. */
+        set(36, tiltDeg);
         set(37, 8.18);
         set(38, 230.0);
         set(39, 230.0);

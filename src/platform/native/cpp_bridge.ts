@@ -204,15 +204,19 @@ async function loadWasm(): Promise<WasmModule> {
   } catch (err) {
     throw new TierRejection('instantiate-failed', err instanceof Error ? err.message : String(err));
   }
-  if (!module || typeof module.ccall !== 'function') {
+  if (!module || typeof module.ccall !== 'function' || typeof module._malloc !== 'function' ||
+      typeof module._free !== 'function' || !(module.HEAPF64 instanceof Float64Array)) {
     /* the glue loaded but carries no Emscripten runtime surface — a truncated or
        hand-edited artifact. Distinct from instantiate-failed: nothing threw. */
-    throw new TierRejection('instantiate-failed', 'module exposed no ccall (truncated or non-Emscripten artifact)');
+    throw new TierRejection('instantiate-failed', 'module exposed no ccall/malloc/free/HEAPF64 surface (truncated or non-Emscripten artifact)');
   }
   return module;
 }
 
-/** Minimal Emscripten module surface used by the bridge. */
+/** Minimal Emscripten module surface used by the bridge. R99 — malloc/free/
+ *  HEAPF64 are REQUIRED, not optional: every batch marshals through them, so
+ *  loadWasm validates the whole surface and a truncated artifact is rejected
+ *  with a named reason instead of exploding at first batch. */
 interface WasmModule {
   ccall: (
     ident: string,
@@ -221,9 +225,9 @@ interface WasmModule {
     args: unknown[],
   ) => unknown;
   _cosmos_version?: () => string;
-  _malloc?: (bytes: number) => number;
-  _free?: (ptr: number) => void;
-  HEAPF64?: Float64Array;
+  _malloc: (bytes: number) => number;
+  _free: (ptr: number) => void;
+  HEAPF64: Float64Array;
 }
 
 class CosmosBridge {
@@ -425,47 +429,9 @@ class CosmosBridge {
       return Float64Array.from(res.fields);
     }
     if (this.statusValue.backend === 'wasm' && this.wasm) {
-      const w = this.wasm;
-      const enc = new TextEncoder();
-      const idsPtrs: number[] = [];
-      const idBufs: number[] = [];
-      for (const id of input.ids) {
-        const bytes = enc.encode(id + '\0');
-        const ptr = w._malloc!(bytes.length);
-        const heapU8 = new Uint8Array(w.HEAPF64!.buffer);
-        heapU8.set(bytes, ptr);
-        idBufs.push(ptr);
-        idsPtrs.push(ptr);
-      }
-      const idsArrPtr = w._malloc!(idsPtrs.length * 4);
-      const heapU32 = new Uint32Array(w.HEAPF64!.buffer);
-      idsPtrs.forEach((p, i) => { heapU32[idsArrPtr / 4 + i] = p; });
-      const pa = this.wasmMallocF64(w, input.orbitA);
-      const pr = this.wasmMallocF64(w, input.radius);
-      const pk = this.wasmMallocF64(w, input.kinds as unknown as number[]);
-      const ph = this.wasmMallocF64(w, input.hasRings as unknown as number[]);
-      const pp = this.wasmMallocF64(w, input.phase);
-      const pv = this.wasmMallocF64(w, input.speed);
-      const po = w._malloc!(n * PHYSICS_FIELD_COUNT * 8);
-      try {
-        w.ccall('cosmos_physics_batch', null, ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-          [idsArrPtr, pa, pr, pk, ph, pp, pv, n, input.simTimeSec, po]);
-        const out = new Float64Array(n * PHYSICS_FIELD_COUNT);
-        out.set(w.HEAPF64!.subarray(po / 8, po / 8 + n * PHYSICS_FIELD_COUNT));
-        return out;
-      } finally {
-        [pa, pr, pk, ph, pp, pv, po].forEach((p) => w._free!(p));
-        idBufs.forEach((p) => w._free!(p));
-        w._free!(idsArrPtr);
-      }
+      return marshalPhysicsBatch(this.wasm, input);
     }
     return this.physicsBatchTS(input);
-  }
-
-  private wasmMallocF64(w: WasmModule, arr: number[]): number {
-    const ptr = w._malloc!(arr.length * 8);
-    w.HEAPF64!.set(arr, ptr / 8);
-    return ptr;
   }
 
   async benchmark(nBodies: number, iterations: number): Promise<{ opsPerSec: number; backend: CosmosBackend }> {
@@ -769,7 +735,12 @@ class CosmosBridge {
     for (let i = 0; i < native.length; i++) {
       const a = native[i];
       const b = reference[i];
-      if (Number.isNaN(a) && Number.isNaN(b)) continue;
+      /* NaN is the emitters' encoding of "not applicable" (the GR fields of a
+         non-relativistic body) — and a -ffast-math artifact may deliver 0 for
+         the same absence, so EITHER side NaN means the slot carries no
+         comparable value. The rel fields themselves are proven explicitly by
+         the round98 gauntlet's numerical half (R99). */
+      if (Number.isNaN(a) || Number.isNaN(b)) continue;
       const d = Math.abs(a - b);
       /* relative-ish scale: huge SI magnitudes need a proportional tolerance */
       const scale = Math.max(1, Math.abs(b));
@@ -999,6 +970,70 @@ function seededSimSystem(): SimBodyInput[] {
     });
   }
   return bodies;
+}
+
+/** R99 — the wasm marshalling for cosmos_physics_batch, extracted from the
+ *  bridge's wasm branch so round98-physics-conformance-gauntlet.ts can drive
+ *  THE EXACT production path under Node: ids as char**, orbitA/radius/phase/
+ *  speed as f64, kinds/hasRings as INT32 — the C signature takes `const int*`,
+ *  and the f64 marshalling this replaced made every non-zero kind read as
+ *  garbage (1.0 = 0x3FF0000000000000, so the C read 0x3FF00000 at odd indices
+ *  and 0 — a STAR — at even ones). Latent since the artifact first existed
+ *  because the parity button was the only caller; found while proving the
+ *  R99 wiring, before it could ship. The round98 gauntlet executes this
+ *  function against the artifact and the TS reference field for field. */
+export function marshalPhysicsBatch(
+  w: {
+    ccall: (ident: string, returnType: string | null, argTypes: string[], args: unknown[]) => unknown;
+    _malloc: (bytes: number) => number;
+    _free: (ptr: number) => void;
+    HEAPF64: Float64Array;
+  },
+  input: PhysicsBatchInput,
+): Float64Array {
+  const n = input.ids.length;
+  const enc = new TextEncoder();
+  const idBufs: number[] = [];
+  const idsPtrs: number[] = [];
+  for (const id of input.ids) {
+    const bytes = enc.encode(id + '\0');
+    const ptr = w._malloc(bytes.length);
+    new Uint8Array(w.HEAPF64.buffer).set(bytes, ptr);
+    idBufs.push(ptr);
+    idsPtrs.push(ptr);
+  }
+  const idsArrPtr = w._malloc(Math.max(idsPtrs.length, 1) * 4);
+  const heapU32 = new Uint32Array(w.HEAPF64.buffer);
+  idsPtrs.forEach((p, i) => { heapU32[idsArrPtr / 4 + i] = p; });
+  const f64 = (arr: number[]): number => {
+    const ptr = w._malloc(Math.max(arr.length, 1) * 8);
+    w.HEAPF64.set(arr, ptr / 8);
+    return ptr;
+  };
+  /* C ints, NOT f64 — see the header comment. */
+  const i32 = (arr: number[]): number => {
+    const ptr = w._malloc(Math.max(arr.length, 1) * 4);
+    new Int32Array(w.HEAPF64.buffer).set(arr, ptr / 4);
+    return ptr;
+  };
+  const pa = f64(input.orbitA);
+  const pr = f64(input.radius);
+  const pk = i32(input.kinds);
+  const ph = i32(input.hasRings);
+  const pp = f64(input.phase);
+  const pv = f64(input.speed);
+  const po = w._malloc(Math.max(n, 1) * PHYSICS_FIELD_COUNT * 8);
+  try {
+    w.ccall('cosmos_physics_batch', null, ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [idsArrPtr, pa, pr, pk, ph, pp, pv, n, input.simTimeSec, po]);
+    const out = new Float64Array(n * PHYSICS_FIELD_COUNT);
+    out.set(w.HEAPF64.subarray(po / 8, po / 8 + n * PHYSICS_FIELD_COUNT));
+    return out;
+  } finally {
+    [pa, pr, pk, ph, pp, pv, po].forEach((p) => w._free(p));
+    idBufs.forEach((p) => w._free(p));
+    w._free(idsArrPtr);
+  }
 }
 
 export const cosmosBridge = new CosmosBridge();

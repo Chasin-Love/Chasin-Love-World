@@ -17,23 +17,39 @@
  *     the bridge, the Rust shell, the TS emitter) must agree, and the count
  *     must equal the number of fields the TS reference actually writes.
  *  3. THE LIVE ARTIFACT CONFORMS — when a WASM artifact is present, the
- *     compiled core is executed and its output compared against the TS
- *     reference field by field. This is the numerical half of `verifyParity`,
- *     promoted from a button to a gate.
+ *     compiled core is EXECUTED (the artifact carries `node` in its
+ *     environment list precisely for this) and its output is compared
+ *     against the TS reference field by field, through the bridge's real
+ *     wasm marshalling and physicsEngine's real native install. This is the
+ *     numerical half of `verifyParity`, promoted from a button to a gate —
+ *     R98's header promised it; R99 kept the promise, and the execution is
+ *     what caught the f64-marshalled kinds bug before the R99 wiring
+ *     could ship it.
  *
  * DEGRADATION IS HONEST HERE TOO (R98's own law, applied to itself). A
- * machine without emsdk has no artifact; that is not a physics failure and
- * must not fail the chain. But it is not silent either: the gauntlet states
- * which halves it actually ran. The static half (1, 2) ALWAYS runs — it needs
- * no artifact and catches exactly the drift this round exists to name.
+ * machine without an artifact has no numerical half; that is not a physics
+ * failure and must not fail the chain. But it is not silent either: the
+ * gauntlet states which halves it actually ran. The static half (1, 2)
+ * ALWAYS runs — it needs no artifact and catches exactly the drift this
+ * round exists to name.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
-import { calculatePhysics } from '../../src/physics/physicsEngine';
+import { calculatePhysics, installNativePhysics } from '../../src/physics/physicsEngine';
+import { marshalPhysicsBatch, PHYSICS_FIELD_COUNT } from '../../src/platform/native/cpp_bridge';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+
+/** The runtime surface the artifact must expose for the numerical half —
+ *  the same shape the bridge marshals through (WasmModule in cpp_bridge.ts). */
+interface WasmModuleShape {
+  ccall: (ident: string, returnType: string | null, argTypes: string[], args: unknown[]) => unknown;
+  _malloc: (bytes: number) => number;
+  _free: (ptr: number) => void;
+  HEAPF64: Float64Array;
+}
 
 /** Every .ts/.tsx source file under a directory — used to prove a negative
  *  ("nothing in production calls X") by reading the whole tree, not a guess. */
@@ -57,6 +73,8 @@ const CPP = readFileSync(`${ROOT}/src/platform/native/cosmos_engine.cpp`, 'utf8'
 const HPP = readFileSync(`${ROOT}/src/platform/native/cosmos_engine.hpp`, 'utf8');
 const BRIDGE = readFileSync(`${ROOT}/src/platform/native/cpp_bridge.ts`, 'utf8');
 const RS = readFileSync(`${ROOT}/src-tauri/src/cosmos.rs`, 'utf8');
+const TS_PHYS = readFileSync(`${ROOT}/src/physics/physicsEngine.ts`, 'utf8');
+const ENGINE_TS = readFileSync(`${ROOT}/src/engine/engine.ts`, 'utf8');
 
 /* ------------------------------------------------------------------ *
  * 1. THE LAW TABLES AGREE
@@ -66,9 +84,7 @@ const RS = readFileSync(`${ROOT}/src-tauri/src/cosmos.rs`, 'utf8');
  * rather than restating them, so this gauntlet cannot drift from the source
  * it is checking. The table is module-private, so it is read as text and
  * parsed — a regex over the one literal block, anchored to its declaration. */
-const TS_TABLE = /const BODY_PROFILES:[\s\S]*?= \{([\s\S]*?)\n\};/.exec(
-  readFileSync(`${ROOT}/src/physics/physicsEngine.ts`, 'utf8'),
-);
+const TS_TABLE = /const BODY_PROFILES:[\s\S]*?= \{([\s\S]*?)\n\};/.exec(TS_PHYS);
 if (!TS_TABLE) {
   console.error('FAIL  the TS BODY_PROFILES table could not be located in physicsEngine.ts — the gauntlet cannot read the law');
   process.exit(1);
@@ -149,33 +165,33 @@ if (cppHasTilt) {
  * body with no profile row, and the gauntlet pins that too — it is the path
  * every newly-minted reality takes before it has a seeded profile. */
 check('R98: the unknown-body default profile agrees across tiers (0.05 / 3.5 / 0.3)',
-  /eccentricity:\s*0\.05,\s*density:\s*3\.5,\s*albedo:\s*0\.3/.test(
-    readFileSync(`${ROOT}/src/physics/physicsEngine.ts`, 'utf8')) &&
+  /eccentricity:\s*0\.05,\s*density:\s*3\.5,\s*albedo:\s*0\.3/.test(TS_PHYS) &&
   /static const BodyProfile DEFAULT\{0\.05,\s*3\.5,\s*0\.3/.test(CPP),
   'the TS fallback literal and the C++ DEFAULT struct must be the same three numbers');
 
-/* The unknown-body TILT default is the subtler half. TS falls back to a
- * SEEDED value (`8 + tiltSeed * 55`, or 7.25 for a star) so two realities
- * minted on the same day are identical but two minted on different days are
- * not — obliquity carries per-world variety. The C API receives only the id
- * string and carries no seed, so its fallback can only be the fixed 23.44.
- *
- * This is a RECORDED DIVERGENCE, not a defect to close: it affects only
- * bodies with no law-table row, and closing it would mean inventing a seed
- * derivation inside a C API that has no seed to derive from. The pin asserts
- * the two facts that make it a recorded divergence rather than a silent one —
- * TS still derives, C++ still uses a constant. Note it deliberately does NOT
- * grep for the word "tiltSeed" in the C++: the source comments name the
- * divergence in prose, and a grep would fail on its own documentation. */
-const cppDefaultTiltConstant = /static const BodyProfile DEFAULT\{0\.05,\s*3\.5,\s*0\.3,\s*([\d.eE+-]+)\}/.exec(CPP);
-check('R98: (recorded) the unknown-body tilt is seeded in TS and a constant in C++ — a known, named gap',
-  /profile\.tiltDeg \?\? \(body\.kind === 'star' \? 7\.25 : 8 \+ tiltSeed \* 55\)/.test(
-    readFileSync(`${ROOT}/src/physics/physicsEngine.ts`, 'utf8')) &&
-  cppDefaultTiltConstant !== null,
-  'if either side changes, re-read this pin — it describes a real divergence, not a preference');
-check('R98: the C++ unknown-body tilt is Earth\'s default, not a body-derived value',
-  cppDefaultTiltConstant?.[1] === '23.44',
-  `C++ default tilt reads ${cppDefaultTiltConstant?.[1] ?? 'nothing'}; the TS seeded range is 8..63`);
+/* THE UNKNOWN-BODY TILT — CLOSED IN R99. R98 recorded this as a permanent
+ * divergence: TS derives a seeded obliquity (`8 + tiltSeed * 55`, or 7.25
+ * for a star) for a body with no profile row, while the C API — receiving
+ * "only an id string" — could only emit the constant 23.44. That reasoning
+ * was half wrong: the seed's three ingredients (the id, the radius and the
+ * kind) were in the batch signature all along. cosmos_engine.cpp now derives
+ * the same number, and the numerical half below PROVES it by executing the
+ * artifact against the TS law over bodies with no profile row. The pins:
+ * both derivations present, the derivation actually used at field 36, and
+ * the default profile reduced to the three agreed numbers. */
+check('R99: the unknown-body tilt derives from the same seeded formula on both tiers',
+  /8 \+ tiltSeed \* 55/.test(TS_PHYS) &&
+  /seededDefaultTilt\(const char\* id, double radius, int kind\)/.test(CPP) &&
+  /8\.0 \+ seed \* 55\.0/.test(CPP) &&
+  /if \(kind == COSMOS_KIND_STAR\) return 7\.25;/.test(CPP),
+  'the TS seeded derivation and the C++ seededDefaultTilt must both be present');
+check('R99: the batch uses the seeded derivation at field 36 (never a constant)',
+  /row \? row->tiltDeg : seededDefaultTilt\(ids\[b\], radius\[b\], kind\)/.test(CPP) &&
+  /set\(36, tiltDeg\)/.test(CPP),
+  'field 36 must read the derived tilt, not a default-profile constant');
+check('R99: the C++ default profile carries only the three agreed numbers (no tilt constant)',
+  /static const BodyProfile DEFAULT\{0\.05,\s*3\.5,\s*0\.3,\s*0\.0\}/.test(CPP),
+  'the default BodyProfile must end , 0.0 — an unused placeholder, not a tilt');
 
 /* ------------------------------------------------------------------ *
  * 2. THE FIELD CONTRACT IS HONEST
@@ -333,6 +349,114 @@ if (!existsSync(artifact)) {
         'the committed public/wasm/cosmos_engine.wasm still contains the PRE-FIX goliath ' +
         'eccentricity 0.0489 and not the fixed 0.0453. Rebuild with `npm run wasm:build` ' +
         '(needs emsdk) — and note it is now REACHABLE, so this is a live physics bug.');
+    }
+
+    /* ====================================================================
+     * THE NUMERICAL HALF — executed, not inspected.
+     *
+     * The parity set: the ten law-table bodies across every kind (star,
+     * planets, nebula, hole) plus two bodies with NO profile row — the
+     * unknown-body default path, whose tilt was R98's recorded divergence
+     * and is R99's closure receipt. Stated here rather than imported: the
+     * bridge class is browser-coupled at runtime, but its marshalling and
+     * the field count are plain exports and ARE imported — so what runs is
+     * the EXACT production wasm path, the EXACT production install decoder,
+     * and the TS law itself.
+     *
+     * The comparison is guarded against its own vacuous failure modes
+     * (R98's law): the install must actually REPLACE the memo entry
+     * (object identity), and the run must execute the artifact at all —
+     * a broken import or a missing export is a FAIL, not a skip. */
+    const TOLERANCE = 1e-6;
+    const PARITY_ROWS: Array<{ id: string; kind: number; a: number; radius: number; rings: number; phase: number; speed: number }> = [
+      { id: 'anchor',        kind: 0, a: 0,   radius: 6.5,  rings: 0, phase: 0,   speed: 0      },
+      { id: 'cinder',        kind: 1, a: 30,  radius: 0.9,  rings: 0, phase: 5.1, speed: 0.0199 },
+      { id: 'aurelia',       kind: 1, a: 52,  radius: 2.05, rings: 0, phase: 1.2, speed: 0.0172 },
+      { id: 'veil',          kind: 1, a: 38,  radius: 1.9,  rings: 0, phase: 3.3, speed: 0.0131 },
+      { id: 'rust',          kind: 1, a: 79,  radius: 1.4,  rings: 0, phase: 2.8, speed: 0.0077 },
+      { id: 'goliath',       kind: 1, a: 180, radius: 6.2,  rings: 1, phase: 0.4, speed: 0.0021 },
+      { id: 'mirror',        kind: 1, a: 264, radius: 2.6,  rings: 0, phase: 1.9, speed: 0.0029 },
+      { id: 'hollow',        kind: 1, a: 344, radius: 1.1,  rings: 1, phase: 4.4, speed: 0.0018 },
+      { id: 'wisp',          kind: 3, a: 0,   radius: 5.0,  rings: 0, phase: 0,   speed: 0      },
+      { id: 'eventide',      kind: 4, a: 96,  radius: 3.1,  rings: 0, phase: 2.2, speed: 0      },
+      { id: 'unknown-world', kind: 2, a: 120, radius: 2.4,  rings: 0, phase: 0.7, speed: 0.0044 },
+      { id: 'deep-haven',    kind: 5, a: 61,  radius: 2.0,  rings: 1, phase: 3.9, speed: 0.0124 },
+    ];
+    const T = 4321.5;
+    try {
+      const artifactMod = await import(pathToFileURL(artifact).href) as
+        { default: (init?: unknown) => Promise<Partial<WasmModuleShape>> };
+      const m = await artifactMod.default();
+      if (!m || typeof m.ccall !== 'function' || !m.HEAPF64 || typeof m._malloc !== 'function') {
+        check('R99: the artifact instantiates with the gate surface (ccall / HEAPF64 / malloc)', false,
+          'the module loaded but lacks the runtime surface the bridge marshals through');
+      } else {
+        const w = m as WasmModuleShape;
+        const input = {
+          ids: PARITY_ROWS.map((r) => r.id),
+          orbitA: PARITY_ROWS.map((r) => r.a),
+          radius: PARITY_ROWS.map((r) => r.radius),
+          kinds: PARITY_ROWS.map((r) => r.kind),
+          hasRings: PARITY_ROWS.map((r) => r.rings),
+          phase: PARITY_ROWS.map((r) => r.phase),
+          speed: PARITY_ROWS.map((r) => r.speed),
+          simTimeSec: T,
+        };
+        check('R99: the imported PHYSICS_FIELD_COUNT agrees with the declared counts',
+          PHYSICS_FIELD_COUNT === declaredCount,
+          `bridge exports ${PHYSICS_FIELD_COUNT}, the declarations say ${declaredCount}`);
+        const nativeFields = marshalPhysicsBatch(w, input);
+        let compared = 0;
+        let worst = 0;
+        let worstAt = '(nothing compared)';
+        for (let i = 0; i < PARITY_ROWS.length; i++) {
+          const row = PARITY_ROWS[i];
+          const body = {
+            id: row.id,
+            kind: row.kind === 0 ? 'star' : row.kind === 2 ? 'dwarf' : row.kind === 3 ? 'nebula' : row.kind === 4 ? 'hole' : row.kind === 5 ? 'vault' : 'planet',
+            radius: row.radius,
+            rings: row.rings === 1,
+            orbit: { a: row.a, phase: row.phase, speed: row.speed, incl: 0 },
+          } as unknown as Parameters<typeof calculatePhysics>[0];
+          /* TS law FIRST (this cold call is the pure reference), snapshot it,
+             then install the artifact's row and read back through the same
+             memo calculatePhysics serves production from. */
+          const pre = calculatePhysics(body, T);
+          const snapshot: Record<string, unknown> = { ...pre };
+          const installedCount = installNativePhysics([body], nativeFields.subarray(i * declaredCount, (i + 1) * declaredCount));
+          check(`R99: ${row.id} — the native install replaced the memo entry (the gate is not vacuous)`,
+            installedCount === 1, `installNativePhysics returned ${installedCount}`);
+          const post = calculatePhysics(body, T);
+          check(`R99: ${row.id} — calculatePhysics now serves the installed object`,
+            post !== pre, 'the memo entry was NOT replaced — the install silently no-opped');
+          for (const k of Object.keys(snapshot)) {
+            const b = snapshot[k];
+            const a = (post as unknown as Record<string, unknown>)[k];
+            if (typeof b === 'number' && typeof a === 'number') {
+              if (Number.isNaN(a) && Number.isNaN(b)) continue;
+              const d = Math.abs(a - b) / Math.max(1, Math.abs(b));
+              if (d > worst) { worst = d; worstAt = `${row.id}.${k}`; }
+              if (d > TOLERANCE) {
+                check(`R99: ${row.id}.${k} — compiled core agrees with the TS law`, false,
+                  `native ${String(a)} vs TS ${String(b)} (relative delta ${d.toExponential(3)})`);
+              }
+            } else if (a !== b) {
+              check(`R99: ${row.id}.${k} — compiled core agrees with the TS law`, false,
+                `native ${String(a)} vs TS ${String(b)}`);
+            }
+          }
+          compared++;
+        }
+        check(`R99: the EXECUTED artifact agrees with the TS law (${compared} bodies, every field, rel tol ${TOLERANCE})`,
+          compared === PARITY_ROWS.length && worst <= TOLERANCE,
+          `worst relative delta ${worst.toExponential(3)} at ${worstAt}`);
+        check('R99: the bridge parity set still exercises the unknown-body default path',
+          BRIDGE.includes("'unknown-world'") && BRIDGE.includes("'deep-haven'"),
+          "verifyParity's set lost its unknown ids — keep at least one no-row body in it");
+      }
+    } catch (err) {
+      check('R99: the artifact executes under Node (the numerical half ran)', false,
+        err instanceof Error ? err.message : String(err));
     }
   }
 }

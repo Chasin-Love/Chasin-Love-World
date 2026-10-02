@@ -164,6 +164,93 @@ export function calculatePhysics(body: CosmicBody, simTimeSec: number = 0): Body
   return d;
 }
 
+/* R99 — the batch stride: 41 fields per body, the same layout as
+   PHYSICS_FIELD_COUNT in cpp_bridge.ts and COSMOS_PHYSICS_FIELD_COUNT in
+   cosmos_engine.hpp (declared here as a literal to keep physicsEngine free
+   of the bridge import — the round98 gauntlet pins all declarations to one
+   number and executes this decoder against the artifact). */
+const PHYSICS_STRIDE = 41;
+
+/**
+ * R99 — THE NATIVE INSTALL: the decoder half of the wiring. The compiled
+ * core (wasm or desktop tier) computes the 41-field law for the rendered
+ * roster through the bridge's primePhysics seam; each row is installed into
+ * the memo so calculatePhysics serves the COMPILED numbers. The TS fresh
+ * solve still builds the object — it owns the two Einstein-only fields the
+ * batch deliberately omits (spacetimeCurvatureSurface, timeDilationAtSurface)
+ * and remains the synchronous zero-fail fallback — then the 41 contract
+ * fields are overlaid. On native tiers the compiled core's numbers ARE what
+ * renders; the values are identical to the TS law by the round98 gauntlet
+ * and R99's executed-artifact receipt, so this seam changes provenance,
+ * never values. Field layout mirrors the emitters (cpp_bridge's
+ * physicsBatchTS and cosmos_engine.cpp's set() indices).
+ *
+ * Returns the number of bodies installed. Callers must treat this as
+ * fire-and-forget: a cold memo simply keeps serving the TS reference.
+ */
+export function installNativePhysics(bodies: CosmicBody[], fields: ArrayLike<number>): number {
+  const n = bodies.length;
+  if (n === 0 || fields.length < n * PHYSICS_STRIDE) return 0;
+  let installed = 0;
+  for (let i = 0; i < n; i++) {
+    const body = bodies[i];
+    const o = i * PHYSICS_STRIDE;
+    const v = (k: number): number => fields[o + k];
+    const fresh = computePhysicsFresh(body, 0);
+    fresh.a_AU = v(0);
+    fresh.eccentricity = v(1);
+    fresh.periodDays = v(2);
+    fresh.periodYears = v(3);
+    fresh.periapsisAU = v(4);
+    fresh.apoapsisAU = v(5);
+    fresh.currentDistanceAU = v(6);
+    fresh.currentVelocityKms = v(7);
+    fresh.meanVelocityKms = v(8);
+    fresh.radiusKm = v(9);
+    fresh.radiusEarth = v(10);
+    fresh.densityGcm3 = v(11);
+    fresh.massKg = v(12);
+    fresh.massEarth = v(13);
+    fresh.surfaceGravityMs2 = v(14);
+    fresh.surfaceGravityRelative = v(15);
+    fresh.escapeVelocityKms = v(16);
+    fresh.gravitationalForceN = v(17);
+    fresh.gravitationalPotentialJ = v(18);
+    fresh.orbitalFieldMs2 = v(19);
+    fresh.centripetalForceN = v(20);
+    fresh.stellarFluxWm2 = v(21);
+    fresh.solarFluxRelative = v(22);
+    fresh.albedo = v(23);
+    fresh.eqTempKelvin = v(24);
+    fresh.eqTempCelsius = v(25);
+    fresh.habitableStatus = v(26) === 1 ? 'Goldilocks (Habitable)' : v(26) === 2 ? 'Too Hot' : 'Frozen Outer Realm';
+    fresh.rocheLimitKm = v(27);
+    fresh.ringsInsideRoche = v(28) === 1;
+    /* The four GR fields are decoded from the isRelativistic FLAG (field 29),
+       never from NaN-ness: the C++ source writes NaN for a non-relativistic
+       body, but the artifact is built with -ffast-math, which does not
+       preserve NaN stores — the shipped binary delivers 0 there (found by
+       the round98 gauntlet's numerical half, R99). The flag is the contract;
+       the NaN was never a reliable wire format. */
+    const isRel = v(29) === 1;
+    fresh.isRelativistic = isRel;
+    fresh.schwarzschildRadiusKm = isRel ? v(30) : undefined;
+    fresh.photonSphereKm = isRel ? v(31) : undefined;
+    fresh.iscoKm = isRel ? v(32) : undefined;
+    fresh.timeDilationFactor = isRel ? v(33) : undefined;
+    fresh.axialRotationPeriodDays = v(34);
+    fresh.axialSpinVelocityKms = v(35);
+    fresh.axialTiltDeg = v(36);
+    fresh.galacticRadiusKpc = v(37);
+    fresh.galacticVelocityKms = v(38);
+    fresh.galacticYearMillionYrs = v(39);
+    fresh.supermassiveBlackHoleMassSun = v(40);
+    _physMemo.set(body.id, { sig: _physSignature(body), data: fresh });
+    installed++;
+  }
+  return installed;
+}
+
 /** The original full 41-field solve — now called once per body signature. */
 function computePhysicsFresh(body: CosmicBody, simTimeSec: number): BodyPhysicsData {
   const profile = BODY_PROFILES[body.id] || { eccentricity: 0.05, density: 3.5, albedo: 0.3 };
