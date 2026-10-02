@@ -26,7 +26,10 @@ const thrSrc = readFileSync(new URL('../../src/engine/systems/stageThresholds.ts
 
 /* ==== 1. the staged stage-warp machine ==== */
 {
-  const machine = /private stageWarp: \{/.test(engSrc)
+  /* R97 reconciliation: the stageWarp machine moved whole into the kamui
+     subsystem and its field is the subsystem's public face — the shape
+     invariant (arrival dial, flip target, hold, pinned dial) is unchanged. */
+  const machine = /stageWarp: \{/.test(engSrc)
     && /arrivalDial: number;/.test(engSrc)
     && /flipTo: 'multiverse' \| 'web';/.test(engSrc)
     && /hold: number;/.test(engSrc)
