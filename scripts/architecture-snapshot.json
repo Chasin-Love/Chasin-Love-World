@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-02T16:07:28.629Z",
+  "generatedAt": "2026-10-02T17:20:41.551Z",
   "fileCount": 166,
   "deadExports": [
     {
@@ -47,7 +47,7 @@
     "server/routes/sky.ts": 1,
     "server/skyStore.ts": 1,
     "src/App.tsx": 1,
-    "src/domain/universe.ts": 32,
+    "src/domain/universe.ts": 33,
     "src/domain/vault.ts": 18,
     "src/engine/blackhole/BlackHoleSystem.ts": 1,
     "src/engine/blackholeParams.ts": 5,
@@ -79,7 +79,7 @@
     "src/physics/simTwin.ts": 2,
     "src/platform/audio.ts": 4,
     "src/platform/desktop/adapter.ts": 7,
-    "src/platform/native/cpp_bridge.ts": 5,
+    "src/platform/native/cpp_bridge.ts": 6,
     "src/platform/performance.ts": 5,
     "src/platform/sentiment/sentiment.ts": 3,
     "src/platform/simClock.ts": 2,
@@ -192,6 +192,7 @@
     "scripts/gauntlets/round95-steady-sky-gauntlet.ts → scripts/gauntlets/engineSource.ts",
     "scripts/gauntlets/round95-steady-sky-gauntlet.ts → scripts/gauntlets/stateSource.ts",
     "scripts/gauntlets/round98-physics-conformance-gauntlet.ts → src/physics/physicsEngine.ts",
+    "scripts/gauntlets/round98-physics-conformance-gauntlet.ts → src/platform/native/cpp_bridge.ts",
     "scripts/probes/round95-physics-probe.ts → src/physics/sessionDriver.ts",
     "scripts/probes/round95-physics-probe.ts → src/realities/solPrime/index.ts",
     "server/index.ts → server/realityDaemon.ts",
@@ -346,6 +347,7 @@
     "src/physics/simTwin.ts → src/physics/physicsEngine.ts",
     "src/physics/simTwin.ts → src/platform/native/cpp_bridge.ts",
     "src/platform/audio.ts → src/platform/storageKeys.ts",
+    "src/platform/native/cpp_bridge.ts → src/domain/universe.ts",
     "src/platform/native/cpp_bridge.ts → src/physics/physicsEngine.ts",
     "src/platform/sentiment/sentiment.ts → src/domain/universe.ts",
     "src/platform/sky/skyRegistry.ts → src/platform/desktop/adapter.ts",
@@ -682,7 +684,7 @@
     "scripts/gauntlets/round94-the-flip-gauntlet.ts": 125,
     "scripts/gauntlets/round95-steady-sky-gauntlet.ts": 192,
     "scripts/gauntlets/round98-backend-conformance-gauntlet.ts": 300,
-    "scripts/gauntlets/round98-physics-conformance-gauntlet.ts": 344,
+    "scripts/gauntlets/round98-physics-conformance-gauntlet.ts": 485,
     "scripts/gauntlets/stateSource.ts": 26,
     "scripts/probes/round63-void-probe.ts": 280,
     "scripts/probes/round92-live-check.ts": 132,
@@ -710,7 +712,7 @@
     "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 2794,
+    "src/engine/engine.ts": 2802,
     "src/engine/kamui/KamuiPortalSystem.ts": 595,
     "src/engine/math.ts": 65,
     "src/engine/shaders.ts": 1542,
@@ -729,12 +731,12 @@
     "src/engine/worlds/InnerGalaxySystem.ts": 814,
     "src/main.tsx": 17,
     "src/physics/nbody.ts": 321,
-    "src/physics/physicsEngine.ts": 438,
+    "src/physics/physicsEngine.ts": 525,
     "src/physics/sessionDriver.ts": 864,
     "src/physics/simTwin.ts": 233,
     "src/platform/audio.ts": 536,
     "src/platform/desktop/adapter.ts": 275,
-    "src/platform/native/cpp_bridge.ts": 1002,
+    "src/platform/native/cpp_bridge.ts": 1097,
     "src/platform/performance.ts": 115,
     "src/platform/sentiment/sentiment.ts": 117,
     "src/platform/simClock.ts": 27,
@@ -830,7 +832,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      2794
+      2802
     ],
     [
       "src/engine/stages/LevelStageSystem.ts",
@@ -866,7 +868,7 @@
     ],
     [
       "src/platform/native/cpp_bridge.ts",
-      1002
+      1097
     ],
     [
       "src/ui/vault/sandbox.tsx",
@@ -919,8 +921,8 @@
     ],
     "disk surface.ts imports": [],
     "native build path": [
-      "src/platform/native/cpp_bridge.ts:164",
-      "src/platform/native/cpp_bridge.ts:392"
+      "src/platform/native/cpp_bridge.ts:166",
+      "src/platform/native/cpp_bridge.ts:399"
     ],
     "gauntlet readFileSync targets": [
       "scripts/gauntlets/round17-gauntlet.ts:106",

@@ -401,11 +401,14 @@ class CosmosBridge {
    *  refused to wire this method rather than ship per-tier divergence. R99
    *  rebuilt the artifact — the author's emsdk lives at ~/Desktop/emsdk,
    *  off the PATH, which is how R98 missed it (build-wasm.sh now activates
-   *  it itself) — and the round98 physics gauntlet checks the binary's
-   *  BYTES, not mtimes: a stale artifact is a WARN while nothing calls this
-   *  method and a hard FAIL the moment one does. `npm run wasm:build` after
-   *  EVERY cosmos_engine.cpp edit — editing C++ changes nothing for the web
-   *  tier until then (PROJECT-BRAIN trap 11).
+   *  it itself) — closed the last divergence (the seeded unknown-body tilt),
+   *  fixed the wasm kinds marshalling, and THEN wired this method into
+   *  production through primePhysics (the one roster seam; the engine feeds
+   *  it after every syncBodies). The round98 gauntlet checks the binary's
+   *  BYTES, not mtimes, and its numerical half executes this exact chain:
+   *  since the wiring, a stale artifact is a hard FAIL, full stop.
+   *  `npm run wasm:build` after EVERY cosmos_engine.cpp edit — editing C++
+   *  changes nothing for the web tier until then (PROJECT-BRAIN trap 11).
    *
    * The desktop tier compiles cosmos_engine.cpp directly and is always as
    * fresh as the source.
@@ -608,6 +611,46 @@ class CosmosBridge {
     return { maxDelta, steps, bodies: bodies.length, backend: active.backend };
   }
 
+  /* ------------------------- the production physics seam ---------------- */
+
+  /* R99 — THE WHEELS. The rendered roster's per-body physics is served by the
+     COMPILED core on every tier above TypeScript: the engine hands this seam
+     its roster after every syncBodies, one batch runs per roster change on
+     the active native tier, and installNativePhysics overlays the 41
+     contract fields onto the memo calculatePhysics already serves. The TS
+     reference remains the synchronous zero-fail path (cold memo, TypeScript
+     tier, any throw) and its numbers are identical to the compiled core's by
+     the round98 gauntlet — whose numerical half executes this exact chain —
+     so the wiring changes PROVENANCE, never values. Fire-and-forget by
+     contract; the engine never awaits it. */
+  async primePhysics(bodies: ReadonlyArray<CosmicBody>, simTimeSec = 0): Promise<{ primed: number; backend: CosmosBackend } | null> {
+    if (!bodies.length) return null;
+    try {
+      await this.init();
+      if (this.statusValue.backend === 'typescript') return null;
+      const input: PhysicsBatchInput = {
+        ids: [], orbitA: [], radius: [], kinds: [], hasRings: [], phase: [], speed: [],
+        simTimeSec,
+      };
+      for (const b of bodies) {
+        input.ids.push(b.id);
+        input.orbitA.push(b.orbit.a);
+        input.radius.push(b.radius);
+        input.kinds.push(kindToCode(b.kind));
+        input.hasRings.push(b.rings ? 1 : 0);
+        input.phase.push(b.orbit.phase);
+        input.speed.push(b.orbit.speed || 0.01);
+      }
+      const fields = await this.physicsBatch(input);
+      const primed = installNativePhysics([...bodies], fields);
+      return { primed, backend: this.statusValue.backend };
+    } catch {
+      /* the zero-fail law: the TS reference already served identical numbers;
+         a failed prime degrades nothing and must never break a frame. */
+      return null;
+    }
+  }
+
   /* ------------------------- TS reference implementations ---------------- */
 
   private tsRk4Burn(n: number, iterations: number): void {
@@ -753,7 +796,8 @@ class CosmosBridge {
 /* Local copies of the TS reference math (imports would create a cycle from
    physicsEngine's side; these mirror calculateKeplerPosition/calculatePhysics
    and are guarded by verifyParity against the C++ port). */
-import { calculatePhysics as calculatePhysicsTS } from '../../physics/physicsEngine';
+import { calculatePhysics as calculatePhysicsTS, installNativePhysics } from '../../physics/physicsEngine';
+import type { CosmicBody } from '../../domain/universe';
 
 function kindFromCode(code: number): string {
   switch (code) {
@@ -763,6 +807,19 @@ function kindFromCode(code: number): string {
     case 4: return 'hole';
     case 5: return 'vault';
     default: return 'planet';
+  }
+}
+
+/* R99 — the encoder half of the same encoding (COSMOS_KIND_* in
+   cosmos_engine.hpp); the reverse of kindFromCode above. */
+function kindToCode(kind: CosmicBody['kind']): number {
+  switch (kind) {
+    case 'star': return 0;
+    case 'dwarf': return 2;
+    case 'nebula': return 3;
+    case 'hole': return 4;
+    case 'vault': return 5;
+    default: return 1;
   }
 }
 

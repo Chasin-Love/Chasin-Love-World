@@ -261,21 +261,22 @@ check('R98: the C++ profile table still has exactly ONE consumer (cosmos_physics
 const physicsBatchCallers: string[] = [];
 for (const f of walk(`${ROOT}/src`)) {
   const rel = f.slice(ROOT.length).replace(/^[\\/]+/, '').replace(/\\/g, '/').replace(/^src\//, '');
-  /* The bridge's own file is where the method is DECLARED and where
-     verifyParity calls it internally — neither is a production consumer. */
+  /* The bridge's own file is where the method is DECLARED, where the parity
+     button's call resolves, and — since R99 — where the production seam
+     (primePhysics) lives. None of those is an external consumer. */
   if (rel === 'platform/native/cpp_bridge.ts') continue;
   const src = readFileSync(f, 'utf8');
   if (/\.physicsBatch\(/.test(src) || /\.verifyParity\(/.test(src)) physicsBatchCallers.push(rel);
 }
 /* Paths here must match the NORMALISED form above (no leading slash, forward
- * slashes) or the allowlist silently never matches and the check degrades to a
- * vacuous `every()` over an empty array — which is exactly the kind of green
+ * slashes) or the allowlist silently never matches and the check degrades to
+ * a vacuous `every()` over an empty array — which is exactly the kind of green
  * that means nothing. */
 const ALLOWED_CALLERS = ['ui/console/CppNativeEngineCard.tsx']; /* the verifyParity button */
-check('R98: no PRODUCTION path calls physicsBatch (only the verifyParity button does)',
+check('R98/R99: no file OUTSIDE the bridge calls physicsBatch or verifyParity (the button is the only external consumer)',
   physicsBatchCallers.every((c) => ALLOWED_CALLERS.includes(c)),
-  `physicsBatch is reached from ${physicsBatchCallers.join(', ') || 'nowhere'} — a production caller ` +
-  'can now reach the drifted profile table. Rebuild the artifact (`npm run wasm:build`) FIRST.');
+  `physicsBatch is reached from ${physicsBatchCallers.join(', ') || 'nowhere'} outside the bridge — ` +
+  'a rogue caller bypasses the wired primePhysics seam and its conformance gates.');
 
 /* The allowlist is only meaningful if the scanner actually finds the caller it
  * blesses. If a future rename makes the entry unmatched, `every()` over the
@@ -286,6 +287,25 @@ check('R98: the caller scanner actually finds the verifyParity button (the scan 
   physicsBatchCallers.length > 0 && physicsBatchCallers.every((c) => ALLOWED_CALLERS.includes(c)),
   `the scanner found ${physicsBatchCallers.length} caller(s) — if this drops to 0 the scan is broken, ` +
   'not clean. Expected to see ui/console/CppNativeEngineCard.tsx.');
+
+/* R99 — THE WIRING IS THE BLESSED PRODUCTION CONSUMER. R98's plan stopped one
+ * step short: the artifact was stale and unwiring was the honest state. R99
+ * rebuilt the artifact (emsdk found at ~/Desktop/emsdk), closed the last
+ * divergence, fixed the wasm kinds marshalling, and completed the plan: the
+ * bridge's primePhysics is THE production seam, the engine feeds it the roster
+ * at every syncBodies, and installNativePhysics lands the rows in the memo
+ * calculatePhysics serves. These three checks prove the seam exists on both
+ * ends — a rename that silently unwires the wheels goes red here. */
+check('R99: the bridge carries the wired production seam (primePhysics → installNativePhysics)',
+  /async primePhysics\(/.test(BRIDGE) && /installNativePhysics\(/.test(BRIDGE),
+  'primePhysics missing from cpp_bridge.ts — the wheels are unwired again');
+check('R99: the engine hands its roster to the compiled core at syncBodies',
+  /cosmosBridge\.primePhysics\(/.test(ENGINE_TS),
+  'engine.ts no longer calls cosmosBridge.primePhysics — the seam is dead');
+check('R99: physicsEngine carries the native install decoder',
+  /export function installNativePhysics\(/.test(TS_PHYS),
+  'installNativePhysics missing from physicsEngine.ts — the wired rows have nowhere to land');
+const WIRED = /async primePhysics\(/.test(BRIDGE) && /cosmosBridge\.primePhysics\(/.test(ENGINE_TS);
 
 const artifact = `${ROOT}/public/wasm/cosmos_engine.js`;
 if (!existsSync(artifact)) {
@@ -323,16 +343,13 @@ if (!existsSync(artifact)) {
     const hasNew = wasm.includes(f64(0.0453));
     const stale = hasOld && !hasNew;
 
-    /* SEVERITY FOLLOWS REACHABILITY, and that is the whole point. A stale
-     * artifact whose drifted numbers no production path can observe is a
-     * build-hygiene debt: loud, recorded, but not a physics bug a user can
-     * hit. The moment physicsBatch gains a production caller the SAME fact
-     * becomes a correctness bug, and this turns into a hard failure that
-     * blocks the merge until the artifact is rebuilt.
-     *
-     * So the flag is not a mood — it is the result of the two reachability
-     * proofs above. A stale artifact passes only while nothing can reach it. */
-    const dormant = profileCallSites === 2 &&
+    /* SEVERITY FOLLOWS REACHABILITY — and since R99 the method is reachable
+     * BY CONSTRUCTION: the wiring checks above prove primePhysics is fed by
+     * the engine. A stale artifact is therefore a hard failure, full stop;
+     * the dormant-WARN shape survives only for a tree where the seam has
+     * been deliberately unwired (WIRED false) — the R98 ordering law, kept
+     * as an escape hatch rather than a habit. */
+    const dormant = !WIRED && profileCallSites === 2 &&
       physicsBatchCallers.every((c) => ALLOWED_CALLERS.includes(c));
 
     if (stale && dormant) {

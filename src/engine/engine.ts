@@ -1460,7 +1460,15 @@ export class UniverseEngine {
   private buildBody(data: CosmicBody) { this.worlds.buildBody(data); }
   private buildBelt() { this.worlds.buildBelt(); }
   buildExoplanetPlates() { this.worlds.buildExoplanetPlates(); }
-  syncBodies(list: CosmicBody[]) { this.worlds.syncBodies(list); }
+  syncBodies(list: CosmicBody[]) {
+    this.worlds.syncBodies(list);
+    /* R99 — THE WHEELS: on every tier above TypeScript the roster's per-body
+       physics is recomputed by the compiled core and installed into the memo
+       calculatePhysics serves. Fire-and-forget — the TS reference already
+       served identical numbers and remains the synchronous zero-fail path
+       (the round98 gauntlet's numerical half executes this exact chain). */
+    void cosmosBridge.primePhysics(list, this.simDays * 86400);
+  }
   syncMoons(entries: { planetId: string; createdAt: number; updatedAt: number }[]) { this.worlds.syncMoons(entries); }
   rebuildOrbitLineFromState(
     line: THREE.Line,
