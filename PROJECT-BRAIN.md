@@ -304,9 +304,13 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ---
 
-## 8. CURRENT STATE (as of 2026-10-02 — main's tip is **v16.0.0**: the R91–R95 REAL UNIVERSE arc merged from `the-real-universe`)
+## 8. CURRENT STATE (as of 2026-10-03 — main's tip is the **R96–R100 chain**, merged --no-ff from `r99-the-wheels-connected` on the author's word; R91–R95 shipped as v16.0.0)
 
-- **`main` is the blessed reference.** Its tip is the merged R91–R95 REAL UNIVERSE arc on top of **v16.0.0** (merged --no-ff and tagged on the author's word, 2026-10-02) on top of R90 on top of **v15.0.10**
+- **`main` is the blessed reference.** Its tip is the merged R96–R100 chain —
+  the tidy house, the engine divided, the real contract, the wheels connected,
+  the self-contained exe — merged --no-ff and pushed on the author's word
+  (2026-10-03, after a fresh full verify on the exact merged tree) — on top of
+  the R91–R95 REAL UNIVERSE arc on top of **v16.0.0** (merged --no-ff and tagged on the author's word, 2026-10-02) on top of R90 on top of **v15.0.10**
   (R88 the per-frame twin + R89 the everywhere core, merged from `r88-per-frame-twin`
   and shipped 2026-10-01 — CI commits the WASM artifact back and attaches it to releases)
   on top of **v15.0.9** (R85 the six seams → R86 the full purge → R87 the native
@@ -336,9 +340,17 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   FLIP, default ON, v16.0.0) → **R95 (THE STEADY SKY — the stability round: the
   flip detonated; star-led rosters, the orbit-true seed, the vault temper, the
   crossfade seam, 1e12 softening; the arc's arc ends in a sky that holds)**. MERGED 2026-10-02 on the author's word: `--no-ff` into main, tagged
-  **v16.0.0** — the real universe is the blessed reference now. (The older
-  in-flight branches — `r71-ten-slices` and friends — remain exactly as they
-  were, awaiting their own rulings.)
+  **v16.0.0** — the real universe is the blessed reference now. R96/R97/R98/
+  R99+R100 (branch chain `r96-the-tidy-house` → `r97-the-engine-divided` →
+  `r98-the-real-contract` → `r99-the-wheels-connected`) **MERGED 2026-10-03 on
+  the author's word: `--no-ff` from `r99-the-wheels-connected`, pushed to
+  origin — after a fresh full verify on the exact merged tree.** (The older
+  ISOLATED branches — `risk-take-kamui` (Sep 29, the author's own "disaster"),
+  `r68-explorer-upgrade`, `r71-ten-slices` — remain exactly as they
+  were, awaiting their own rulings; the merged chain's branch pointers
+  (`r82-the-voice`, `r85-the-six-seams`, `r87-native-simulator`,
+  `r88-per-frame-twin`, `the-real-universe`) are historical signposts, fully
+  contained in main.)
 - **R96 (this round, on branch `r96-the-tidy-house`):** the author's verdict on
   the tree — "the frontend looks genuinely good, but the backend is total mess"
   — audited and answered. THE AUDIT: there is no backend (offline-first is the
