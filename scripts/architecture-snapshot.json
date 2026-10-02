@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-02T15:39:39.217Z",
+  "generatedAt": "2026-10-02T16:07:28.629Z",
   "fileCount": 166,
   "deadExports": [
     {
@@ -682,7 +682,7 @@
     "scripts/gauntlets/round94-the-flip-gauntlet.ts": 125,
     "scripts/gauntlets/round95-steady-sky-gauntlet.ts": 192,
     "scripts/gauntlets/round98-backend-conformance-gauntlet.ts": 300,
-    "scripts/gauntlets/round98-physics-conformance-gauntlet.ts": 229,
+    "scripts/gauntlets/round98-physics-conformance-gauntlet.ts": 344,
     "scripts/gauntlets/stateSource.ts": 26,
     "scripts/probes/round63-void-probe.ts": 280,
     "scripts/probes/round92-live-check.ts": 132,
@@ -734,7 +734,7 @@
     "src/physics/simTwin.ts": 233,
     "src/platform/audio.ts": 536,
     "src/platform/desktop/adapter.ts": 275,
-    "src/platform/native/cpp_bridge.ts": 979,
+    "src/platform/native/cpp_bridge.ts": 1002,
     "src/platform/performance.ts": 115,
     "src/platform/sentiment/sentiment.ts": 117,
     "src/platform/simClock.ts": 27,
@@ -866,7 +866,7 @@
     ],
     [
       "src/platform/native/cpp_bridge.ts",
-      979
+      1002
     ],
     [
       "src/ui/vault/sandbox.tsx",
@@ -919,7 +919,8 @@
     ],
     "disk surface.ts imports": [],
     "native build path": [
-      "src/platform/native/cpp_bridge.ts:164"
+      "src/platform/native/cpp_bridge.ts:164",
+      "src/platform/native/cpp_bridge.ts:392"
     ],
     "gauntlet readFileSync targets": [
       "scripts/gauntlets/round17-gauntlet.ts:106",

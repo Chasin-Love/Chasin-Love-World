@@ -96,6 +96,28 @@ TypeScript  a line-faithful RK4 twin in cpp_bridge.ts                   fallback
 The R91 decree made the **N-body session the main driver of the sky**:
 **the canon seeds; the session drives; the clockwork is the fallback and the heal.**
 
+**R98 — the tier chain is OBSERVABLE, and the artifact is not the source.**
+Each tier rejection is recorded as a named `DegradationReason` (not a bare
+`null`) and surfaced through `CosmosStatus.degraded[]` / `fellBack` to the
+console card; `smoke.ts` and the R95 live probe **assert** that no tier was
+silently lost, so a quiet fallback fails the chain instead of passing it.
+
+Two standing facts about the tiers, both pinned by gauntlet:
+
+- **`public/wasm/` is a committed binary.** Editing `cosmos_engine.cpp` changes
+  nothing for the browser until `npm run wasm:build` runs. The committed
+  artifact is currently stale (it predates the R98 obliquity fix); it is
+  harmless only because the one C++ path that reads the per-body profile table
+  has no production caller. `round98-physics-conformance-gauntlet.ts` reads the
+  artifact's bytes and escalates that staleness from a WARN to a hard FAIL the
+  moment a production caller appears.
+- **What is actually connected.** The Kepler path (`refreshKeplerCache` →
+  `keplerBatch`) runs on any tier above TypeScript today. The per-body profile
+  table (eccentricity / density / albedo / obliquity) is reachable only through
+  `cosmos_physics_batch`, which no production path calls — so the C++ law table
+  and the TypeScript law are currently compared by gauntlet rather than merged
+  at runtime. Both conformance gauntlets exist to keep that comparison honest.
+
 - The Kepler `physicsEngine` still seeds every session (canon positions,
   orbit-true speeds √(GM/r), real kg masses) and renders any frame whose
   readback goes stale (the freshness law — an 8-sim-day trust window + crossfade).
@@ -152,7 +174,7 @@ The R91 decree made the **N-body session the main driver of the sky**:
 
 ```
 npm run verify   =  typecheck (tsc --noEmit)
-                 +  19 gauntlets  scripts/gauntlets/round16 … round95-steady-sky
+                 +  21 gauntlets  scripts/gauntlets/round16 … round98-backend-conformance
                  +  smoke         (headless boot, zero console errors,
                                    frame match vs scripts/verify/reference-hole.png)
                  +  prod:smoke    (serves the built dist/, asserts the boot again)

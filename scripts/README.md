@@ -15,7 +15,7 @@ Regrouped in R96 (chronological flatness → purpose).
 
 ```
 typecheck (tsc --noEmit)
-  → 19 gauntlets  round16 → round95-steady-sky     (source invariants + math)
+  → 21 gauntlets  round16 → round98-backend-conformance (source invariants + math)
   → smoke         (headless boot, zero console errors,
                    frame match vs verify/reference-hole.png)
   → prod:smoke    (serves the built dist/, asserts the boot again)
@@ -64,6 +64,11 @@ against `architecture-snapshot.json` (exit 1 on drift).
 - `round93-real-moons-gauntlet.ts` — deterministic moon identity, mass law, world→local seam.
 - `round94-the-flip-gauntlet.ts` — the universe boots DRIVING (flag law, scope swaps, star-led rosters).
 - `round95-steady-sky-gauntlet.ts` — the substep law, orbit-true seed, vault temper, crossfade seam, softening lockstep; reads `probes/round95-physics-probe.ts`.
+- `round98-physics-conformance-gauntlet.ts` — the C++/WASM tier against the TypeScript law, value for value: per-body profiles, the 41-field contract (checked against the emitter's own indices), and the committed artifact's freshness. **Staleness severity follows reachability** — WARN while `physicsBatch` has no production caller, hard FAIL the moment one appears.
+- `round98-backend-conformance-gauntlet.ts` — the Node daemon against the Rust Tauri shell: every route has a command and an adapter arm, sanitisation parity, rename file-set parity, containment before destructive per bin op, Sky Studio caps/MIME, asset whitelist parity.
+
+**tools/**
+- `build-wasm.sh` — `npm run wasm:build`. Recompiles `cosmos_engine.cpp` → `public/wasm/` via emsdk. **The committed artifact is stale** (no emsdk on the authoring laptop); run this before wiring `cosmos_physics_batch` into production.
 
 **probes/ (standalone, hand-run)**
 - `round63-void-probe.ts` — runtime GPU void diagnostic (`--gate` writes `verify/r63-probe.png`).

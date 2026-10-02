@@ -161,6 +161,8 @@ Appendix A. **`README.md` is the single source of truth for reconstruction and c
 │   │                          actions.ts is a barrel over actions/ (R97: shared · realities ·
 │   │                          bodies · entries · vault · portability — import path unchanged)
 │   ├── platform/           ← native C++ core + bridge, desktop adapter, sky, sync, sentiment, storage keys
+│   │                          cpp_bridge.ts records WHY each tier was rejected (R98: DegradationReason
+│   │                          → CosmosStatus.degraded[] — degradation is a value, not a shrug)
 │   ├── engine/             ← THE SHELL (engine.ts, 2.8k ln: boot / 22-step tickFrame /
 │   │                          updateBodies the ONE write seam / interaction / dispose) + the
 │   │                          subsystem family (R97): sky/SkyFxSystem · blackhole/BlackHoleSystem ·
@@ -175,6 +177,10 @@ Appendix A. **`README.md` is the single source of truth for reconstruction and c
 │   ├── vault/              ← EFS (copy-on-write fs), crypto (Argon2id/AES-GCM), executors (JS/Py/HTML/PDF/ISO)
 │   └── ui/                 ← ALL React surfaces (console, hud, vault, diary, lineage…)
 └── public/                 ← vendored pyodide + fonts + the compiled WASM core (wasm/) — offline capability, keep committed
+│                              R98: the committed wasm/ is STALE by content (no emsdk here to rebuild —
+│                              `npm run wasm:build`). Harmless only because the one C++ path that reads
+│                              the profile table has no production caller; the gauntlet escalates to a
+│                              hard FAIL the moment that changes.
 ```
 
 ---
@@ -236,6 +242,24 @@ snapshot):**
   `simTwin.ts` (the lab stays read-only); the driver lives in `src/physics/sessionDriver.ts`
   and is gauntleted separately. Safety nets and the R71 container law are untouched —
   the driver moves bodies, never the camera.
+- **R98 law — A CONTRACT EXISTS ONLY IF SOMETHING CAN FAIL WHEN IT BREAKS.** R98
+  found three implementations of contracts this project believed were single (the
+  TS physics law vs the C++ port, the Node daemon vs the Rust shell, the source
+  vs the shipped binary) and **no gate could see any of them**. The follow-on
+  rule, learned the hard way three times in one round:
+  - **Every negative must be proven by MUTATION, not by inspection.** A check
+    that reads the wrong file, an allowlist whose paths never match (so `every()`
+    passes vacuously over an empty list), and a scanner blind to an indirect
+    caller all reported GREEN while proving nothing. Ask "what would make this
+    check unable to fail?", then break the code on purpose and watch it go red.
+  - **Degradation is a VALUE, never a shrug.** A tier that fails silently must
+    name *why* (`DegradationReason`), surface it to the UI, and be asserted on by
+    `smoke.ts`. "It fell back and nobody noticed" is a bug report waiting to happen.
+  - **A shipped binary is not its source.** `public/wasm/` is committed, so
+    editing `cosmos_engine.cpp` changes nothing for the web tier until it is
+    rebuilt. Conformance must be checked against the ARTIFACT's bytes, and the
+    severity of a stale artifact must follow REACHABILITY: dormant is a WARN,
+    reachable is a hard FAIL.
 
 ---
 
@@ -381,6 +405,69 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   README §3 repointed, scripts/README.md updated, and the round doc records the
   full reconciliation ledger.
   `docs/ROUND-97-THE-ENGINE-DIVIDED-2026-10-02.md`
+- **R98 (this round, on branch `r98-the-real-contract`, cut from R97's tip):** THE
+  REAL CONTRACT — the author's verdict, in the car metaphor: *"the C++ engine is
+  in the boot but not connected to the wheels"*, *"two gearboxes have started
+  disagreeing"*, *"something that tells us this has gone wrong"*. One theme under
+  all three: **the project had three implementations of contracts it believed were
+  single** — the TS physics law vs the C++ port, the Node daemon vs the Rust
+  desktop shell, and the SOURCE vs the SHIPPED BINARY — and **nothing in the
+  verify chain could see any of the disagreement**. Every one was invisible by
+  construction. COMMIT 1 — repair the test net: R97 commit 1 moved `windowFn`/
+  `hash`/`vnoise`/`cpuFbm` into `engine/math.ts` but `ENGINE_FILES` was never
+  updated, so any future pin on them would have matched nothing and passed
+  VACUOUSLY; plus the dead-code sweep (a dead `coreHoverT` setter was removed,
+  TS2540 restored it — compound assignment through a getter is true at runtime
+  and false at compile time, and the compiler was right). COMMIT 2 — make
+  degradation VISIBLE (the author's question): five bare `return null` paths in
+  `loadWasm` became NAMED rejection reasons; `CosmosStatus.degraded[]`/`fellBack`
+  reaches `CppNativeEngineCard`; a one-time `console.warn` names the reason and
+  the tier used; and **hard assertions** in `round95-steady-sky-live.ts` +
+  `smoke.ts` fail on a silently lost tier. That assertion is the receipt that
+  proves the whole round — and it was **negative-tested** (with the artifact moved
+  aside it fires; without that move the TS branch is never reached and the test
+  proves nothing). COMMIT 3 — the physics conformance gauntlet, which went RED on
+  today's drift **on purpose**. COMMIT 4 — closed it: goliath ecc
+  `0.0489`→`0.0453`, `BodyProfile` gained `tiltDeg` so the three retrograde
+  worlds (veil 177.4 / hollow 122.5 / mirror 97.77) stop being flattened to
+  Earth's 23.44° by a `kind ==` ternary, and the false "identical ids, values
+  and defaults" comment rewritten to state what is actually guaranteed.
+  **Proven at runtime with real MSVC-compiled C++: 8 mismatches → 0.** COMMIT 5 —
+  the backend conformance gauntlet (89 checks: every route has a Tauri command
+  AND an adapter arm, sanitisation parity, rename derivation, containment before
+  destructive per bin op, Sky Studio caps/MIME, the asset whitelist). COMMIT 6 —
+  the two gearboxes resynchronised, three real drifts closed: the Rust rename
+  patched only `index.ts` while Node patched `index.ts` AND `surface.ts` (one
+  world, two names); the Rust sky whitelist took the **LAST FOUR BYTES** and
+  matched patterns **including the dot**, so only 4-char extensions had ever
+  worked and `.jpeg`/`.webp`/`.avif` silently failed on desktop while its own
+  `MIME_BY_EXT` listed them; and it accepted the empty id `sky-.png` that Node
+  rejects while being byte-exact where Node's regex carries `/i`. **Proven with a
+  standalone `rustc` harness: 8 divergences → 0 over 17 cases.** (Neither form was
+  a path escape — `is_inside` holds either way; these were contract drift.)
+  COMMIT 7 — **the wheels stayed UNWIRED, deliberately.** `cosmos_physics_batch`
+  is the profile table's ONLY consumer and has no production caller, so the plan's
+  final wiring step was not performed: the committed `cosmos_engine.wasm` is
+  STALE (proved by content — the pre-fix `0.0489` hits the binary's bytes, the
+  fixed `0.0453` does not) and there is no emsdk/clang/wasm-ld on this machine,
+  so wiring it would have made **web and desktop return different per-body
+  physics** — the exact divergence the round exists to kill, reintroduced by the
+  step meant to close it. The guard is a **severity that follows reachability**:
+  WARN while dormant, hard FAIL the moment a production caller appears
+  (negative-tested both directions). The Kepler path IS connected and always was
+  — `refreshKeplerCache` calls `keplerBatch`, smoke prints `SMOKE TIER — wasm`
+  with `keplerCache.valid: true`. **THE LESSON:** three times this round a check
+  passed green while proving nothing (read the source not the artifact; an
+  allowlist path mismatch making `every()` vacuous over an empty array; a scanner
+  blind to the indirect `verifyParity`→`physicsBatch` caller). Each was caught by
+  asking "what would make this check unable to fail?" and then mutating the code
+  to find out. Every negative in R98 is proven by mutation, not by inspection.
+  Chain: typecheck + **21 gauntlets, 398 checks** + smoke + prod smoke all green,
+  frame unmoved (histL1 0.0725 vs the 0.12 pin); `audit:arch --check` clean.
+  Standing debt: the stale WASM artifact (`npm run wasm:build`, added this round,
+  needs emsdk), the by-design unknown-body tilt gap (TS seeded, C++ constant),
+  and `verifyParity` still UI-button-only.
+  `docs/ROUND-98-THE-REAL-CONTRACT-2026-10-02.md`
 - **R90 (this round, on main):** the author's report — the Native Simulator Twin card
   (Verify Twin with it) could not be scrolled into view in the Core Console — reproduced
   by live measurement and traced to a **Tailwind v4 cascade-layer trap**: `.cc-root`'s
@@ -596,16 +683,21 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (21 checks) in the verify chain. Smoke reference held (green 0.066–0.074 histL1; one
   cold-boot flake diagnosed, never reproduced). `docs/ROUND-84-THE-ASCENDING-NODES-
   2026-09-30.md`.
-- **Verification status:** `npm run verify` ALL GREEN (typecheck; all **19
-  gauntlets**, `scripts/gauntlets/round16` → `round95-steady-sky` since R96's
-  regroup; smoke + prod-smoke, zero console errors) — re-verified per round,
-  most recently at R96 (first chain hit the smoke cold-boot flake after 19/19
-  gauntlets — green on the immediate re-run and on the second full chain);
-  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R96
+- **Verification status:** `npm run verify` ALL GREEN (typecheck; all **21
+  gauntlets** / 398 checks, `scripts/gauntlets/round16` → `round98-backend-
+  conformance` since R98 added the two conformance gates; smoke + prod-smoke,
+  zero console errors) — re-verified per round, most recently at R98 (a clean
+  single run: every gauntlet green, `SMOKE TIER — wasm`, histL1 0.0725 against
+  the 0.12 pin);
+  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R98
   snapshot** (zero dead exports; absorbed in-commit on every structural change);
-  `desktop:check` unrunnable on this laptop (no MSVC toolchain — R96 touched no
-  Rust). Shipped: **v16.0.0** (the R91–R95 REAL UNIVERSE arc) — tagged and
-  pushed; R96 rides the next tag.
+  `desktop:check` passes but with the pre-existing "No C++ compiler found —
+  building with cosmos FFI stubs" warning, so the C++ core is not compile-verified
+  on this laptop (R98's two Rust edits are pure Rust and DO compile in that mode).
+  **`npm run wasm:build` is new in R98** — no emsdk/clang/wasm-ld here, so the
+  committed WASM artifact could not be rebuilt; it is stale by content and the
+  physics gauntlet says so out loud. Shipped: **v16.0.0** — tagged and
+  pushed; R98 rides the next tag.
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); `cargo check` proof on a toolchained host (R84's FFI
   extension + R85's `reality_write_data` twin + R86's seed guard, all reviewed but never
@@ -623,7 +715,23 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ## 9. WHERE IT'S GOING
 
-0. **R83 decision queue — RULED and EXECUTED (R85, branch `r85-the-six-seams`).** The
+0. **R98 follow-ups — the ordering is now LAW, not a preference.** R98 left one
+   step deliberately unperformed, and the reason is mechanical rather than
+   stylistic: **`npm run wasm:build` FIRST, then wire `cosmos_physics_batch` into
+   production — never the other way round.** The committed `cosmos_engine.wasm`
+   is stale by content today (proved by scanning the binary's bytes for the
+   pre-fix goliath `0.0489`), and this machine has no emsdk/clang/wasm-ld, so the
+   rebuild needs an author host. Until it happens the web tier's profile table
+   predates the R98 tilt fix while the desktop tier compiles the source directly
+   and is already correct — wiring first would ship *different per-body physics
+   per backend*, which is the divergence R98 was commissioned to kill. The
+   physics gauntlet enforces the ordering itself: dormant staleness is a loud
+   WARN, and it becomes a hard FAIL the moment a production caller appears. Also
+   open: the by-design unknown-body tilt gap (TS derives a seeded obliquity,
+   C++ can only emit a constant — pinned, needs an author ruling to close), and
+   `verifyParity` remains a console button even though its comparison now runs
+   in CI as gauntlet checks.
+1. **R83 decision queue — RULED and EXECUTED (R85, branch `r85-the-six-seams`).** The
    author ruled on 2026-10-01: "create a new isolated branch … solve all these six bugs
    … best shape possible," and chose the mechanical sweep when offered the census's fate.
    All six findings + the sweep + the MIT notice are done on the branch — awaiting only
@@ -704,6 +812,14 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 10. **Ignoring the gauntlets** — if `round16/17/18/63` or `audit:arch` disagree with your
     change, your change is wrong until reconciled (fix or consciously re-snapshot — never
     delete the check to make it pass).
+11. **Editing C++ and assuming the web tier changed** — `public/wasm/` is a COMMITTED
+    binary. Fixing `cosmos_engine.cpp` does nothing for the browser until
+    `npm run wasm:build` runs (needs emsdk). R98 found the committed artifact carrying
+    the pre-fix physics this way. Check the artifact, not the source.
+12. **Trusting a check you have never seen fail** — a gauntlet that has never gone red is
+    an untested hypothesis. R98 shipped three checks that were green and meaningless; each
+    was found by deliberately breaking the code and watching for the failure (see §6,
+    the R98 law).
 
 ---
 
