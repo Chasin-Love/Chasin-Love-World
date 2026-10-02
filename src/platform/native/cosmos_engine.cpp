@@ -253,26 +253,44 @@ struct BodyProfile {
     double eccentricity;
     double density;   /* g/cm^3 */
     double albedo;
+    /* R98 — per-body axial obliquity, ported from physicsEngine's
+       BODY_PROFILES.tiltDeg. The field existed in the TS law and NOT here:
+       field 36 used to be `kind == STAR ? 7.25 : 23.44`, which handed Earth's
+       obliquity to all eight non-star bodies and flattened the three
+       retrograde worlds (veil 177.4, hollow 122.5, mirror 97.77) to 23.4. */
+    double tiltDeg;
 };
 
-/* physicsEngine.ts BODY_PROFILES — identical ids, values and defaults. */
+/* physicsEngine.ts BODY_PROFILES — the ids, the ecc/density/albedo values and
+   the unknown-body default are identical across the two tiers, and
+   round98-physics-conformance-gauntlet.ts now proves it by parsing both tables
+   and comparing them value for value. That claim was NOT true before R98:
+   goliath read 0.0489 here against 0.0453 in the law table (fixed below).
+   One honest gap remains and the gauntlet pins it explicitly: for a body with
+   NO profile row the TS law derives a SEEDED tilt from its id, so the two
+   tiers can only be equal for a NAMED body. */
 const BodyProfile* bodyProfileOf(const char* id) {
     static const struct { const char* id; BodyProfile p; } TABLE[] = {
-        {"anchor",  {0.0,    1.41,  0.00}},
-        {"cinder",  {0.2056, 5.43,  0.12}},
-        {"veil",    {0.0067, 5.24,  0.77}},
-        {"aurelia", {0.0167, 5.51,  0.30}},
-        {"rust",    {0.0934, 3.93,  0.25}},
-        {"goliath", {0.0489, 1.33,  0.52}},
-        {"mirror",  {0.0444, 1.90,  0.85}},
-        {"hollow",  {0.2488, 1.85,  0.14}},
-        {"wisp",    {0.1500, 0.001, 0.40}},
-        {"eventide",{0.0,    1e12,  0.00}},
+        {"anchor",  {0.0,    1.41,  0.00, 7.25}},
+        {"cinder",  {0.2056, 5.43,  0.12, 0.03}},
+        {"veil",    {0.0067, 5.24,  0.77, 177.4}},
+        {"aurelia", {0.0167, 5.51,  0.30, 23.44}},
+        {"rust",    {0.0934, 3.93,  0.25, 25.19}},
+        {"goliath", {0.0453, 1.33,  0.52, 3.13}},
+        {"mirror",  {0.0444, 1.90,  0.85, 97.77}},
+        {"hollow",  {0.2488, 1.85,  0.14, 122.5}},
+        {"wisp",    {0.1500, 0.001, 0.40, 12.0}},
+        {"eventide",{0.0,    1e12,  0.00, 30.0}},
     };
     for (const auto& row : TABLE) {
         if (std::strcmp(row.id, id) == 0) return &row.p;
     }
-    static const BodyProfile DEFAULT{0.05, 3.5, 0.3};
+    /* Unknown body: TS falls back to {0.05, 3.5, 0.3} with no tiltDeg, then
+       derives 8 + tiltSeed*55 (7.25 for a star). There is no seed in a C API
+       that receives only the id string, so the C++ side returns the same three
+       profile numbers and Earth's default obliquity. Named bodies — every
+       body in every roster — are exact. */
+    static const BodyProfile DEFAULT{0.05, 3.5, 0.3, 23.44};
     return &DEFAULT;
 }
 
@@ -464,7 +482,10 @@ void cosmos_physics_batch(const char* const* ids, const double* orbitA,
         const double axialDays = kind == COSMOS_KIND_STAR ? 25.05 : 1.0 + (radiusKm / 6371.0) * 0.5;
         set(34, axialDays);
         set(35, (2.0 * PI * radiusKm) / (axialDays * 86400.0));
-        set(36, kind == COSMOS_KIND_STAR ? 7.25 : 23.44);
+        /* R98 — the profile's own obliquity, not a kind-derived constant. This
+           is what keeps veil / hollow / mirror retrograde on the compiled tier
+           instead of every non-star body reporting Earth's 23.44. */
+        set(36, profile.tiltDeg);
         set(37, 8.18);
         set(38, 230.0);
         set(39, 230.0);

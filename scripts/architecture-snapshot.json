@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-02T14:53:41.892Z",
-  "fileCount": 164,
+  "generatedAt": "2026-10-02T15:09:56.506Z",
+  "fileCount": 165,
   "deadExports": [
     {
       "symbol": "shadowReferencesFiles",
@@ -74,7 +74,7 @@
     "src/engine/worlds/BodyBuilders.ts": 1,
     "src/engine/worlds/InnerGalaxySystem.ts": 1,
     "src/physics/nbody.ts": 3,
-    "src/physics/physicsEngine.ts": 9,
+    "src/physics/physicsEngine.ts": 10,
     "src/physics/sessionDriver.ts": 4,
     "src/physics/simTwin.ts": 2,
     "src/platform/audio.ts": 4,
@@ -191,6 +191,7 @@
     "scripts/gauntlets/round94-the-flip-gauntlet.ts → scripts/gauntlets/engineSource.ts",
     "scripts/gauntlets/round95-steady-sky-gauntlet.ts → scripts/gauntlets/engineSource.ts",
     "scripts/gauntlets/round95-steady-sky-gauntlet.ts → scripts/gauntlets/stateSource.ts",
+    "scripts/gauntlets/round98-physics-conformance-gauntlet.ts → src/physics/physicsEngine.ts",
     "scripts/probes/round95-physics-probe.ts → src/physics/sessionDriver.ts",
     "scripts/probes/round95-physics-probe.ts → src/realities/solPrime/index.ts",
     "server/index.ts → server/realityDaemon.ts",
@@ -680,6 +681,7 @@
     "scripts/gauntlets/round93-real-moons-gauntlet.ts": 96,
     "scripts/gauntlets/round94-the-flip-gauntlet.ts": 125,
     "scripts/gauntlets/round95-steady-sky-gauntlet.ts": 192,
+    "scripts/gauntlets/round98-physics-conformance-gauntlet.ts": 229,
     "scripts/gauntlets/stateSource.ts": 26,
     "scripts/probes/round63-void-probe.ts": 280,
     "scripts/probes/round92-live-check.ts": 132,

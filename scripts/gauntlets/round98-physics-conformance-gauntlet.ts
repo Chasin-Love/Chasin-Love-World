@@ -75,7 +75,10 @@ if (!CPP_TABLE) {
 }
 const CPP_ROWS = new Map<string, { ecc: number; density: number; albedo: number }>();
 for (const line of CPP_TABLE[1].split('\n')) {
-  const m = /\{\"([a-z]+)\",\s*\{([\d.eE+-]+),\s*([\d.eE+-]+),\s*([\d.eE+-]+)\}\}/.exec(line);
+  /* R98 — the row gained a fourth value (tiltDeg). The parse takes the first
+     three positionally and tolerates a trailing one, so this gauntlet does not
+     itself become the thing that breaks when the struct changes shape. */
+  const m = /\{\"([a-z]+)\",\s*\{([\d.eE+-]+),\s*([\d.eE+-]+),\s*([\d.eE+-]+)(?:,\s*([\d.eE+-]+))?\s*\}\}/.exec(line);
   if (m) CPP_ROWS.set(m[1], { ecc: +m[2], density: +m[3], albedo: +m[4] });
 }
 check('R98: the C++ profile table parses (same ids as the law table)',
@@ -134,21 +137,31 @@ if (cppHasTilt) {
 check('R98: the unknown-body default profile agrees across tiers (0.05 / 3.5 / 0.3)',
   /eccentricity:\s*0\.05,\s*density:\s*3\.5,\s*albedo:\s*0\.3/.test(
     readFileSync(`${ROOT}/src/physics/physicsEngine.ts`, 'utf8')) &&
-  /static const BodyProfile DEFAULT\{0\.05,\s*3\.5,\s*0\.3\}/.test(CPP),
+  /static const BodyProfile DEFAULT\{0\.05,\s*3\.5,\s*0\.3/.test(CPP),
   'the TS fallback literal and the C++ DEFAULT struct must be the same three numbers');
 
 /* The unknown-body TILT default is the subtler half. TS falls back to a
  * SEEDED value (`8 + tiltSeed * 55`, or 7.25 for a star) so two realities
  * minted on the same day are identical but two minted on different days are
- * not — obliquity carries per-world variety. The C++ side has no seed and no
- * such expression, so it can only ever emit one constant. Recorded as a
- * known divergence rather than silently tolerated: the two tiers agree on
- * every NAMED body (pinned above) and disagree only on unnamed ones. */
-check('R98: (recorded) the TS unknown-body tilt is a SEEDED value, the C++ has no such expression',
+ * not — obliquity carries per-world variety. The C API receives only the id
+ * string and carries no seed, so its fallback can only be the fixed 23.44.
+ *
+ * This is a RECORDED DIVERGENCE, not a defect to close: it affects only
+ * bodies with no law-table row, and closing it would mean inventing a seed
+ * derivation inside a C API that has no seed to derive from. The pin asserts
+ * the two facts that make it a recorded divergence rather than a silent one —
+ * TS still derives, C++ still uses a constant. Note it deliberately does NOT
+ * grep for the word "tiltSeed" in the C++: the source comments name the
+ * divergence in prose, and a grep would fail on its own documentation. */
+const cppDefaultTiltConstant = /static const BodyProfile DEFAULT\{0\.05,\s*3\.5,\s*0\.3,\s*([\d.eE+-]+)\}/.exec(CPP);
+check('R98: (recorded) the unknown-body tilt is seeded in TS and a constant in C++ — a known, named gap',
   /profile\.tiltDeg \?\? \(body\.kind === 'star' \? 7\.25 : 8 \+ tiltSeed \* 55\)/.test(
     readFileSync(`${ROOT}/src/physics/physicsEngine.ts`, 'utf8')) &&
-  !/tiltSeed/.test(CPP),
+  cppDefaultTiltConstant !== null,
   'if either side changes, re-read this pin — it describes a real divergence, not a preference');
+check('R98: the C++ unknown-body tilt is Earth\'s default, not a body-derived value',
+  cppDefaultTiltConstant?.[1] === '23.44',
+  `C++ default tilt reads ${cppDefaultTiltConstant?.[1] ?? 'nothing'}; the TS seeded range is 8..63`);
 
 /* ------------------------------------------------------------------ *
  * 2. THE FIELD CONTRACT IS HONEST
