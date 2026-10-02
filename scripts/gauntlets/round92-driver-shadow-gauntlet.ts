@@ -74,8 +74,11 @@ const pkgSrc = read('../../package.json');
   check('R92: the seam consumes the readback inside updateBodies only (R95: crossfaded, star-led)', seam, 'driver positions escape the seam');
 
   /* R94 reconciliation: the inner-system seam is the second consumer —
-     the import + the home seam + the inner seam. */
-  const singleConsumer = (engineSrc.match(/driverReadback/g) || []).length === 3;
+     the import + the home seam + the inner seam. R97 reconciliation: the
+     inner seam moved whole into the inner-galaxy subsystem and each module
+     imports the verb once, so the union carries exactly four occurrences —
+     still exactly TWO consumption seams. */
+  const singleConsumer = (engineSrc.match(/driverReadback/g) || []).length === 4;
   check('R92: driverReadback is consumed only through seams (home + inner)', singleConsumer, 'an unaccounted consumer');
 
   /* R95 reconciliation: the clockwork anchor (cache → solve) is computed
@@ -84,7 +87,15 @@ const pkgSrc = read('../../package.json');
     && /const pos = calculateKeplerPosition\(o\.a, phys\.eccentricity, o\.phase, o\.incl, this\.simDays, o\.speed \|\| 0\.01, o\.node \?\? 0, o\.argP \?\? 0\);/.test(engineSrc);
   check('R92: a stale readback eases back to the Kepler solve (the freshness law, crossfaded)', fallback, 'no clockwork fallback in the seam');
 
-  const noDirectWrites = !/driverReadback\([\s\S]*?\.position\.set/.test(engineSrc.replace(/const drvPos[\s\S]*?b\.group\.position\.set\(px, py, pz\);/, ''));
+  /* R97 reconciliation: in the monolith the lazy home-seam strip accidentally
+     swallowed the inner seam too (it sat earlier in the file); split, BOTH
+     legitimate seams are stripped explicitly before the negative scan —
+     the invariant (no driver position write outside the two seams) is unchanged. */
+  const noDirectWrites = !/driverReadback\([\s\S]*?\.position\.set/.test(
+    engineSrc
+      .replace(/const drvPos[\s\S]*?b\.group\.position\.set\(px, py, pz\);/, '')
+      .replace(/const drvPos = this\.universeDriverOn && driverState\.scopeId === scopeId[\s\S]*?sys\.belt\.position\.copy\(sys\.starMesh\.position\);/, ''),
+  );
   check('R92: no driver position write exists outside the single updateBodies write', noDirectWrites, 'a second writer would fight the canon');
 }
 
