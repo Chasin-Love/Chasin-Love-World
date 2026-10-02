@@ -13,7 +13,8 @@
  * ever touching the frame (a pre-bloom restore disc was tried and washed the
  * whole flow out at close focus). Checked without a GPU.
  */
-import { readFileSync } from 'node:fs';
+import { engineSource } from './engineSource';
+import{ readFileSync } from 'node:fs';
 import { criticalImpactParam } from '../../src/engine/blackholeRaymarch';
 
 let failures = 0;
@@ -23,7 +24,7 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const marchSrc = readFileSync(new URL('../../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
-const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const engSrc = engineSource();
 const shSrc = readFileSync(new URL('../../src/engine/shaders.ts', import.meta.url), 'utf8');
 const pkgSrc = readFileSync(new URL('../../package.json', import.meta.url), 'utf8');
 

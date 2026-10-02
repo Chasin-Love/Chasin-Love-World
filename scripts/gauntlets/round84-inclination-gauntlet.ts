@@ -14,7 +14,8 @@
  *
  * Pure-source mirrors of the round's invariants. Checked without a GPU.
  */
-import { readFileSync } from 'node:fs';
+import { engineSource } from './engineSource';
+import{ readFileSync } from 'node:fs';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown) {
@@ -25,7 +26,7 @@ function check(name: string, ok: boolean, detail: unknown) {
 const physSrc = readFileSync(new URL('../../src/physics/physicsEngine.ts', import.meta.url), 'utf8');
 const domainSrc = readFileSync(new URL('../../src/domain/universe.ts', import.meta.url), 'utf8');
 const nbodySrc = readFileSync(new URL('../../src/physics/nbody.ts', import.meta.url), 'utf8');
-const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const engSrc = engineSource();
 const bridgeSrc = readFileSync(new URL('../../src/platform/native/cpp_bridge.ts', import.meta.url), 'utf8');
 const cppSrc = readFileSync(new URL('../../src/platform/native/cosmos_engine.cpp', import.meta.url), 'utf8');
 const hppSrc = readFileSync(new URL('../../src/platform/native/cosmos_engine.hpp', import.meta.url), 'utf8');

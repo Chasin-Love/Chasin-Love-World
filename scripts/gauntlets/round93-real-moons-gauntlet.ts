@@ -19,7 +19,8 @@
  *  - A moon being born must NOT reconfigure the session (the roster
  *    signature counts bodies only).
  */
-import { readFileSync } from 'node:fs';
+import { engineSource } from './engineSource';
+import{ readFileSync } from 'node:fs';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown) {
@@ -28,7 +29,7 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-const engineSrc = read('../../src/engine/engine.ts');
+const engineSrc = engineSource();
 const driverSrc = read('../../src/physics/sessionDriver.ts');
 const pkgSrc = read('../../package.json');
 

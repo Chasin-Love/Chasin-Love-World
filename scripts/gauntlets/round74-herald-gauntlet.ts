@@ -9,7 +9,8 @@
  *
  * Pure-source mirrors of the round's invariants. Checked without a GPU.
  */
-import { readFileSync } from 'node:fs';
+import { engineSource } from './engineSource';
+import{ readFileSync } from 'node:fs';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown) {
@@ -17,7 +18,7 @@ function check(name: string, ok: boolean, detail: unknown) {
   if (!ok) failures++;
 }
 
-const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const engSrc = engineSource();
 const shellSrc = readFileSync(new URL('../../src/ui/hud/HoloCard.tsx', import.meta.url), 'utf8');
 const cssSrc = readFileSync(new URL('../../src/index.css', import.meta.url), 'utf8');
 const appSrc = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');

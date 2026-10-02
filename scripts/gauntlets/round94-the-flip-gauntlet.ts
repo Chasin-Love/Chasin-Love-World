@@ -22,7 +22,8 @@
  *  - UI HONESTY: the Physics Laws panel shows the driving badge and rests
  *    the Living Gravity toggle while the session owns the sky.
  */
-import { readFileSync } from 'node:fs';
+import { engineSource } from './engineSource';
+import{ readFileSync } from 'node:fs';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown) {
@@ -31,7 +32,7 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-const engineSrc = read('../../src/engine/engine.ts');
+const engineSrc = engineSource();
 const driverSrc = read('../../src/physics/sessionDriver.ts');
 const appSrc = read('../../src/App.tsx');
 const cardSrc = read('../../src/ui/console/SimulatorTwinCard.tsx');

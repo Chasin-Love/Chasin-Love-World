@@ -11,7 +11,8 @@
  *
  * Pure-source mirrors of the round's invariants. Checked without a GPU.
  */
-import { readFileSync } from 'node:fs';
+import { engineSource } from './engineSource';
+import{ readFileSync } from 'node:fs';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown) {
@@ -21,7 +22,7 @@ function check(name: string, ok: boolean, detail: unknown) {
 
 const domeSrc = readFileSync(new URL('../../src/engine/surface/photoDome.ts', import.meta.url), 'utf8');
 const surfaceSrc = readFileSync(new URL('../../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
-const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const engSrc = engineSource();
 const registrySrc = readFileSync(new URL('../../src/platform/sky/skyRegistry.ts', import.meta.url), 'utf8');
 const storeSrc = readFileSync(new URL('../../server/skyStore.ts', import.meta.url), 'utf8');
 const rustSrc = readFileSync(new URL('../../src-tauri/src/sky.rs', import.meta.url), 'utf8');

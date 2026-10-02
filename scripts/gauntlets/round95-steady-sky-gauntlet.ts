@@ -30,7 +30,8 @@
  *  - THE LOCKSTEP SOFTENING: 1e12 m² (ε = 1000 km) in the C++ core and
  *    the TS twin alike.
  */
-import { readFileSync } from 'node:fs';
+import { engineSource } from './engineSource';
+import{ readFileSync } from 'node:fs';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown) {
@@ -39,7 +40,7 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-const engineSrc = read('../../src/engine/engine.ts');
+const engineSrc = engineSource();
 const driverSrc = read('../../src/physics/sessionDriver.ts');
 const cppSrc = read('../../src/platform/native/cosmos_engine.cpp');
 const bridgeSrc = read('../../src/platform/native/cpp_bridge.ts');

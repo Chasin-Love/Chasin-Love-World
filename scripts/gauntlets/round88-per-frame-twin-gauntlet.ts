@@ -16,7 +16,8 @@
  *  - Session discipline: the card's Verify Twin rests while the per-frame
  *    twin owns the shared native session.
  */
-import { readFileSync } from 'node:fs';
+import { engineSource } from './engineSource';
+import{ readFileSync } from 'node:fs';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown) {
@@ -25,7 +26,7 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const twinSrc = readFileSync(new URL('../../src/physics/simTwin.ts', import.meta.url), 'utf8');
-const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+const engSrc = engineSource();
 const cardSrc = readFileSync(new URL('../../src/ui/console/SimulatorTwinCard.tsx', import.meta.url), 'utf8');
 const pkgSrc = readFileSync(new URL('../../package.json', import.meta.url), 'utf8');
 

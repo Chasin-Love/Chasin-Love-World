@@ -21,7 +21,8 @@
  *    honest ownership (Verify Twin rests while the driver owns).
  *  - THE MEMORY OUTLIVES THE ENGINE: dispose saves one last time.
  */
-import { readFileSync } from 'node:fs';
+import { engineSource } from './engineSource';
+import{ readFileSync } from 'node:fs';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown) {
@@ -30,7 +31,7 @@ function check(name: string, ok: boolean, detail: unknown) {
 }
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-const engineSrc = read('../../src/engine/engine.ts');
+const engineSrc = engineSource();
 const domainSrc = read('../../src/domain/universe.ts');
 const actionsSrc = read('../../src/state/actions.ts');
 const appSrc = read('../../src/App.tsx');

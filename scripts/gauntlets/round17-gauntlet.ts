@@ -4,7 +4,8 @@
    sections retired with it, and new checks pin the single-renderer rebuild:
    his background on the escaped bent rays, the seam law, the silhouette. */
 
-import { readFileSync, existsSync } from 'fs';
+import { engineSource } from './engineSource';
+import{ readFileSync, existsSync } from 'fs';
 import { blackbodyColorOf } from '../../src/engine/blackholeRaymarch';
 
 let failures = 0;
@@ -124,7 +125,7 @@ function inv(d: [number, number, number]): [number, number] {
 /* ==== 4. ROUND 20/53 — the presentation fixes + the reference camera ==== */
 {
   const rmSrc = readFileSync(new URL('../../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
-  const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+  const engSrc = engineSource();
   const capSrc = readFileSync(new URL('../../src/engine/capability.ts', import.meta.url), 'utf8');
   const bpSrc = readFileSync(new URL('../../src/engine/blackholeParams.ts', import.meta.url), 'utf8');
 
@@ -218,7 +219,7 @@ function inv(d: [number, number, number]): [number, number] {
 {
   const shSrc = readFileSync(new URL('../../src/engine/shaders.ts', import.meta.url), 'utf8');
   const ssSrc = readFileSync(new URL('../../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
-  const enSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+  const enSrc = engineSource();
   const mgrSrc = readFileSync(new URL('../../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
 
   /* The sky's discrete stars are point clouds. Until R52 their materials
@@ -256,7 +257,7 @@ function inv(d: [number, number, number]): [number, number] {
 
 /* ==== ROUND 62 — system objects never bend ==== */
 {
-  const enSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+  const enSrc = engineSource();
 
   /* THE RIGIDITY LAW — the belt-tear fix: point clouds default to the plain
      vertex shader (no lens defines, no bend) and only the cosmic sky clouds
@@ -294,7 +295,7 @@ function inv(d: [number, number, number]): [number, number] {
 
 /* ==== 6. ROUND 53 — the tier that STAYS: policy fixes + the user's switch ==== */
 {
-  const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+  const engSrc = engineSource();
   const capSrc = readFileSync(new URL('../../src/engine/capability.ts', import.meta.url), 'utf8');
   const btSrc = readFileSync(new URL('../../src/engine/blackholeTier.ts', import.meta.url), 'utf8');
   const skSrc = readFileSync(new URL('../../src/platform/storageKeys.ts', import.meta.url), 'utf8');
@@ -346,7 +347,7 @@ function inv(d: [number, number, number]): [number, number] {
 /* ==== 7. ROUND 54 — the single-renderer rebuild ==== */
 {
   const rmSrc = readFileSync(new URL('../../src/engine/blackholeRaymarch.ts', import.meta.url), 'utf8');
-  const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+  const engSrc = engineSource();
 
   /* THE OLD VERSION IS GONE — one renderer, no painted fakes anywhere. */
   const oldGone = !existsSync(new URL('../../src/engine/blackhole.ts', import.meta.url));
@@ -454,7 +455,7 @@ function inv(d: [number, number, number]): [number, number] {
 
 /* ==== ROUND 61 — the whole universe bends (lensing is not Sol-Prime-only) ==== */
 {
-  const engSrc = readFileSync(new URL('../../src/engine/engine.ts', import.meta.url), 'utf8');
+  const engSrc = engineSource();
 
   /* ONE LENS LAW — every lens (home roster and other galaxies alike) is
      written through the single slot writer: same asin(R/d) rim, same halo
