@@ -807,19 +807,23 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    dead-export sweep, optional React 19 / Vite 7 evaluation, optional
    touch-first HUD pass. (The architecture re-snapshot is DONE at R96; R97
    EXECUTED the engine decomposition and the actions domaining — §5/§8 carry it.)
-7. **Watch item (small):** the smoke cold-boot flake has THREE sightings now
+7. **Watch item (small):** the smoke cold-boot flake has FIVE sightings now
    (R84 diagnosis, R96 reproduction, R97 close-out — `page.evaluate` context
-   destroyed mid-boot; green on every immediate re-run and on the full
-   re-chain). R97's sighting is worth naming precisely: the run that flaked
-   captured a near-black frame (shadow 0.000 vs 0.290, bright 0.000 vs 0.086)
-   and logged ~34 refused connections — Vite's HMR socket on **:24678** plus
-   page resources — i.e. the app booted before its module/HMR server finished
-   binding, not a rendering regression. Standalone re-run: histL1 0.0716 /
-   shadow 0.289 / bright 0.086, byte-for-byte the R96 figures. Rule of thumb:
-   **a red smoke run whose errors are ALL `ERR_CONNECTION_REFUSED` and whose
-   frame is uniformly dark is the flake, not the code** — re-run standalone
-   before investigating. If it recurs further, a boot-retry guard in
-   `scripts/smoke.ts` is its own tiny round.
+   destroyed mid-boot — and R99's post-close audit, which went red TWICE
+   back-to-back before a green, the first time an immediate re-run did not
+   clear it). Signature in every sighting: errors ALL
+   `ERR_CONNECTION_REFUSED` (Vite's HMR socket on **:24678** plus page
+   resources) and a uniformly dark frame (shadow 0.000 vs 0.290, bright
+   0.000 vs 0.086) — the app booted before its dev/HMR server finished
+   binding, not a rendering regression; the healthy re-run reproduces the
+   pinned frame (R99: histL1 0.0738, shadow 0.289, zero console errors) with
+   code byte-identical between red and green runs. Rule of thumb: **a red
+   smoke run whose errors are ALL `ERR_CONNECTION_REFUSED` and whose frame
+   is uniformly dark is the flake, not the code** — re-run standalone before
+   investigating, and re-run TWICE if the first re-run shares the signature
+   (a failed boot can leave its own port debris behind). It has recurred
+   enough: the boot-retry guard in `scripts/smoke.ts` is now the recommended
+   tiny round.
 
 ---
 
