@@ -380,6 +380,29 @@ class CosmosBridge {
     return this.keplerBatchTS(input);
   }
 
+  /**
+   * The 41-field per-body physics port, one body per PHYSICS_FIELD_COUNT slot.
+   *
+   * R98 — READ THIS BEFORE CALLING IT FROM PRODUCTION.
+   *
+   * This is the ONLY consumer of the C++ BODY PROFILE TABLE (the per-body
+   * eccentricity / density / albedo / axial-tilt law), and therefore the only
+   * path that can observe that table's numbers. Two consequences:
+   *
+   *  1. THE SHIPPED WASM ARTIFACT IS CURRENTLY STALE. public/wasm/cosmos_engine.wasm
+   *     predates the R98 tilt/goliath fix — it still carries goliath's old 0.0489
+   *     eccentricity and has no tiltDeg column at all. It is harmless today ONLY
+   *     because nothing in production calls this method; the Kepler path takes its
+   *     eccentricity from TypeScript and passes it in as an argument.
+   *  2. The desktop tier compiles cosmos_engine.cpp directly and is already
+   *     correct, so this same call returns DIFFERENT numbers on web vs desktop
+   *     until the artifact is rebuilt with `npm run wasm:build` (needs emsdk).
+   *
+   * So: rebuild the artifact FIRST, then wire this into production — not the
+   * other way round. round98-physics-conformance-gauntlet.ts enforces exactly
+   * that ordering: while this method has no production caller the stale artifact
+   * is a WARN, and the moment one appears the same fact becomes a hard FAIL.
+   */
   async physicsBatch(input: PhysicsBatchInput): Promise<Float64Array> {
     await this.init();
     const n = input.ids.length;

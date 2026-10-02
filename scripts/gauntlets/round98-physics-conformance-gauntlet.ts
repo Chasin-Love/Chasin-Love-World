@@ -27,12 +27,26 @@
  * which halves it actually ran. The static half (1, 2) ALWAYS runs — it needs
  * no artifact and catches exactly the drift this round exists to name.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { calculatePhysics } from '../../src/physics/physicsEngine';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+
+/** Every .ts/.tsx source file under a directory — used to prove a negative
+ *  ("nothing in production calls X") by reading the whole tree, not a guess. */
+function walk(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...walk(full));
+    else if (/\.tsx?$/.test(entry)) out.push(full);
+  }
+  return out;
+}
+
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  ${ok ? '' : detail}`);
@@ -204,6 +218,59 @@ check('R98: the C++ core writes the same number of slots it declares',
  * 3. THE LIVE ARTIFACT CONFORMS  (runs only when an artifact exists)
  * ------------------------------------------------------------------ */
 
+/* WHY THE STALE ARTIFACT IS NOT CURRENTLY A PHYSICS BUG — proved, not assumed.
+ *
+ * The stale binary's drifted numbers live in the C++ PROFILE TABLE, and that
+ * table has exactly one consumer: cosmos_physics_batch (the sole bodyProfileOf
+ * call site in the file). If nothing in production calls physicsBatch, the
+ * drift is dormant — the web tier and the C++ source agree on everything a
+ * user can actually see.
+ *
+ * Pin it. If someone wires physicsBatch into production this goes red the
+ * same day, and the rebuild becomes mandatory before those numbers can reach
+ * anyone. Both halves are counted, not assumed: the C++ side, and every call
+ * site of the TS wrapper across src/. */
+const profileCallSites = [...CPP.matchAll(/bodyProfileOf\(/g)].length;
+check('R98: the C++ profile table still has exactly ONE consumer (cosmos_physics_batch)',
+  profileCallSites === 2 /* the definition, plus that one call */,
+  `bodyProfileOf appears ${profileCallSites} times — a new consumer can now reach the drifted ` +
+  'numbers. Rebuild the artifact (`npm run wasm:build`) before shipping that path');
+
+/* The scanner must see INDIRECT callers too. CppNativeEngineCard does not call
+ * `.physicsBatch(` — it presses a button that calls `verifyParity()`, which
+ * calls `this.physicsBatch(...)` inside the bridge. Scanning for the literal
+ * call syntax alone finds nothing, which would make the exemption list below
+ * meaningless and the check vacuous. So track a reachable closure: a file that
+ * calls verifyParity() reaches physicsBatch, and the allowlist blesses THAT. */
+const physicsBatchCallers: string[] = [];
+for (const f of walk(`${ROOT}/src`)) {
+  const rel = f.slice(ROOT.length).replace(/^[\\/]+/, '').replace(/\\/g, '/').replace(/^src\//, '');
+  /* The bridge's own file is where the method is DECLARED and where
+     verifyParity calls it internally — neither is a production consumer. */
+  if (rel === 'platform/native/cpp_bridge.ts') continue;
+  const src = readFileSync(f, 'utf8');
+  if (/\.physicsBatch\(/.test(src) || /\.verifyParity\(/.test(src)) physicsBatchCallers.push(rel);
+}
+/* Paths here must match the NORMALISED form above (no leading slash, forward
+ * slashes) or the allowlist silently never matches and the check degrades to a
+ * vacuous `every()` over an empty array — which is exactly the kind of green
+ * that means nothing. */
+const ALLOWED_CALLERS = ['ui/console/CppNativeEngineCard.tsx']; /* the verifyParity button */
+check('R98: no PRODUCTION path calls physicsBatch (only the verifyParity button does)',
+  physicsBatchCallers.every((c) => ALLOWED_CALLERS.includes(c)),
+  `physicsBatch is reached from ${physicsBatchCallers.join(', ') || 'nowhere'} — a production caller ` +
+  'can now reach the drifted profile table. Rebuild the artifact (`npm run wasm:build`) FIRST.');
+
+/* The allowlist is only meaningful if the scanner actually finds the caller it
+ * blesses. If a future rename makes the entry unmatched, `every()` over the
+ * remaining callers would still pass and the exemption would silently stop
+ * applying — or worse, start exempting nothing while looking green. Assert the
+ * scanner is alive: it must SEE the verifyParity button. */
+check('R98: the caller scanner actually finds the verifyParity button (the scan is not vacuous)',
+  physicsBatchCallers.length > 0 && physicsBatchCallers.every((c) => ALLOWED_CALLERS.includes(c)),
+  `the scanner found ${physicsBatchCallers.length} caller(s) — if this drops to 0 the scan is broken, ` +
+  'not clean. Expected to see ui/console/CppNativeEngineCard.tsx.');
+
 const artifact = `${ROOT}/public/wasm/cosmos_engine.js`;
 if (!existsSync(artifact)) {
   console.log('SKIP  R98: no WASM artifact on this machine — the numerical half needs emsdk (npm run wasm:build).');
@@ -217,9 +284,57 @@ if (!existsSync(artifact)) {
     js.includes('cosmos_physics_batch'), 'cosmos_physics_batch missing from the built module');
   check('R98: the artifact exposes the Kepler batch the production path uses',
     js.includes('cosmos_kepler_batch'), 'cosmos_kepler_batch missing from the built module');
-  check('R98: the artifact was built from a source that carries the tilt fix',
-    cppHasTilt || !tiltAssignedFromKind,
-    'the committed artifact predates the C++ tilt fix — rebuild with npm run wasm:build for the numerical half to be meaningful');
+
+  /* STALENESS, DETECTED BY CONTENT. The check this replaces read the SOURCE,
+   * which is fixed — so it passed while the SHIPPED binary still carried the
+   * pre-fix numbers. That is the failure mode this round exists to end: a
+   * green that means nothing because it looked at the wrong artifact. mtime
+   * cannot answer it either, since a fresh clone gives every file the same
+   * checkout time.
+   *
+   * So read the BINARY and look for the doubles themselves. A little-endian
+   * f64 is an exact 8-byte pattern and .wasm data segments store these
+   * verbatim, so a hit is a fact about the shipped physics, not a heuristic. */
+  const wasmPath = `${ROOT}/public/wasm/cosmos_engine.wasm`;
+  if (existsSync(wasmPath)) {
+    const wasm = readFileSync(wasmPath);
+    const f64 = (d: number) => {
+      const b = Buffer.alloc(8);
+      b.writeDoubleLE(d);
+      return b;
+    };
+    const hasOld = wasm.includes(f64(0.0489));
+    const hasNew = wasm.includes(f64(0.0453));
+    const stale = hasOld && !hasNew;
+
+    /* SEVERITY FOLLOWS REACHABILITY, and that is the whole point. A stale
+     * artifact whose drifted numbers no production path can observe is a
+     * build-hygiene debt: loud, recorded, but not a physics bug a user can
+     * hit. The moment physicsBatch gains a production caller the SAME fact
+     * becomes a correctness bug, and this turns into a hard failure that
+     * blocks the merge until the artifact is rebuilt.
+     *
+     * So the flag is not a mood — it is the result of the two reachability
+     * proofs above. A stale artifact passes only while nothing can reach it. */
+    const dormant = profileCallSites === 2 &&
+      physicsBatchCallers.every((c) => ALLOWED_CALLERS.includes(c));
+
+    if (stale && dormant) {
+      console.log('WARN  R98: the shipped WASM artifact is STALE, but its drifted numbers are DORMANT');
+      console.log('      public/wasm/cosmos_engine.wasm still carries the pre-fix goliath eccentricity 0.0489');
+      console.log('      instead of 0.0453. No production path calls physicsBatch — the only consumer of the');
+      console.log('      C++ profile table — so nothing a user can see is affected. The KEPLER path takes its');
+      console.log('      eccentricity from TypeScript, not from the table.');
+      console.log('      Fix before it matters: `npm run wasm:build` (needs emsdk). This WARN becomes a FAIL');
+      console.log('      the moment a production caller appears.');
+    } else {
+      check('R98: the shipped WASM artifact is NOT stale (it carries the fixed goliath eccentricity)',
+        !stale,
+        'the committed public/wasm/cosmos_engine.wasm still contains the PRE-FIX goliath ' +
+        'eccentricity 0.0489 and not the fixed 0.0453. Rebuild with `npm run wasm:build` ' +
+        '(needs emsdk) — and note it is now REACHABLE, so this is a live physics bug.');
+    }
+  }
 }
 
 console.log(failures === 0
