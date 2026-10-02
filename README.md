@@ -8,7 +8,8 @@
 > after a disaster. No other document is required. If only this file survives, the universe
 > survives.
 > **Status:** Authoritative Master Document (Single Source of Truth). All numbers below were
-> verified against the source code on 2026-09-26.
+> verified against the source code on 2026-10-03 (post-R100; the R96–R100 chain is merged
+> into `main`).
 
 ---
 
@@ -26,7 +27,7 @@
 9. [The Vault & Eventide Filesystem (EFS)](#9-the-vault--eventide-filesystem-efs)
 10. [Engine Mechanics & Physics Reference](#10-engine-mechanics--physics-reference)
 11. [Server & Desktop Contract](#11-server--desktop-contract)
-12. [⭐ PHASE-BY-PHASE REBUILD PROTOCOL (Phase 0–11)](#12--phase-by-phase-rebuild-protocol-phase-011)
+12. [⭐ PHASE-BY-PHASE REBUILD PROTOCOL (Phase 0–12)](#12--phase-by-phase-rebuild-protocol-phase-012)
 13. [Verification, Acceptance & Glossary](#13-verification-acceptance--glossary)
 14. [APPENDIX A — THE COSMIC GRAPHICS CODE (VERBATIM)](#appendix-a--the-cosmic-graphics-code-verbatim)
 
@@ -243,8 +244,15 @@ binaries ship the genuine native core).
     │   ├── audio.ts, performance.ts, simClock.ts, storageKeys.ts
     │
     ├── engine/                 # Three.js cosmos (NO React inside — see §4.1)
-    │   ├── engine.ts           # 6,667 ln orchestrator: scene, loop, picking, LOD, portals
-    │   ├── blackhole.ts        # composite Gargantua hole + spacetime funnel
+    │   ├── engine.ts           # ~2.8k ln SHELL (R97 divided the 6.9k monolith): boot,
+    │   │                       #   tickFrame, updateBodies the ONE write seam, dispose —
+    │   │                       #   over six verbatim-extracted subsystems:
+    │   ├── sky/SkyFxSystem.ts          # meteors, Cosmic Echo, aurora, surface dressing
+    │   ├── blackhole/BlackHoleSystem.ts# tier attach/release, 55 ms breaker, adaptive res
+    │   ├── kamui/KamuiPortalSystem.ts  # the ONE portal machine (vortex + hold + stage-warp)
+    │   ├── worlds/InnerGalaxySystem.ts # the galaxy-dive isolated system + its life
+    │   ├── worlds/BodyBuilders.ts      # anchor/bodies/belt/moons/plates, roster sync
+    │   ├── stages/LevelStageSystem.ts  # multiverse builder + cosmic stages + arbiter
     │   ├── blackholeRaymarch.ts# geodesic raymarched tier (dgreenheck port, §7.3)
     │   ├── blackholeParams.ts  # Black Hole Studio store (§7.6)
     │   ├── cameraRig.ts        # logarithmic camera controller, drag inertia
@@ -254,15 +262,17 @@ binaries ship the genuine native core).
     │   └── surface/            # Universe Surface: dome 460,000u, star shells, lens bending
     │
     ├── physics/
-    │   ├── physicsEngine.ts    # CONSTANTS, BODY_PROFILES, 41-field solve, Kepler solver
-    │   └── nbody.ts            # LivingGravityField — Gauss planetary equations, THE KEEPER
+    │   ├── physicsEngine.ts    # CONSTANTS, BODY_PROFILES, 41-field solve, Kepler solver,
+    │   │                       #   installNativePhysics (R99 — the native install decoder)
+    │   ├── nbody.ts            # LivingGravityField — Gauss planetary equations, THE KEEPER
+    │   ├── sessionDriver.ts    # R91–R95 THE SESSION — the real N-body driver of the sky
+    │   └── simTwin.ts          # the read-only twin lab (R88)
     │
     ├── realities/              # path-locked content packs (import.meta.glob './*/index.ts')
     │   ├── index.ts            # registry, buildRealityConfig enforcement, createNewRealityConfig
     │   ├── types.ts, hierarchyTypes.ts, hierarchyStages.ts (11 stages + dials)
     │   ├── clusterGenerator.ts, galaxyGenerator.ts
     │   ├── solPrime/           # CANONICAL home reality (literal seed, §6.1) + surface.ts + sky.json
-    │   ├── auroraTest/ chasinLove/ testOne/ testWorld/   # user-created reality snapshots
     │   └── bin/                # Quantum Bin (deleted realities + orphan adoption) + README.md
     │
     ├── vault/                  # encrypted vault domain
@@ -289,7 +299,7 @@ binaries ship the genuine native core).
     └── types/                  # monaco-esm.d.ts only
 ```
 
-**File counts (tracked, R96):** `src/` 121 · `server/` 7 · `src-tauri/` 16 · `scripts/` 39 · `docs/` 67 · `public/` 22.
+**File counts (tracked, R100):** `src/` 134 · `server/` 7 · `src-tauri/` 16 · `scripts/` 43 · `docs/` 71 · `public/` 22.
 
 ---
 
@@ -310,6 +320,17 @@ binaries ship the genuine native core).
    `scripts/tools/generate-architecture-diagram.ts` from the auditor snapshot).
 6. **Route strings and Tauri command names are a locked contract** between
    `server/routes/*.ts` ⇄ `src/platform/desktop/adapter.ts` ⇄ `src-tauri/src/lib.rs`.
+7. **A contract exists only if something can fail when it breaks** (R98). Every negative is
+   proven by MUTATION, never inspection; degradation is a VALUE (`CosmosStatus.degraded[]`,
+   `primeFailures`) that the smoke asserts on — never a shrug; and a shipped binary is not
+   its source: conformance is checked against the ARTIFACT's bytes, and the physics gauntlet
+   EXECUTES the shipped wasm against the TypeScript law (12 bodies, every field).
+8. **Negative environment claims get disk probes** (R99/R100). emsdk lives at
+   `~/Desktop/emsdk`, MSVC answers to vswhere — neither is on the PATH, and both were once
+   declared "missing" by a PATH-only probe while the disk held them. The shipped exe's true
+   dependencies are whatever `dumpbin -dependents` says they are — and it says ZERO
+   redistributable DLLs (the C++ runtime is welded in via `static_crt`; the remaining
+   api-ms-win-crt-* imports are the Universal CRT, built into Windows 10+ itself).
 
 ### 4.2 Locked paths (enforced by `scripts/audit-architecture.ts --check`, 9 groups)
 
@@ -991,6 +1012,12 @@ AU       = 1.495978707e11 m               g_earth = 9.80665    m/s²
   `cosmosBridge.keplerBatch`; the cache is trusted only if `|cache.simDays − simDays| < 0.25 day`,
   else the inline TS Kepler solver takes over. Skipped entirely when backend is `typescript`
   (the TS tier is reference/parity — the render loop uses its own math).
+- **The physics prime (R99 — THE WHEELS CONNECTED):** every roster change (`syncBodies`) also
+  hands the roster to `cosmosBridge.primePhysics` — the COMPILED core computes the 41-field
+  law and `installNativePhysics` overlays it onto the memo `calculatePhysics` serves. The
+  TypeScript reference stays the synchronous zero-fail path; the numbers are identical by
+  the round98 physics gauntlet, whose numerical half EXECUTES the shipped artifact against
+  the TS law (12 bodies, every field, rel tol 1e-6). A stale artifact is a hard gauntlet FAIL.
 - **Scene:** camera far 8,000,000; clear color `#04060c`; ACESFilmic tone mapping, sRGB output;
   composer = RenderPass → UnrealBloomPass(**strength 0.12, radius 0.15, threshold 0.90**) →
   OutputPass; shader precompile at boot; `webglcontextlost/restored` handling; shader failures
@@ -1072,11 +1099,13 @@ Tauri it `invoke`s the Rust commands. Route strings ↔ command names are locked
   `cosmos_physics_batch`, `cosmos_benchmark` (+ terrain), `store_state` / `store_payload` /
   loaders, `reality_*` CRUD + bin, `sky_*` Studio.
 - **`build.rs` — the C++ core compiles INTO the binary (no DLL loading, ever):** probes
-  `cl` / `g++` / `c++` / `clang++` on PATH; if found, the `cc` crate compiles
+  `cl` / `g++` / `c++` / `clang++` on PATH **and asks vswhere** (MSVC is famously not on
+  the PATH outside a developer prompt — R100); if found, the `cc` crate compiles
   `src/platform/native/cosmos_engine.cpp` (C++20, `/O2 /arch:AVX2` MSVC or
-  `-O3 -ffast-math -mavx2` GCC/Clang) and sets `cargo:rustc-cfg=cosmos_cpp`; else
-  `cosmos_stub` (zero-returning stubs reporting version `"stub"` — the JS bridge refuses to claim
-  native physics on a stub).
+  `-O3 -ffast-math -mavx2` GCC/Clang) with **`static_crt(true)`** — the C++ runtime is
+  welded INTO the exe (`dumpbin -dependents` reads ZERO redistributable DLLs; R100) — and
+  sets `cargo:rustc-cfg=cosmos_cpp`; else `cosmos_stub` (zero-returning stubs reporting
+  version `"stub"` — the JS bridge refuses to claim native physics on a stub).
 - No C++ toolchain on the machine? Run `scripts/tools/setup-windows-toolchain.ps1` once (installs
   VS Build Tools 2022 MSVC + Windows SDK + CMake + Rust MSVC target), then `npm run desktop:build`.
 
@@ -1097,13 +1126,20 @@ Tauri it `invoke`s the Rust commands. Route strings ↔ command names are locked
 - **Benchmark contract:** `benchmark(128, 100)` — 128 bodies, 100 RK4 gravity iterations
   (RK4 exists in the C++ core as the benchmark kernel; TS uses an equivalent burn);
   throughput = bodies² × iterations / seconds; a second short run times step latency.
-- The engine consumes `keplerBatch` only (every 2nd frame, §10.2); `physicsBatch` is exercised by
-  Verify Parity. UI: the engine card in the Core Console shows ACTIVE BACKEND / CORE VERSION /
-  throughput / latency + Verify Parity + Run RK4 Benchmark + quality tiers + build pipelines.
+- The engine consumes `keplerBatch` every 2nd frame (§10.2). **R99 — `physicsBatch` is WIRED
+  into production:** every roster change (`syncBodies`) hands the roster to
+  `cosmosBridge.primePhysics` (fire-and-forget); the compiled core computes the 41-field law
+  and `installNativePhysics` overlays it onto the memo `calculatePhysics` serves — the TS
+  reference remains the synchronous zero-fail path and keeps the two Einstein-only fields.
+  Values are identical by the round98 gauntlet, whose **numerical half executes the shipped
+  artifact** against the TS law. Every failed prime is counted on
+  `CosmosStatus.primeFailures` (smoke-asserted at zero). UI: the engine card in the Core
+  Console shows ACTIVE BACKEND / CORE VERSION / throughput / latency + Verify Parity + Run
+  RK4 Benchmark + quality tiers + build pipelines.
 
 ---
 
-## 12. ⭐ PHASE-BY-PHASE REBUILD PROTOCOL (PHASE 0–11)
+## 12. ⭐ PHASE-BY-PHASE REBUILD PROTOCOL (PHASE 0–12)
 
 > Build in this exact order. Each phase lists its goal, the steps, and ACCEPTANCE CRITERIA that
 > must pass before the next phase begins. Historical evidence for each phase lives in
@@ -1234,6 +1270,26 @@ typecheck + gauntlets + smoke; regenerate the architecture diagram.
 **Accept:** `npm run verify` green end-to-end; `audit:arch --check` exits 0.
 *(Historical: R52 verification layer.)*
 
+### Phase 12 — The Contract Era (R96–R100: one engine, three compilers, zero silent divergence)
+**Goal:** make drift impossible BY CONSTRUCTION, wire the wheels, and make the exe
+self-contained.
+Steps: regroup scripts (gauntlets/probes/tools) + rewrite the architecture record (R96);
+divide `engine.ts` into six verbatim-extracted subsystems over a union test-harness and
+domain the actions barrel (R97); build the two CONFORMANCE gauntlets — the physics law
+(the C++ port vs the TS law, 41 fields, value for value) and the backend contract (the Node
+daemon vs the Rust shell, 89 checks) — make degradation a named ledger
+(`CosmosStatus.degraded[]`), rebuild the wasm artifact, EXECUTE it against the TS law (the
+numerical half — it catches what no static check can), and wire `cosmos_physics_batch` into
+production through `primePhysics` → `installNativePhysics` (R98→R99). Find the REAL
+toolchains — emsdk at `~/Desktop/emsdk`, MSVC via vswhere (disk probes beat PATH probes) —
+and weld the C++ runtime into the exe (`cc static_crt`, verified with
+`dumpbin -dependents` → zero redistributable DLLs) (R100). End every round with its round
+document and a PROJECT-BRAIN §8/§9 refresh.
+**Accept:** `npm run verify` fully green — 21 gauntlets including the executed-artifact
+numerical half and the wiring pins; `dumpbin -dependents` reads ZERO redistributable
+imports; a stale artifact is a hard FAIL; the smoke asserts `primeFailures == 0`.
+*(Historical: ROUND-96 → ROUND-100.)*
+
 ---
 
 ## 13. VERIFICATION, ACCEPTANCE & GLOSSARY
@@ -1243,8 +1299,10 @@ typecheck + gauntlets + smoke; regenerate the architecture diagram.
 ```
 npm run typecheck   # tsc --noEmit — the type law
 npm run audit:arch  # structural drift vs scripts/architecture-snapshot.json (--check exits 1)
-npm run smoke       # headless playwright vs reference frame
-npm run verify      # typecheck + round16-gauntlet + round17-gauntlet + smoke  ← run at every gate
+npm run smoke       # headless playwright vs reference frame (+ tier & primeFailures assertions)
+npm run verify      # typecheck + ALL 21 gauntlets (round16 … round98-backend-conformance,
+                    #   incl. the physics conformance gate that EXECUTES the shipped artifact)
+                    #   + smoke + prod:smoke  ← run at every gate
 ```
 
 ### 13.2 The zero-difference acceptance checklist
@@ -4261,7 +4319,12 @@ void main(){
 
 ### A.6 Engine wiring — `src/engine/engine.ts` (the black-hole & star excerpts, verbatim)
 
-**(1) The cinematic tier attach + safety net (engine.ts:407-491):**
+*(Since R97 these bodies live verbatim in the subsystems — the tier attach in
+`engine/blackhole/BlackHoleSystem.ts`, the builders in `engine/worlds/BodyBuilders.ts`; the
+engine.ts line numbers below refer to the historical pre-R97 monolith and are kept as the
+excerpt's provenance.)*
+
+**(1) The cinematic tier attach + safety net (pre-R97 `engine.ts:407-491`; now `engine/blackhole/BlackHoleSystem.ts`):**
 
 ```typescript
   /* cinematic tier: raymarched overlays live here so a shader failure can
@@ -4351,7 +4414,7 @@ void main(){
   }
 ```
 
-**(2) The Anchor Star assembly (`buildAnchor`, engine.ts:876-931):**
+**(2) The Anchor Star assembly (`buildAnchor`, pre-R97 `engine.ts:876-931`; now `engine/worlds/BodyBuilders.ts`):**
 
 ```typescript
   private buildAnchor() {
@@ -4412,7 +4475,7 @@ void main(){
   }
 ```
 
-**(3) The hole & vault body construction (engine.ts:1138-1186):**
+**(3) The hole & vault body construction (pre-R97 `engine.ts:1138-1186`; now `engine/worlds/BodyBuilders.ts`):**
 
 ```typescript
     } else if (data.kind === 'hole') {
