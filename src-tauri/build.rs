@@ -79,6 +79,20 @@ fn main() {
             .flag_if_supported("-O3")
             .flag_if_supported("-ffast-math")
             .flag_if_supported("-mavx2")
+            /* R100 — WELD THE RUNTIME IN. cc's default /MD makes the binary
+               demand MSVCP140.dll (the VC++ Redistributable) at load time —
+               dumpbin proved it, and a machine without the redist refuses to
+               start the app at all. static_crt(true) is cc's OWN supported
+               /MT switch (a raw .flag("/MT") loses to cc's appended /MD, and
+               CXXFLAGS lands before it too — both found empirically); the
+               C++ runtime is then welded into the exe and the redist count
+               drops to zero. The Linux twins weld libstdc++/libgcc the same
+               way; glibc stays dynamic by design (static glibc breaks NSS).
+               flag_if_supported keeps every flag a no-op where the compiler
+               doesn't know it. */
+            .static_crt(true)
+            .flag_if_supported("-static-libstdc++")
+            .flag_if_supported("-static-libgcc")
             .compile("cosmos_engine");
         println!("cargo:rustc-cfg=cosmos_cpp");
     } else if !core_source.is_file() {
