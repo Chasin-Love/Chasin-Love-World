@@ -13,6 +13,35 @@ fn has_cpp_compiler() -> bool {
             }
         }
     }
+    /* R100 — the PATH probe alone LIED. MSVC is famously not on the PATH
+       outside a developer prompt, and this laptop carried TWO full MSVC
+       installations (VS 18 Community + Build Tools 2022) while every local
+       desktop build printed "No C++ compiler found" and fell back to the
+       FFI stubs. The cc crate locates MSVC through vswhere (and the
+       registry) without any PATH, so the gate must ask vswhere the same
+       question before declaring the machine bare. Same lesson as R98's
+       emsdk: a negative environment claim gets a disk probe, not just a
+       PATH probe. */
+    #[cfg(windows)]
+    {
+        let vswhere = "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
+        if let Ok(out) = std::process::Command::new(vswhere)
+            .args([
+                "-latest",
+                "-products",
+                "*",
+                "-requires",
+                "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                "-property",
+                "installationPath",
+            ])
+            .output()
+        {
+            if out.status.success() && !out.stdout.is_empty() {
+                return true;
+            }
+        }
+    }
     false
 }
 
