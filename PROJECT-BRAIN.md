@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-09-30, after R83 (the deep audit).
+> **Last updated:** 2026-10-03, after R100 (the self-contained exe).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -64,8 +64,9 @@ browser and as a Tauri desktop app.
   into planets (diary), into the black hole (vault), and (since R71) explicitly between
   cosmological slices.
 
-**Scale of the codebase:** ~136 code files, ~43k lines. `src/engine/engine.ts` alone is
-~6.4k lines (the orchestrator). Strict TypeScript throughout.
+**Scale of the codebase:** ~150 code files, ~45k lines (the auditor's count, incl.
+server + scripts). `src/engine/engine.ts` alone is ~7.0k lines (the orchestrator).
+Strict TypeScript throughout.
 
 ---
 
@@ -144,24 +145,42 @@ Appendix A. **`README.md` is the single source of truth for reconstruction and c
 ├── README.md               ← THE RESURRECTION BLUEPRINT (228 KB rebuild spec + all shader code verbatim)
 ├── PROJECT-BRAIN.md        ← this file — current state + navigation
 ├── note.txt                ← friendly folder guide
-├── docs/                   ← ARCHITECTURE.md (R52 record) · ROUND-*.md (per-round reports)
-│                             · EXPERIENCE-REPORT (quality + roadmap baseline) · research corpus
-├── scripts/                ← round16/17/18/63 gauntlets (verification) · audit-architecture.ts
-│                             · smoke.ts (playwright) · toolchain helpers
+├── docs/                   ← ARCHITECTURE.md (the architecture record, refreshed R96) ·
+│                             ROUND-*.md (per-round reports) · EXPERIENCE-REPORT (baseline)
+│                             · architecture-diagram.html/.mmd (generated) · research corpus
+├── scripts/                ← THE HOUSEKEEPERS (regrouped R96; see scripts/README.md):
+│                             gauntlets/ (19 per-round gates — ALL in npm run verify) ·
+│                             probes/ (4 hand-run diagnostics) · tools/ (5: wasm, icons,
+│                             updater manifest, diagram, toolchain) · audit-architecture.ts
+│                             + its frozen snapshot · smoke.ts · prod-smoke.ts · verify/ (golden frames)
 ├── server/                 ← Express dev host + reality disk daemon (3s self-healing scan)
-├── src-tauri/              ← desktop shell (Rust commands, C++ core compile)
+├── src-tauri/              ← desktop shell (31 Rust commands, C++ core compile; 1,715 ln / 6 files)
 ├── src/
 │   ├── domain/             ← pure data contracts (universe.ts, vault.ts)
-│   ├── state/              ← THE single mutation surface (store + ~60 actions + persistence)
-│   ├── platform/           ← native C++ core + bridge, desktop adapter, sync, audio, storage keys
-│   ├── engine/             ← Three.js cosmos: engine.ts (6.4k ln orchestrator), blackhole*.ts,
-│   │                          cameraRig.ts, shaders.ts, systems/ (portalPhases, stageThresholds,
-│   │                          stageSlices, levelSystem), surface/ (universe dome)
+│   ├── state/              ← THE single mutation surface (store + persistence + actions.ts)
+│   │                          actions.ts is a barrel over actions/ (R97: shared · realities ·
+│   │                          bodies · entries · vault · portability — import path unchanged)
+│   ├── platform/           ← native C++ core + bridge, desktop adapter, sky, sync, sentiment, storage keys
+│   │                          cpp_bridge.ts records WHY each tier was rejected (R98: DegradationReason
+│   │                          → CosmosStatus.degraded[] — degradation is a value, not a shrug)
+│   ├── engine/             ← THE SHELL (engine.ts, 2.8k ln: boot / 22-step tickFrame /
+│   │                          updateBodies the ONE write seam / interaction / dispose) + the
+│   │                          subsystem family (R97): sky/SkyFxSystem · blackhole/BlackHoleSystem ·
+│   │                          kamui/KamuiPortalSystem · worlds/InnerGalaxySystem · worlds/BodyBuilders ·
+│   │                          stages/LevelStageSystem; plus the older extractees — cameraRig.ts,
+│   │                          shaders.ts, math.ts, capability.ts, blackholeRaymarch/-Params/-Tier,
+│   │                          cameraMemory.ts, surface/, systems/ (kamuiPhases, stageThresholds,
+│   │                          levelSystem)
 │   ├── physics/            ← physicsEngine.ts (41-field solve, Kepler solver) · nbody.ts (Living Gravity)
+│   │                          · sessionDriver.ts (THE N-body session) · simTwin.ts (read-only lab)
 │   ├── realities/          ← path-locked content packs; solPrime/ = canonical seed; bin/ = Quantum Bin
 │   ├── vault/              ← EFS (copy-on-write fs), crypto (Argon2id/AES-GCM), executors (JS/Py/HTML/PDF/ISO)
 │   └── ui/                 ← ALL React surfaces (console, hud, vault, diary, lineage…)
-└── public/                 ← vendored pyodide + fonts (offline capability — keep committed)
+└── public/                 ← vendored pyodide + fonts + the compiled WASM core (wasm/) — offline capability, keep committed
+│                              R99: rebuilt from the R98-fixed source (emsdk 6.0.10 lives at
+│                              ~/Desktop/emsdk — off the PATH; build-wasm.sh activates it itself), and
+│                              the physics batch is WIRED (primePhysics → installNativePhysics). A
+│                              stale artifact is a hard gauntlet FAIL, full stop.
 ```
 
 ---
@@ -223,6 +242,24 @@ snapshot):**
   `simTwin.ts` (the lab stays read-only); the driver lives in `src/physics/sessionDriver.ts`
   and is gauntleted separately. Safety nets and the R71 container law are untouched —
   the driver moves bodies, never the camera.
+- **R98 law — A CONTRACT EXISTS ONLY IF SOMETHING CAN FAIL WHEN IT BREAKS.** R98
+  found three implementations of contracts this project believed were single (the
+  TS physics law vs the C++ port, the Node daemon vs the Rust shell, the source
+  vs the shipped binary) and **no gate could see any of them**. The follow-on
+  rule, learned the hard way three times in one round:
+  - **Every negative must be proven by MUTATION, not by inspection.** A check
+    that reads the wrong file, an allowlist whose paths never match (so `every()`
+    passes vacuously over an empty list), and a scanner blind to an indirect
+    caller all reported GREEN while proving nothing. Ask "what would make this
+    check unable to fail?", then break the code on purpose and watch it go red.
+  - **Degradation is a VALUE, never a shrug.** A tier that fails silently must
+    name *why* (`DegradationReason`), surface it to the UI, and be asserted on by
+    `smoke.ts`. "It fell back and nobody noticed" is a bug report waiting to happen.
+  - **A shipped binary is not its source.** `public/wasm/` is committed, so
+    editing `cosmos_engine.cpp` changes nothing for the web tier until it is
+    rebuilt. Conformance must be checked against the ARTIFACT's bytes, and the
+    severity of a stale artifact must follow REACHABILITY: dormant is a WARN,
+    reachable is a hard FAIL.
 
 ---
 
@@ -267,9 +304,13 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ---
 
-## 8. CURRENT STATE (as of 2026-10-02 — main's tip is **v16.0.0**: the R91–R95 REAL UNIVERSE arc merged from `the-real-universe`)
+## 8. CURRENT STATE (as of 2026-10-03 — main's tip is the **R96–R100 chain**, merged --no-ff from `r99-the-wheels-connected` on the author's word; R91–R95 shipped as v16.0.0)
 
-- **`main` is the blessed reference.** Its tip is the merged R91–R95 REAL UNIVERSE arc on top of **v16.0.0** (merged --no-ff and tagged on the author's word, 2026-10-02) on top of R90 on top of **v15.0.10**
+- **`main` is the blessed reference.** Its tip is the merged R96–R100 chain —
+  the tidy house, the engine divided, the real contract, the wheels connected,
+  the self-contained exe — merged --no-ff and pushed on the author's word
+  (2026-10-03, after a fresh full verify on the exact merged tree) — on top of
+  the R91–R95 REAL UNIVERSE arc on top of **v16.0.0** (merged --no-ff and tagged on the author's word, 2026-10-02) on top of R90 on top of **v15.0.10**
   (R88 the per-frame twin + R89 the everywhere core, merged from `r88-per-frame-twin`
   and shipped 2026-10-01 — CI commits the WASM artifact back and attaches it to releases)
   on top of **v15.0.9** (R85 the six seams → R86 the full purge → R87 the native
@@ -299,9 +340,224 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   FLIP, default ON, v16.0.0) → **R95 (THE STEADY SKY — the stability round: the
   flip detonated; star-led rosters, the orbit-true seed, the vault temper, the
   crossfade seam, 1e12 softening; the arc's arc ends in a sky that holds)**. MERGED 2026-10-02 on the author's word: `--no-ff` into main, tagged
-  **v16.0.0** — the real universe is the blessed reference now. (The older
-  in-flight branches — `r71-ten-slices` and friends — remain exactly as they
-  were, awaiting their own rulings.)
+  **v16.0.0** — the real universe is the blessed reference now. R96/R97/R98/
+  R99+R100 (branch chain `r96-the-tidy-house` → `r97-the-engine-divided` →
+  `r98-the-real-contract` → `r99-the-wheels-connected`) **MERGED 2026-10-03 on
+  the author's word: `--no-ff` from `r99-the-wheels-connected`, pushed to
+  origin — after a fresh full verify on the exact merged tree.** (The older
+  ISOLATED branches — `risk-take-kamui` (Sep 29, the author's own "disaster"),
+  `r68-explorer-upgrade`, `r71-ten-slices` — remain exactly as they
+  were, awaiting their own rulings; the merged chain's branch pointers
+  (`r82-the-voice`, `r85-the-six-seams`, `r87-native-simulator`,
+  `r88-per-frame-twin`, `the-real-universe`) are historical signposts, fully
+  contained in main.)
+- **R96 (this round, on branch `r96-the-tidy-house`):** the author's verdict on
+  the tree — "the frontend looks genuinely good, but the backend is total mess"
+  — audited and answered. THE AUDIT: there is no backend (offline-first is the
+  law); the Rust shell is 1,715 lines / 31 commands / six documented files;
+  `src-tauri/target`, `dist`, `node_modules` are untracked build cache (0
+  tracked files among them); the architecture is real and audit-enforced. The
+  ONE genuine mess was `scripts/` — 32 files flat, named by round number.
+  THE TIDY HOUSE: 19 gauntlets → `scripts/gauntlets/`, 4 probes →
+  `scripts/probes/`, 5 tools → `scripts/tools/` (top level: 5 files + 5
+  folders, cataloged in the new `scripts/README.md`); every reference followed
+  the move (package.json verify chain ×19, the auditor's path-encode lists,
+  AGENTS.md, CI ×2, ~132 relative-root rewrites, the three probes' ROOT,
+  build-wasm.sh's root, two cross-gauntlet reads); the snapshot regenerated in
+  the same commit. THE VISIBILITY: `docs/ARCHITECTURE.md` rewritten from the
+  stale R52 record to post-v16.0.0 truth (the tier chain, the session driver,
+  updated locked-path and persistence tables, the debt register); the diagram
+  regenerated (120 files / 379 edges); README §3 and note.txt surgically
+  refreshed; §5's map rewritten. Canary receipts: round16/17/63 green
+  from their new homes (63 proves its own chain path), the physics probe 30
+  sim-days clean, `audit:arch --check` clean. Full chain: the first
+  `npm run verify` run went 19-for-19 on gauntlets then hit the SMOKE cold-boot
+  flake (R84's sighting, now a second — green on the immediate re-run,
+  histL1 0.0707); the second full chain was GREEN end-to-end (histL1 0.0716,
+  prod smoke green, zero console errors). NO law, constant, seed, or gauntlet
+  touched — the gauntlets moved, they did not change; `src/` is byte-identical.
+  Historical round docs keep the old paths (records, not rewritten).
+  `docs/ROUND-96-THE-TIDY-HOUSE-2026-10-02.md`
+- **R97 (this round, on branch `r97-the-engine-divided`):** THE ENGINE, DIVIDED
+  — the author's follow-on verdict: the house is tidy but the engine is still a
+  monolith; the round decomposes it for real. COMMIT 0 — the union harness:
+  `scripts/gauntlets/engineSource.ts` joins engine.ts and the coming subsystem
+  modules (fixed order, shell first) so all 14 engine-reading gauntlets keep
+  their 235 source pins intact over the whole family. THE SIX EXTRACTIONS,
+  each independently green (typecheck + 19 gauntlets + smoke + prod smoke,
+  audit snapshot refreshed in the same commit): **sky/SkyFxSystem.ts** (meteors,
+  Cosmic Echo, aurora, surface dressing — first cut, beat the R62 rigid-default
+  pin honestly with a `lens?` pass-through), **blackhole/BlackHoleSystem.ts**
+  (attach/release, tier switch, breaker, adaptive resolution, camera checkpoint
+  — round63 caught the one wrong cut; answered architecturally by leaving
+  `bloomHoleBoost` engine-owned since the pinned bloom line stays in the shell),
+  **kamui/KamuiPortalSystem.ts** (vortex + portal + hold + stage-warp moved as
+  ONE machine because they share the pass and the beat clock — the four
+  tickFrame segments became updateKamuiBeats/updatePortalHold/updateStageWarp/
+  updatePortalPhases called in the same order; one reconciliation: round72's
+  `private stageWarp {` shape pin), **worlds/InnerGalaxySystem.ts** (the dive
+  realms + lifecycle; two round92 union reconciliations — driverReadback count
+  3→4, and both legitimate seams now stripped before the negative scan),
+  **worlds/BodyBuilders.ts** (anchor/bodies/belt/moons/plates/rebuilders — one
+  recovery: a mis-bounded sed was caught by typecheck, file checked out and the
+  cut redone in a single verified pass), **stages/LevelStageSystem.ts**
+  (multiverse builder + level stages + the per-frame arbiter; 129 generated
+  name-preserving getter/setter pairs typed `UniverseEngine[...]`).
+  THE BARREL: `state/actions.ts` (1,275) → a 16-line barrel over
+  `actions/shared|realities|bodies|entries|vault|portability`, same import
+  path, byte-identical slices, plus `scripts/gauntlets/stateSource.ts` as the
+  state-side union (round92/84/95 pins green verbatim). RESULT: `engine.ts`
+  6,983 → 2,785 (the shell: boot, frozen tickFrame order, updateBodies the
+  one write seam, interaction, dispose); public API frozen — `App.tsx` and
+  `SimulatorTwinCard.tsx` untouched; dispose order verbatim; every commit in
+  the chain is independently green. engine.ts's perceptible shape did not
+  change — the smoke frame-pin keeps passing (0.0716 L1 distance in the last
+  full run). Diagram regenerated (132 files / 464 edges).
+  Docs: ARCHITECTURE.md §1/§2/§3/§7 refreshed (register #1 and #2 struck),
+  README §3 repointed, scripts/README.md updated, and the round doc records the
+  full reconciliation ledger.
+  `docs/ROUND-97-THE-ENGINE-DIVIDED-2026-10-02.md`
+- **R98 (this round, on branch `r98-the-real-contract`, cut from R97's tip):** THE
+  REAL CONTRACT — the author's verdict, in the car metaphor: *"the C++ engine is
+  in the boot but not connected to the wheels"*, *"two gearboxes have started
+  disagreeing"*, *"something that tells us this has gone wrong"*. One theme under
+  all three: **the project had three implementations of contracts it believed were
+  single** — the TS physics law vs the C++ port, the Node daemon vs the Rust
+  desktop shell, and the SOURCE vs the SHIPPED BINARY — and **nothing in the
+  verify chain could see any of the disagreement**. Every one was invisible by
+  construction. COMMIT 1 — repair the test net: R97 commit 1 moved `windowFn`/
+  `hash`/`vnoise`/`cpuFbm` into `engine/math.ts` but `ENGINE_FILES` was never
+  updated, so any future pin on them would have matched nothing and passed
+  VACUOUSLY; plus the dead-code sweep (a dead `coreHoverT` setter was removed,
+  TS2540 restored it — compound assignment through a getter is true at runtime
+  and false at compile time, and the compiler was right). COMMIT 2 — make
+  degradation VISIBLE (the author's question): five bare `return null` paths in
+  `loadWasm` became NAMED rejection reasons; `CosmosStatus.degraded[]`/`fellBack`
+  reaches `CppNativeEngineCard`; a one-time `console.warn` names the reason and
+  the tier used; and **hard assertions** in `round95-steady-sky-live.ts` +
+  `smoke.ts` fail on a silently lost tier. That assertion is the receipt that
+  proves the whole round — and it was **negative-tested** (with the artifact moved
+  aside it fires; without that move the TS branch is never reached and the test
+  proves nothing). COMMIT 3 — the physics conformance gauntlet, which went RED on
+  today's drift **on purpose**. COMMIT 4 — closed it: goliath ecc
+  `0.0489`→`0.0453`, `BodyProfile` gained `tiltDeg` so the three retrograde
+  worlds (veil 177.4 / hollow 122.5 / mirror 97.77) stop being flattened to
+  Earth's 23.44° by a `kind ==` ternary, and the false "identical ids, values
+  and defaults" comment rewritten to state what is actually guaranteed.
+  **Proven at runtime with real MSVC-compiled C++: 8 mismatches → 0.** COMMIT 5 —
+  the backend conformance gauntlet (89 checks: every route has a Tauri command
+  AND an adapter arm, sanitisation parity, rename derivation, containment before
+  destructive per bin op, Sky Studio caps/MIME, the asset whitelist). COMMIT 6 —
+  the two gearboxes resynchronised, three real drifts closed: the Rust rename
+  patched only `index.ts` while Node patched `index.ts` AND `surface.ts` (one
+  world, two names); the Rust sky whitelist took the **LAST FOUR BYTES** and
+  matched patterns **including the dot**, so only 4-char extensions had ever
+  worked and `.jpeg`/`.webp`/`.avif` silently failed on desktop while its own
+  `MIME_BY_EXT` listed them; and it accepted the empty id `sky-.png` that Node
+  rejects while being byte-exact where Node's regex carries `/i`. **Proven with a
+  standalone `rustc` harness: 8 divergences → 0 over 17 cases.** (Neither form was
+  a path escape — `is_inside` holds either way; these were contract drift.)
+  COMMIT 7 — **the wheels stayed UNWIRED, deliberately.** `cosmos_physics_batch`
+  is the profile table's ONLY consumer and has no production caller, so the plan's
+  final wiring step was not performed: the committed `cosmos_engine.wasm` is
+  STALE (proved by content — the pre-fix `0.0489` hits the binary's bytes, the
+  fixed `0.0453` does not) and there is no emsdk/clang/wasm-ld on this machine,
+  so wiring it would have made **web and desktop return different per-body
+  physics** — the exact divergence the round exists to kill, reintroduced by the
+  step meant to close it. The guard is a **severity that follows reachability**:
+  WARN while dormant, hard FAIL the moment a production caller appears
+  (negative-tested both directions). The Kepler path IS connected and always was
+  — `refreshKeplerCache` calls `keplerBatch`, smoke prints `SMOKE TIER — wasm`
+  with `keplerCache.valid: true`. **THE LESSON:** three times this round a check
+  passed green while proving nothing (read the source not the artifact; an
+  allowlist path mismatch making `every()` vacuous over an empty array; a scanner
+  blind to the indirect `verifyParity`→`physicsBatch` caller). Each was caught by
+  asking "what would make this check unable to fail?" and then mutating the code
+  to find out. Every negative in R98 is proven by mutation, not by inspection.
+  Chain: typecheck + **21 gauntlets, 398 checks** + smoke + prod smoke all green,
+  frame unmoved (histL1 0.0725 vs the 0.12 pin); `audit:arch --check` clean.
+  Standing debt: the stale WASM artifact (`npm run wasm:build`, added this round,
+  needs emsdk), the by-design unknown-body tilt gap (TS seeded, C++ constant),
+  and `verifyParity` still UI-button-only.
+  `docs/ROUND-98-THE-REAL-CONTRACT-2026-10-02.md`
+- **R99 (this round, on branch `r99-the-wheels-connected`, cut from R98's tip):** THE
+  WHEELS CONNECTED — the author asked for a review of the R98 session and for the
+  plan's final step to actually happen. THE REVIEW: R98's engineering held up (the
+  drift closures, the degradation ledger, the staleness gate all verified against
+  the tree), but its load-bearing premise was FALSE — **emsdk 6.0.10 has lived at
+  `~/Desktop/emsdk` since R95's post-session completion (recorded in §7!), off the
+  PATH, and R98 probed only the PATH** and concluded "no emsdk on this machine".
+  COMMIT 1 — build-wasm.sh activates emsdk itself (probing ~/Desktop/emsdk then
+  ~/emsdk) and the artifact is REBUILT from the R98-fixed source (0.0453 in the
+  binary's bytes; the staleness WARN fell silent). COMMIT 2 — the last divergence
+  R98 recorded (the unknown-body tilt: TS seeded, C++ constant) is CLOSED — the C
+  API always carried the seed's three ingredients (id, radius, kind) and
+  `seededDefaultTilt` now derives the same number line-for-line — and the numerical
+  half R98's header promised but never implemented now EXISTS: the gauntlet
+  executes the shipped artifact under Node through the EXACT production marshalling
+  and decoder, comparing every field against the TS law (12 bodies, **91 green
+  checks**), and the execution caught TWO latent bugs before the wiring shipped
+  them: (a) the wasm path marshalled kinds/hasRings as f64 while the C takes
+  `const int*` — 1.0 reads as 0x3FF00000, every non-zero kind arrived as garbage
+  and even indices read as kind 0, a STAR (latent since the artifact first existed;
+  fixed by the extracted, exported `marshalPhysicsBatch` over Int32Array); (b)
+  `-ffast-math` does not preserve NaN stores — the C's NaN for a non-rel body's GR
+  fields ships as 0, so the decoder keys off the isRelativistic FLAG (field 29),
+  verifyParity treats either-side NaN as absence, and loadWasm validates the whole
+  ccall/malloc/free/HEAPF64 surface. COMMIT 3 — THE WIRING: `engine.syncBodies`
+  hands the roster to `cosmosBridge.primePhysics` (fire-and-forget, one batch per
+  roster change); on wasm the compiled core answers, on desktop
+  `invoke('cosmos_physics_batch')` does, and `installNativePhysics` overlays the 41
+  contract fields onto the memo `calculatePhysics` serves — the TS reference stays
+  the synchronous zero-fail path and keeps the two Einstein-only fields.
+  **PROVENANCE, NOT VALUES:** the gauntlet executes the chain field-for-field and
+  the smoke ran the real app — `SMOKE TIER — wasm`, histL1 0.0712 vs the 0.12 pin
+  (R96–R98: 0.0716–0.0725), zero console errors, prod smoke green. Reachability
+  law consciously reconciled: primePhysics is the blessed production consumer
+  (three checks pin the seam at both ends), no file outside the bridge may call
+  physicsBatch/verifyParity, and since the method is reachable BY CONSTRUCTION a
+  stale artifact is a hard FAIL without qualification. Mutation-proven both ways
+  (unwire → red → rewire → green). Snapshot refreshed; scope lines drawn: the
+  session driver, simTwin and the galaxy-dive inner systems stay on the TS
+  reference by law (the driver's determinism is its own contract).
+  **R99.1 (same day):** the last silent path — primePhysics' bare catch — became
+  a VALUE: counted on `CosmosStatus.primeFailures`, warned once on the console,
+  and asserted at ZERO by the smoke ("the boot is not clean even though the
+  frame may match") — mutation-proven red on a forced failure.
+  `docs/ROUND-99-THE-WHEELS-CONNECTED-2026-10-02.md`
+- **R100 (this round, same branch, 2026-10-03):** THE SELF-CONTAINED EXE — the
+  author said *"I have MSVC — check please"*, and the disk proved them right
+  TWICE over: Visual Studio 18 Community (VC tools 14.44 and 14.51) plus Build
+  Tools 2022, on the machine whose every desktop build printed "No C++ compiler
+  found — building with cosmos FFI stubs" since the port began. The build.rs
+  probe looked only at the PATH; MSVC is famously not on the PATH outside a
+  developer prompt — R98's emsdk lesson, repeated verbatim, corrected the same
+  day. COMMIT 1 — the gate asks vswhere what the cc crate asks; `desktop:check`
+  now runs with ZERO stub warnings and `libcosmos_engine.a` (888 KB) freshly
+  compiled from the R99-fixed source: **cargo check is compile-verified on the
+  author's laptop — the standing debt since R85 is CLOSED** (R84's FFI
+  extension, R85's write-data twin, R86's seed guard, R98's Rust edits — all
+  now compiled). COMMIT 2 — THE WELD: dumpbin showed the shipped exe demanding
+  **MSVCP140.dll** (the VC++ Redistributable — a machine without it refuses to
+  START the app); `cc::Build::static_crt(true)` (the crate's own supported /MT
+  switch — a raw .flag("/MT") loses to cc's appended /MD, found empirically)
+  makes the C++ core link `libcpmt` (static) instead of `msvcprt` (dynamic),
+  and the exe's redistributable imports drop **1 → 0** — the remaining
+  api-ms-win-crt-* imports are the Universal CRT, built into Windows 10+
+  itself, not a download. crt-static for the Rust half was attempted and
+  REVERTED with the lesson recorded (proc-macro crates like `syn` cannot link
+  a static CRT — and the baseline proved it unnecessary: the Rust side demanded
+  no redist DLL). Linux twins (-static-libstdc++/-static-libgcc, no-ops where
+  unknown) weld libstdc++/libgcc; glibc stays dynamic by design (static glibc
+  breaks NSS) — and the Linux dependency story is the distro's own: .deb
+  resolves deps via apt, AppImage bundles them, and WebKitGTK is the one
+  system library no Tauri app can weld (by design). Receipts read from the
+  binaries themselves: dumpbin 1 → 0, the exe LAUNCHES under the new linkage,
+  desktop:check green, cc 1.5.1 pinned in Cargo.lock so CI inherits it.
+  NEW watch item: CI builds Linux on ubuntu-latest (24.04) — pinning to the
+  OLDEST supported LTS is its own small round (the workflow's 24.04
+  workarounds would need re-checking).
+  `docs/ROUND-100-THE-SELF-CONTAINED-EXE-2026-10-03.md`
 - **R90 (this round, on main):** the author's report — the Native Simulator Twin card
   (Verify Twin with it) could not be scrolled into view in the Core Console — reproduced
   by live measurement and traced to a **Tailwind v4 cascade-layer trap**: `.cc-root`'s
@@ -517,18 +773,32 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (21 checks) in the verify chain. Smoke reference held (green 0.066–0.074 histL1; one
   cold-boot flake diagnosed, never reproduced). `docs/ROUND-84-THE-ASCENDING-NODES-
   2026-09-30.md`.
-- **Verification status:** `npm run verify` ALL GREEN (typecheck;
-  round16/17/18/63/72/73/74/75/76/79/84/**87/88** gauntlets; smoke + prod-smoke, zero
-  console errors) — re-verified per round: after the R85 sweep, after R87, after R88;
-  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the new fixed-point
-  snapshot** (zero dead exports; absorbed in-commit on every contract-surface change);
-  `desktop:check` unrunnable on this laptop (no MSVC toolchain — recorded honestly in
-  R84–R87; R88 touched no Rust). Shipped: **v15.0.9** (R85+R86+R87) — tagged and pushed,
-  CI installers inbound; R88 rides the next tag.
-- **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
-  is planned as its own future round); `cargo check` proof on a toolchained host (R84's FFI
-  extension + R85's `reality_write_data` twin + R86's seed guard, all reviewed but never
-  compiled here). RESOLVED in R85: the desktop sky seam, the write-data twin, the chain-dead
+- **Verification status:** `npm run verify` ALL GREEN (typecheck; all **21
+  gauntlets** — the R98 physics gate now carries 91 checks including the
+  executed-artifact numerical half and the wiring pins — smoke + prod-smoke,
+  zero console errors) — re-verified per round, most recently at R99 (a clean
+  single run: every gauntlet green, `SMOKE TIER — wasm`, histL1 0.0712 against
+  the 0.12 pin);
+  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R100
+  snapshot** (zero dead exports; absorbed in-commit on every structural change);
+  `desktop:check` **compiles the REAL C++ core as of R100** — the author's
+  laptop carries VS 18 Community + Build Tools 2022 (found via vswhere; the
+  old PATH-only probe claimed "no compiler" for the port's whole life) —
+  R100's static_crt also removed the exe's last redistributable dependency
+  (MSVCP140.dll): dumpbin now reads ZERO redist imports.
+  **R99 corrected R98's environment claim:** emsdk 6.0.10 has been at
+  `~/Desktop/emsdk` since R95 (off the PATH — build-wasm.sh now activates it
+  itself); the WASM artifact was rebuilt from the R98-fixed source and the
+  physics batch is WIRED (`primePhysics`), with a stale artifact now a hard
+  gauntlet FAIL. Shipped: **v16.0.0** — tagged and pushed; R98+R99+R100 ride the
+  next tag.
+- **Known technical debt (conscious, ranked):** ~~`engine.ts` size~~ (RESOLVED in
+  R97 — the engine is a 2.8k-line shell over six subsystems); ~~`cargo check`
+  proof on a toolchained host~~ (RESOLVED in R100 — the author's laptop carries
+  two full MSVC toolchains, the build.rs probe now finds them via vswhere, and
+  the R84 FFI extension, the R85 write-data twin, the R86 seed guard and the
+  R98 Rust edits are all compile-verified; R100's static_crt also made the exe
+  redist-free). RESOLVED in R85: the desktop sky seam, the write-data twin, the chain-dead
   routes, the black hole dispose leak, both void events, the lying facade, the isNova
   shadow, the dead-export/unused-import census (fixed point), the MIT notice, the stale
   `BUILD` constant. RESOLVED in R86: the never-called code, the write-only engine fields,
@@ -542,7 +812,21 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ## 9. WHERE IT'S GOING
 
-0. **R83 decision queue — RULED and EXECUTED (R85, branch `r85-the-six-seams`).** The
+0. **R98 follow-ups — DONE in R99 (branch `r99-the-wheels-connected`, awaiting the
+   author's merge).** The ordering R98 made law was followed and the step was
+   taken: the artifact rebuilt (emsdk was at `~/Desktop/emsdk` all along — R98
+   probed only the PATH), the last divergence (the seeded unknown-body tilt)
+   closed, the wasm kinds marshalling fixed, the numerical half of the physics
+   gauntlet implemented (the artifact EXECUTED against the TS law), and
+   `cosmos_physics_batch` wired into production through `primePhysics` —
+   provenance changed, values identical, frame unmoved (histL1 0.0712). A stale
+   artifact is a hard FAIL now. STILL OPEN from that item: `cargo check` on a
+   toolchained host, and retiring the `verifyParity` button (its job now runs in
+   CI as the numerical half). ~~cargo check on a toolchained host~~ — CLOSED in
+   R100: the author's laptop carries two full MSVC installations (found via
+   vswhere), the build.rs probe now finds them, and desktop:check compiles the
+   real core — every Rust edit since R84 is compile-verified.
+1. **R83 decision queue — RULED and EXECUTED (R85, branch `r85-the-six-seams`).** The
    author ruled on 2026-10-01: "create a new isolated branch … solve all these six bugs
    … best shape possible," and chose the mechanical sweep when offered the census's fate.
    All six findings + the sweep + the MIT notice are done on the branch — awaiting only
@@ -574,9 +858,29 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    a one-line Kamui narrative caption, cross-reality entry search in the palette.
 5. **Desktop as the storage answer** — Tauri file store lifts the web localStorage ~5 MB
    ceiling for heavy diarists.
-6. **Deferred (do as their own rounds, unasked):** `engine.ts` decomposition (gauntlets as
-   guardrails), architecture re-snapshot, dead-export sweep, optional React 19 / Vite 7
-   evaluation, optional touch-first HUD pass.
+6. **Deferred (do as their own rounds, unasked):** the UI giants
+   (`DiaryWindow`/`App.tsx`/`keyring`/`CoreConsole`/`FileManager`/`MediaPlates`)
+   — each its own round with gauntlet guardrails; `src/types/` fold-in;
+   dead-export sweep, optional React 19 / Vite 7 evaluation, optional
+   touch-first HUD pass. (The architecture re-snapshot is DONE at R96; R97
+   EXECUTED the engine decomposition and the actions domaining — §5/§8 carry it.)
+7. **Watch item (small):** the smoke cold-boot flake has FIVE sightings now
+   (R84 diagnosis, R96 reproduction, R97 close-out — `page.evaluate` context
+   destroyed mid-boot — and R99's post-close audit, which went red TWICE
+   back-to-back before a green, the first time an immediate re-run did not
+   clear it). Signature in every sighting: errors ALL
+   `ERR_CONNECTION_REFUSED` (Vite's HMR socket on **:24678** plus page
+   resources) and a uniformly dark frame (shadow 0.000 vs 0.290, bright
+   0.000 vs 0.086) — the app booted before its dev/HMR server finished
+   binding, not a rendering regression; the healthy re-run reproduces the
+   pinned frame (R99: histL1 0.0738, shadow 0.289, zero console errors) with
+   code byte-identical between red and green runs. Rule of thumb: **a red
+   smoke run whose errors are ALL `ERR_CONNECTION_REFUSED` and whose frame
+   is uniformly dark is the flake, not the code** — re-run standalone before
+   investigating, and re-run TWICE if the first re-run shares the signature
+   (a failed boot can leave its own port debris behind). It has recurred
+   enough: the boot-retry guard in `scripts/smoke.ts` is now the recommended
+   tiny round.
 
 ---
 
@@ -588,8 +892,10 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    reference params, bloom calibrations. They are identity, measured or canonical. If a
    constant looks odd, it's probably pinned on purpose (gauntlets assert some of them in
    source text).
-3. **Rewriting `engine.ts` wholesale** — it's 6.4k lines for a reason; decomposition is a
-   planned dedicated round with gauntlet guardrails, not a drive-by refactor.
+3. **Rewriting `engine.ts` wholesale** — was 6.9k lines for a reason; decomposition was a
+   planned dedicated round — **R97 EXECUTED it with the gauntlets as guardrails** (the
+   engine is now a 2.8k-line shell over six verbatim-extracted subsystems; any future
+   engine work follows the same contract: never a drive-by rewrite).
 4. **Breaking the metaphor loop** — decoupling entries from moons, moods from aurora, vault
    from the hole, or the Anchor Star's guarantees (bodies[0], undeletable, auto-repair).
 5. **Removing safety nets** — the composite fallback, shader-error disarm, 55 ms breaker.
@@ -605,6 +911,17 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 10. **Ignoring the gauntlets** — if `round16/17/18/63` or `audit:arch` disagree with your
     change, your change is wrong until reconciled (fix or consciously re-snapshot — never
     delete the check to make it pass).
+11. **Editing C++ and assuming the web tier changed** — `public/wasm/` is a COMMITTED
+    binary. Fixing `cosmos_engine.cpp` does nothing for the browser until
+    `npm run wasm:build` runs (build-wasm.sh activates the author's emsdk at
+    `~/Desktop/emsdk` itself — R98 missed it by probing only the PATH). R98 found
+    the committed artifact carrying the pre-fix physics this way; check the
+    artifact, not the source — and a negative environment claim ("no X here")
+    deserves a disk probe, not just a PATH probe.
+12. **Trusting a check you have never seen fail** — a gauntlet that has never gone red is
+    an untested hypothesis. R98 shipped three checks that were green and meaningless; each
+    was found by deliberately breaking the code and watching for the failure (see §6,
+    the R98 law).
 
 ---
 

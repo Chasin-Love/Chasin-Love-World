@@ -13,6 +13,35 @@ fn has_cpp_compiler() -> bool {
             }
         }
     }
+    /* R100 — the PATH probe alone LIED. MSVC is famously not on the PATH
+       outside a developer prompt, and this laptop carried TWO full MSVC
+       installations (VS 18 Community + Build Tools 2022) while every local
+       desktop build printed "No C++ compiler found" and fell back to the
+       FFI stubs. The cc crate locates MSVC through vswhere (and the
+       registry) without any PATH, so the gate must ask vswhere the same
+       question before declaring the machine bare. Same lesson as R98's
+       emsdk: a negative environment claim gets a disk probe, not just a
+       PATH probe. */
+    #[cfg(windows)]
+    {
+        let vswhere = "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
+        if let Ok(out) = std::process::Command::new(vswhere)
+            .args([
+                "-latest",
+                "-products",
+                "*",
+                "-requires",
+                "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                "-property",
+                "installationPath",
+            ])
+            .output()
+        {
+            if out.status.success() && !out.stdout.is_empty() {
+                return true;
+            }
+        }
+    }
     false
 }
 
@@ -50,6 +79,20 @@ fn main() {
             .flag_if_supported("-O3")
             .flag_if_supported("-ffast-math")
             .flag_if_supported("-mavx2")
+            /* R100 — WELD THE RUNTIME IN. cc's default /MD makes the binary
+               demand MSVCP140.dll (the VC++ Redistributable) at load time —
+               dumpbin proved it, and a machine without the redist refuses to
+               start the app at all. static_crt(true) is cc's OWN supported
+               /MT switch (a raw .flag("/MT") loses to cc's appended /MD, and
+               CXXFLAGS lands before it too — both found empirically); the
+               C++ runtime is then welded into the exe and the redist count
+               drops to zero. The Linux twins weld libstdc++/libgcc the same
+               way; glibc stays dynamic by design (static glibc breaks NSS).
+               flag_if_supported keeps every flag a no-op where the compiler
+               doesn't know it. */
+            .static_crt(true)
+            .flag_if_supported("-static-libstdc++")
+            .flag_if_supported("-static-libgcc")
             .compile("cosmos_engine");
         println!("cargo:rustc-cfg=cosmos_cpp");
     } else if !core_source.is_file() {

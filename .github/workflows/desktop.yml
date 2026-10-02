@@ -118,8 +118,8 @@ jobs:
           version: '3.1.74'
           actions-cache-folder: 'emsdk-cache'
 
-      - name: Build the WASM core (scripts/build-wasm.sh)
-        run: bash scripts/build-wasm.sh
+      - name: Build the WASM core (scripts/tools/build-wasm.sh)
+        run: bash scripts/tools/build-wasm.sh
 
       - name: Upload the WASM artifact
         uses: actions/upload-artifact@v4
@@ -180,7 +180,7 @@ jobs:
       # manifest. Unsigned builds have none — it skips and the updater
       # simply stays dormant until the signing secret exists.
       - name: Generate updater manifest (latest.json)
-        run: node scripts/make-latest-json.mjs release-assets "${{ github.ref_name }}"
+        run: node scripts/tools/make-latest-json.mjs release-assets "${{ github.ref_name }}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

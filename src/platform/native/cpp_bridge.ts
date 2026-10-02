@@ -16,11 +16,60 @@
 
 type CosmosBackend = 'native-cpp' | 'wasm' | 'typescript';
 
+/* R98 — THE DEGRADATION LEDGER.
+   Before this round every failed tier collapsed into a bare `return null`, so a
+   browser with no WASM artifact and a browser whose artifact was corrupt both
+   looked identical from the outside: `backend: 'typescript'`, no message, no
+   error, nothing in the console. "Nothing asserts that the browser is actually
+   on the WASM tier" was a TRUE and UNFALSIFIABLE statement about the old code —
+   the answer was not merely unreported, it did not exist.
+
+   The loader now names the reason it rejected each tier. The names are the
+   whole point: `no-artifact` (nothing built — expected on a machine without
+   emsdk) is a different fact from `instantiate-failed` (something WAS built and
+   is broken — a real defect someone must fix). Degradation stays SILENT for the
+   user (never an error, never a broken sky) but is now LOUD in the one place
+   that is for maintainers: the console, and the console card. */
+export type DegradationReason =
+  /* tier 1 (native) rejections — expected everywhere except the desktop shell */
+  | 'no-tauri'            /* not running inside the Tauri shell at all */
+  | 'tauri-import-failed' /* __TAURI_INTERNALS__ present but the api module would not load */
+  | 'native-status-failed'/* invoke('cosmos_status') threw */
+  | 'native-stub-build'   /* the shell answered, but with the type-check stub — never claim native physics */
+  /* tier 2 (wasm) rejections — the five paths loadWasm used to swallow */
+  | 'no-artifact'         /* HEAD did not answer ok — CI never built it / public/wasm missing */
+  | 'wrong-content-type'  /* an HTML SPA fallback, not JavaScript — Vite dev answered 200 for a missing path */
+  | 'import-failed'       /* the JS loaded but the dynamic import threw */
+  | 'no-factory'          /* neither EXPORT_ES6 default nor the global name was present */
+  | 'instantiate-failed'  /* the factory ran and the module could not be built/would not expose ccall */
+  | 'wasm-fetch-failed';  /* the HEAD probe itself threw (offline, blocked, CORS) */
+
+export interface TierDegradation {
+  tier: 'native-cpp' | 'wasm';
+  reason: DegradationReason;
+  detail: string;
+}
+
 export interface CosmosStatus {
   backend: CosmosBackend;
   version: string;
   physicsFieldCount: number;
   ready: boolean;
+  /** R98 — every tier that was tried and rejected, in the order tried.
+   *  Empty means the FIRST tier won (nothing was given up). */
+  degraded: TierDegradation[];
+  /** R98 — true only when a tier above `typescript` was tried and lost. The
+   *  browser normally lands on wasm (the artifact is committed at
+   *  public/wasm/); landing here means that artifact could not be fetched or
+   *  instantiated, or the page predates it. The desktop shell landing here
+   *  IS a defect. */
+  fellBack: boolean;
+  /** R99.1 — how many times the primePhysics seam failed AFTER the tier was
+   *  won. The catch is deliberate (the zero-fail law: the TS reference
+   *  already served identical numbers, so a failed prime must never break a
+   *  frame) but silence is not: every failure is counted, the first warns
+   *  with its reason, and the smoke asserts a healthy boot at zero. */
+  primeFailures: number;
 }
 
 interface KeplerBatchInput {
@@ -85,54 +134,95 @@ export const PHYSICS_FIELD_COUNT = 41;
 
 type TauriInvoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
 
-async function loadTauriInvoke(): Promise<TauriInvoke | null> {
+/** R98 — the loaders reject with a NAMED reason instead of a bare null, so the
+ *  caller can record which tier died and why. `detail` is developer-facing
+ *  (status line, error text) and never reaches an end user unfiltered. */
+class TierRejection extends Error {
+  constructor(readonly reason: DegradationReason, readonly detail: string) {
+    super(`${reason}: ${detail}`);
+    this.name = 'TierRejection';
+  }
+}
+
+async function loadTauriInvoke(): Promise<TauriInvoke> {
   const w = window as unknown as { __TAURI_INTERNALS__?: unknown };
-  if (!w.__TAURI_INTERNALS__) return null;
+  if (!w.__TAURI_INTERNALS__) {
+    throw new TierRejection('no-tauri', 'no __TAURI_INTERNALS__ on window (not the desktop shell)');
+  }
   try {
     const core = await import('@tauri-apps/api/core');
     return core.invoke as TauriInvoke;
-  } catch {
-    return null;
+  } catch (err) {
+    throw new TierRejection('tauri-import-failed', err instanceof Error ? err.message : String(err));
   }
 }
 
-async function loadWasm(): Promise<WasmModule | null> {
+async function loadWasm(): Promise<WasmModule> {
+  /* the WASM artifact is optional (built by CI / scripts/tools/build-wasm.sh into
+     public/wasm/, served at the site root in dev and prod alike — R89 moved
+     it there from the in-source folder, which the bundled dist could never
+     serve). */
+  /* Absolute and computed at runtime — Vite's dev transform wraps dynamic
+     imports in __vite__injectQuery(spec, 'import'), whose helper passes
+     through only specifiers that do NOT start with '.' or '/'; a
+     root-relative path arrived as '/wasm/...?import' and the dev server
+     404s public-dir files under that query. Absolute URLs sail through in
+     dev and resolve identically in prod and Tauri. @vite-ignore still
+     guards the build-time resolver (the artifact may not exist at build). */
+  const wasmSpec = new URL('/wasm/cosmos_engine.js', window.location.origin).href;
+  let probe: Response;
   try {
-    /* the WASM artifact is optional (built by CI / scripts/build-wasm.sh into
-       public/wasm/, served at the site root in dev and prod alike — R89 moved
-       it there from the in-source folder, which the bundled dist could never
-       serve). */
-    /* Absolute and computed at runtime — Vite's dev transform wraps dynamic
-       imports in __vite__injectQuery(spec, 'import'), whose helper passes
-       through only specifiers that do NOT start with '.' or '/'; a
-       root-relative path arrived as '/wasm/...?import' and the dev server
-       404s public-dir files under that query. Absolute URLs sail through in
-       dev and resolve identically in prod and Tauri. @vite-ignore still
-       guards the build-time resolver (the artifact may not exist at build). */
-    const wasmSpec = new URL('/wasm/cosmos_engine.js', window.location.origin).href;
-    const probe = await fetch(wasmSpec, { method: 'HEAD' });
-    if (!probe.ok) return null;
-    /* Vite's dev SPA fallback answers missing paths with 200 text/html —
-       importing that would throw a loud console error for a perfectly
-       normal "no artifact yet" host. The artifact is optional; only a real
-       JavaScript response may be imported (the silent-fallback contract). */
-    if (!(probe.headers.get('content-type') || '').includes('javascript')) return null;
-    /* @vite-ignore — the artifact is optional and may not exist at build time */
-    const mod = await import(/* @vite-ignore */ wasmSpec);
-    /* EXPORT_ES6 gives a default export; older glue assigns the global name —
-       accept both so either artifact shape loads */
-    const w = window as unknown as { cosmos_engine?: unknown };
-    const factory = (mod.default ?? mod.cosmos_engine ?? w.cosmos_engine) as
-      | ((init?: unknown) => Promise<WasmModule>)
-      | null;
-    if (!factory) return null;
-    return await factory({ locateFile: (f: string) => `/wasm/${f}` });
-  } catch {
-    return null;
+    probe = await fetch(wasmSpec, { method: 'HEAD' });
+  } catch (err) {
+    throw new TierRejection('wasm-fetch-failed', err instanceof Error ? err.message : String(err));
   }
+  if (!probe.ok) {
+    throw new TierRejection('no-artifact', `HEAD ${wasmSpec} → HTTP ${probe.status}`);
+  }
+  /* Vite's dev SPA fallback answers missing paths with 200 text/html —
+     importing that would throw a loud console error for a perfectly
+     normal "no artifact yet" host. The artifact is optional; only a real
+     JavaScript response may be imported (the silent-fallback contract). */
+  const contentType = probe.headers.get('content-type') || '(none)';
+  if (!contentType.includes('javascript')) {
+    throw new TierRejection('wrong-content-type', `HEAD ${wasmSpec} → content-type ${contentType}`);
+  }
+  /* @vite-ignore — the artifact is optional and may not exist at build time */
+  let mod: Record<string, unknown>;
+  try {
+    mod = (await import(/* @vite-ignore */ wasmSpec)) as unknown as Record<string, unknown>;
+  } catch (err) {
+    throw new TierRejection('import-failed', err instanceof Error ? err.message : String(err));
+  }
+  /* EXPORT_ES6 gives a default export; older glue assigns the global name —
+     accept both so either artifact shape loads */
+  const w = window as unknown as { cosmos_engine?: unknown };
+  const factory = (mod.default ?? mod.cosmos_engine ?? w.cosmos_engine) as
+    | ((init?: unknown) => Promise<WasmModule>)
+    | null
+    | undefined;
+  if (typeof factory !== 'function') {
+    throw new TierRejection('no-factory', `neither default export nor global cosmos_engine on ${wasmSpec}`);
+  }
+  let module: WasmModule;
+  try {
+    module = await factory({ locateFile: (f: string) => `/wasm/${f}` });
+  } catch (err) {
+    throw new TierRejection('instantiate-failed', err instanceof Error ? err.message : String(err));
+  }
+  if (!module || typeof module.ccall !== 'function' || typeof module._malloc !== 'function' ||
+      typeof module._free !== 'function' || !(module.HEAPF64 instanceof Float64Array)) {
+    /* the glue loaded but carries no Emscripten runtime surface — a truncated or
+       hand-edited artifact. Distinct from instantiate-failed: nothing threw. */
+    throw new TierRejection('instantiate-failed', 'module exposed no ccall/malloc/free/HEAPF64 surface (truncated or non-Emscripten artifact)');
+  }
+  return module;
 }
 
-/** Minimal Emscripten module surface used by the bridge. */
+/** Minimal Emscripten module surface used by the bridge. R99 — malloc/free/
+ *  HEAPF64 are REQUIRED, not optional: every batch marshals through them, so
+ *  loadWasm validates the whole surface and a truncated artifact is rejected
+ *  with a named reason instead of exploding at first batch. */
 interface WasmModule {
   ccall: (
     ident: string,
@@ -141,9 +231,9 @@ interface WasmModule {
     args: unknown[],
   ) => unknown;
   _cosmos_version?: () => string;
-  _malloc?: (bytes: number) => number;
-  _free?: (ptr: number) => void;
-  HEAPF64?: Float64Array;
+  _malloc: (bytes: number) => number;
+  _free: (ptr: number) => void;
+  HEAPF64: Float64Array;
 }
 
 class CosmosBridge {
@@ -152,10 +242,18 @@ class CosmosBridge {
     version: 'ts-1.0',
     physicsFieldCount: PHYSICS_FIELD_COUNT,
     ready: false,
+    degraded: [],
+    fellBack: false,
+    primeFailures: 0,
   };
   private initPromise: Promise<CosmosStatus> | null = null;
   private invokeFn: TauriInvoke | null = null;
   private wasm: WasmModule | null = null;
+  /** R98 — the ledger, in the order the tiers were tried. */
+  private degraded: TierDegradation[] = [];
+  /* R99.1 — the prime seam's failure ledger (see CosmosStatus.primeFailures). */
+  private primeFailureCount = 0;
+  private primeFailureWarned = false;
   /* R87 sim session state — one handle on the wasm tier, one twin on TS */
   private wasmSimHandle: number | null = null;
   private wasmSimBodyCount = 0; /* R91 — roster size of the wasm session (the C++ core does not report it back) */
@@ -163,41 +261,89 @@ class CosmosBridge {
 
   /* ------------------------------ lifecycle ------------------------------ */
 
+  /** R98 — record why a tier was given up. Never throws: degradation is not
+   *  an error, it is the documented fallback contract. */
+  private reject(tier: 'native-cpp' | 'wasm', err: unknown): void {
+    const rejection = err instanceof TierRejection ? err : null;
+    this.degraded.push({
+      tier,
+      reason: rejection?.reason ?? 'wasm-fetch-failed',
+      detail: rejection?.detail ?? (err instanceof Error ? err.message : String(err)),
+    });
+  }
+
+  /** R98 — THE ONE-TIME WARNING.
+   *  This is the answer to "something that tells us this has gone wrong".
+   *  Exactly one line per page load, on the console, naming the tier that was
+   *  lost and why — deliberately NOT console.error, because falling back to the
+   *  TS reference is the designed behaviour on a machine with no emsdk, and a
+   *  red console would train the eye to ignore it. The line is quiet enough to
+   *  miss in normal use and impossible to miss when you go looking, and it
+   *  separates "never built here" from "built and broken". */
+  private warnDegradation(): void {
+    const d = this.degraded;
+    if (d.length === 0) return;
+    /* no-tauri is the browser's NORMAL state, not a degradation worth a line —
+       a plain web tab has no reason to have the desktop shell. Log the rest. */
+    const notable = d.filter((x) => x.reason !== 'no-tauri');
+    if (notable.length === 0) return;
+    const lines = notable.map((x) => `  · ${x.tier}: ${x.reason} — ${x.detail}`);
+    console.warn(
+      `[cosmos] native tier degraded → running the TypeScript reference.\n${lines.join('\n')}\n` +
+      `  The sky is unaffected (the TS reference is numerically the same law); ` +
+      `if this is the desktop app, run: bash scripts/tools/build-wasm.sh (or reinstall the release).`,
+    );
+  }
+
   init(): Promise<CosmosStatus> {
     if (this.initPromise) return this.initPromise;
     this.initPromise = (async () => {
-      const invoke = await loadTauriInvoke();
-      if (invoke) {
+      /* R98 — each tier now throws a NAMED TierRejection instead of returning
+         null. The fall-through order and the winning conditions are unchanged;
+         only the bookkeeping around the failures is new. */
+      try {
+        const invoke = await loadTauriInvoke();
         try {
           const res = await invoke<{ backend: string; version: string; physicsFieldCount: number }>('cosmos_status');
           if (res.version !== 'stub') {
             this.invokeFn = invoke;
-            this.statusValue = { backend: 'native-cpp', version: res.version, physicsFieldCount: res.physicsFieldCount, ready: true };
+            this.statusValue = { backend: 'native-cpp', version: res.version, physicsFieldCount: res.physicsFieldCount, ready: true, degraded: [...this.degraded], fellBack: false, primeFailures: 0 };
             return this.statusValue;
           }
           /* stub build (type-check host) — never claim native physics */
-        } catch {
-          /* fall through to wasm */
+          this.reject('native-cpp', new TierRejection('native-stub-build', `cosmos_status reported version "stub"`));
+        } catch (err) {
+          this.reject('native-cpp', new TierRejection('native-status-failed', err instanceof Error ? err.message : String(err)));
         }
+      } catch (err) {
+        this.reject('native-cpp', err);
       }
-      const wasm = await loadWasm();
-      if (wasm) {
+      try {
+        const wasm = await loadWasm();
         this.wasm = wasm;
         let version = 'wasm';
         try {
           version = wasm.ccall('cosmos_version', 'string', [], []) as string;
         } catch { /* keep default */ }
-        this.statusValue = { backend: 'wasm', version, physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true };
+        this.statusValue = { backend: 'wasm', version, physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true, degraded: [...this.degraded], fellBack: false, primeFailures: 0 };
         return this.statusValue;
+      } catch (err) {
+        this.reject('wasm', err);
       }
-      this.statusValue = { backend: 'typescript', version: 'ts-reference', physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true };
+      this.statusValue = { backend: 'typescript', version: 'ts-reference', physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true, degraded: [...this.degraded], fellBack: true, primeFailures: 0 };
+      this.warnDegradation();
       return this.statusValue;
     })();
     return this.initPromise;
   }
 
   getStatus(): CosmosStatus {
-    return { ...this.statusValue };
+    return {
+      ...this.statusValue,
+      degraded: this.statusValue.degraded.map((d) => ({ ...d })),
+      /* live — the init snapshots carry 0; the counter moves after boot */
+      primeFailures: this.primeFailureCount,
+    };
   }
 
   /* -------------------------------- kernels ------------------------------ */
@@ -255,6 +401,33 @@ class CosmosBridge {
     return this.keplerBatchTS(input);
   }
 
+  /**
+   * The 41-field per-body physics port, one body per PHYSICS_FIELD_COUNT slot.
+   *
+   * R98 — READ THIS BEFORE CALLING IT FROM PRODUCTION.
+   *
+   * This is the ONLY consumer of the C++ BODY PROFILE TABLE (the per-body
+   * eccentricity / density / albedo / axial-tilt law), and therefore the only
+   * path that can observe that table's numbers. The law that governs it:
+   *
+   *  THE ARTIFACT AND THE SOURCE MUST AGREE WHILE THIS METHOD IS REACHABLE.
+   *  R98 found the committed public/wasm/cosmos_engine.wasm carrying pre-fix
+   *  physics (goliath 0.0489, no tiltDeg) while the source had moved on, and
+   *  refused to wire this method rather than ship per-tier divergence. R99
+   *  rebuilt the artifact — the author's emsdk lives at ~/Desktop/emsdk,
+   *  off the PATH, which is how R98 missed it (build-wasm.sh now activates
+   *  it itself) — closed the last divergence (the seeded unknown-body tilt),
+   *  fixed the wasm kinds marshalling, and THEN wired this method into
+   *  production through primePhysics (the one roster seam; the engine feeds
+   *  it after every syncBodies). The round98 gauntlet checks the binary's
+   *  BYTES, not mtimes, and its numerical half executes this exact chain:
+   *  since the wiring, a stale artifact is a hard FAIL, full stop.
+   *  `npm run wasm:build` after EVERY cosmos_engine.cpp edit — editing C++
+   *  changes nothing for the web tier until then (PROJECT-BRAIN trap 11).
+   *
+   * The desktop tier compiles cosmos_engine.cpp directly and is always as
+   * fresh as the source.
+   */
   async physicsBatch(input: PhysicsBatchInput): Promise<Float64Array> {
     await this.init();
     const n = input.ids.length;
@@ -274,47 +447,9 @@ class CosmosBridge {
       return Float64Array.from(res.fields);
     }
     if (this.statusValue.backend === 'wasm' && this.wasm) {
-      const w = this.wasm;
-      const enc = new TextEncoder();
-      const idsPtrs: number[] = [];
-      const idBufs: number[] = [];
-      for (const id of input.ids) {
-        const bytes = enc.encode(id + '\0');
-        const ptr = w._malloc!(bytes.length);
-        const heapU8 = new Uint8Array(w.HEAPF64!.buffer);
-        heapU8.set(bytes, ptr);
-        idBufs.push(ptr);
-        idsPtrs.push(ptr);
-      }
-      const idsArrPtr = w._malloc!(idsPtrs.length * 4);
-      const heapU32 = new Uint32Array(w.HEAPF64!.buffer);
-      idsPtrs.forEach((p, i) => { heapU32[idsArrPtr / 4 + i] = p; });
-      const pa = this.wasmMallocF64(w, input.orbitA);
-      const pr = this.wasmMallocF64(w, input.radius);
-      const pk = this.wasmMallocF64(w, input.kinds as unknown as number[]);
-      const ph = this.wasmMallocF64(w, input.hasRings as unknown as number[]);
-      const pp = this.wasmMallocF64(w, input.phase);
-      const pv = this.wasmMallocF64(w, input.speed);
-      const po = w._malloc!(n * PHYSICS_FIELD_COUNT * 8);
-      try {
-        w.ccall('cosmos_physics_batch', null, ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-          [idsArrPtr, pa, pr, pk, ph, pp, pv, n, input.simTimeSec, po]);
-        const out = new Float64Array(n * PHYSICS_FIELD_COUNT);
-        out.set(w.HEAPF64!.subarray(po / 8, po / 8 + n * PHYSICS_FIELD_COUNT));
-        return out;
-      } finally {
-        [pa, pr, pk, ph, pp, pv, po].forEach((p) => w._free!(p));
-        idBufs.forEach((p) => w._free!(p));
-        w._free!(idsArrPtr);
-      }
+      return marshalPhysicsBatch(this.wasm, input);
     }
     return this.physicsBatchTS(input);
-  }
-
-  private wasmMallocF64(w: WasmModule, arr: number[]): number {
-    const ptr = w._malloc!(arr.length * 8);
-    w.HEAPF64!.set(arr, ptr / 8);
-    return ptr;
   }
 
   async benchmark(nBodies: number, iterations: number): Promise<{ opsPerSec: number; backend: CosmosBackend }> {
@@ -491,6 +626,59 @@ class CosmosBridge {
     return { maxDelta, steps, bodies: bodies.length, backend: active.backend };
   }
 
+  /* ------------------------- the production physics seam ---------------- */
+
+  /* R99 — THE WHEELS. The rendered roster's per-body physics is served by the
+     COMPILED core on every tier above TypeScript: the engine hands this seam
+     its roster after every syncBodies, one batch runs per roster change on
+     the active native tier, and installNativePhysics overlays the 41
+     contract fields onto the memo calculatePhysics already serves. The TS
+     reference remains the synchronous zero-fail path (cold memo, TypeScript
+     tier, any throw) and its numbers are identical to the compiled core's by
+     the round98 gauntlet — whose numerical half executes this exact chain —
+     so the wiring changes PROVENANCE, never values. Fire-and-forget by
+     contract; the engine never awaits it. */
+  async primePhysics(bodies: ReadonlyArray<CosmicBody>, simTimeSec = 0): Promise<{ primed: number; backend: CosmosBackend } | null> {
+    if (!bodies.length) return null;
+    try {
+      await this.init();
+      if (this.statusValue.backend === 'typescript') return null;
+      const input: PhysicsBatchInput = {
+        ids: [], orbitA: [], radius: [], kinds: [], hasRings: [], phase: [], speed: [],
+        simTimeSec,
+      };
+      for (const b of bodies) {
+        input.ids.push(b.id);
+        input.orbitA.push(b.orbit.a);
+        input.radius.push(b.radius);
+        input.kinds.push(kindToCode(b.kind));
+        input.hasRings.push(b.rings ? 1 : 0);
+        input.phase.push(b.orbit.phase);
+        input.speed.push(b.orbit.speed || 0.01);
+      }
+      const fields = await this.physicsBatch(input);
+      const primed = installNativePhysics([...bodies], fields);
+      return { primed, backend: this.statusValue.backend };
+    } catch (err) {
+      /* R99.1 — the zero-fail law: the TS reference already served identical
+         numbers, so a failed prime must never break a frame. But R98's own
+         law says degradation is a VALUE, never a shrug: the failure is
+         counted, the first one warns with its reason, the count rides
+         CosmosStatus.primeFailures, and the smoke asserts a healthy boot at
+         zero. Before this the catch was a bare return — the one true
+         silence left in the bridge. */
+      this.primeFailureCount++;
+      if (!this.primeFailureWarned) {
+        this.primeFailureWarned = true;
+        console.warn(
+          `[cosmos] physics prime failed — native provenance is off for this roster ` +
+          `(the TS reference served identical numbers): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      return null;
+    }
+  }
+
   /* ------------------------- TS reference implementations ---------------- */
 
   private tsRk4Burn(n: number, iterations: number): void {
@@ -618,7 +806,12 @@ class CosmosBridge {
     for (let i = 0; i < native.length; i++) {
       const a = native[i];
       const b = reference[i];
-      if (Number.isNaN(a) && Number.isNaN(b)) continue;
+      /* NaN is the emitters' encoding of "not applicable" (the GR fields of a
+         non-relativistic body) — and a -ffast-math artifact may deliver 0 for
+         the same absence, so EITHER side NaN means the slot carries no
+         comparable value. The rel fields themselves are proven explicitly by
+         the round98 gauntlet's numerical half (R99). */
+      if (Number.isNaN(a) || Number.isNaN(b)) continue;
       const d = Math.abs(a - b);
       /* relative-ish scale: huge SI magnitudes need a proportional tolerance */
       const scale = Math.max(1, Math.abs(b));
@@ -631,7 +824,8 @@ class CosmosBridge {
 /* Local copies of the TS reference math (imports would create a cycle from
    physicsEngine's side; these mirror calculateKeplerPosition/calculatePhysics
    and are guarded by verifyParity against the C++ port). */
-import { calculatePhysics as calculatePhysicsTS } from '../../physics/physicsEngine';
+import { calculatePhysics as calculatePhysicsTS, installNativePhysics } from '../../physics/physicsEngine';
+import type { CosmicBody } from '../../domain/universe';
 
 function kindFromCode(code: number): string {
   switch (code) {
@@ -641,6 +835,19 @@ function kindFromCode(code: number): string {
     case 4: return 'hole';
     case 5: return 'vault';
     default: return 'planet';
+  }
+}
+
+/* R99 — the encoder half of the same encoding (COSMOS_KIND_* in
+   cosmos_engine.hpp); the reverse of kindFromCode above. */
+function kindToCode(kind: CosmicBody['kind']): number {
+  switch (kind) {
+    case 'star': return 0;
+    case 'dwarf': return 2;
+    case 'nebula': return 3;
+    case 'hole': return 4;
+    case 'vault': return 5;
+    default: return 1;
   }
 }
 
@@ -848,6 +1055,70 @@ function seededSimSystem(): SimBodyInput[] {
     });
   }
   return bodies;
+}
+
+/** R99 — the wasm marshalling for cosmos_physics_batch, extracted from the
+ *  bridge's wasm branch so round98-physics-conformance-gauntlet.ts can drive
+ *  THE EXACT production path under Node: ids as char**, orbitA/radius/phase/
+ *  speed as f64, kinds/hasRings as INT32 — the C signature takes `const int*`,
+ *  and the f64 marshalling this replaced made every non-zero kind read as
+ *  garbage (1.0 = 0x3FF0000000000000, so the C read 0x3FF00000 at odd indices
+ *  and 0 — a STAR — at even ones). Latent since the artifact first existed
+ *  because the parity button was the only caller; found while proving the
+ *  R99 wiring, before it could ship. The round98 gauntlet executes this
+ *  function against the artifact and the TS reference field for field. */
+export function marshalPhysicsBatch(
+  w: {
+    ccall: (ident: string, returnType: string | null, argTypes: string[], args: unknown[]) => unknown;
+    _malloc: (bytes: number) => number;
+    _free: (ptr: number) => void;
+    HEAPF64: Float64Array;
+  },
+  input: PhysicsBatchInput,
+): Float64Array {
+  const n = input.ids.length;
+  const enc = new TextEncoder();
+  const idBufs: number[] = [];
+  const idsPtrs: number[] = [];
+  for (const id of input.ids) {
+    const bytes = enc.encode(id + '\0');
+    const ptr = w._malloc(bytes.length);
+    new Uint8Array(w.HEAPF64.buffer).set(bytes, ptr);
+    idBufs.push(ptr);
+    idsPtrs.push(ptr);
+  }
+  const idsArrPtr = w._malloc(Math.max(idsPtrs.length, 1) * 4);
+  const heapU32 = new Uint32Array(w.HEAPF64.buffer);
+  idsPtrs.forEach((p, i) => { heapU32[idsArrPtr / 4 + i] = p; });
+  const f64 = (arr: number[]): number => {
+    const ptr = w._malloc(Math.max(arr.length, 1) * 8);
+    w.HEAPF64.set(arr, ptr / 8);
+    return ptr;
+  };
+  /* C ints, NOT f64 — see the header comment. */
+  const i32 = (arr: number[]): number => {
+    const ptr = w._malloc(Math.max(arr.length, 1) * 4);
+    new Int32Array(w.HEAPF64.buffer).set(arr, ptr / 4);
+    return ptr;
+  };
+  const pa = f64(input.orbitA);
+  const pr = f64(input.radius);
+  const pk = i32(input.kinds);
+  const ph = i32(input.hasRings);
+  const pp = f64(input.phase);
+  const pv = f64(input.speed);
+  const po = w._malloc(Math.max(n, 1) * PHYSICS_FIELD_COUNT * 8);
+  try {
+    w.ccall('cosmos_physics_batch', null, ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [idsArrPtr, pa, pr, pk, ph, pp, pv, n, input.simTimeSec, po]);
+    const out = new Float64Array(n * PHYSICS_FIELD_COUNT);
+    out.set(w.HEAPF64.subarray(po / 8, po / 8 + n * PHYSICS_FIELD_COUNT));
+    return out;
+  } finally {
+    [pa, pr, pk, ph, pp, pv, po].forEach((p) => w._free(p));
+    idBufs.forEach((p) => w._free(p));
+    w._free(idsArrPtr);
+  }
 }
 
 export const cosmosBridge = new CosmosBridge();

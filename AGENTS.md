@@ -17,8 +17,8 @@ Blueprint). For quality baseline and roadmap: `docs/EXPERIENCE-REPORT-2026-09-29
 - Physics constants, seed tables, black-hole reference params are LAW — never "clean them up".
 - Never remove safety nets (composite fallback, shader disarm, 55 ms breaker, reduced-motion).
 - R71 law: zoom never crosses cosmological slices; crossing is an explicit Kamui only.
-- Verify before claiming done: `npm run verify` (+ `npx tsx scripts/round18-kamui-gauntlet.ts`,
-  `npx tsx scripts/round63-void-probe.ts` when relevant, `npm run audit:arch -- --check`).
+- Verify before claiming done: `npm run verify` (+ `npx tsx scripts/gauntlets/round18-kamui-gauntlet.ts`,
+  `npx tsx scripts/probes/round63-void-probe.ts` when relevant, `npm run audit:arch -- --check`).
 - End every round by updating `PROJECT-BRAIN.md` §8/§9 and writing the round document in `docs/`.
 
 If a "bug" looks artistic, check `PROJECT-BRAIN.md` §6/§10 and the round docs before fixing it.
