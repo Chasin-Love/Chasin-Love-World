@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-02T14:32:07.219Z",
+  "generatedAt": "2026-10-02T14:53:41.892Z",
   "fileCount": 164,
   "deadExports": [
     {
@@ -24,6 +24,14 @@
     {
       "name": "SimTwinDrift",
       "file": "src/physics/simTwin.ts"
+    },
+    {
+      "name": "DegradationReason",
+      "file": "src/platform/native/cpp_bridge.ts"
+    },
+    {
+      "name": "TierDegradation",
+      "file": "src/platform/native/cpp_bridge.ts"
     }
   ],
   "deadCss": [
@@ -676,9 +684,9 @@
     "scripts/probes/round63-void-probe.ts": 280,
     "scripts/probes/round92-live-check.ts": 132,
     "scripts/probes/round95-physics-probe.ts": 134,
-    "scripts/probes/round95-steady-sky-live.ts": 229,
+    "scripts/probes/round95-steady-sky-live.ts": 262,
     "scripts/prod-smoke.ts": 87,
-    "scripts/smoke.ts": 233,
+    "scripts/smoke.ts": 270,
     "scripts/tools/generate-architecture-diagram.ts": 207,
     "scripts/tools/make-icons.mjs": 406,
     "scripts/tools/make-latest-json.mjs": 86,
@@ -699,7 +707,7 @@
     "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 2786,
+    "src/engine/engine.ts": 2794,
     "src/engine/kamui/KamuiPortalSystem.ts": 595,
     "src/engine/math.ts": 65,
     "src/engine/shaders.ts": 1542,
@@ -723,7 +731,7 @@
     "src/physics/simTwin.ts": 233,
     "src/platform/audio.ts": 536,
     "src/platform/desktop/adapter.ts": 275,
-    "src/platform/native/cpp_bridge.ts": 854,
+    "src/platform/native/cpp_bridge.ts": 979,
     "src/platform/performance.ts": 115,
     "src/platform/sentiment/sentiment.ts": 117,
     "src/platform/simClock.ts": 27,
@@ -759,7 +767,7 @@
     "src/ui/console/CommandPalette.tsx": 350,
     "src/ui/console/CoreConsole.tsx": 1469,
     "src/ui/console/CoreSigil.tsx": 226,
-    "src/ui/console/CppNativeEngineCard.tsx": 269,
+    "src/ui/console/CppNativeEngineCard.tsx": 289,
     "src/ui/console/QuantumBinTab.tsx": 342,
     "src/ui/console/ScenicBackdrop.tsx": 354,
     "src/ui/console/SimulatorTwinCard.tsx": 307,
@@ -819,7 +827,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      2786
+      2794
     ],
     [
       "src/engine/stages/LevelStageSystem.ts",
@@ -854,6 +862,10 @@
       1271
     ],
     [
+      "src/platform/native/cpp_bridge.ts",
+      979
+    ],
+    [
       "src/ui/vault/sandbox.tsx",
       944
     ],
@@ -864,10 +876,6 @@
     [
       "src/physics/sessionDriver.ts",
       864
-    ],
-    [
-      "src/platform/native/cpp_bridge.ts",
-      854
     ],
     [
       "src/ui/vault/viewers.tsx",
@@ -908,7 +916,7 @@
     ],
     "disk surface.ts imports": [],
     "native build path": [
-      "src/platform/native/cpp_bridge.ts:112"
+      "src/platform/native/cpp_bridge.ts:164"
     ],
     "gauntlet readFileSync targets": [
       "scripts/gauntlets/round17-gauntlet.ts:106",
@@ -1022,12 +1030,14 @@
       "scripts/probes/round63-void-probe.ts:212",
       "scripts/probes/round63-void-probe.ts:230",
       "scripts/probes/round95-steady-sky-live.ts:8",
-      "scripts/probes/round95-steady-sky-live.ts:65",
+      "scripts/probes/round95-steady-sky-live.ts:67",
       "scripts/smoke.ts:153",
       "scripts/smoke.ts:159",
       "scripts/smoke.ts:164",
       "scripts/smoke.ts:176",
       "scripts/smoke.ts:186",
+      "scripts/smoke.ts:208",
+      "src/engine/engine.ts:428",
       "src/platform/desktop/adapter.ts:5",
       "src/platform/performance.ts:72"
     ]

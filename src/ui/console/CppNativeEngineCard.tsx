@@ -139,6 +139,26 @@ export const CppNativeEngineCard: React.FC = () => {
                 are self-tests, not features.
               </p>
             )}
+            {/* R98 — the degradation ledger, surfaced. Before this round the
+                card showed a bare "TS REFERENCE FALLBACK" badge with no way to
+                tell a never-built artifact from a broken one. */}
+            {status.fellBack && (
+              <p className="font-mono text-[9px] text-amber-300/90 max-w-[420px] leading-relaxed">
+                Compiled core not in use.
+                {status.degraded.filter((d) => d.reason !== 'no-tauri').length === 0 ? (
+                  <> Running in a browser tab — the native tier needs the desktop shell, so this is expected here.</>
+                ) : (
+                  <>
+                    {' '}
+                    {status.degraded.filter((d) => d.reason !== 'no-tauri').map((d) => (
+                      <span key={`${d.tier}-${d.reason}`} className="block">
+                        ✕ {d.tier}: {d.reason} <span className="text-slate-500">({d.detail})</span>
+                      </span>
+                    ))}
+                  </>
+                )}
+              </p>
+            )}
           </div>
         </div>
 

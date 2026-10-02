@@ -16,11 +16,52 @@
 
 type CosmosBackend = 'native-cpp' | 'wasm' | 'typescript';
 
+/* R98 — THE DEGRADATION LEDGER.
+   Before this round every failed tier collapsed into a bare `return null`, so a
+   browser with no WASM artifact and a browser whose artifact was corrupt both
+   looked identical from the outside: `backend: 'typescript'`, no message, no
+   error, nothing in the console. "Nothing asserts that the browser is actually
+   on the WASM tier" was a TRUE and UNFALSIFIABLE statement about the old code —
+   the answer was not merely unreported, it did not exist.
+
+   The loader now names the reason it rejected each tier. The names are the
+   whole point: `no-artifact` (nothing built — expected on a machine without
+   emsdk) is a different fact from `instantiate-failed` (something WAS built and
+   is broken — a real defect someone must fix). Degradation stays SILENT for the
+   user (never an error, never a broken sky) but is now LOUD in the one place
+   that is for maintainers: the console, and the console card. */
+export type DegradationReason =
+  /* tier 1 (native) rejections — expected everywhere except the desktop shell */
+  | 'no-tauri'            /* not running inside the Tauri shell at all */
+  | 'tauri-import-failed' /* __TAURI_INTERNALS__ present but the api module would not load */
+  | 'native-status-failed'/* invoke('cosmos_status') threw */
+  | 'native-stub-build'   /* the shell answered, but with the type-check stub — never claim native physics */
+  /* tier 2 (wasm) rejections — the five paths loadWasm used to swallow */
+  | 'no-artifact'         /* HEAD did not answer ok — CI never built it / public/wasm missing */
+  | 'wrong-content-type'  /* an HTML SPA fallback, not JavaScript — Vite dev answered 200 for a missing path */
+  | 'import-failed'       /* the JS loaded but the dynamic import threw */
+  | 'no-factory'          /* neither EXPORT_ES6 default nor the global name was present */
+  | 'instantiate-failed'  /* the factory ran and the module could not be built/would not expose ccall */
+  | 'wasm-fetch-failed';  /* the HEAD probe itself threw (offline, blocked, CORS) */
+
+export interface TierDegradation {
+  tier: 'native-cpp' | 'wasm';
+  reason: DegradationReason;
+  detail: string;
+}
+
 export interface CosmosStatus {
   backend: CosmosBackend;
   version: string;
   physicsFieldCount: number;
   ready: boolean;
+  /** R98 — every tier that was tried and rejected, in the order tried.
+   *  Empty means the FIRST tier won (nothing was given up). */
+  degraded: TierDegradation[];
+  /** R98 — true only when a tier above `typescript` was tried and lost. The
+   *  browser normally lands here (no emsdk on the author's machine is not a
+   *  defect); the desktop shell landing here IS. */
+  fellBack: boolean;
 }
 
 interface KeplerBatchInput {
@@ -85,51 +126,88 @@ export const PHYSICS_FIELD_COUNT = 41;
 
 type TauriInvoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
 
-async function loadTauriInvoke(): Promise<TauriInvoke | null> {
-  const w = window as unknown as { __TAURI_INTERNALS__?: unknown };
-  if (!w.__TAURI_INTERNALS__) return null;
-  try {
-    const core = await import('@tauri-apps/api/core');
-    return core.invoke as TauriInvoke;
-  } catch {
-    return null;
+/** R98 — the loaders reject with a NAMED reason instead of a bare null, so the
+ *  caller can record which tier died and why. `detail` is developer-facing
+ *  (status line, error text) and never reaches an end user unfiltered. */
+class TierRejection extends Error {
+  constructor(readonly reason: DegradationReason, readonly detail: string) {
+    super(`${reason}: ${detail}`);
+    this.name = 'TierRejection';
   }
 }
 
-async function loadWasm(): Promise<WasmModule | null> {
-  try {
-    /* the WASM artifact is optional (built by CI / scripts/build-wasm.sh into
-       public/wasm/, served at the site root in dev and prod alike — R89 moved
-       it there from the in-source folder, which the bundled dist could never
-       serve). */
-    /* Absolute and computed at runtime — Vite's dev transform wraps dynamic
-       imports in __vite__injectQuery(spec, 'import'), whose helper passes
-       through only specifiers that do NOT start with '.' or '/'; a
-       root-relative path arrived as '/wasm/...?import' and the dev server
-       404s public-dir files under that query. Absolute URLs sail through in
-       dev and resolve identically in prod and Tauri. @vite-ignore still
-       guards the build-time resolver (the artifact may not exist at build). */
-    const wasmSpec = new URL('/wasm/cosmos_engine.js', window.location.origin).href;
-    const probe = await fetch(wasmSpec, { method: 'HEAD' });
-    if (!probe.ok) return null;
-    /* Vite's dev SPA fallback answers missing paths with 200 text/html —
-       importing that would throw a loud console error for a perfectly
-       normal "no artifact yet" host. The artifact is optional; only a real
-       JavaScript response may be imported (the silent-fallback contract). */
-    if (!(probe.headers.get('content-type') || '').includes('javascript')) return null;
-    /* @vite-ignore — the artifact is optional and may not exist at build time */
-    const mod = await import(/* @vite-ignore */ wasmSpec);
-    /* EXPORT_ES6 gives a default export; older glue assigns the global name —
-       accept both so either artifact shape loads */
-    const w = window as unknown as { cosmos_engine?: unknown };
-    const factory = (mod.default ?? mod.cosmos_engine ?? w.cosmos_engine) as
-      | ((init?: unknown) => Promise<WasmModule>)
-      | null;
-    if (!factory) return null;
-    return await factory({ locateFile: (f: string) => `/wasm/${f}` });
-  } catch {
-    return null;
+async function loadTauriInvoke(): Promise<TauriInvoke> {
+  const w = window as unknown as { __TAURI_INTERNALS__?: unknown };
+  if (!w.__TAURI_INTERNALS__) {
+    throw new TierRejection('no-tauri', 'no __TAURI_INTERNALS__ on window (not the desktop shell)');
   }
+  try {
+    const core = await import('@tauri-apps/api/core');
+    return core.invoke as TauriInvoke;
+  } catch (err) {
+    throw new TierRejection('tauri-import-failed', err instanceof Error ? err.message : String(err));
+  }
+}
+
+async function loadWasm(): Promise<WasmModule> {
+  /* the WASM artifact is optional (built by CI / scripts/tools/build-wasm.sh into
+     public/wasm/, served at the site root in dev and prod alike — R89 moved
+     it there from the in-source folder, which the bundled dist could never
+     serve). */
+  /* Absolute and computed at runtime — Vite's dev transform wraps dynamic
+     imports in __vite__injectQuery(spec, 'import'), whose helper passes
+     through only specifiers that do NOT start with '.' or '/'; a
+     root-relative path arrived as '/wasm/...?import' and the dev server
+     404s public-dir files under that query. Absolute URLs sail through in
+     dev and resolve identically in prod and Tauri. @vite-ignore still
+     guards the build-time resolver (the artifact may not exist at build). */
+  const wasmSpec = new URL('/wasm/cosmos_engine.js', window.location.origin).href;
+  let probe: Response;
+  try {
+    probe = await fetch(wasmSpec, { method: 'HEAD' });
+  } catch (err) {
+    throw new TierRejection('wasm-fetch-failed', err instanceof Error ? err.message : String(err));
+  }
+  if (!probe.ok) {
+    throw new TierRejection('no-artifact', `HEAD ${wasmSpec} → HTTP ${probe.status}`);
+  }
+  /* Vite's dev SPA fallback answers missing paths with 200 text/html —
+     importing that would throw a loud console error for a perfectly
+     normal "no artifact yet" host. The artifact is optional; only a real
+     JavaScript response may be imported (the silent-fallback contract). */
+  const contentType = probe.headers.get('content-type') || '(none)';
+  if (!contentType.includes('javascript')) {
+    throw new TierRejection('wrong-content-type', `HEAD ${wasmSpec} → content-type ${contentType}`);
+  }
+  /* @vite-ignore — the artifact is optional and may not exist at build time */
+  let mod: Record<string, unknown>;
+  try {
+    mod = (await import(/* @vite-ignore */ wasmSpec)) as unknown as Record<string, unknown>;
+  } catch (err) {
+    throw new TierRejection('import-failed', err instanceof Error ? err.message : String(err));
+  }
+  /* EXPORT_ES6 gives a default export; older glue assigns the global name —
+     accept both so either artifact shape loads */
+  const w = window as unknown as { cosmos_engine?: unknown };
+  const factory = (mod.default ?? mod.cosmos_engine ?? w.cosmos_engine) as
+    | ((init?: unknown) => Promise<WasmModule>)
+    | null
+    | undefined;
+  if (typeof factory !== 'function') {
+    throw new TierRejection('no-factory', `neither default export nor global cosmos_engine on ${wasmSpec}`);
+  }
+  let module: WasmModule;
+  try {
+    module = await factory({ locateFile: (f: string) => `/wasm/${f}` });
+  } catch (err) {
+    throw new TierRejection('instantiate-failed', err instanceof Error ? err.message : String(err));
+  }
+  if (!module || typeof module.ccall !== 'function') {
+    /* the glue loaded but carries no Emscripten runtime surface — a truncated or
+       hand-edited artifact. Distinct from instantiate-failed: nothing threw. */
+    throw new TierRejection('instantiate-failed', 'module exposed no ccall (truncated or non-Emscripten artifact)');
+  }
+  return module;
 }
 
 /** Minimal Emscripten module surface used by the bridge. */
@@ -152,10 +230,14 @@ class CosmosBridge {
     version: 'ts-1.0',
     physicsFieldCount: PHYSICS_FIELD_COUNT,
     ready: false,
+    degraded: [],
+    fellBack: false,
   };
   private initPromise: Promise<CosmosStatus> | null = null;
   private invokeFn: TauriInvoke | null = null;
   private wasm: WasmModule | null = null;
+  /** R98 — the ledger, in the order the tiers were tried. */
+  private degraded: TierDegradation[] = [];
   /* R87 sim session state — one handle on the wasm tier, one twin on TS */
   private wasmSimHandle: number | null = null;
   private wasmSimBodyCount = 0; /* R91 — roster size of the wasm session (the C++ core does not report it back) */
@@ -163,41 +245,84 @@ class CosmosBridge {
 
   /* ------------------------------ lifecycle ------------------------------ */
 
+  /** R98 — record why a tier was given up. Never throws: degradation is not
+   *  an error, it is the documented fallback contract. */
+  private reject(tier: 'native-cpp' | 'wasm', err: unknown): void {
+    const rejection = err instanceof TierRejection ? err : null;
+    this.degraded.push({
+      tier,
+      reason: rejection?.reason ?? 'wasm-fetch-failed',
+      detail: rejection?.detail ?? (err instanceof Error ? err.message : String(err)),
+    });
+  }
+
+  /** R98 — THE ONE-TIME WARNING.
+   *  This is the answer to "something that tells us this has gone wrong".
+   *  Exactly one line per page load, on the console, naming the tier that was
+   *  lost and why — deliberately NOT console.error, because falling back to the
+   *  TS reference is the designed behaviour on a machine with no emsdk, and a
+   *  red console would train the eye to ignore it. The line is quiet enough to
+   *  miss in normal use and impossible to miss when you go looking, and it
+   *  separates "never built here" from "built and broken". */
+  private warnDegradation(): void {
+    const d = this.degraded;
+    if (d.length === 0) return;
+    /* no-tauri is the browser's NORMAL state, not a degradation worth a line —
+       a plain web tab has no reason to have the desktop shell. Log the rest. */
+    const notable = d.filter((x) => x.reason !== 'no-tauri');
+    if (notable.length === 0) return;
+    const lines = notable.map((x) => `  · ${x.tier}: ${x.reason} — ${x.detail}`);
+    console.warn(
+      `[cosmos] native tier degraded → running the TypeScript reference.\n${lines.join('\n')}\n` +
+      `  The sky is unaffected (the TS reference is numerically the same law); ` +
+      `if this is the desktop app, run: bash scripts/tools/build-wasm.sh (or reinstall the release).`,
+    );
+  }
+
   init(): Promise<CosmosStatus> {
     if (this.initPromise) return this.initPromise;
     this.initPromise = (async () => {
-      const invoke = await loadTauriInvoke();
-      if (invoke) {
+      /* R98 — each tier now throws a NAMED TierRejection instead of returning
+         null. The fall-through order and the winning conditions are unchanged;
+         only the bookkeeping around the failures is new. */
+      try {
+        const invoke = await loadTauriInvoke();
         try {
           const res = await invoke<{ backend: string; version: string; physicsFieldCount: number }>('cosmos_status');
           if (res.version !== 'stub') {
             this.invokeFn = invoke;
-            this.statusValue = { backend: 'native-cpp', version: res.version, physicsFieldCount: res.physicsFieldCount, ready: true };
+            this.statusValue = { backend: 'native-cpp', version: res.version, physicsFieldCount: res.physicsFieldCount, ready: true, degraded: [...this.degraded], fellBack: false };
             return this.statusValue;
           }
           /* stub build (type-check host) — never claim native physics */
-        } catch {
-          /* fall through to wasm */
+          this.reject('native-cpp', new TierRejection('native-stub-build', `cosmos_status reported version "stub"`));
+        } catch (err) {
+          this.reject('native-cpp', new TierRejection('native-status-failed', err instanceof Error ? err.message : String(err)));
         }
+      } catch (err) {
+        this.reject('native-cpp', err);
       }
-      const wasm = await loadWasm();
-      if (wasm) {
+      try {
+        const wasm = await loadWasm();
         this.wasm = wasm;
         let version = 'wasm';
         try {
           version = wasm.ccall('cosmos_version', 'string', [], []) as string;
         } catch { /* keep default */ }
-        this.statusValue = { backend: 'wasm', version, physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true };
+        this.statusValue = { backend: 'wasm', version, physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true, degraded: [...this.degraded], fellBack: false };
         return this.statusValue;
+      } catch (err) {
+        this.reject('wasm', err);
       }
-      this.statusValue = { backend: 'typescript', version: 'ts-reference', physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true };
+      this.statusValue = { backend: 'typescript', version: 'ts-reference', physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true, degraded: [...this.degraded], fellBack: true };
+      this.warnDegradation();
       return this.statusValue;
     })();
     return this.initPromise;
   }
 
   getStatus(): CosmosStatus {
-    return { ...this.statusValue };
+    return { ...this.statusValue, degraded: this.statusValue.degraded.map((d) => ({ ...d })) };
   }
 
   /* -------------------------------- kernels ------------------------------ */

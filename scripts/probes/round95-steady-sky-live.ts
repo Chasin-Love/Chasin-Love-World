@@ -16,7 +16,9 @@
    3. the sim clock advances continuously (real gravity owns the sky);
    4. the frame loop never starves (the catch-up burst yields);
    5. the star leads the roster with a bounded barycentric wobble;
-   6. zero console/page errors across the whole hold.
+   6. the physics tier is OWNED — it resolved, and the R98 degradation ledger
+      is honest (see check 1b below);
+   7. zero console/page errors across the whole hold.
 
    NOTE: this harness deliberately does NOT `import('/src/physics/sessionDriver.ts')`
    page-side. Under the app's dynamic import graph that yields a SECOND module
@@ -136,6 +138,37 @@ async function main() {
     check('live: the universe boots DRIVING (gate on, crossfade full, readback whole)',
       !!s0.ready && !!s0.driverOn && (s0.blend ?? 0) >= 1 && (s0.readbackLen ?? 0) > 0,
       JSON.stringify(s0));
+
+    /* 1b — R98: THE TIER RECEIPT. Before this round a silent drop to the
+       TypeScript tier was indistinguishable from never having tried, so this
+       probe could not fail on it. Now the engine publishes the live status
+       (backend + the degradation ledger), and the invariant is asserted:
+         - the status must be READY (init resolved) — an unresolved tier means
+           the sky is running on an unowned default;
+         - if the app is NOT on the typescript tier, the ledger MUST be empty
+           (nothing was given up). A non-empty ledger with a non-TS backend
+           would mean the bridge silently recovered — that must never happen;
+         - if it IS on typescript, the ledger MUST name a reason. This is the
+           assertion that turns "we fell back" from an unfalsifiable shrug into
+           a fact the chain can check.
+       A browser legitimately lands on typescript when no WASM artifact was
+       built (no emsdk on the machine), so `no-artifact` is NOT a failure —
+       an EMPTY ledger on the typescript tier IS. */
+    const tier = await page.evaluate(() => {
+      const e = (window as any).__ENGINE__;
+      const s = e?.cosmosStatus?.();
+      return s ? { backend: s.backend, ready: s.ready, fellBack: s.fellBack, degraded: s.degraded ?? [] } : null;
+    });
+    check('live: the physics tier resolved (init completed, tier is owned)',
+      !!tier && tier.ready === true, `no published cosmos status on the engine: ${JSON.stringify(tier)}`);
+    if (tier) {
+      const notable = tier.degraded.filter((d: any) => d.reason !== 'no-tauri');
+      const emptyLedgerOnTs = tier.backend === 'typescript' && notable.length === 0;
+      const ledgerWithNative = tier.backend !== 'typescript' && notable.length > 0;
+      check('live: the degradation ledger is honest (TS ⇒ named reason; native ⇒ nothing lost)',
+        !emptyLedgerOnTs && !ledgerWithNative,
+        `backend=${tier.backend} degraded=${JSON.stringify(tier.degraded)}`);
+    }
 
     /* 2 — the hold: sample every 15 s for HOLD_MS, asserting the anti-
        detonation law continuously */

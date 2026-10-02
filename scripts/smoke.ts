@@ -185,6 +185,43 @@ async function main(): Promise<void> {
 
     await page.evaluate(`(() => { const e = window.__ENGINE__; if (e && typeof e.setPaused === 'function') e.setPaused(true); })()`);
     await page.waitForTimeout(800);                         // let the paused frame flush
+
+    /* R98 — THE TIER RECEIPT, in the chain itself.
+       Before this round the app could silently drop from the compiled core to
+       the TypeScript reference and the whole verify chain stayed green: the
+       frame matches either way, because the TS reference implements the same
+       law. That is correct for the USER and useless as a guarantee — nothing
+       asserted the compiled core was even reachable.
+
+       Now the engine publishes its live bridge status and the chain reads it.
+       The invariant deliberately does NOT demand a particular tier: a machine
+       without emsdk has no artifact and legitimately runs TypeScript. What it
+       forbids is the two dishonest states:
+         - an unresolved tier (ready:false) — the bridge never finished
+           selecting, so the sky rides an unowned default;
+         - an incoherent ledger — typescript with no named reason (a silent
+           fallback the chain cannot see), or a native tier that also reports
+           something lost.
+       A drop to TypeScript must now be EXPLAINED. That is the whole difference
+       between a shrug and a receipt. */
+    const tier = await page.evaluate(`(() => {
+      const e = window.__ENGINE__;
+      const s = e && typeof e.cosmosStatus === 'function' ? e.cosmosStatus() : null;
+      return s ? { backend: s.backend, ready: s.ready, degraded: s.degraded || [] } : null;
+    })()`);
+    if (!tier || tier.ready !== true) {
+      errors.push('[tier] the physics tier never resolved — the bridge reports no owned backend');
+    } else {
+      const notable = tier.degraded.filter((d) => d.reason !== 'no-tauri');
+      console.log(`SMOKE TIER — ${tier.backend}${notable.length ? ` (degraded: ${notable.map((d) => `${d.tier}:${d.reason}`).join(', ')})` : ''}`);
+      if (tier.backend === 'typescript' && notable.length === 0) {
+        errors.push('[tier] running the TypeScript reference with an EMPTY degradation ledger — a silent fallback the chain cannot see');
+      }
+      if (tier.backend !== 'typescript' && notable.length > 0) {
+        errors.push(`[tier] backend ${tier.backend} claims success while also reporting lost tiers: ${JSON.stringify(notable)}`);
+      }
+    }
+
     const shot = await page.screenshot();
     const shotB64 = shot.toString('base64');
 

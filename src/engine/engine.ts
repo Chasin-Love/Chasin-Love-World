@@ -44,7 +44,7 @@ import { simTwinTick, enableSimTwin, disableSimTwin } from '../physics/simTwin';
    driver module itself never writes rendered state — the updateBodies seam
    below is the only writer, exactly as the round92 gauntlet pins. */
 import { driverTick, driverReadback, driverVelReadback, driverState, activateScope, enableDriver, disableDriver, healDriver, setScopeStar, type DriverBody } from '../physics/sessionDriver';
-import { cosmosBridge } from '../platform/native/cpp_bridge';
+import { cosmosBridge, type CosmosStatus } from '../platform/native/cpp_bridge';
 import { isPerformanceEnabled, perfMark, perfMeasure, recordFrame } from '../platform/performance';
 import { isDesktop } from '../platform/desktop/adapter';
 import { ensureSkyFor, getActiveSkySpec, type ActiveSkySpec } from '../platform/sky/skyRegistry';
@@ -424,6 +424,14 @@ export class UniverseEngine {
     inflight: boolean;
   } = { simDays: NaN, xyz: new Float64Array(0), valid: false, inflight: false };
   private keplerFrame = 0;
+  /** R98 — the physics tier the app is ACTUALLY on, published on the engine so
+   *  a live probe can read it off window.__ENGINE__ (the honest observation
+   *  point). Reading it page-side by importing cpp_bridge would create a second
+   *  module instance whose init() never saw this engine's session — the same
+   *  trap the R95 probe documents for the driver. This is a snapshot of the
+   *  bridge's status, not a second loader: the bridge stays the single owner
+   *  of tier selection. */
+  cosmosStatus(): CosmosStatus { return cosmosBridge.getStatus(); }
   /* ROUND 63 — the reference's blaze, whole: his demo runs bloom strength
      0.68 / radius 0.2 / threshold 0.4 (main.js config verbatim). While a
      geodesic hole is on stage the composer eases to exactly those values —
