@@ -1,12 +1,7 @@
 {
-  "generatedAt": "2026-10-02T06:49:20.646Z",
+  "generatedAt": "2026-10-02T14:32:07.219Z",
   "fileCount": 164,
   "deadExports": [
-    {
-      "symbol": "BodyBuildersSeed",
-      "file": "src/engine/worlds/BodyBuilders.ts",
-      "action": "delete"
-    },
     {
       "symbol": "shadowReferencesFiles",
       "file": "src/state/actions/shared.ts",
@@ -657,7 +652,7 @@
   ],
   "loc": {
     "scripts/audit-architecture.ts": 277,
-    "scripts/gauntlets/engineSource.ts": 27,
+    "scripts/gauntlets/engineSource.ts": 35,
     "scripts/gauntlets/round16-gauntlet.ts": 103,
     "scripts/gauntlets/round17-gauntlet.ts": 488,
     "scripts/gauntlets/round18-kamui-gauntlet.ts": 198,
@@ -687,7 +682,7 @@
     "scripts/tools/generate-architecture-diagram.ts": 207,
     "scripts/tools/make-icons.mjs": 406,
     "scripts/tools/make-latest-json.mjs": 86,
-    "server/index.ts": 95,
+    "server/index.ts": 103,
     "server/paths.ts": 35,
     "server/realityDaemon.ts": 464,
     "server/realityTemplates.ts": 153,
@@ -719,8 +714,8 @@
     "src/engine/systems/kamuiPhases.ts": 99,
     "src/engine/systems/levelSystem.ts": 42,
     "src/engine/systems/stageThresholds.ts": 32,
-    "src/engine/worlds/BodyBuilders.ts": 717,
-    "src/engine/worlds/InnerGalaxySystem.ts": 817,
+    "src/engine/worlds/BodyBuilders.ts": 714,
+    "src/engine/worlds/InnerGalaxySystem.ts": 814,
     "src/main.tsx": 17,
     "src/physics/nbody.ts": 321,
     "src/physics/physicsEngine.ts": 438,
@@ -880,7 +875,7 @@
     ],
     [
       "src/engine/worlds/InnerGalaxySystem.ts",
-      817
+      814
     ]
   ],
   "pathEncode": {
@@ -903,13 +898,13 @@
       "server/skyStore.ts:7",
       "server/skyStore.ts:64",
       "src-tauri/src/realities.rs:3",
-      "src-tauri/src/realities.rs:500"
+      "src-tauri/src/realities.rs:519"
     ],
     "generated-code imports": [
       "server/realityTemplates.ts:44",
       "server/realityTemplates.ts:81",
-      "src-tauri/src/realities.rs:400",
-      "src-tauri/src/realities.rs:411"
+      "src-tauri/src/realities.rs:419",
+      "src-tauri/src/realities.rs:430"
     ],
     "disk surface.ts imports": [],
     "native build path": [
@@ -998,7 +993,7 @@
       "src/state/actions/realities.ts:326",
       "src/state/actions/realities.ts:374",
       "src/ui/reality/CreateRealityModal.tsx:69",
-      "src-tauri/src/realities.rs:437"
+      "src-tauri/src/realities.rs:456"
     ],
     "localStorage keys": [
       "scripts/gauntlets/round91-session-memory-gauntlet.ts:108",

@@ -10,6 +10,14 @@ import { existsSync, readFileSync } from 'fs';
 
 const ENGINE_FILES = [
   'engine/engine.ts',
+  /* engine/math.ts carries the CPU-noise helpers (windowFn/hash/vnoise/cpuFbm)
+     that R97 commit 1 moved OUT of engine.ts. It belongs in the union for the
+     same reason the subsystems do: a gauntlet pinning one of those bodies must
+     read the text where it now LIVES, or the pin silently matches nothing and
+     passes vacuously. Seven modules import from this file — the shell, the sky
+     subsystem, the world builders, the inner galaxy, the stage arbiter, the
+     camera rig and the surface manager. */
+  'engine/math.ts',
   'engine/sky/SkyFxSystem.ts',
   'engine/blackhole/BlackHoleSystem.ts',
   'engine/kamui/KamuiPortalSystem.ts',

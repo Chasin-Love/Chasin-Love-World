@@ -99,5 +99,14 @@ dark is the flake — re-run standalone before investigating anything.*
 - Every shader string, every physics constant, every seed table.
 - No gauntlet deleted or weakened; three pins reconciled and logged (§2).
 - The R71 container law, the R71.1 slice law, the R86 anti-reduced-motion decree.
-- `src/realities/solPrime/sky.json` (the author's own untracked file) stays
-  untouched and uncommitted.
+- `src/realities/solPrime/sky.json` was left byte-untouched. **Correction (R98):**
+  it was never untracked — the author committed it in `3b28c37` alongside the
+  Node/Rust backend fixes, and it is tracked today. That is correct and stays:
+  the file is not author state. Its contents are exactly the default manifest
+  (`version 1`, `activeId: null`, empty `photos`, and the five slider values that
+  `server/skyStore.ts:41-46`, `src-tauri/src/sky.rs:65-69` and
+  `src/platform/sky/skyRegistry.ts:128` each hardcode), so both backends fall back
+  to it when it is absent, and its siblings (`index.ts`, `surface.ts`,
+  `data.json`) are all tracked. Only the author's own sky *state* — an uploaded
+  photo or a moved slider — is machine-local, and that belongs in `.gitignore`,
+  which the Sky Studio route already respects.

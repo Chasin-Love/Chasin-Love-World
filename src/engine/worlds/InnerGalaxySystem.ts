@@ -28,13 +28,11 @@ export class InnerGalaxySystem {
   constructor(private eng: UniverseEngine) {}
 
   /* ---- the shared runtime (engine-owned; name-preserving access) ---- */
-  private get scene(): THREE.Scene { return this.eng.scene; }
   private get camera(): THREE.PerspectiveCamera { return this.eng.camera; }
   private get rig(): CameraRig { return this.eng.rig; }
   private get cb(): UniverseEngine['cb'] { return this.eng.cb; }
   private get clockT(): number { return this.eng.clockT; }
   private get simDays(): number { return this.eng.simDays; }
-  private get bodies(): RuntimeBody[] { return this.eng.bodies; }
   private get bhSys(): UniverseEngine['bhSys'] { return this.eng.bhSys; }
   private get portal(): UniverseEngine['portal'] { return this.eng.portal; }
   private get kamuiTimer(): number { return this.eng.kamuiTimer; }
@@ -48,7 +46,6 @@ export class InnerGalaxySystem {
   private get innerColliderList(): THREE.Mesh[] { return this.eng.innerColliderList; }
   private get _vScratch1(): THREE.Vector3 { return this.eng._vScratch1; }
   private get _vScratch2(): THREE.Vector3 { return this.eng._vScratch2; }
-  private get _vScratch4(): THREE.Vector3 { return this.eng._vScratch4; }
   private get _vDirScratch(): THREE.Vector3 { return this.eng._vDirScratch; }
   private get _qScratch(): THREE.Quaternion { return this.eng._qScratch; }
   private get _qScratch2(): THREE.Quaternion { return this.eng._qScratch2; }

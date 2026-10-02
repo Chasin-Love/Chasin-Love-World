@@ -24,8 +24,6 @@ import { getBlackHoleParams } from '../blackholeParams';
 import { getQualityTier } from '../capability';
 import type { BeltRock, RuntimeBody, UniverseEngine } from '../engine';
 
-export class BodyBuildersSeed { /* placeholder to keep sed anchors stable */ }
-
 export class BodyBuilders {
   constructor(private eng: UniverseEngine) {}
 
@@ -57,7 +55,6 @@ export class BodyBuilders {
   private get lastEntries(): { planetId: string; createdAt: number; updatedAt: number }[] | undefined { return this.eng.lastEntries; }
   private set lastEntries(v: { planetId: string; createdAt: number; updatedAt: number }[] | undefined) { this.eng.lastEntries = v; }
   private get bhSys(): UniverseEngine['bhSys'] { return this.eng.bhSys; }
-  private get kamuiTimer(): number { return this.eng.kamuiTimer; }
   private makePoints(count: number, posFn: (i: number, arr: Float32Array) => void, sizeFn: (i: number) => number, colFn: (i: number) => [number, number, number], alphaFn: (i: number) => number, px: number, twinkle: boolean, lens?: boolean): THREE.Points {
     return this.eng.makePoints(count, posFn, sizeFn, colFn, alphaFn, px, twinkle, lens === true);
   }
