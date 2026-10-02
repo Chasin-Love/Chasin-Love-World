@@ -203,11 +203,19 @@ async function main(): Promise<void> {
            fallback the chain cannot see), or a native tier that also reports
            something lost.
        A drop to TypeScript must now be EXPLAINED. That is the whole difference
-       between a shrug and a receipt. */
+       between a shrug and a receipt.
+
+       R99.1 adds the last leg: CosmosStatus.primeFailures — the count of
+       post-tier-won failures of the wired native physics prime. The catch is
+       deliberate (zero-fail law: TS already served identical numbers) but it
+       is no longer SILENT: counted on the status, warned once on the console,
+       and asserted at ZERO here — a non-zero count means the native batch
+       threw after the tier was won, and the boot is not clean no matter how
+       right the frame looks. */
     const tier = await page.evaluate(`(() => {
       const e = window.__ENGINE__;
       const s = e && typeof e.cosmosStatus === 'function' ? e.cosmosStatus() : null;
-      return s ? { backend: s.backend, ready: s.ready, degraded: s.degraded || [] } : null;
+      return s ? { backend: s.backend, ready: s.ready, degraded: s.degraded || [], primeFailures: s.primeFailures } : null;
     })()`);
     if (!tier || tier.ready !== true) {
       errors.push('[tier] the physics tier never resolved — the bridge reports no owned backend');
@@ -219,6 +227,9 @@ async function main(): Promise<void> {
       }
       if (tier.backend !== 'typescript' && notable.length > 0) {
         errors.push(`[tier] backend ${tier.backend} claims success while also reporting lost tiers: ${JSON.stringify(notable)}`);
+      }
+      if ((tier.primeFailures ?? 0) !== 0) {
+        errors.push(`[tier] the physics prime failed ${tier.primeFailures} time(s) after the tier was won — the wired native batch threw (see the [cosmos] console warning); the boot is not clean even though the frame may match`);
       }
     }
 

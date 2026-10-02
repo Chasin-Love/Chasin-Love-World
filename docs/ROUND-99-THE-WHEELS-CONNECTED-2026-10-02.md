@@ -188,3 +188,26 @@ instead of inspecting the source, trusting mtimes, or reading the doc
 comment — caught two latent bugs on its FIRST run, one of them a
 production-bound ABI break that static checks, runtime MSVC proofs, and a
 green verify chain had all missed for six rounds.
+
+---
+
+## Addendum — R99.1: THE LAST SHRUG NAMED (same day)
+
+The author read this round's honest-limits note — the one place errors could
+still vanish — and asked for it closed. `primePhysics`'s catch was the last
+bare `return` in the bridge: deliberate (the zero-fail law: the TS reference
+already served identical numbers, so a failed prime must never break a
+frame) but invisible. It is now a value, per the R98 law this round
+inherited:
+
+- every failed prime is counted on **`CosmosStatus.primeFailures`** (live
+  through `getStatus()`, so the console card and the chain read the truth);
+- the first failure warns once on the console with its reason;
+- the smoke carries the count and **hard-fails a boot at any non-zero** —
+  the new assertion says it outright: *"the boot is not clean even though
+  the frame may match."*
+
+Mutation-proven per the house law: forcing the prime to throw turns the
+smoke RED with exactly that message while the tier still reports wasm and
+the frame still matches — loud precisely because nothing else would reveal
+it. Reverted, the healthy boot is green at zero.

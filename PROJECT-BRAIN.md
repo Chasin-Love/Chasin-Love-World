@@ -508,6 +508,10 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (unwire → red → rewire → green). Snapshot refreshed; scope lines drawn: the
   session driver, simTwin and the galaxy-dive inner systems stay on the TS
   reference by law (the driver's determinism is its own contract).
+  **R99.1 (same day):** the last silent path — primePhysics' bare catch — became
+  a VALUE: counted on `CosmosStatus.primeFailures`, warned once on the console,
+  and asserted at ZERO by the smoke ("the boot is not clean even though the
+  frame may match") — mutation-proven red on a forced failure.
   `docs/ROUND-99-THE-WHEELS-CONNECTED-2026-10-02.md`
 - **R90 (this round, on main):** the author's report — the Native Simulator Twin card
   (Verify Twin with it) could not be scrolled into view in the Core Console — reproduced

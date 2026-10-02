@@ -64,6 +64,12 @@ export interface CosmosStatus {
    *  instantiated, or the page predates it. The desktop shell landing here
    *  IS a defect. */
   fellBack: boolean;
+  /** R99.1 — how many times the primePhysics seam failed AFTER the tier was
+   *  won. The catch is deliberate (the zero-fail law: the TS reference
+   *  already served identical numbers, so a failed prime must never break a
+   *  frame) but silence is not: every failure is counted, the first warns
+   *  with its reason, and the smoke asserts a healthy boot at zero. */
+  primeFailures: number;
 }
 
 interface KeplerBatchInput {
@@ -238,12 +244,16 @@ class CosmosBridge {
     ready: false,
     degraded: [],
     fellBack: false,
+    primeFailures: 0,
   };
   private initPromise: Promise<CosmosStatus> | null = null;
   private invokeFn: TauriInvoke | null = null;
   private wasm: WasmModule | null = null;
   /** R98 — the ledger, in the order the tiers were tried. */
   private degraded: TierDegradation[] = [];
+  /* R99.1 — the prime seam's failure ledger (see CosmosStatus.primeFailures). */
+  private primeFailureCount = 0;
+  private primeFailureWarned = false;
   /* R87 sim session state — one handle on the wasm tier, one twin on TS */
   private wasmSimHandle: number | null = null;
   private wasmSimBodyCount = 0; /* R91 — roster size of the wasm session (the C++ core does not report it back) */
@@ -297,7 +307,7 @@ class CosmosBridge {
           const res = await invoke<{ backend: string; version: string; physicsFieldCount: number }>('cosmos_status');
           if (res.version !== 'stub') {
             this.invokeFn = invoke;
-            this.statusValue = { backend: 'native-cpp', version: res.version, physicsFieldCount: res.physicsFieldCount, ready: true, degraded: [...this.degraded], fellBack: false };
+            this.statusValue = { backend: 'native-cpp', version: res.version, physicsFieldCount: res.physicsFieldCount, ready: true, degraded: [...this.degraded], fellBack: false, primeFailures: 0 };
             return this.statusValue;
           }
           /* stub build (type-check host) — never claim native physics */
@@ -315,12 +325,12 @@ class CosmosBridge {
         try {
           version = wasm.ccall('cosmos_version', 'string', [], []) as string;
         } catch { /* keep default */ }
-        this.statusValue = { backend: 'wasm', version, physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true, degraded: [...this.degraded], fellBack: false };
+        this.statusValue = { backend: 'wasm', version, physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true, degraded: [...this.degraded], fellBack: false, primeFailures: 0 };
         return this.statusValue;
       } catch (err) {
         this.reject('wasm', err);
       }
-      this.statusValue = { backend: 'typescript', version: 'ts-reference', physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true, degraded: [...this.degraded], fellBack: true };
+      this.statusValue = { backend: 'typescript', version: 'ts-reference', physicsFieldCount: PHYSICS_FIELD_COUNT, ready: true, degraded: [...this.degraded], fellBack: true, primeFailures: 0 };
       this.warnDegradation();
       return this.statusValue;
     })();
@@ -328,7 +338,12 @@ class CosmosBridge {
   }
 
   getStatus(): CosmosStatus {
-    return { ...this.statusValue, degraded: this.statusValue.degraded.map((d) => ({ ...d })) };
+    return {
+      ...this.statusValue,
+      degraded: this.statusValue.degraded.map((d) => ({ ...d })),
+      /* live — the init snapshots carry 0; the counter moves after boot */
+      primeFailures: this.primeFailureCount,
+    };
   }
 
   /* -------------------------------- kernels ------------------------------ */
@@ -644,9 +659,22 @@ class CosmosBridge {
       const fields = await this.physicsBatch(input);
       const primed = installNativePhysics([...bodies], fields);
       return { primed, backend: this.statusValue.backend };
-    } catch {
-      /* the zero-fail law: the TS reference already served identical numbers;
-         a failed prime degrades nothing and must never break a frame. */
+    } catch (err) {
+      /* R99.1 — the zero-fail law: the TS reference already served identical
+         numbers, so a failed prime must never break a frame. But R98's own
+         law says degradation is a VALUE, never a shrug: the failure is
+         counted, the first one warns with its reason, the count rides
+         CosmosStatus.primeFailures, and the smoke asserts a healthy boot at
+         zero. Before this the catch was a bare return — the one true
+         silence left in the bridge. */
+      this.primeFailureCount++;
+      if (!this.primeFailureWarned) {
+        this.primeFailureWarned = true;
+        console.warn(
+          `[cosmos] physics prime failed — native provenance is off for this roster ` +
+          `(the TS reference served identical numbers): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       return null;
     }
   }
