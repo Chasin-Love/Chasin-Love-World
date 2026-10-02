@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-02T04:01:42.222Z",
-  "fileCount": 152,
+  "generatedAt": "2026-10-02T04:19:17.744Z",
+  "fileCount": 153,
   "deadExports": [],
   "deadTypes": [
     {
@@ -34,13 +34,14 @@
     "src/App.tsx": 1,
     "src/domain/universe.ts": 24,
     "src/domain/vault.ts": 16,
+    "src/engine/blackhole/BlackHoleSystem.ts": 1,
     "src/engine/blackholeParams.ts": 4,
-    "src/engine/blackholeRaymarch.ts": 3,
-    "src/engine/blackholeTier.ts": 2,
-    "src/engine/cameraMemory.ts": 1,
-    "src/engine/cameraRig.ts": 1,
-    "src/engine/capability.ts": 2,
-    "src/engine/engine.ts": 2,
+    "src/engine/blackholeRaymarch.ts": 4,
+    "src/engine/blackholeTier.ts": 3,
+    "src/engine/cameraMemory.ts": 2,
+    "src/engine/cameraRig.ts": 2,
+    "src/engine/capability.ts": 3,
+    "src/engine/engine.ts": 3,
     "src/engine/math.ts": 4,
     "src/engine/shaders.ts": 3,
     "src/engine/sky/SkyFxSystem.ts": 1,
@@ -205,6 +206,12 @@
     "src/App.tsx → src/ui/toast.ts",
     "src/domain/universe.ts → src/domain/vault.ts",
     "src/domain/universe.ts → src/realities/hierarchyTypes.ts",
+    "src/engine/blackhole/BlackHoleSystem.ts → src/engine/blackholeRaymarch.ts",
+    "src/engine/blackhole/BlackHoleSystem.ts → src/engine/blackholeTier.ts",
+    "src/engine/blackhole/BlackHoleSystem.ts → src/engine/cameraMemory.ts",
+    "src/engine/blackhole/BlackHoleSystem.ts → src/engine/cameraRig.ts",
+    "src/engine/blackhole/BlackHoleSystem.ts → src/engine/capability.ts",
+    "src/engine/blackhole/BlackHoleSystem.ts → src/engine/engine.ts",
     "src/engine/blackholeParams.ts → src/platform/storageKeys.ts",
     "src/engine/blackholeRaymarch.ts → src/engine/blackholeParams.ts",
     "src/engine/blackholeTier.ts → src/platform/storageKeys.ts",
@@ -212,6 +219,7 @@
     "src/engine/cameraRig.ts → src/engine/math.ts",
     "src/engine/capability.ts → src/platform/storageKeys.ts",
     "src/engine/engine.ts → src/domain/universe.ts",
+    "src/engine/engine.ts → src/engine/blackhole/BlackHoleSystem.ts",
     "src/engine/engine.ts → src/engine/blackholeParams.ts",
     "src/engine/engine.ts → src/engine/blackholeRaymarch.ts",
     "src/engine/engine.ts → src/engine/blackholeTier.ts",
@@ -593,10 +601,11 @@
     "src/engine/blackholeParams.ts": 125,
     "src/engine/blackholeRaymarch.ts": 585,
     "src/engine/blackholeTier.ts": 70,
+    "src/engine/blackhole/BlackHoleSystem.ts": 278,
     "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 6616,
+    "src/engine/engine.ts": 6386,
     "src/engine/math.ts": 65,
     "src/engine/shaders.ts": 1542,
     "src/engine/sky/SkyFxSystem.ts": 413,
@@ -706,7 +715,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      6616
+      6386
     ],
     [
       "src/ui/diary/DiaryWindow.tsx",
