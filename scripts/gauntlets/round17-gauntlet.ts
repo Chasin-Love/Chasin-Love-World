@@ -265,7 +265,10 @@ function inv(d: [number, number, number]): [number, number] {
      the anchor star halos and the inner-star halos must all stay RIGID —
      they are foreground content with an owner, and the capture mirror would
      paint ghost copies of them on the far side of the camera. */
-  const rigidDefault = /private makePoints\([\s\S]*?twinkle: boolean, lens = false\)/.test(enSrc)
+  /* R97 reconciliation: makePoints was publicized (not `private`) so the sky
+     subsystem can call it through the engine handle — same check, same intent:
+     the rigid `lens = false` default exists and exactly two call sites carry it. */
+  const rigidDefault = /makePoints\([\s\S]*?twinkle: boolean, lens = false\)/.test(enSrc)
     && /private pointsMaterial\([\s\S]*?twinkle: boolean, lens = false\)/.test(enSrc)
     && (enSrc.match(/, lens = false/g)?.length ?? 0) === 2;
   check('R62: point clouds default RIGID — lensing is an explicit sky opt-in', rigidDefault, `${rigidDefault}`);

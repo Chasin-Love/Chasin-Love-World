@@ -1,8 +1,12 @@
 {
-  "generatedAt": "2026-10-02T03:38:21.534Z",
-  "fileCount": 151,
+  "generatedAt": "2026-10-02T04:01:42.222Z",
+  "fileCount": 152,
   "deadExports": [],
   "deadTypes": [
+    {
+      "name": "ShootingMeteor",
+      "file": "src/engine/sky/SkyFxSystem.ts"
+    },
     {
       "name": "DriverDrift",
       "file": "src/physics/sessionDriver.ts"
@@ -36,9 +40,10 @@
     "src/engine/cameraMemory.ts": 1,
     "src/engine/cameraRig.ts": 1,
     "src/engine/capability.ts": 2,
-    "src/engine/engine.ts": 1,
-    "src/engine/math.ts": 3,
-    "src/engine/shaders.ts": 2,
+    "src/engine/engine.ts": 2,
+    "src/engine/math.ts": 4,
+    "src/engine/shaders.ts": 3,
+    "src/engine/sky/SkyFxSystem.ts": 1,
     "src/engine/surface/UniverseSurfaceManager.ts": 1,
     "src/engine/surface/index.ts": 1,
     "src/engine/surface/photoDome.ts": 1,
@@ -56,7 +61,7 @@
     "src/platform/desktop/adapter.ts": 6,
     "src/platform/native/cpp_bridge.ts": 5,
     "src/platform/performance.ts": 4,
-    "src/platform/sentiment/sentiment.ts": 2,
+    "src/platform/sentiment/sentiment.ts": 3,
     "src/platform/simClock.ts": 2,
     "src/platform/sky/skyRegistry.ts": 3,
     "src/platform/storageKeys.ts": 10,
@@ -215,6 +220,7 @@
     "src/engine/engine.ts → src/engine/capability.ts",
     "src/engine/engine.ts → src/engine/math.ts",
     "src/engine/engine.ts → src/engine/shaders.ts",
+    "src/engine/engine.ts → src/engine/sky/SkyFxSystem.ts",
     "src/engine/engine.ts → src/engine/surface/index.ts",
     "src/engine/engine.ts → src/engine/surface/surfaceShaders.ts",
     "src/engine/engine.ts → src/engine/systems/kamuiPhases.ts",
@@ -232,6 +238,10 @@
     "src/engine/engine.ts → src/realities/galaxyGenerator.ts",
     "src/engine/engine.ts → src/realities/hierarchyStages.ts",
     "src/engine/engine.ts → src/realities/index.ts",
+    "src/engine/sky/SkyFxSystem.ts → src/engine/engine.ts",
+    "src/engine/sky/SkyFxSystem.ts → src/engine/math.ts",
+    "src/engine/sky/SkyFxSystem.ts → src/engine/shaders.ts",
+    "src/engine/sky/SkyFxSystem.ts → src/platform/sentiment/sentiment.ts",
     "src/engine/surface/UniverseSurfaceManager.ts → src/engine/blackholeParams.ts",
     "src/engine/surface/UniverseSurfaceManager.ts → src/engine/math.ts",
     "src/engine/surface/UniverseSurfaceManager.ts → src/engine/surface/photoDome.ts",
@@ -543,7 +553,7 @@
     "scripts/audit-architecture.ts": 277,
     "scripts/gauntlets/engineSource.ts": 27,
     "scripts/gauntlets/round16-gauntlet.ts": 103,
-    "scripts/gauntlets/round17-gauntlet.ts": 485,
+    "scripts/gauntlets/round17-gauntlet.ts": 488,
     "scripts/gauntlets/round18-kamui-gauntlet.ts": 198,
     "scripts/gauntlets/round63-void-gauntlet.ts": 150,
     "scripts/gauntlets/round72-stage-arrival-gauntlet.ts": 89,
@@ -586,9 +596,10 @@
     "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 6984,
-    "src/engine/math.ts": 42,
+    "src/engine/engine.ts": 6616,
+    "src/engine/math.ts": 65,
     "src/engine/shaders.ts": 1542,
+    "src/engine/sky/SkyFxSystem.ts": 413,
     "src/engine/surface/UniverseSurfaceManager.ts": 546,
     "src/engine/surface/index.ts": 13,
     "src/engine/surface/photoDome.ts": 360,
@@ -695,7 +706,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      6984
+      6616
     ],
     [
       "src/ui/diary/DiaryWindow.tsx",
@@ -794,16 +805,16 @@
       "scripts/gauntlets/round17-gauntlet.ts:220",
       "scripts/gauntlets/round17-gauntlet.ts:221",
       "scripts/gauntlets/round17-gauntlet.ts:223",
-      "scripts/gauntlets/round17-gauntlet.ts:287",
-      "scripts/gauntlets/round17-gauntlet.ts:299",
-      "scripts/gauntlets/round17-gauntlet.ts:300",
-      "scripts/gauntlets/round17-gauntlet.ts:301",
-      "scripts/gauntlets/round17-gauntlet.ts:349",
-      "scripts/gauntlets/round17-gauntlet.ts:376",
-      "scripts/gauntlets/round17-gauntlet.ts:425",
-      "scripts/gauntlets/round17-gauntlet.ts:426",
-      "scripts/gauntlets/round17-gauntlet.ts:427",
-      "scripts/gauntlets/round17-gauntlet.ts:428"
+      "scripts/gauntlets/round17-gauntlet.ts:290",
+      "scripts/gauntlets/round17-gauntlet.ts:302",
+      "scripts/gauntlets/round17-gauntlet.ts:303",
+      "scripts/gauntlets/round17-gauntlet.ts:304",
+      "scripts/gauntlets/round17-gauntlet.ts:352",
+      "scripts/gauntlets/round17-gauntlet.ts:379",
+      "scripts/gauntlets/round17-gauntlet.ts:428",
+      "scripts/gauntlets/round17-gauntlet.ts:429",
+      "scripts/gauntlets/round17-gauntlet.ts:430",
+      "scripts/gauntlets/round17-gauntlet.ts:431"
     ],
     "public roots": [
       "index.html:11",
