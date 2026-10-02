@@ -24,6 +24,24 @@ pub(crate) fn is_inside(parent: &Path, child: &Path) -> bool {
     }
 }
 
+/// The desktop twin of `ident()` in server/realityTemplates.ts — the generated
+/// module declares `export const <name>Reality`, so a folder like "my-reality"
+/// would emit an invalid identifier, and because every reality is compiled
+/// together through one eager glob, one bad file white-screens the whole app.
+/// fold_folder_name sanitizes to `[A-Za-z0-9_]`; this folds to identifier-safe.
+pub(crate) fn ident_of(folder: &str) -> String {
+    let cleaned: String = folder
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })
+        .collect();
+    let cleaned = if cleaned.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        format!("_{}", cleaned)
+    } else {
+        cleaned
+    };
+    if cleaned.is_empty() { "reality".to_string() } else { cleaned }
+}
+
 pub(crate) fn realities_dir() -> Result<PathBuf, String> {
     // 1. Explicit override (dev convenience / CI).
     if let Ok(dir) = std::env::var("MYU_REALITIES_DIR") {
@@ -388,8 +406,9 @@ pub fn create_folder(
             .collect::<String>()
             .to_lowercase()
     });
-    let var_name = format!("{}Reality", folder);
-    let surface_var = format!("{}Surface", folder);
+    let ident = ident_of(&folder);
+    let var_name = format!("{}Reality", ident);
+    let surface_var = format!("{}Surface", ident);
     let esc = |s: &str| -> String { serde_json::to_string(s).unwrap_or_else(|_| "\"\"".into()) };
 
     /* Every user-controlled value crosses as a JSON string literal (JSON is a

@@ -20,6 +20,10 @@ import { realityDaemon } from './realityDaemon';
 import { realitiesRouter } from './routes/realities';
 import { skyRouter } from './routes/sky';
 
+/* The daemon's scan cadence, in milliseconds. Kept beside the port (and named
+   so the two can never be confused again) — it is NOT the HTTP port. */
+const DAEMON_SCAN_MS = 3000;
+
 async function startServer() {
   const app = express();
   /* PORT env var so hosted deploys (Render/Railway/VPS behind a proxy) can
@@ -28,8 +32,12 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
 
-  // Start continuous background reality synchronization daemon
-  realityDaemon.start(PORT);
+  // Start continuous background reality synchronization daemon.
+  // NOTE: start() takes the SCAN INTERVAL in ms — never the HTTP port. Passing
+  // PORT here coincided with the daemon's 3000ms default only because both
+  // are 3000; a deployed PORT=8080 would have silently scanned every 8s and
+  // re-armed the dev reload-storm the grace window exists to prevent.
+  realityDaemon.start(DAEMON_SCAN_MS);
 
   // API: Health check
   app.get('/api/health', (_req, res) => {
