@@ -8,7 +8,7 @@
 | docs | ARCHITECTURE.md — the authoritative architecture record. ROUND-*.md are per-round build reports. verify/ holds the bundle baseline. | Read/reference. |
 | node_modules | Installed npm dependencies. | Regenerable (npm install). |
 | public | Static assets served as-is: the vendored Python runtime (pyodide/) and fonts (fonts/). | Keep — this is your offline capability. |
-| scripts | round16/17 gauntlets (verification), audit-architecture.ts + smoke.ts (R52 gates), toolchain/icon/WASM helpers. | Run via npm run verify / audit:arch. |
+| scripts | The housekeepers (R96): gauntlets/ (19 per-round regression gates — ALL run in npm run verify), probes/ (4 hand-run diagnostics), tools/ (WASM core, icons, updater manifest, diagram), and the top-level gates: audit-architecture.ts + its frozen snapshot, smoke.ts, prod-smoke.ts, verify/ (golden frames). See scripts/README.md. | Run via npm run verify / audit:arch. |
 | server | The Node side: dev server, reality folder API, disk daemon. Desktop replaces it natively. | Source — editable. |
 | src | The app itself: React UI, the 3D engine, physics, realities, encrypted vault, everything you see on screen. | Source — editable. |
 | src-tauri | The desktop shell: Rust commands, app config, icons — and where the C++ core gets compiled into the binary. | Source — editable. |

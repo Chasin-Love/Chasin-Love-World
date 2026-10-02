@@ -12,41 +12,42 @@ flowchart LR
     platform[platform]
     server[server]
   end
-    src_engine_engine_ts["engine/engine.ts<br>6667 lines"]
+    src_engine_engine_ts["engine/engine.ts<br>6984 lines"]
     src_ui_diary_DiaryWindow_tsx["ui/diary/DiaryWindow.tsx<br>1659 lines"]
-    src_ui_console_CoreConsole_tsx["ui/console/CoreConsole.tsx<br>1578 lines"]
-    src_ui_vault_keyring_tsx["ui/vault/keyring.tsx<br>1525 lines"]
-    src_engine_shaders_ts["engine/shaders.ts<br>1431 lines"]
-    src_App_tsx["App.tsx<br>1354 lines"]
+    src_App_tsx["App.tsx<br>1550 lines"]
+    src_engine_shaders_ts["engine/shaders.ts<br>1542 lines"]
+    src_ui_vault_keyring_tsx["ui/vault/keyring.tsx<br>1521 lines"]
+    src_ui_console_CoreConsole_tsx["ui/console/CoreConsole.tsx<br>1469 lines"]
     src_ui_FileManager_tsx["ui/FileManager.tsx<br>1280 lines"]
+    src_state_actions_ts["state/actions.ts<br>1276 lines"]
     src_ui_diary_MediaPlates_tsx["ui/diary/MediaPlates.tsx<br>1271 lines"]
-    src_state_actions_ts["state/actions.ts<br>1248 lines"]
-    src_ui_vault_sandbox_tsx["ui/vault/sandbox.tsx<br>957 lines"]
+    src_ui_vault_sandbox_tsx["ui/vault/sandbox.tsx<br>944 lines"]
     src_ui_CoreMode_tsx["ui/CoreMode.tsx<br>921 lines"]
-    src_ui_vault_viewers_tsx["ui/vault/viewers.tsx<br>838 lines"]
-    src_engine_blackhole_ts["engine/blackhole.ts<br>717 lines"]
-    src_ui_vault_shell_tsx["ui/vault/shell.tsx<br>711 lines"]
-    src_ui_hud_MultiverseBar_tsx["ui/hud/MultiverseBar.tsx<br>613 lines"]
-    src_ui_lineage_CosmicLineageModal_tsx["ui/lineage/CosmicLineageModal.tsx<br>579 lines"]
-    src_engine_blackholeRaymarch_ts["engine/blackholeRaymarch.ts<br>558 lines"]
-    src_ui_VaultUI_tsx["ui/VaultUI.tsx<br>546 lines"]
-    src_vault_storage_seeds_ts["vault/storage/seeds.ts<br>541 lines"]
-    src_ui_reality_RealityAdvancedPanel_tsx["ui/reality/RealityAdvancedPanel.tsx<br>521 lines"]
-    src_engine_surface_UniverseSurfaceManager_ts["engine/surface/UniverseSurfaceManager.ts<br>499 lines"]
+    src_physics_sessionDriver_ts["physics/sessionDriver.ts<br>864 lines"]
+    src_platform_native_cpp_bridge_ts["platform/native/cpp_bridge.ts<br>854 lines"]
+    src_ui_vault_viewers_tsx["ui/vault/viewers.tsx<br>833 lines"]
+    src_ui_vault_shell_tsx["ui/vault/shell.tsx<br>704 lines"]
+    src_ui_hud_MultiverseBar_tsx["ui/hud/MultiverseBar.tsx<br>616 lines"]
+    src_engine_blackholeRaymarch_ts["engine/blackholeRaymarch.ts<br>585 lines"]
+    src_ui_lineage_CosmicLineageModal_tsx["ui/lineage/CosmicLineageModal.tsx<br>577 lines"]
+    src_engine_surface_UniverseSurfaceManager_ts["engine/surface/UniverseSurfaceManager.ts<br>546 lines"]
+    src_vault_storage_seeds_ts["vault/storage/seeds.ts<br>546 lines"]
+    src_ui_VaultUI_tsx["ui/VaultUI.tsx<br>544 lines"]
+    src_platform_audio_ts["platform/audio.ts<br>536 lines"]
+    src_ui_reality_RealityAdvancedPanel_tsx["ui/reality/RealityAdvancedPanel.tsx<br>523 lines"]
     src_ui_diary_AttachmentEditor_tsx["ui/diary/AttachmentEditor.tsx<br>495 lines"]
     src_ui_PhysicsHUD_tsx["ui/PhysicsHUD.tsx<br>485 lines"]
     src_vault_storage_efs_ts["vault/storage/efs.ts<br>481 lines"]
     server_realityDaemon_ts["server/realityDaemon.ts<br>464 lines"]
-    src_platform_native_cpp_bridge_ts["platform/native/cpp_bridge.ts<br>461 lines"]
+    src_engine_surface_surfaceShaders_ts["engine/surface/surfaceShaders.ts<br>459 lines"]
+    src_physics_physicsEngine_ts["physics/physicsEngine.ts<br>438 lines"]
     src_vault_storage_crypto_ts["vault/storage/crypto.ts<br>437 lines"]
-    src_engine_cameraRig_ts["engine/cameraRig.ts<br>422 lines"]
-    src_realities_galaxyGenerator_ts["realities/galaxyGenerator.ts<br>420 lines"]
-    src_ui_vault_gate_tsx["ui/vault/gate.tsx<br>416 lines"]
-    src_physics_physicsEngine_ts["physics/physicsEngine.ts<br>407 lines"]
-    src_ui_vault_avatars_tsx["ui/vault/avatars.tsx<br>401 lines"]
-    src_state_persist_ts["state/persist.ts<br>386 lines"]
-    src_ui_diary_exportDiary_ts["ui/diary/exportDiary.ts<br>372 lines"]
+    src_realities_galaxyGenerator_ts["realities/galaxyGenerator.ts<br>436 lines"]
+    src_engine_cameraRig_ts["engine/cameraRig.ts<br>415 lines"]
+    src_ui_vault_gate_tsx["ui/vault/gate.tsx<br>408 lines"]
+    src_state_persist_ts["state/persist.ts<br>398 lines"]
     src_App_tsx --> src_engine_engine_ts
+    src_App_tsx --> src_platform_audio_ts
     src_App_tsx --> src_ui_CoreMode_tsx
     src_App_tsx --> src_ui_PhysicsHUD_tsx
     src_App_tsx --> src_ui_VaultUI_tsx
@@ -54,38 +55,32 @@ flowchart LR
     src_App_tsx --> src_ui_diary_DiaryWindow_tsx
     src_App_tsx --> src_ui_hud_MultiverseBar_tsx
     src_App_tsx --> src_ui_lineage_CosmicLineageModal_tsx
-    src_engine_blackholeRaymarch_ts --> src_engine_blackhole_ts
-    src_engine_engine_ts --> src_engine_blackhole_ts
     src_engine_engine_ts --> src_engine_blackholeRaymarch_ts
     src_engine_engine_ts --> src_engine_cameraRig_ts
     src_engine_engine_ts --> src_engine_shaders_ts
+    src_engine_engine_ts --> src_engine_surface_surfaceShaders_ts
     src_engine_engine_ts --> src_physics_physicsEngine_ts
+    src_engine_engine_ts --> src_physics_sessionDriver_ts
     src_engine_engine_ts --> src_platform_native_cpp_bridge_ts
     src_engine_engine_ts --> src_realities_galaxyGenerator_ts
+    src_engine_surface_UniverseSurfaceManager_ts --> src_engine_surface_surfaceShaders_ts
+    src_engine_surface_surfaceShaders_ts --> src_engine_shaders_ts
+    src_physics_sessionDriver_ts --> src_physics_physicsEngine_ts
+    src_physics_sessionDriver_ts --> src_platform_native_cpp_bridge_ts
     src_platform_native_cpp_bridge_ts --> src_physics_physicsEngine_ts
     src_state_actions_ts --> src_state_persist_ts
     src_state_actions_ts --> src_vault_storage_seeds_ts
-    src_state_persist_ts --> src_vault_storage_seeds_ts
     src_ui_PhysicsHUD_tsx --> src_physics_physicsEngine_ts
     src_ui_VaultUI_tsx --> src_ui_FileManager_tsx
-    src_ui_VaultUI_tsx --> src_ui_vault_avatars_tsx
     src_ui_VaultUI_tsx --> src_ui_vault_gate_tsx
     src_ui_VaultUI_tsx --> src_ui_vault_keyring_tsx
-    src_ui_VaultUI_tsx --> src_ui_vault_sandbox_tsx
     src_ui_VaultUI_tsx --> src_ui_vault_shell_tsx
     src_ui_VaultUI_tsx --> src_ui_vault_viewers_tsx
     src_ui_console_CoreConsole_tsx --> src_ui_reality_RealityAdvancedPanel_tsx
+    src_ui_diary_DiaryWindow_tsx --> src_platform_audio_ts
     src_ui_diary_DiaryWindow_tsx --> src_ui_diary_AttachmentEditor_tsx
     src_ui_diary_DiaryWindow_tsx --> src_ui_diary_MediaPlates_tsx
-    src_ui_diary_DiaryWindow_tsx --> src_ui_diary_exportDiary_ts
-    src_ui_vault_avatars_tsx --> src_ui_FileManager_tsx
-    src_ui_vault_gate_tsx --> src_ui_FileManager_tsx
-    src_ui_vault_gate_tsx --> src_ui_vault_avatars_tsx
-    src_ui_vault_keyring_tsx --> src_ui_FileManager_tsx
-    src_ui_vault_sandbox_tsx --> src_ui_FileManager_tsx
-    src_ui_vault_shell_tsx --> src_ui_FileManager_tsx
-    src_ui_vault_shell_tsx --> src_ui_vault_avatars_tsx
-    src_ui_vault_viewers_tsx --> src_ui_FileManager_tsx
+    src_ui_diary_MediaPlates_tsx --> src_platform_audio_ts
     src_ui_vault_viewers_tsx --> src_ui_vault_sandbox_tsx
     src_vault_storage_seeds_ts --> src_vault_storage_efs_ts
 ```

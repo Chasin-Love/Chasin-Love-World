@@ -64,8 +64,9 @@ browser and as a Tauri desktop app.
   into planets (diary), into the black hole (vault), and (since R71) explicitly between
   cosmological slices.
 
-**Scale of the codebase:** ~136 code files, ~43k lines. `src/engine/engine.ts` alone is
-~6.4k lines (the orchestrator). Strict TypeScript throughout.
+**Scale of the codebase:** ~150 code files, ~45k lines (the auditor's count, incl.
+server + scripts). `src/engine/engine.ts` alone is ~7.0k lines (the orchestrator).
+Strict TypeScript throughout.
 
 ---
 
@@ -144,24 +145,29 @@ Appendix A. **`README.md` is the single source of truth for reconstruction and c
 ├── README.md               ← THE RESURRECTION BLUEPRINT (228 KB rebuild spec + all shader code verbatim)
 ├── PROJECT-BRAIN.md        ← this file — current state + navigation
 ├── note.txt                ← friendly folder guide
-├── docs/                   ← ARCHITECTURE.md (R52 record) · ROUND-*.md (per-round reports)
-│                             · EXPERIENCE-REPORT (quality + roadmap baseline) · research corpus
-├── scripts/                ← round16/17/18/63 gauntlets (verification) · audit-architecture.ts
-│                             · smoke.ts (playwright) · toolchain helpers
+├── docs/                   ← ARCHITECTURE.md (the architecture record, refreshed R96) ·
+│                             ROUND-*.md (per-round reports) · EXPERIENCE-REPORT (baseline)
+│                             · architecture-diagram.html/.mmd (generated) · research corpus
+├── scripts/                ← THE HOUSEKEEPERS (regrouped R96; see scripts/README.md):
+│                             gauntlets/ (19 per-round gates — ALL in npm run verify) ·
+│                             probes/ (4 hand-run diagnostics) · tools/ (5: wasm, icons,
+│                             updater manifest, diagram, toolchain) · audit-architecture.ts
+│                             + its frozen snapshot · smoke.ts · prod-smoke.ts · verify/ (golden frames)
 ├── server/                 ← Express dev host + reality disk daemon (3s self-healing scan)
-├── src-tauri/              ← desktop shell (Rust commands, C++ core compile)
+├── src-tauri/              ← desktop shell (31 Rust commands, C++ core compile; 1,715 ln / 6 files)
 ├── src/
 │   ├── domain/             ← pure data contracts (universe.ts, vault.ts)
 │   ├── state/              ← THE single mutation surface (store + ~60 actions + persistence)
-│   ├── platform/           ← native C++ core + bridge, desktop adapter, sync, audio, storage keys
-│   ├── engine/             ← Three.js cosmos: engine.ts (6.4k ln orchestrator), blackhole*.ts,
-│   │                          cameraRig.ts, shaders.ts, systems/ (portalPhases, stageThresholds,
-│   │                          stageSlices, levelSystem), surface/ (universe dome)
+│   ├── platform/           ← native C++ core + bridge, desktop adapter, sky, sync, sentiment, storage keys
+│   ├── engine/             ← Three.js cosmos: engine.ts (6.9k ln orchestrator), blackhole*.ts,
+│   │                          cameraRig.ts, shaders.ts, systems/ (kamuiPhases, stageThresholds,
+│   │                          levelSystem), surface/ (photo dome, universe surface)
 │   ├── physics/            ← physicsEngine.ts (41-field solve, Kepler solver) · nbody.ts (Living Gravity)
+│   │                          · sessionDriver.ts (THE N-body session) · simTwin.ts (read-only lab)
 │   ├── realities/          ← path-locked content packs; solPrime/ = canonical seed; bin/ = Quantum Bin
 │   ├── vault/              ← EFS (copy-on-write fs), crypto (Argon2id/AES-GCM), executors (JS/Py/HTML/PDF/ISO)
 │   └── ui/                 ← ALL React surfaces (console, hud, vault, diary, lineage…)
-└── public/                 ← vendored pyodide + fonts (offline capability — keep committed)
+└── public/                 ← vendored pyodide + fonts + the compiled WASM core (wasm/) — offline capability, keep committed
 ```
 
 ---
@@ -302,6 +308,33 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   **v16.0.0** — the real universe is the blessed reference now. (The older
   in-flight branches — `r71-ten-slices` and friends — remain exactly as they
   were, awaiting their own rulings.)
+- **R96 (this round, on branch `r96-the-tidy-house`):** the author's verdict on
+  the tree — "the frontend looks genuinely good, but the backend is total mess"
+  — audited and answered. THE AUDIT: there is no backend (offline-first is the
+  law); the Rust shell is 1,715 lines / 31 commands / six documented files;
+  `src-tauri/target`, `dist`, `node_modules` are untracked build cache (0
+  tracked files among them); the architecture is real and audit-enforced. The
+  ONE genuine mess was `scripts/` — 32 files flat, named by round number.
+  THE TIDY HOUSE: 19 gauntlets → `scripts/gauntlets/`, 4 probes →
+  `scripts/probes/`, 5 tools → `scripts/tools/` (top level: 5 files + 5
+  folders, cataloged in the new `scripts/README.md`); every reference followed
+  the move (package.json verify chain ×19, the auditor's path-encode lists,
+  AGENTS.md, CI ×2, ~132 relative-root rewrites, the three probes' ROOT,
+  build-wasm.sh's root, two cross-gauntlet reads); the snapshot regenerated in
+  the same commit. THE VISIBILITY: `docs/ARCHITECTURE.md` rewritten from the
+  stale R52 record to post-v16.0.0 truth (the tier chain, the session driver,
+  updated locked-path and persistence tables, the debt register); the diagram
+  regenerated (120 files / 379 edges); README §3 and note.txt surgically
+  refreshed; §5's map rewritten. Canary receipts: round16/17/63 green
+  from their new homes (63 proves its own chain path), the physics probe 30
+  sim-days clean, `audit:arch --check` clean. Full chain: the first
+  `npm run verify` run went 19-for-19 on gauntlets then hit the SMOKE cold-boot
+  flake (R84's sighting, now a second — green on the immediate re-run,
+  histL1 0.0707); the second full chain was GREEN end-to-end (histL1 0.0716,
+  prod smoke green, zero console errors). NO law, constant, seed, or gauntlet
+  touched — the gauntlets moved, they did not change; `src/` is byte-identical.
+  Historical round docs keep the old paths (records, not rewritten).
+  `docs/ROUND-96-THE-TIDY-HOUSE-2026-10-02.md`
 - **R90 (this round, on main):** the author's report — the Native Simulator Twin card
   (Verify Twin with it) could not be scrolled into view in the Core Console — reproduced
   by live measurement and traced to a **Tailwind v4 cascade-layer trap**: `.cc-root`'s
@@ -517,14 +550,16 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (21 checks) in the verify chain. Smoke reference held (green 0.066–0.074 histL1; one
   cold-boot flake diagnosed, never reproduced). `docs/ROUND-84-THE-ASCENDING-NODES-
   2026-09-30.md`.
-- **Verification status:** `npm run verify` ALL GREEN (typecheck;
-  round16/17/18/63/72/73/74/75/76/79/84/**87/88** gauntlets; smoke + prod-smoke, zero
-  console errors) — re-verified per round: after the R85 sweep, after R87, after R88;
-  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the new fixed-point
-  snapshot** (zero dead exports; absorbed in-commit on every contract-surface change);
-  `desktop:check` unrunnable on this laptop (no MSVC toolchain — recorded honestly in
-  R84–R87; R88 touched no Rust). Shipped: **v15.0.9** (R85+R86+R87) — tagged and pushed,
-  CI installers inbound; R88 rides the next tag.
+- **Verification status:** `npm run verify` ALL GREEN (typecheck; all **19
+  gauntlets**, `scripts/gauntlets/round16` → `round95-steady-sky` since R96's
+  regroup; smoke + prod-smoke, zero console errors) — re-verified per round,
+  most recently at R96 (first chain hit the smoke cold-boot flake after 19/19
+  gauntlets — green on the immediate re-run and on the second full chain);
+  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R96
+  snapshot** (zero dead exports; absorbed in-commit on every structural change);
+  `desktop:check` unrunnable on this laptop (no MSVC toolchain — R96 touched no
+  Rust). Shipped: **v16.0.0** (the R91–R95 REAL UNIVERSE arc) — tagged and
+  pushed; R96 rides the next tag.
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); `cargo check` proof on a toolchained host (R84's FFI
   extension + R85's `reality_write_data` twin + R86's seed guard, all reviewed but never
@@ -575,8 +610,13 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 5. **Desktop as the storage answer** — Tauri file store lifts the web localStorage ~5 MB
    ceiling for heavy diarists.
 6. **Deferred (do as their own rounds, unasked):** `engine.ts` decomposition (gauntlets as
-   guardrails), architecture re-snapshot, dead-export sweep, optional React 19 / Vite 7
-   evaluation, optional touch-first HUD pass.
+   guardrails), dead-export sweep, optional React 19 / Vite 7 evaluation, optional
+   touch-first HUD pass. (The architecture re-snapshot queued here is DONE — R96
+   regenerated it; R96 itself has no follow-ups queued.)
+7. **Watch item (small):** the smoke cold-boot flake has two sightings now (R84
+   diagnosis, R96 reproduction — `page.evaluate` context destroyed mid-boot;
+   green on every immediate re-run and on the full re-chain). If it recurs, a
+   boot-retry guard in `scripts/smoke.ts` is its own tiny round.
 
 ---
 
