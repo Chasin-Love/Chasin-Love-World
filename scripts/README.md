@@ -42,7 +42,9 @@ against `architecture-snapshot.json` (exit 1 on drift).
 - `smoke.ts` — headless Playwright boot: zero console errors + Eventide frame matched against `verify/reference-hole.png` (16-bin luminance histogram + region bands).
 - `prod-smoke.ts` — serves the built `dist/` and asserts the boot again (the v15.0.0 black-screen gate).
 
-**gauntlets/ (R-numbered, all in `npm run verify`)**
+**gauntlets/ (R-numbered, all in `npm run verify`) — plus the two R97 union helpers**
+- `engineSource.ts` — THE ENGINE UNION SOURCE: joins `engine.ts` + every subsystem module (SkyFx / BlackHole / KamuiPortal / InnerGalaxy / BodyBuilders / LevelStage) into one text, fixed order, absent files read empty. Every verbatim pin, whole-file count pin and absence pin evaluates over the union exactly as it did over the pre-R97 monolith; 14 engine-reading gauntlets call it instead of reading `engine.ts` directly. Add new engine modules to `ENGINE_FILES` with any future split.
+- `stateSource.ts` — the state-side mirror: joins the actions barrel + `actions/shared|realities|bodies|entries|vault|portability`; round92/84/95 read it through `stateSource()`.
 - `round16-gauntlet.ts` — GR lensing math, pure.
 - `round17-gauntlet.ts` — funnel/photo-lens math + SOURCE-TEXT assertions across engine/black-hole/capability files; the auditor's special file.
 - `round18-kamui-gauntlet.ts` — the Kamui portal machine (vortex, timings, per-pixel DOM bend, living spin).

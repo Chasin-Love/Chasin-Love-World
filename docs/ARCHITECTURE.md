@@ -1,11 +1,12 @@
 # MY UNIVERSE — Architecture Record
 
 > **Status:** Authoritative. Written at the R52 architecture pass; refreshed at
-> R96 (2026-10-02) to the post-v16.0.0 truth — the R91–R95 REAL UNIVERSE arc is
-> merged, the sky is driven by the N-body session, and `scripts/` is regrouped
-> by purpose. Round-by-round history lives in `docs/ROUND-*.md`; this file
-> documents *what is*. Run `npm run audit:arch` for the machine-checked
-> version of §3–§7 (150 code files, 383 import edges at this writing).
+> R96 (2026-10-02, scripts/ regrouped and the story surfaced) and again at **R97**,
+> the honest-to-god engine decomposition — the monolith is now an orchestrator
+> shell plus six subsystem modules, and the single mutation surface is a barrel
+> over six domain files. Round-by-round history lives in `docs/ROUND-*.md`; this
+> file documents *what is*. Run `npm run audit:arch` for the machine-checked
+> version of §3–§7 (**164 code files** at this writing).
 
 ---
 
@@ -24,13 +25,27 @@ A Mermaid flowchart of the top files by mass lives in
 src/
   main.tsx · App.tsx · index.css      entry point
   domain/                             pure data contracts (universe.ts, vault.ts)
-  state/                              store + persist + actions (THE mutation surface)
+  state/                              store + persist + actions.ts (THE mutation surface)
+                                      + actions/ (R97: shared · realities · bodies ·
+                                      entries · vault · portability — barrel shape kept)
   platform/                           desktop/adapter · native/ (C++ core + bridge)
                                       · sky/ · sync/ · sentiment/ · storageKeys
-  engine/                             three.js cosmos: engine.ts (6.9k orchestrator),
-                                      blackhole*.ts, cameraRig, shaders,
-                                      surface/ (photo dome, universe surface),
-                                      systems/ (kamuiPhases, stageThresholds, levelSystem)
+  engine/                             engine.ts — THE SHELL (2,785 ln): constructor,
+                                      tickFrame's frozen 22-step order, updateBodies
+                                      (THE one write seam), interaction, dispose + the
+                                      subsystem rows below — each a class fed through
+                                      the `eng` handle with name-preserving pairs:
+                                      sky/SkyFxSystem.ts (meteors/echo/aurora/surface)
+                                      blackhole/BlackHoleSystem.ts (attach/tier/breaker)
+                                      kamui/KamuiPortalSystem.ts (vortex+portal+warp)
+                                      worlds/InnerGalaxySystem.ts (dive realms)
+                                      worlds/BodyBuilders.ts (anchor/bodies/belt/moons)
+                                      stages/LevelStageSystem.ts (multiverse+levels)
+                                      (the older extractees: cameraRig, shaders, math,
+                                      capability, blackholeRaymarch/Params/Tier,
+                                      cameraMemory, surface/ (photo dome + universe
+                                      surface), systems/ (kamuiPhases, stageThresholds,
+                                      levelSystem))
   physics/                            physicsEngine (Kepler + SI) · nbody (Living Gravity)
                                       · sessionDriver (THE N-body session) · simTwin (lab)
   realities/                          path-locked content packs (solPrime/ = canon seed,
@@ -103,8 +118,15 @@ The R91 decree made the **N-body session the main driver of the sky**:
 |---|---|
 | `src/App.tsx` | App shell: engine boot + `EngineCallbacks` wiring, window manager, global keys, lazy chunks |
 | `src/state/` | Observable store (`useSyncExternalStore`), ~60 actions, debounced persistence |
+| `src/state/actions.ts` + `src/state/actions/` | THE single mutation surface — since R97 a barrel over six domain modules (shared/realities/bodies/entries/vault/portability); import path and registry shape unchanged |
 | `src/domain/` | Domain types for the whole app (`universe.ts`, `vault.ts` — pure data, no logic) |
-| `src/engine/engine.ts` | `UniverseEngine` — the cosmos orchestrator (6,984 lines; the known monster — decomposition is its own planned round) |
+| `src/engine/engine.ts` | `UniverseEngine` shell (2,785 lines): boot, frozen 22-step tickFrame, updateBodies (THE seam), interaction, camera API, dispose |
+| `src/engine/sky/SkyFxSystem.ts` | Meteors, Cosmic Echo shower, sentiment aurora, planet-surface dressing |
+| `src/engine/blackhole/BlackHoleSystem.ts` | Hole attach/release, tier switch, frame-budget breaker, adaptive resolution, camera checkpoint |
+| `src/engine/kamui/KamuiPortalSystem.ts` | The vortex (Kamui v1), plain-zoom portal, summon hold, staged stage-warp |
+| `src/engine/worlds/InnerGalaxySystem.ts` | The dived galaxy's isolated stellar system: build, per-frame life, dive lifecycle |
+| `src/engine/worlds/BodyBuilders.ts` | Anchor Star, per-body builder, belt, diary-moon sync, roster sync, orbit-ring rebuilders |
+| `src/engine/stages/LevelStageSystem.ts` | Multiverse builder, cosmic level stages, intro marble, updateLevels arbiter |
 | `src/engine/blackholeRaymarch.ts` | Geodesic raymarched hole (verbatim dgreenheck port) — overlay tier |
 | `src/engine/blackholeTier.ts` / `blackholeParams.ts` | Tier decision (raymarcher vs the zero-fail composite fallback) / live tuning store |
 | `src/engine/cameraRig.ts` / `cameraMemory.ts` | Orbit/pan/zoom rig (`dist = 3 · 800000^zoomT`) / persisted placements |
@@ -180,11 +202,11 @@ npm run audit:arch   architecture drift report (--snapshot / --check)
 
 ## 7. Known debt register (conscious, ranked)
 
-1. **`engine.ts` god class** (6,984 lines) — decomposition is planned as its own
-   dedicated round with the gauntlets as guardrails. Not executed; do not
-   rewrite it wholesale (PROJECT-BRAIN trap #3).
-2. **`src/state/actions.ts`** (1,276 lines) — kept as one file for behavior
-   safety; a domain split is follow-up work after the engine decomposition.
+1. ~~`engine.ts` god class (6,984 lines)~~ — **EXECUTED in R97** (branch
+   `r97-the-engine-divided`): the monolith is now an orchestrator shell (2,785
+   lines) + six subsystem modules, moved verbatim under the gauntlets.
+2. ~~`src/state/actions.ts` (1,276 lines)~~ — **EXECUTED in R97**: now a barrel
+   over six domain files under `src/state/actions/` (import path unchanged).
 3. **The UI giants** — `DiaryWindow.tsx` (1,659), `App.tsx` wiring (1,550),
    `keyring.tsx` (1,521), `CoreConsole.tsx` (1,469), `FileManager.tsx` (1,280),
    `MediaPlates.tsx` (1,271) — split candidates, each its own round.
@@ -203,3 +225,7 @@ npm run audit:arch   architecture drift report (--snapshot / --check)
   end-to-end — see §2.
 - **R96** (branch `r96-the-tidy-house`): `scripts/` regrouped by purpose; this
   record refreshed; no law, constant, or gauntlet touched.
+- **R97** (branch `r97-the-engine-divided`): THE ENGINE, DIVIDED — six subsystem
+  extractions from `engine.ts` (sky / blackhole / kamui+portal / worlds / stages)
+  + the actions surface domained, every commit independently green under
+  `npm run verify` + `audit:arch --check`. Debt #1 and #2 executed.

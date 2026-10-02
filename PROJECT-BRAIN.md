@@ -157,11 +157,18 @@ Appendix A. **`README.md` is the single source of truth for reconstruction and c
 ├── src-tauri/              ← desktop shell (31 Rust commands, C++ core compile; 1,715 ln / 6 files)
 ├── src/
 │   ├── domain/             ← pure data contracts (universe.ts, vault.ts)
-│   ├── state/              ← THE single mutation surface (store + ~60 actions + persistence)
+│   ├── state/              ← THE single mutation surface (store + persistence + actions.ts)
+│   │                          actions.ts is a barrel over actions/ (R97: shared · realities ·
+│   │                          bodies · entries · vault · portability — import path unchanged)
 │   ├── platform/           ← native C++ core + bridge, desktop adapter, sky, sync, sentiment, storage keys
-│   ├── engine/             ← Three.js cosmos: engine.ts (6.9k ln orchestrator), blackhole*.ts,
-│   │                          cameraRig.ts, shaders.ts, systems/ (kamuiPhases, stageThresholds,
-│   │                          levelSystem), surface/ (photo dome, universe surface)
+│   ├── engine/             ← THE SHELL (engine.ts, 2.8k ln: boot / 22-step tickFrame /
+│   │                          updateBodies the ONE write seam / interaction / dispose) + the
+│   │                          subsystem family (R97): sky/SkyFxSystem · blackhole/BlackHoleSystem ·
+│   │                          kamui/KamuiPortalSystem · worlds/InnerGalaxySystem · worlds/BodyBuilders ·
+│   │                          stages/LevelStageSystem; plus the older extractees — cameraRig.ts,
+│   │                          shaders.ts, math.ts, capability.ts, blackholeRaymarch/-Params/-Tier,
+│   │                          cameraMemory.ts, surface/, systems/ (kamuiPhases, stageThresholds,
+│   │                          levelSystem)
 │   ├── physics/            ← physicsEngine.ts (41-field solve, Kepler solver) · nbody.ts (Living Gravity)
 │   │                          · sessionDriver.ts (THE N-body session) · simTwin.ts (read-only lab)
 │   ├── realities/          ← path-locked content packs; solPrime/ = canonical seed; bin/ = Quantum Bin
@@ -335,6 +342,45 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   touched — the gauntlets moved, they did not change; `src/` is byte-identical.
   Historical round docs keep the old paths (records, not rewritten).
   `docs/ROUND-96-THE-TIDY-HOUSE-2026-10-02.md`
+- **R97 (this round, on branch `r97-the-engine-divided`):** THE ENGINE, DIVIDED
+  — the author's follow-on verdict: the house is tidy but the engine is still a
+  monolith; the round decomposes it for real. COMMIT 0 — the union harness:
+  `scripts/gauntlets/engineSource.ts` joins engine.ts and the coming subsystem
+  modules (fixed order, shell first) so all 14 engine-reading gauntlets keep
+  their 235 source pins intact over the whole family. THE SIX EXTRACTIONS,
+  each independently green (typecheck + 19 gauntlets + smoke + prod smoke,
+  audit snapshot refreshed in the same commit): **sky/SkyFxSystem.ts** (meteors,
+  Cosmic Echo, aurora, surface dressing — first cut, beat the R62 rigid-default
+  pin honestly with a `lens?` pass-through), **blackhole/BlackHoleSystem.ts**
+  (attach/release, tier switch, breaker, adaptive resolution, camera checkpoint
+  — round63 caught the one wrong cut; answered architecturally by leaving
+  `bloomHoleBoost` engine-owned since the pinned bloom line stays in the shell),
+  **kamui/KamuiPortalSystem.ts** (vortex + portal + hold + stage-warp moved as
+  ONE machine because they share the pass and the beat clock — the four
+  tickFrame segments became updateKamuiBeats/updatePortalHold/updateStageWarp/
+  updatePortalPhases called in the same order; one reconciliation: round72's
+  `private stageWarp {` shape pin), **worlds/InnerGalaxySystem.ts** (the dive
+  realms + lifecycle; two round92 union reconciliations — driverReadback count
+  3→4, and both legitimate seams now stripped before the negative scan),
+  **worlds/BodyBuilders.ts** (anchor/bodies/belt/moons/plates/rebuilders — one
+  recovery: a mis-bounded sed was caught by typecheck, file checked out and the
+  cut redone in a single verified pass), **stages/LevelStageSystem.ts**
+  (multiverse builder + level stages + the per-frame arbiter; 129 generated
+  name-preserving getter/setter pairs typed `UniverseEngine[...]`).
+  THE BARREL: `state/actions.ts` (1,275) → a 16-line barrel over
+  `actions/shared|realities|bodies|entries|vault|portability`, same import
+  path, byte-identical slices, plus `scripts/gauntlets/stateSource.ts` as the
+  state-side union (round92/84/95 pins green verbatim). RESULT: `engine.ts`
+  6,983 → 2,785 (the shell: boot, frozen tickFrame order, updateBodies the
+  one write seam, interaction, dispose); public API frozen — `App.tsx` and
+  `SimulatorTwinCard.tsx` untouched; dispose order verbatim; every commit in
+  the chain is independently green. engine.ts's perceptible shape did not
+  change — the smoke frame-pin keeps passing (0.0716 L1 distance in the last
+  full run). Diagram regenerated (132 files / 464 edges).
+  Docs: ARCHITECTURE.md §1/§2/§3/§7 refreshed (register #1 and #2 struck),
+  README §3 repointed, scripts/README.md updated, and the round doc records the
+  full reconciliation ledger.
+  `docs/ROUND-97-THE-ENGINE-DIVIDED-2026-10-02.md`
 - **R90 (this round, on main):** the author's report — the Native Simulator Twin card
   (Verify Twin with it) could not be scrolled into view in the Core Console — reproduced
   by live measurement and traced to a **Tailwind v4 cascade-layer trap**: `.cc-root`'s
@@ -609,14 +655,25 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    a one-line Kamui narrative caption, cross-reality entry search in the palette.
 5. **Desktop as the storage answer** — Tauri file store lifts the web localStorage ~5 MB
    ceiling for heavy diarists.
-6. **Deferred (do as their own rounds, unasked):** `engine.ts` decomposition (gauntlets as
-   guardrails), dead-export sweep, optional React 19 / Vite 7 evaluation, optional
-   touch-first HUD pass. (The architecture re-snapshot queued here is DONE — R96
-   regenerated it; R96 itself has no follow-ups queued.)
-7. **Watch item (small):** the smoke cold-boot flake has two sightings now (R84
-   diagnosis, R96 reproduction — `page.evaluate` context destroyed mid-boot;
-   green on every immediate re-run and on the full re-chain). If it recurs, a
-   boot-retry guard in `scripts/smoke.ts` is its own tiny round.
+6. **Deferred (do as their own rounds, unasked):** the UI giants
+   (`DiaryWindow`/`App.tsx`/`keyring`/`CoreConsole`/`FileManager`/`MediaPlates`)
+   — each its own round with gauntlet guardrails; `src/types/` fold-in;
+   dead-export sweep, optional React 19 / Vite 7 evaluation, optional
+   touch-first HUD pass. (The architecture re-snapshot is DONE at R96; R97
+   EXECUTED the engine decomposition and the actions domaining — §5/§8 carry it.)
+7. **Watch item (small):** the smoke cold-boot flake has THREE sightings now
+   (R84 diagnosis, R96 reproduction, R97 close-out — `page.evaluate` context
+   destroyed mid-boot; green on every immediate re-run and on the full
+   re-chain). R97's sighting is worth naming precisely: the run that flaked
+   captured a near-black frame (shadow 0.000 vs 0.290, bright 0.000 vs 0.086)
+   and logged ~34 refused connections — Vite's HMR socket on **:24678** plus
+   page resources — i.e. the app booted before its module/HMR server finished
+   binding, not a rendering regression. Standalone re-run: histL1 0.0716 /
+   shadow 0.289 / bright 0.086, byte-for-byte the R96 figures. Rule of thumb:
+   **a red smoke run whose errors are ALL `ERR_CONNECTION_REFUSED` and whose
+   frame is uniformly dark is the flake, not the code** — re-run standalone
+   before investigating. If it recurs further, a boot-retry guard in
+   `scripts/smoke.ts` is its own tiny round.
 
 ---
 
@@ -628,8 +685,10 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    reference params, bloom calibrations. They are identity, measured or canonical. If a
    constant looks odd, it's probably pinned on purpose (gauntlets assert some of them in
    source text).
-3. **Rewriting `engine.ts` wholesale** — it's 6.4k lines for a reason; decomposition is a
-   planned dedicated round with gauntlet guardrails, not a drive-by refactor.
+3. **Rewriting `engine.ts` wholesale** — was 6.9k lines for a reason; decomposition was a
+   planned dedicated round — **R97 EXECUTED it with the gauntlets as guardrails** (the
+   engine is now a 2.8k-line shell over six verbatim-extracted subsystems; any future
+   engine work follows the same contract: never a drive-by rewrite).
 4. **Breaking the metaphor loop** — decoupling entries from moons, moods from aurora, vault
    from the hole, or the Anchor Star's guarantees (bodies[0], undeletable, auto-repair).
 5. **Removing safety nets** — the composite fallback, shader-error disarm, 55 ms breaker.
