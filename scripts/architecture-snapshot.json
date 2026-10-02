@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-02T15:09:56.506Z",
-  "fileCount": 165,
+  "generatedAt": "2026-10-02T15:39:39.217Z",
+  "fileCount": 166,
   "deadExports": [
     {
       "symbol": "shadowReferencesFiles",
@@ -681,6 +681,7 @@
     "scripts/gauntlets/round93-real-moons-gauntlet.ts": 96,
     "scripts/gauntlets/round94-the-flip-gauntlet.ts": 125,
     "scripts/gauntlets/round95-steady-sky-gauntlet.ts": 192,
+    "scripts/gauntlets/round98-backend-conformance-gauntlet.ts": 300,
     "scripts/gauntlets/round98-physics-conformance-gauntlet.ts": 229,
     "scripts/gauntlets/stateSource.ts": 26,
     "scripts/probes/round63-void-probe.ts": 280,
@@ -908,13 +909,13 @@
       "server/skyStore.ts:7",
       "server/skyStore.ts:64",
       "src-tauri/src/realities.rs:3",
-      "src-tauri/src/realities.rs:519"
+      "src-tauri/src/realities.rs:525"
     ],
     "generated-code imports": [
       "server/realityTemplates.ts:44",
       "server/realityTemplates.ts:81",
-      "src-tauri/src/realities.rs:419",
-      "src-tauri/src/realities.rs:430"
+      "src-tauri/src/realities.rs:425",
+      "src-tauri/src/realities.rs:436"
     ],
     "disk surface.ts imports": [],
     "native build path": [
@@ -944,6 +945,7 @@
       "src/vault/executors/index.ts:318"
     ],
     "route↔command strings": [
+      "scripts/gauntlets/round98-backend-conformance-gauntlet.ts:50",
       "server/realityTemplates.ts:4",
       "server/routes/realities.ts:21",
       "server/routes/realities.ts:26",
@@ -1003,7 +1005,7 @@
       "src/state/actions/realities.ts:326",
       "src/state/actions/realities.ts:374",
       "src/ui/reality/CreateRealityModal.tsx:69",
-      "src-tauri/src/realities.rs:456"
+      "src-tauri/src/realities.rs:462"
     ],
     "localStorage keys": [
       "scripts/gauntlets/round91-session-memory-gauntlet.ts:108",

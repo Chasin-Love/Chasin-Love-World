@@ -312,10 +312,16 @@ pub fn rename_folder(reality_id: String, new_name: String) -> Result<String, Str
     }
     fs::rename(&src, &dst).map_err(|e| e.to_string())?;
 
-    // Patch the name field in index.ts (same naive regex semantics as the daemon).
-    let index_path = dst.join("index.ts");
-    if index_path.exists() {
-        let content = fs::read_to_string(&index_path).map_err(|e| e.to_string())?;
+    // Patch the name field in BOTH generated modules (same file set as the Node
+    // daemon). R98: this patched index.ts only, so renaming a world on the
+    // desktop left surface.ts holding the old name — one world, two names, one
+    // per backend. Both templates carry `name:`, so both must be rewritten.
+    for file in ["index.ts", "surface.ts"] {
+        let module_path = dst.join(file);
+        if !module_path.exists() {
+            continue;
+        }
+        let content = fs::read_to_string(&module_path).map_err(|e| e.to_string())?;
         if let Some(start) = content.find("name:") {
             if let Some(q1) = content[start..].find(['\'', '"']) {
                 let q1 = start + q1;
@@ -330,7 +336,7 @@ pub fn rename_folder(reality_id: String, new_name: String) -> Result<String, Str
                 let mut patched = String::from(&content[..q1]);
                 patched.push_str(&name_literal);
                 patched.push_str(&content[q1 + 1 + len..]);
-                    fs::write(&index_path, patched).map_err(|e| e.to_string())?;
+                    fs::write(&module_path, patched).map_err(|e| e.to_string())?;
                 }
             }
         }

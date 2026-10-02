@@ -150,11 +150,12 @@ check('R98: both backends protect sol-prime from rename',
  * world therefore kept its old name in surface.ts on the desktop. */
 const nodeRenameFiles = /for \(const file of \[([^\]]+)\]\)/.exec(nodeDaemon.slice(nodeDaemon.indexOf('RENAME_FOLDER') - 3000));
 const nodePatchSet = nodeRenameFiles?.[1] ?? '';
+const rustPatchLoop = /for file in \[([^\]]+)\]/.exec(realitiesRs);
+const rustPatchSet = rustPatchLoop?.[1] ?? '';
 check('R98: rename patches the SAME module files on both backends (index.ts AND surface.ts)',
   /index\.ts/.test(nodePatchSet) && /surface\.ts/.test(nodePatchSet) &&
-  (realitiesRs.match(/dst\.join\("(index|surface)\.ts"\)/g) ?? []).length === 2,
-  `Node patches [${nodePatchSet}] but Rust patches ` +
-  `${JSON.stringify(realitiesRs.match(/dst\.join\("([^"]+)"\)/g) ?? [])} — the file sets differ`);
+  /index\.ts/.test(rustPatchSet) && /surface\.ts/.test(rustPatchSet),
+  `Node patches [${nodePatchSet}] but Rust patches [${rustPatchSet || 'nothing'}] — the file sets differ`);
 
 /* Both backends must refuse a path that escapes the realities tree, and the
  * check must come BEFORE the destructive remove/rename. */
@@ -252,17 +253,32 @@ for (const mime of ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image
  * CHARACTER CLASSES must be the same class of strictness — this is the check
  * that caught the Rust list missing `.jpeg` while its own MIME_BY_EXT table
  * listed it, and accepting the empty-id name `sky-.png` that Node rejects. */
+/* The Rust side was rewritten in R98 from fixed-offset byte slicing to a
+ * string form (strip_prefix + rfind) because the byte form silently rejected
+ * every 5-character extension. These checks pin the NEW shape: prefix by
+ * strip_prefix, extension by searching for the dot, stem by an explicit
+ * emptiness test. A check that greps for the old byte idiom would go stale
+ * the moment someone improved the code, which is the exact failure the
+ * backend gauntlet exists to catch. */
 check('R98: the asset whitelist is present on both backends and both re-check containment',
-  /\^sky-\[a-z0-9-\]\+\\\./.test(nodeSky) && /b\.starts_with\(b"sky-"\)/.test(skyRs) &&
+  /\^sky-\[a-z0-9-\]\+\\\./.test(nodeSky) && /strip_prefix\("sky-"\)/.test(skyRs) &&
   /isInside\(dir, assetPath\)/.test(nodeSky) && /is_inside\(&dir, &path\)/.test(skyRs),
   'the whitelist or the containment re-check is missing on one side');
 
-const rsWhitelistExts = [...skyRs.matchAll(/b"\.(\w+)"/g)].map((m) => m[1]);
-check('R98: the Rust asset whitelist accepts .jpeg, which the Node whitelist accepts',
-  rsWhitelistExts.includes('jpeg'), `Rust whitelist extensions: ${rsWhitelistExts.join(', ')}`);
+const rsWhitelistExts = [...skyRs.matchAll(/matches!\(ext,\s*([^)]+)\)/g)]
+  .flatMap((m) => [...m[1].matchAll(/"(\w+)"/g)].map((e) => e[1]));
+/* The extensions the old byte window rejected outright. */
+const fiveCharExts = ['jpeg', 'webp', 'avif'];
 check('R98: the Rust asset whitelist REJECTS an empty id (sky-.png), which the Node whitelist rejects',
-  /b\.len\(\) > 6/.test(skyRs) && /\[a-z0-9-\]\+/.test(nodeSky),
-  'Rust accepts `sky-.png`: the stem check uses all() over an empty range, which is vacuously true');
+  /!stem\.is_empty\(\)/.test(skyRs) && /\[a-z0-9-\]\+/.test(nodeSky),
+  'Rust accepts `sky-.png`: the stem check must be an explicit emptiness test, not all() over an empty range');
+check('R98: the Rust whitelist finds the extension by SEARCHING for the dot, not by fixed-offset slicing',
+  /rfind\('\.'\)/.test(skyRs) && !/b\[b\.len\(\) - 4\.\./.test(skyRs),
+  'a fixed-offset slice silently rejects every 5-character extension (.jpeg/.webp/.avif)');
+for (const ext of fiveCharExts) {
+  check(`R98: the Rust asset whitelist accepts .${ext}, which the Node whitelist accepts`,
+    rsWhitelistExts.includes(ext), `Rust whitelist extensions: ${rsWhitelistExts.join(', ') || 'none'}`);
+}
 
 /* ------------------------------------------------------------------ *
  * 6. RECORDED DIVERGENCES — allowed, but pinned so they stay decisions

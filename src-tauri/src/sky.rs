@@ -331,13 +331,46 @@ pub fn update_sky_settings(
 /// the Tauri webview has no HTTP route into the realities tree.
 pub fn sky_asset(folder: String, file: String) -> Result<Vec<u8>, String> {
     let dir = resolve_sky_dir(Some(&folder), false)?;
-    /* strict whitelist — only generated sky asset names ever leave the disk */
+    /* strict whitelist — only generated sky asset names ever leave the disk.
+       R98 — brought to parity with server/routes/sky.ts, which accepts
+       /sky-[a-z0-9-]+\.(png|jpe?g|webp|gif|avif)$/i. Three real defects:
+
+         1. THE EXTENSION WINDOW WAS OFF BY ONE FOR EVERY 5-CHAR EXTENSION.
+            The old code matched the last 4 bytes against patterns that INCLUDE
+            the leading dot (`b".png"`, `b".gif"`) — so only 4-character
+            extensions ever passed. `.jpeg`, `.webp` and `.avif` are 5
+            characters: their last four bytes are `jpeg`/`webp`/`avif`, with no
+            dot, and matched nothing. A `.jpeg` sky therefore loaded in the web
+            build and silently failed on the desktop, while MIME_BY_EXT below
+            cheerfully listed all of them. The extension is now stripped by
+            searching for the dot rather than fixed-offset slicing.
+         2. `.jpeg` was absent from the accepted list entirely, though Node
+            serves it and the MIME table maps it.
+         3. `sky-.png` was ACCEPTED: `all()` over an empty range is vacuously
+            true, where Node's `[a-z0-9-]+` rejects an empty stem. Fixed by the
+            length floor — `sky-` (4) + ≥1 stem char + `.` + a ≥3-char
+            extension — and by requiring a stem character at all.
+
+       Neither the old nor the new form was a path escape: the is_inside check
+       below still holds either way. These were contract drift — the same asset
+       behaving differently per backend, which is the class the round-98
+       conformance gauntlet now pins. */
     let valid = {
-        let b = file.as_bytes();
-        b.len() > 6
-            && b.starts_with(b"sky-")
-            && b.iter().take(b.len() - 4).all(|c| c.is_ascii_alphanumeric() || *c == b'-')
-            && matches!(&b[b.len() - 4..], b".png" | b".jpg" | b".webp" | b".gif" | b".avif")
+        /* Node's regex carries the `i` flag, so it accepts `SKY-`/`SKY-x.PNG`
+           as readily as lowercase. Generated names are always lowercase, but
+           parity is cheaper than an argument: compare case-insensitively and
+           let both backends accept or reject the same set. */
+        let lower = file.to_ascii_lowercase();
+        let stem_and_ext = lower.strip_prefix("sky-").unwrap_or("");
+        match stem_and_ext.rfind('.') {
+            Some(dot) => {
+                let (stem, ext) = (&stem_and_ext[..dot], &stem_and_ext[dot + 1..]);
+                !stem.is_empty()
+                    && stem.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-')
+                    && matches!(ext, "png" | "jpg" | "jpeg" | "webp" | "gif" | "avif")
+            }
+            None => false,
+        }
     };
     if !valid {
         return Err("Unsafe asset name".into());
