@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-02T17:20:41.551Z",
+  "generatedAt": "2026-10-02T18:51:33.396Z",
   "fileCount": 166,
   "deadExports": [
     {
@@ -691,7 +691,7 @@
     "scripts/probes/round95-physics-probe.ts": 134,
     "scripts/probes/round95-steady-sky-live.ts": 262,
     "scripts/prod-smoke.ts": 87,
-    "scripts/smoke.ts": 270,
+    "scripts/smoke.ts": 281,
     "scripts/tools/generate-architecture-diagram.ts": 207,
     "scripts/tools/make-icons.mjs": 406,
     "scripts/tools/make-latest-json.mjs": 86,
@@ -736,7 +736,7 @@
     "src/physics/simTwin.ts": 233,
     "src/platform/audio.ts": 536,
     "src/platform/desktop/adapter.ts": 275,
-    "src/platform/native/cpp_bridge.ts": 1097,
+    "src/platform/native/cpp_bridge.ts": 1125,
     "src/platform/performance.ts": 115,
     "src/platform/sentiment/sentiment.ts": 117,
     "src/platform/simClock.ts": 27,
@@ -868,7 +868,7 @@
     ],
     [
       "src/platform/native/cpp_bridge.ts",
-      1097
+      1125
     ],
     [
       "src/ui/vault/sandbox.tsx",
@@ -921,8 +921,8 @@
     ],
     "disk surface.ts imports": [],
     "native build path": [
-      "src/platform/native/cpp_bridge.ts:166",
-      "src/platform/native/cpp_bridge.ts:399"
+      "src/platform/native/cpp_bridge.ts:172",
+      "src/platform/native/cpp_bridge.ts:414"
     ],
     "gauntlet readFileSync targets": [
       "scripts/gauntlets/round17-gauntlet.ts:106",
@@ -1043,7 +1043,7 @@
       "scripts/smoke.ts:164",
       "scripts/smoke.ts:176",
       "scripts/smoke.ts:186",
-      "scripts/smoke.ts:208",
+      "scripts/smoke.ts:216",
       "src/engine/engine.ts:428",
       "src/platform/desktop/adapter.ts:5",
       "src/platform/performance.ts:72"

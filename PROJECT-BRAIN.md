@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-10-02, after R99 (the wheels connected).
+> **Last updated:** 2026-10-03, after R100 (the self-contained exe).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -513,6 +513,39 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   and asserted at ZERO by the smoke ("the boot is not clean even though the
   frame may match") — mutation-proven red on a forced failure.
   `docs/ROUND-99-THE-WHEELS-CONNECTED-2026-10-02.md`
+- **R100 (this round, same branch, 2026-10-03):** THE SELF-CONTAINED EXE — the
+  author said *"I have MSVC — check please"*, and the disk proved them right
+  TWICE over: Visual Studio 18 Community (VC tools 14.44 and 14.51) plus Build
+  Tools 2022, on the machine whose every desktop build printed "No C++ compiler
+  found — building with cosmos FFI stubs" since the port began. The build.rs
+  probe looked only at the PATH; MSVC is famously not on the PATH outside a
+  developer prompt — R98's emsdk lesson, repeated verbatim, corrected the same
+  day. COMMIT 1 — the gate asks vswhere what the cc crate asks; `desktop:check`
+  now runs with ZERO stub warnings and `libcosmos_engine.a` (888 KB) freshly
+  compiled from the R99-fixed source: **cargo check is compile-verified on the
+  author's laptop — the standing debt since R85 is CLOSED** (R84's FFI
+  extension, R85's write-data twin, R86's seed guard, R98's Rust edits — all
+  now compiled). COMMIT 2 — THE WELD: dumpbin showed the shipped exe demanding
+  **MSVCP140.dll** (the VC++ Redistributable — a machine without it refuses to
+  START the app); `cc::Build::static_crt(true)` (the crate's own supported /MT
+  switch — a raw .flag("/MT") loses to cc's appended /MD, found empirically)
+  makes the C++ core link `libcpmt` (static) instead of `msvcprt` (dynamic),
+  and the exe's redistributable imports drop **1 → 0** — the remaining
+  api-ms-win-crt-* imports are the Universal CRT, built into Windows 10+
+  itself, not a download. crt-static for the Rust half was attempted and
+  REVERTED with the lesson recorded (proc-macro crates like `syn` cannot link
+  a static CRT — and the baseline proved it unnecessary: the Rust side demanded
+  no redist DLL). Linux twins (-static-libstdc++/-static-libgcc, no-ops where
+  unknown) weld libstdc++/libgcc; glibc stays dynamic by design (static glibc
+  breaks NSS) — and the Linux dependency story is the distro's own: .deb
+  resolves deps via apt, AppImage bundles them, and WebKitGTK is the one
+  system library no Tauri app can weld (by design). Receipts read from the
+  binaries themselves: dumpbin 1 → 0, the exe LAUNCHES under the new linkage,
+  desktop:check green, cc 1.5.1 pinned in Cargo.lock so CI inherits it.
+  NEW watch item: CI builds Linux on ubuntu-latest (24.04) — pinning to the
+  OLDEST supported LTS is its own small round (the workflow's 24.04
+  workarounds would need re-checking).
+  `docs/ROUND-100-THE-SELF-CONTAINED-EXE-2026-10-03.md`
 - **R90 (this round, on main):** the author's report — the Native Simulator Twin card
   (Verify Twin with it) could not be scrolled into view in the Core Console — reproduced
   by live measurement and traced to a **Tailwind v4 cascade-layer trap**: `.cc-root`'s
@@ -734,21 +767,26 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   zero console errors) — re-verified per round, most recently at R99 (a clean
   single run: every gauntlet green, `SMOKE TIER — wasm`, histL1 0.0712 against
   the 0.12 pin);
-  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R99
+  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R100
   snapshot** (zero dead exports; absorbed in-commit on every structural change);
-  `desktop:check` passes but with the pre-existing "No C++ compiler found —
-  building with cosmos FFI stubs" warning, so the C++ core is not compile-verified
-  on this laptop (R98's two Rust edits are pure Rust and DO compile in that mode).
+  `desktop:check` **compiles the REAL C++ core as of R100** — the author's
+  laptop carries VS 18 Community + Build Tools 2022 (found via vswhere; the
+  old PATH-only probe claimed "no compiler" for the port's whole life) —
+  R100's static_crt also removed the exe's last redistributable dependency
+  (MSVCP140.dll): dumpbin now reads ZERO redist imports.
   **R99 corrected R98's environment claim:** emsdk 6.0.10 has been at
   `~/Desktop/emsdk` since R95 (off the PATH — build-wasm.sh now activates it
   itself); the WASM artifact was rebuilt from the R98-fixed source and the
   physics batch is WIRED (`primePhysics`), with a stale artifact now a hard
-  gauntlet FAIL. Shipped: **v16.0.0** — tagged and pushed; R98+R99 ride the
+  gauntlet FAIL. Shipped: **v16.0.0** — tagged and pushed; R98+R99+R100 ride the
   next tag.
-- **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
-  is planned as its own future round); `cargo check` proof on a toolchained host (R84's FFI
-  extension + R85's `reality_write_data` twin + R86's seed guard, all reviewed but never
-  compiled here). RESOLVED in R85: the desktop sky seam, the write-data twin, the chain-dead
+- **Known technical debt (conscious, ranked):** ~~`engine.ts` size~~ (RESOLVED in
+  R97 — the engine is a 2.8k-line shell over six subsystems); ~~`cargo check`
+  proof on a toolchained host~~ (RESOLVED in R100 — the author's laptop carries
+  two full MSVC toolchains, the build.rs probe now finds them via vswhere, and
+  the R84 FFI extension, the R85 write-data twin, the R86 seed guard and the
+  R98 Rust edits are all compile-verified; R100's static_crt also made the exe
+  redist-free). RESOLVED in R85: the desktop sky seam, the write-data twin, the chain-dead
   routes, the black hole dispose leak, both void events, the lying facade, the isNova
   shadow, the dead-export/unused-import census (fixed point), the MIT notice, the stale
   `BUILD` constant. RESOLVED in R86: the never-called code, the write-only engine fields,
@@ -772,7 +810,10 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    provenance changed, values identical, frame unmoved (histL1 0.0712). A stale
    artifact is a hard FAIL now. STILL OPEN from that item: `cargo check` on a
    toolchained host, and retiring the `verifyParity` button (its job now runs in
-   CI as the numerical half).
+   CI as the numerical half). ~~cargo check on a toolchained host~~ — CLOSED in
+   R100: the author's laptop carries two full MSVC installations (found via
+   vswhere), the build.rs probe now finds them, and desktop:check compiles the
+   real core — every Rust edit since R84 is compile-verified.
 1. **R83 decision queue — RULED and EXECUTED (R85, branch `r85-the-six-seams`).** The
    author ruled on 2026-10-01: "create a new isolated branch … solve all these six bugs
    … best shape possible," and chose the mechanical sweep when offered the census's fate.
