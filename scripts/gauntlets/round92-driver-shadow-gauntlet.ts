@@ -33,7 +33,8 @@ function check(name: string, ok: boolean, detail: unknown) {
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
 const engineSrc = engineSource();
 const domainSrc = read('../../src/domain/universe.ts');
-const actionsSrc = read('../../src/state/actions.ts');
+import { stateSource } from './stateSource';
+const actionsSrc = stateSource();
 const appSrc = read('../../src/App.tsx');
 const cardSrc = read('../../src/ui/console/SimulatorTwinCard.tsx');
 const driverSrc = read('../../src/physics/sessionDriver.ts');

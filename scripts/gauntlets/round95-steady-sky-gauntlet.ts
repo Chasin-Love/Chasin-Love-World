@@ -44,7 +44,8 @@ const engineSrc = engineSource();
 const driverSrc = read('../../src/physics/sessionDriver.ts');
 const cppSrc = read('../../src/platform/native/cosmos_engine.cpp');
 const bridgeSrc = read('../../src/platform/native/cpp_bridge.ts');
-const actionsSrc = read('../../src/state/actions.ts');
+import { stateSource } from './stateSource';
+const actionsSrc = stateSource();
 const keysSrc = read('../../src/platform/storageKeys.ts');
 const pkgSrc = read('../../package.json');
 

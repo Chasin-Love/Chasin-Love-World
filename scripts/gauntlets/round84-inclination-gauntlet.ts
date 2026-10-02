@@ -15,7 +15,8 @@
  * Pure-source mirrors of the round's invariants. Checked without a GPU.
  */
 import { engineSource } from './engineSource';
-import{ readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { stateSource } from './stateSource';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown) {
@@ -35,7 +36,7 @@ const libSrc = readFileSync(new URL('../../src-tauri/src/lib.rs', import.meta.ur
 const seedsSrc = readFileSync(new URL('../../src/vault/storage/seeds.ts', import.meta.url), 'utf8');
 const genSrc = readFileSync(new URL('../../src/realities/galaxyGenerator.ts', import.meta.url), 'utf8');
 const realitiesSrc = readFileSync(new URL('../../src/realities/index.ts', import.meta.url), 'utf8');
-const actionsSrc = readFileSync(new URL('../../src/state/actions.ts', import.meta.url), 'utf8');
+const actionsSrc = stateSource();
 const templatesSrc = readFileSync(new URL('../../server/realityTemplates.ts', import.meta.url), 'utf8');
 const readmeSrc = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
 const pkgSrc = readFileSync(new URL('../../package.json', import.meta.url), 'utf8');
