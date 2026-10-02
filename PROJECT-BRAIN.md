@@ -790,8 +790,9 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   `~/Desktop/emsdk` since R95 (off the PATH — build-wasm.sh now activates it
   itself); the WASM artifact was rebuilt from the R98-fixed source and the
   physics batch is WIRED (`primePhysics`), with a stale artifact now a hard
-  gauntlet FAIL. Shipped: **v16.0.0** — tagged and pushed; R98+R99+R100 ride the
-  next tag.
+  gauntlet FAIL. **Shipped: v16.1.0** — tagged and pushed 2026-10-03 (the contract
+  era: R96–R100 + the Resurrection README brought to post-R100 truth); CI builds
+  the installers and the updater card delivers it.
 - **Known technical debt (conscious, ranked):** ~~`engine.ts` size~~ (RESOLVED in
   R97 — the engine is a 2.8k-line shell over six subsystems); ~~`cargo check`
   proof on a toolchained host~~ (RESOLVED in R100 — the author's laptop carries
