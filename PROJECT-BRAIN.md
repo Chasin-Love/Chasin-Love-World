@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-09-30, after R83 (the deep audit).
+> **Last updated:** 2026-10-02, after R99 (the wheels connected).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -177,10 +177,10 @@ Appendix A. **`README.md` is the single source of truth for reconstruction and c
 │   ├── vault/              ← EFS (copy-on-write fs), crypto (Argon2id/AES-GCM), executors (JS/Py/HTML/PDF/ISO)
 │   └── ui/                 ← ALL React surfaces (console, hud, vault, diary, lineage…)
 └── public/                 ← vendored pyodide + fonts + the compiled WASM core (wasm/) — offline capability, keep committed
-│                              R98: the committed wasm/ is STALE by content (no emsdk here to rebuild —
-│                              `npm run wasm:build`). Harmless only because the one C++ path that reads
-│                              the profile table has no production caller; the gauntlet escalates to a
-│                              hard FAIL the moment that changes.
+│                              R99: rebuilt from the R98-fixed source (emsdk 6.0.10 lives at
+│                              ~/Desktop/emsdk — off the PATH; build-wasm.sh activates it itself), and
+│                              the physics batch is WIRED (primePhysics → installNativePhysics). A
+│                              stale artifact is a hard gauntlet FAIL, full stop.
 ```
 
 ---
@@ -468,6 +468,47 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   needs emsdk), the by-design unknown-body tilt gap (TS seeded, C++ constant),
   and `verifyParity` still UI-button-only.
   `docs/ROUND-98-THE-REAL-CONTRACT-2026-10-02.md`
+- **R99 (this round, on branch `r99-the-wheels-connected`, cut from R98's tip):** THE
+  WHEELS CONNECTED — the author asked for a review of the R98 session and for the
+  plan's final step to actually happen. THE REVIEW: R98's engineering held up (the
+  drift closures, the degradation ledger, the staleness gate all verified against
+  the tree), but its load-bearing premise was FALSE — **emsdk 6.0.10 has lived at
+  `~/Desktop/emsdk` since R95's post-session completion (recorded in §7!), off the
+  PATH, and R98 probed only the PATH** and concluded "no emsdk on this machine".
+  COMMIT 1 — build-wasm.sh activates emsdk itself (probing ~/Desktop/emsdk then
+  ~/emsdk) and the artifact is REBUILT from the R98-fixed source (0.0453 in the
+  binary's bytes; the staleness WARN fell silent). COMMIT 2 — the last divergence
+  R98 recorded (the unknown-body tilt: TS seeded, C++ constant) is CLOSED — the C
+  API always carried the seed's three ingredients (id, radius, kind) and
+  `seededDefaultTilt` now derives the same number line-for-line — and the numerical
+  half R98's header promised but never implemented now EXISTS: the gauntlet
+  executes the shipped artifact under Node through the EXACT production marshalling
+  and decoder, comparing every field against the TS law (12 bodies, **91 green
+  checks**), and the execution caught TWO latent bugs before the wiring shipped
+  them: (a) the wasm path marshalled kinds/hasRings as f64 while the C takes
+  `const int*` — 1.0 reads as 0x3FF00000, every non-zero kind arrived as garbage
+  and even indices read as kind 0, a STAR (latent since the artifact first existed;
+  fixed by the extracted, exported `marshalPhysicsBatch` over Int32Array); (b)
+  `-ffast-math` does not preserve NaN stores — the C's NaN for a non-rel body's GR
+  fields ships as 0, so the decoder keys off the isRelativistic FLAG (field 29),
+  verifyParity treats either-side NaN as absence, and loadWasm validates the whole
+  ccall/malloc/free/HEAPF64 surface. COMMIT 3 — THE WIRING: `engine.syncBodies`
+  hands the roster to `cosmosBridge.primePhysics` (fire-and-forget, one batch per
+  roster change); on wasm the compiled core answers, on desktop
+  `invoke('cosmos_physics_batch')` does, and `installNativePhysics` overlays the 41
+  contract fields onto the memo `calculatePhysics` serves — the TS reference stays
+  the synchronous zero-fail path and keeps the two Einstein-only fields.
+  **PROVENANCE, NOT VALUES:** the gauntlet executes the chain field-for-field and
+  the smoke ran the real app — `SMOKE TIER — wasm`, histL1 0.0712 vs the 0.12 pin
+  (R96–R98: 0.0716–0.0725), zero console errors, prod smoke green. Reachability
+  law consciously reconciled: primePhysics is the blessed production consumer
+  (three checks pin the seam at both ends), no file outside the bridge may call
+  physicsBatch/verifyParity, and since the method is reachable BY CONSTRUCTION a
+  stale artifact is a hard FAIL without qualification. Mutation-proven both ways
+  (unwire → red → rewire → green). Snapshot refreshed; scope lines drawn: the
+  session driver, simTwin and the galaxy-dive inner systems stay on the TS
+  reference by law (the driver's determinism is its own contract).
+  `docs/ROUND-99-THE-WHEELS-CONNECTED-2026-10-02.md`
 - **R90 (this round, on main):** the author's report — the Native Simulator Twin card
   (Verify Twin with it) could not be scrolled into view in the Core Console — reproduced
   by live measurement and traced to a **Tailwind v4 cascade-layer trap**: `.cc-root`'s
@@ -684,20 +725,22 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   cold-boot flake diagnosed, never reproduced). `docs/ROUND-84-THE-ASCENDING-NODES-
   2026-09-30.md`.
 - **Verification status:** `npm run verify` ALL GREEN (typecheck; all **21
-  gauntlets** / 398 checks, `scripts/gauntlets/round16` → `round98-backend-
-  conformance` since R98 added the two conformance gates; smoke + prod-smoke,
-  zero console errors) — re-verified per round, most recently at R98 (a clean
-  single run: every gauntlet green, `SMOKE TIER — wasm`, histL1 0.0725 against
+  gauntlets** — the R98 physics gate now carries 91 checks including the
+  executed-artifact numerical half and the wiring pins — smoke + prod-smoke,
+  zero console errors) — re-verified per round, most recently at R99 (a clean
+  single run: every gauntlet green, `SMOKE TIER — wasm`, histL1 0.0712 against
   the 0.12 pin);
-  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R98
+  `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R99
   snapshot** (zero dead exports; absorbed in-commit on every structural change);
   `desktop:check` passes but with the pre-existing "No C++ compiler found —
   building with cosmos FFI stubs" warning, so the C++ core is not compile-verified
   on this laptop (R98's two Rust edits are pure Rust and DO compile in that mode).
-  **`npm run wasm:build` is new in R98** — no emsdk/clang/wasm-ld here, so the
-  committed WASM artifact could not be rebuilt; it is stale by content and the
-  physics gauntlet says so out loud. Shipped: **v16.0.0** — tagged and
-  pushed; R98 rides the next tag.
+  **R99 corrected R98's environment claim:** emsdk 6.0.10 has been at
+  `~/Desktop/emsdk` since R95 (off the PATH — build-wasm.sh now activates it
+  itself); the WASM artifact was rebuilt from the R98-fixed source and the
+  physics batch is WIRED (`primePhysics`), with a stale artifact now a hard
+  gauntlet FAIL. Shipped: **v16.0.0** — tagged and pushed; R98+R99 ride the
+  next tag.
 - **Known technical debt (conscious, ranked):** `engine.ts` size (~6.5k lines — decomposition
   is planned as its own future round); `cargo check` proof on a toolchained host (R84's FFI
   extension + R85's `reality_write_data` twin + R86's seed guard, all reviewed but never
@@ -715,22 +758,17 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ## 9. WHERE IT'S GOING
 
-0. **R98 follow-ups — the ordering is now LAW, not a preference.** R98 left one
-   step deliberately unperformed, and the reason is mechanical rather than
-   stylistic: **`npm run wasm:build` FIRST, then wire `cosmos_physics_batch` into
-   production — never the other way round.** The committed `cosmos_engine.wasm`
-   is stale by content today (proved by scanning the binary's bytes for the
-   pre-fix goliath `0.0489`), and this machine has no emsdk/clang/wasm-ld, so the
-   rebuild needs an author host. Until it happens the web tier's profile table
-   predates the R98 tilt fix while the desktop tier compiles the source directly
-   and is already correct — wiring first would ship *different per-body physics
-   per backend*, which is the divergence R98 was commissioned to kill. The
-   physics gauntlet enforces the ordering itself: dormant staleness is a loud
-   WARN, and it becomes a hard FAIL the moment a production caller appears. Also
-   open: the by-design unknown-body tilt gap (TS derives a seeded obliquity,
-   C++ can only emit a constant — pinned, needs an author ruling to close), and
-   `verifyParity` remains a console button even though its comparison now runs
-   in CI as gauntlet checks.
+0. **R98 follow-ups — DONE in R99 (branch `r99-the-wheels-connected`, awaiting the
+   author's merge).** The ordering R98 made law was followed and the step was
+   taken: the artifact rebuilt (emsdk was at `~/Desktop/emsdk` all along — R98
+   probed only the PATH), the last divergence (the seeded unknown-body tilt)
+   closed, the wasm kinds marshalling fixed, the numerical half of the physics
+   gauntlet implemented (the artifact EXECUTED against the TS law), and
+   `cosmos_physics_batch` wired into production through `primePhysics` —
+   provenance changed, values identical, frame unmoved (histL1 0.0712). A stale
+   artifact is a hard FAIL now. STILL OPEN from that item: `cargo check` on a
+   toolchained host, and retiring the `verifyParity` button (its job now runs in
+   CI as the numerical half).
 1. **R83 decision queue — RULED and EXECUTED (R85, branch `r85-the-six-seams`).** The
    author ruled on 2026-10-01: "create a new isolated branch … solve all these six bugs
    … best shape possible," and chose the mechanical sweep when offered the census's fate.
@@ -814,8 +852,11 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
     delete the check to make it pass).
 11. **Editing C++ and assuming the web tier changed** — `public/wasm/` is a COMMITTED
     binary. Fixing `cosmos_engine.cpp` does nothing for the browser until
-    `npm run wasm:build` runs (needs emsdk). R98 found the committed artifact carrying
-    the pre-fix physics this way. Check the artifact, not the source.
+    `npm run wasm:build` runs (build-wasm.sh activates the author's emsdk at
+    `~/Desktop/emsdk` itself — R98 missed it by probing only the PATH). R98 found
+    the committed artifact carrying the pre-fix physics this way; check the
+    artifact, not the source — and a negative environment claim ("no X here")
+    deserves a disk probe, not just a PATH probe.
 12. **Trusting a check you have never seen fail** — a gauntlet that has never gone red is
     an untested hypothesis. R98 shipped three checks that were green and meaningless; each
     was found by deliberately breaking the code and watching for the failure (see §6,
