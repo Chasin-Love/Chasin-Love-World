@@ -1,0 +1,157 @@
+{
+ "measuredMs": 35000,
+ "exe": "C:\\Users\\Chasin-Love\\Desktop\\New folder ()\\Chasin Love World\\src-tauri\\target\\release\\my-universe.exe",
+ "desktop": {
+  "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "avgFps": 10.995038266795998,
+  "p95FrameMs": 103.79999999999927,
+  "frames": -70,
+  "gaps": 3,
+  "invokes": 0,
+  "invokeAvgMs": 0,
+  "holeGeodesic": true,
+  "stage": "web",
+  "activeRealityId": "sol-prime",
+  "witness": "[desktop] boot witness — GPU: ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0 ps_5_0, D3D11) · tier: medium · physics: native-cpp · webview: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0",
+  "tierEvents": [
+   {
+    "t": 1672.9000000022352,
+    "detail": {
+     "state": "active",
+     "reason": "attached"
+    }
+   },
+   {
+    "t": 2505.800000000745,
+    "detail": {
+     "state": "active",
+     "reason": "attached"
+    }
+   },
+   {
+    "t": 2601.5,
+    "detail": {
+     "state": "active",
+     "reason": "attached"
+    }
+   },
+   {
+    "t": 2686.60000000149,
+    "detail": {
+     "state": "active",
+     "reason": "attached"
+    }
+   },
+   {
+    "t": 2780.2000000029802,
+    "detail": {
+     "state": "active",
+     "reason": "attached"
+    }
+   }
+  ]
+ },
+ "desktopConsoleErrors": [],
+ "recipe": {
+  "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "avgFps": 15.926538839602333,
+  "p95FrameMs": 76.5,
+  "frames": -87,
+  "gaps": 7,
+  "invokes": 0,
+  "invokeAvgMs": 0,
+  "holeGeodesic": false,
+  "stage": "web",
+  "activeRealityId": "sol-prime",
+  "witness": "[desktop] boot witness — GPU: ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0 ps_5_0, D3D11) · tier: low · physics: native-cpp · webview: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0",
+  "tierEvents": [
+   {
+    "t": 726.6000000014901,
+    "detail": {
+     "state": "off",
+     "reason": "override-off"
+    }
+   },
+   {
+    "t": 1436.699999999255,
+    "detail": {
+     "state": "off",
+     "reason": "override-off"
+    }
+   },
+   {
+    "t": 1497.6000000014901,
+    "detail": {
+     "state": "off",
+     "reason": "override-off"
+    }
+   },
+   {
+    "t": 1543.3999999985099,
+    "detail": {
+     "state": "off",
+     "reason": "override-off"
+    }
+   },
+   {
+    "t": 1588.1000000014901,
+    "detail": {
+     "state": "off",
+     "reason": "override-off"
+    }
+   }
+  ],
+  "note": "quality=low + Studio tier=off, keys restored after"
+ },
+ "browserAB": {
+  "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "avgFps": 1.8513486875402898,
+  "p95FrameMs": 266.6000000000058,
+  "frames": -10,
+  "gaps": 115,
+  "invokes": 0,
+  "invokeAvgMs": 0,
+  "holeGeodesic": true,
+  "stage": "web",
+  "activeRealityId": "sol-prime",
+  "witness": null,
+  "tierEvents": [
+   {
+    "t": 2784.199999999255,
+    "detail": {
+     "state": "active",
+     "reason": "attached"
+    }
+   },
+   {
+    "t": 16262.199999999255,
+    "detail": {
+     "state": "active",
+     "reason": "attached"
+    }
+   },
+   {
+    "t": 16536.39999999851,
+    "detail": {
+     "state": "active",
+     "reason": "attached"
+    }
+   },
+   {
+    "t": 55760.099999997765,
+    "detail": {
+     "state": "active",
+     "reason": "attached"
+    }
+   },
+   {
+    "t": 55994.39999999851,
+    "detail": {
+     "state": "active",
+     "reason": "attached"
+    }
+   }
+  ]
+ },
+ "lastRun": "2026-10-03T18:50:17.977Z"
+}
