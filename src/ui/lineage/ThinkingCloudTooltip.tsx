@@ -109,19 +109,24 @@ export const ThinkingCloudTooltip: React.FC<ThinkingCloudTooltipProps> = ({
   const [shift, setShift] = useState({ x: 0, y: 0 });
   useLayoutEffect(() => {
     if (!isHovered) {
-      setShift({ x: 0, y: 0 });
+      setShift((s) => (s.x === 0 && s.y === 0 ? s : { x: 0, y: 0 }));
       return;
     }
     const el = cloudRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    let x = 0;
-    let y = 0;
-    if (r.left < 8) x = 8 - r.left;
-    else if (r.right > window.innerWidth - 8) x = window.innerWidth - 8 - r.right;
-    if (r.top < 8) y = 8 - r.top;
-    else if (r.bottom > window.innerHeight - 8) y = window.innerHeight - 8 - r.bottom;
-    setShift({ x, y });
+    /* cumulative single-pass correction (the ThoughtCloud law — a replacing
+       clamp measured against an already-shifted rect would oscillate) */
+    setShift((s) => {
+      let dx = 0;
+      if (r.left < 8) dx = 8 - r.left;
+      else if (r.right > window.innerWidth - 8) dx = window.innerWidth - 8 - r.right;
+      let dy = 0;
+      if (r.top < 8) dy = 8 - r.top;
+      else if (r.bottom > window.innerHeight - 8) dy = window.innerHeight - 8 - r.bottom;
+      if (dx === 0 && dy === 0) return s;
+      return { x: s.x + dx, y: s.y + dy };
+    });
   }, [isHovered, position]);
 
   /* puff chain anchor — the dots always ride the trigger's side of the card */

@@ -6,6 +6,9 @@ import type { UniverseSurfaceConfig } from '../../realities/types';
  * Only the Sol Prime baseline is hand-tuned here; every other reality is
  * synthesized on the fly in getSurfaceConfigForReality from its own colors,
  * and realities forged on disk ship their own surface.ts module.
+ * R102 — the independent-realities decree: the generic fallback below is
+ * NOT Sol Prime. With no reality (or an unknown id) the dome renders from
+ * this neutral profile; no reality is load-bearing for the surface.
  */
 const SURFACE_PRESETS: Record<string, UniverseSurfaceConfig> = {
   'sol-prime': {
@@ -22,12 +25,26 @@ const SURFACE_PRESETS: Record<string, UniverseSurfaceConfig> = {
   },
 };
 
+/* the reality-agnostic dome — the preset values without a reality's name */
+const NEUTRAL_SURFACE: UniverseSurfaceConfig = {
+  realityId: '',
+  name: 'Universe Surface',
+  colorA: '#38bdf8',
+  colorB: '#f59e0b',
+  deepColor: '#000104',
+  starColor: '#ffb54d',
+  webFilaments: '#1e3a8a',
+  nebulaIntensity: 1.0,
+  dustLaneIntensity: 0.85,
+  starDensity: 1.0,
+};
+
 /**
  * Resolves the appropriate surface configuration for a given reality or fallback.
  */
 export function getSurfaceConfigForReality(reality?: RealityConfig | string | null): UniverseSurfaceConfig {
   if (!reality) {
-    return SURFACE_PRESETS['sol-prime'];
+    return NEUTRAL_SURFACE;
   }
   const id = typeof reality === 'string' ? reality : reality.id;
   const preset = SURFACE_PRESETS[id];
@@ -51,5 +68,5 @@ export function getSurfaceConfigForReality(reality?: RealityConfig | string | nu
     };
   }
 
-  return SURFACE_PRESETS['sol-prime'];
+  return NEUTRAL_SURFACE;
 }

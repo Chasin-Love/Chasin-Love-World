@@ -42,8 +42,23 @@ async function ensureServer(): Promise<ChildProcess | null> {
 async function main() {
   const server = await ensureServer();
   mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    /* R101.3 — no-throttle flags: when the physical machine is in active use,
+       Chromium occlusion-throttles the headless page (rAF + CSS-animation
+       timeline freeze) and the deck's entrance never advances past frame 0 —
+       the console mounts at opacity 0 and every capture starves. These flags
+       keep the probe's page rendering like a foreground page. */
+    args: [
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-background-timer-throttling',
+    ],
+  });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  await page.bringToFront();
+  const probeErrors: string[] = [];
+  page.on('console', (m) => { if (m.type() === 'error') probeErrors.push(m.text()); });
+  page.on('pageerror', (e) => probeErrors.push(`PAGEERROR: ${e.message}`));
 
   try {
     await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
@@ -102,6 +117,31 @@ async function main() {
     await page.screenshot({ path: path.join(OUT, 'frost-twin-cloud.png') });
     console.log('captured frost-twin-cloud.png');
     await page.mouse.move(700, 500); /* leave the seal before the next step */
+    await page.waitForTimeout(400);
+
+    /* THE FLIP LAW (R101.3) — shrink the viewport so the title sits ~110px
+       from the top (no honest room above): the cloud must flip BELOW its
+       trigger, never onto it. */
+    await page.setViewportSize({ width: 1600, height: 340 });
+    await page.waitForTimeout(700);
+    /* nudge the deck down so the title enters the no-room zone (~<248px from the top) */
+    await page.evaluate(`(() => { const s = document.querySelector('.cc-root .overflow-y-auto'); if (s) s.scrollTop += 140; })()`);
+    await page.waitForTimeout(500);
+    const box = await page.locator('#simulator-twin-card h3').boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(900);
+      await page.screenshot({ path: path.join(OUT, 'frost-twin-cloud-below.png') });
+      console.log(`captured frost-twin-cloud-below.png (viewport 340px — flip below)`);
+      if (probeErrors.length) {
+        console.log('ERRORS DURING FLIP:');
+        console.log(probeErrors.slice(0, 6).join('\n---\n'));
+      } else {
+        console.log('flip: zero console errors');
+      }
+    }
+    await page.mouse.move(700, 300);
+    await page.setViewportSize({ width: 1600, height: 900 });
     await page.waitForTimeout(400);
 
     /* the Backdrop Studio popover, anchored to the rail */

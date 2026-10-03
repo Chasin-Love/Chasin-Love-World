@@ -7,7 +7,7 @@ import {
   Cpu, Database, Wallpaper
 } from 'lucide-react';
 import { useConsoleBackdrop } from './backdropStore';
-import { REALITIES, getReality, createNewRealityConfig, RealityConfig } from '../../realities';
+import { REALITIES, RAW_REALITIES, getReality, createNewRealityConfig, RealityConfig } from '../../realities';
 import { actions, useUniverse } from '../../state';
 import type { DiskSyncState } from '../../domain/universe';
 import { toast } from '../../ui/toast';
@@ -17,6 +17,7 @@ import { ScenicBackdrop, FALLBACK_NIGHT } from './ScenicBackdrop';
 import { TiltButton } from './TiltButton';
 import { RealityAdvancedPanel } from '../reality/RealityAdvancedPanel';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
+import { ThoughtCloud } from './ThoughtCloud';
 import { QuantumBinTab } from './QuantumBinTab';
 import { CppNativeEngineCard } from './CppNativeEngineCard';
 import { SimulatorTwinCard } from './SimulatorTwinCard';
@@ -447,7 +448,8 @@ function BentoRealityCard({
   onDelete: () => void;
   onEnterGalaxy: (rid: string, gid: string) => void;
 }) {
-  const protectedReality = reality.id === 'sol-prime';
+  /* R102 — the independent-realities decree: sol-prime is no longer singled
+     out; every reality card offers the same two-step collapse */
   const [confirmDel, setConfirmDel] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(reality.name);
@@ -666,8 +668,9 @@ function BentoRealityCard({
           <span>{active ? 'Anchored' : 'Warp to Reality'}</span>
         </button>
 
-        {!protectedReality && (
-          confirmDel ? (
+        {/* R102 — no reality is protected: every world, the home one
+            included, can collapse into the Quantum Bin */}
+        {confirmDel ? (
             <button
               onClick={() => {
                 onDelete();
@@ -689,8 +692,7 @@ function BentoRealityCard({
             >
               <Trash2 className="w-4 h-4" />
             </button>
-          )
-        )}
+          )}
       </div>
 
       {/* Expanded Deep Advanced Reality Workbench */}
@@ -715,7 +717,7 @@ function DeepHierarchyExplorer({
   onEnterGalaxy: (realityId: string, galaxyId: string) => void;
   onWarpReality: (realityId: string) => void;
 }) {
-  const [selectedRealityId, setSelectedRealityId] = useState<string>(realities[0]?.id || 'sol-prime');
+  const [selectedRealityId, setSelectedRealityId] = useState<string>(realities[0]?.id ?? '');
   const selectedReality = realities.find((r) => r.id === selectedRealityId) || realities[0];
 
   return (
@@ -941,9 +943,11 @@ export const CoreConsole: React.FC<Props> = ({
     return () => window.removeEventListener('mousedown', close);
   }, [studioOpen]);
 
-  const activeRealityId = state.activeRealityId || 'sol-prime';
+  const activeRealityId = state.activeRealityId ?? '';
   const realities: RealityConfig[] = REALITIES;
-  const activeReality = getReality(activeRealityId, state.customRealityDescriptions);
+  /* R102 — undefined when the multiverse is empty; every consumer below
+     guards instead of assuming a home reality */
+  const activeReality = activeRealityId ? getReality(activeRealityId, state.customRealityDescriptions) : undefined;
   const totalGalaxies = realities.reduce((n, r) => n + (r.galaxies?.length ?? 0), 0);
   const totalClusters = realities.reduce((n, r) => n + (r.clusters?.length ?? 0), 0);
   const totalWorlds = realities.reduce((n, r) => n + r.bodies.length, 0);
@@ -952,7 +956,9 @@ export const CoreConsole: React.FC<Props> = ({
   const filteredRealities = useMemo(() => {
     return realities.filter((r) => {
       if (filterType === 'anchored' && r.id !== activeRealityId) return false;
-      if (filterType === 'custom' && r.id === 'sol-prime') return false;
+      /* R102 — "custom" means traveler-forged, not "everything but the old
+         home": any disc-born reality is excluded the same way */
+      if (filterType === 'custom' && RAW_REALITIES.some((raw) => raw.id === r.id)) return false;
       if (filterType === 'dense' && (r.galaxies?.length ?? 0) < 4) return false;
 
       if (!searchQuery.trim()) return true;
@@ -1258,7 +1264,7 @@ export const CoreConsole: React.FC<Props> = ({
                 <div className="mt-auto pt-3 w-full flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-white/6">
                   <span className="flex items-center gap-1.5 min-w-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.9)] shrink-0" />
-                    <span className="truncate">Anchor: <span className="text-cyan-300 font-bold">{activeReality.name}</span></span>
+                    <span className="truncate">Anchor: <span className="text-cyan-300 font-bold">{activeReality?.name ?? 'None — the multiverse is empty'}</span></span>
                   </span>
                   <button onClick={() => setTab('realities')} className="text-cyan-400 hover:text-white shrink-0">View All →</button>
                 </div>
@@ -1294,55 +1300,76 @@ export const CoreConsole: React.FC<Props> = ({
                   gravity now. */}
               <motion.div variants={rise} className="lg:col-span-8 cc-panel p-4 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="cc-panel-title">
-                    <Orbit className="w-3.5 h-3.5" />
-                    Physics Laws — Relativity &amp; Gravitation
-                  </span>
+                  <ThoughtCloud
+                    label="Physics Laws — Relativity & Gravitation"
+                    subtitle={state.universeDriver !== false
+                      ? 'TRUE GRAVITY DRIVES THE SKY — every world and every moon follows real mutual N-body gravity. The canon is the seed, the Kepler clockwork renders any frame the session cannot deliver, and Restore Ephemeris re-seeds the divine plan. Chaos is honest; the story persists across restarts.'
+                      : "The real universe has no grid — so curvature is shown the only way it can be seen: light bending. Every mass lenses the starlight passing it (strongest around the star, a deep ring around the Vault), and Living Gravity lets worlds tug each other through Gauss's planetary equations in osculating elements — orbits breathe and precess, never wander. Restore Ephemeris heals every path instantly; the divine plan is never lost."}
+                    hint="hover a law for its own words"
+                  >
+                    <span className="cc-panel-title cursor-default">
+                      <Orbit className="w-3.5 h-3.5" />
+                      Physics Laws — Relativity &amp; Gravitation
+                    </span>
+                  </ThoughtCloud>
                   <span className={`cc-label flex items-center gap-1.5 ${state.universeDriver !== false ? 'text-emerald-300/90' : 'text-cyan-300/80'}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${state.universeDriver !== false ? 'bg-emerald-400 animate-pulse' : 'bg-cyan-400'}`} />
                     {state.universeDriver !== false ? 'TRUE GRAVITY · DRIVING' : 'Einstein · Newton · Live'}
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <TiltButton
-                    onClick={() => onToggleLens(!lensOn)}
-                    maxTilt={11}
-                    lift={16}
-                    style={{ ['--btn' as string]: lensOn ? '34 211 238' : '100 116 139' }}
-                    className={`cc-btn-glass p-2.5 rounded-xl text-[10px] font-mono uppercase tracking-wider cursor-pointer ${lensOn ? 'text-cyan-100' : 'text-slate-400'}`}
-                    title="Einstein lensing — every mass bends the light passing it. The real universe has no grid; curvature shows in the light."
+                  <ThoughtCloud
+                    label="Einstein Lensing"
+                    subtitle="Every mass bends the light passing it. The real universe has no grid; curvature shows in the light — strongest around the star, a deep ring around the Vault."
+                    hint={lensOn ? 'currently bending' : 'currently clear'}
+                    className="w-full"
                   >
-                    <Orbit className="w-3.5 h-3.5" /> Lens · {lensOn ? 'Bent' : 'Clear'}
-                  </TiltButton>
-                  <TiltButton
-                    onClick={() => onToggleLiving(!livingOn)}
-                    disabled={state.universeDriver !== false}
-                    maxTilt={11}
-                    lift={16}
-                    style={{ ['--btn' as string]: state.universeDriver !== false ? '16 185 129' : livingOn ? '167 139 250' : '100 116 139' }}
-                    className={`cc-btn-glass p-2.5 rounded-xl text-[10px] font-mono uppercase tracking-wider ${state.universeDriver !== false ? 'text-emerald-200 cursor-default' : livingOn ? 'text-violet-200 cursor-pointer' : 'text-slate-400 cursor-pointer'}`}
-                    title={state.universeDriver !== false
-                      ? 'True mutual gravity IS the session now — the clockwork coupling rests while the driver owns the sky'
-                      : "True mutual N-body coupling in osculating elements (Gauss's planetary equations) — bounded forever"}
+                    <TiltButton
+                      onClick={() => onToggleLens(!lensOn)}
+                      maxTilt={11}
+                      lift={16}
+                      style={{ ['--btn' as string]: lensOn ? '34 211 238' : '100 116 139' }}
+                      className={`cc-btn-glass w-full p-2.5 rounded-xl text-[10px] font-mono uppercase tracking-wider cursor-pointer ${lensOn ? 'text-cyan-100' : 'text-slate-400'}`}
+                    >
+                      <Orbit className="w-3.5 h-3.5" /> Lens · {lensOn ? 'Bent' : 'Clear'}
+                    </TiltButton>
+                  </ThoughtCloud>
+                  <ThoughtCloud
+                    label="Living Gravity"
+                    subtitle={state.universeDriver !== false
+                      ? 'True mutual gravity IS the session now — the clockwork coupling rests while the driver owns the sky.'
+                      : "True mutual N-body coupling in osculating elements (Gauss's planetary equations) — orbits breathe and precess, bounded forever."}
+                    hint={state.universeDriver !== false ? 'in the session' : livingOn ? 'awake' : 'rested'}
+                    className="w-full"
                   >
-                    <Zap className="w-3.5 h-3.5" /> {state.universeDriver !== false ? 'Gravity · In the Session' : livingOn ? 'Gravity · Awake' : 'Gravity · Rested'}
-                  </TiltButton>
-                  <TiltButton
-                    onClick={onRestoreEphemeris}
-                    maxTilt={11}
-                    lift={16}
-                    style={{ ['--btn' as string]: '251 191 36' }}
-                    className="cc-btn-glass p-2.5 rounded-xl text-amber-100 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
-                    title="Canonical heal — restore every world's exact divine path in one stroke (re-seeds the driving session too)"
+                    <TiltButton
+                      onClick={() => onToggleLiving(!livingOn)}
+                      disabled={state.universeDriver !== false}
+                      maxTilt={11}
+                      lift={16}
+                      style={{ ['--btn' as string]: state.universeDriver !== false ? '16 185 129' : livingOn ? '167 139 250' : '100 116 139' }}
+                      className={`cc-btn-glass w-full p-2.5 rounded-xl text-[10px] font-mono uppercase tracking-wider ${state.universeDriver !== false ? 'text-emerald-200 cursor-default' : livingOn ? 'text-violet-200 cursor-pointer' : 'text-slate-400 cursor-pointer'}`}
+                    >
+                      <Zap className="w-3.5 h-3.5" /> {state.universeDriver !== false ? 'Gravity · In the Session' : livingOn ? 'Gravity · Awake' : 'Gravity · Rested'}
+                    </TiltButton>
+                  </ThoughtCloud>
+                  <ThoughtCloud
+                    label="Restore Ephemeris"
+                    subtitle="The canonical heal — restore every world's exact divine path in one stroke (re-seeds the driving session too)."
+                    hint="one stroke, all worlds"
+                    className="w-full"
                   >
-                    <Compass className="w-3.5 h-3.5" /> Restore Ephemeris
-                  </TiltButton>
+                    <TiltButton
+                      onClick={onRestoreEphemeris}
+                      maxTilt={11}
+                      lift={16}
+                      style={{ ['--btn' as string]: '251 191 36' }}
+                      className="cc-btn-glass w-full p-2.5 rounded-xl text-amber-100 text-[10px] font-mono uppercase tracking-wider cursor-pointer"
+                    >
+                      <Compass className="w-3.5 h-3.5" /> Restore Ephemeris
+                    </TiltButton>
+                  </ThoughtCloud>
                 </div>
-                <p className="text-[10px] font-mono leading-relaxed text-slate-400/90">
-                  {state.universeDriver !== false
-                    ? 'TRUE GRAVITY DRIVES THE SKY — every world and every moon follows real mutual N-body gravity. The canon is the seed, the Kepler clockwork renders any frame the session cannot deliver, and Restore Ephemeris re-seeds the divine plan. Chaos is honest; the story persists across restarts.'
-                    : 'The real universe has no grid — so curvature is shown the only way it can be seen: light bending. Every mass lenses the starlight passing it (strongest around the star, a deep ring around the Vault), and Living Gravity lets worlds tug each other through Gauss\'s planetary equations in osculating elements — orbits breathe and precess, never wander. Restore Ephemeris heals every path instantly; the divine plan is never lost.'}
-                </p>
               </motion.div>
 
               {/* QUICK PODS — 4-col, lands directly under the radar.
@@ -1488,10 +1515,6 @@ export const CoreConsole: React.FC<Props> = ({
                       vaultCount={state.realities?.[r.id]?.vault?.length ?? 0}
                     onWarp={() => onWarpReality(r.id)}
                     onDelete={() => {
-                      if (r.id === 'sol-prime') {
-                        toast('Sol Prime is the primordial anchor — it cannot be erased', 'warn');
-                        return;
-                      }
                       actions.deleteReality(r.id);
                       toast(`${r.name} collapsed out of existence`);
                     }}

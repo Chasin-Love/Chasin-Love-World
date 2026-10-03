@@ -3,6 +3,7 @@ import { Cpu, Terminal, Play, Zap, Copy, Check, BadgeCheck, BadgeX, FlaskConical
 import { cosmosBridge, type CosmosStatus } from '../../platform/native/cpp_bridge';
 import { getQualityTier, setQualityTier, probeCapability, type QualityTier } from '../../engine/capability';
 import { toast } from '../../ui/toast';
+import { ThoughtCloud } from './ThoughtCloud';
 
 const BACKEND_LABEL: Record<string, { text: string; cls: string }> = {
   'native-cpp': { text: 'NATIVE C++ CORE', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' },
@@ -114,55 +115,57 @@ export const CppNativeEngineCard: React.FC = () => {
 
   return (
     <div className="cc-panel p-4 sm:p-5 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-white/12 pb-3 flex-wrap">
+      {/* Header — R101.3 quiet manner: the words live in the clouds */}
+      <div className="flex items-start justify-between gap-3 border-b border-white/12 pb-3 flex-wrap">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-400/35 text-cyan-300">
             <Cpu className="w-4 h-4" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-display text-[13px] font-semibold text-white tracking-wide">
+            <ThoughtCloud
+              label="Astrophysics Simulation Core"
+              subtitle={`core v${status.version} · ${status.physicsFieldCount}-field telemetry · RK4 integrator. The same core that drives the sky — Verify Parity checks it field-for-field against the TypeScript reference.`}
+              hint="the compiled engine, with its face here"
+            >
+              <h3 className="font-display text-[13px] font-semibold text-white tracking-wide cursor-default">
                 ASTROPHYSICS SIMULATION CORE
               </h3>
-              <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${backend.cls}`}>
-                {backend.text}
-              </span>
-            </div>
-            <p className="font-mono text-[9px] text-slate-400">
-              core v{status.version} · {status.physicsFieldCount}-field telemetry · RK4 integrator
-            </p>
+            </ThoughtCloud>
             {!isDesktopShell && (
-              <p className="font-mono text-[9px] text-cyan-300/80 max-w-[340px]">
-                Browser preview — the compiled C++ core ships inside the desktop app only.
-                This tab runs the TypeScript reference engine; Verify Parity &amp; the benchmark
-                are self-tests, not features.
-              </p>
-            )}
-            {/* R98 — the degradation ledger, surfaced. Before this round the
-                card showed a bare "TS REFERENCE FALLBACK" badge with no way to
-                tell a never-built artifact from a broken one. */}
-            {status.fellBack && (
-              <p className="font-mono text-[9px] text-amber-300/90 max-w-[420px] leading-relaxed">
-                Compiled core not in use.
-                {status.degraded.filter((d) => d.reason !== 'no-tauri').length === 0 ? (
-                  <> Running in a browser tab — the native tier needs the desktop shell, so this is expected here.</>
-                ) : (
-                  <>
-                    {' '}
-                    {status.degraded.filter((d) => d.reason !== 'no-tauri').map((d) => (
-                      <span key={`${d.tier}-${d.reason}`} className="block">
-                        ✕ {d.tier}: {d.reason} <span className="text-slate-500">({d.detail})</span>
-                      </span>
-                    ))}
-                  </>
-                )}
+              <p className="font-mono text-[9px] text-cyan-300/80">
+                Browser preview — hover the tier badge for what that means
               </p>
             )}
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <ThoughtCloud
+            label={backend.text}
+            subtitle={
+              status.fellBack ? (
+                <span className="block space-y-1">
+                  <span className="block">Compiled core not in use — this is why:</span>
+                  {status.degraded.filter((d) => d.reason !== 'no-tauri').length === 0 ? (
+                    <span className="block">Running in a browser tab — the native tier needs the desktop shell, so this is expected here.</span>
+                  ) : (
+                    status.degraded.filter((d) => d.reason !== 'no-tauri').map((d) => (
+                      <span key={`${d.tier}-${d.reason}`} className="block">
+                        ✕ {d.tier}: {d.reason} <span className="text-slate-500">({d.detail})</span>
+                      </span>
+                    ))
+                  )}
+                </span>
+              ) : (
+                'The compiled core is live — every physics number you see was computed by it.'
+              )
+            }
+            hint="why this tier"
+          >
+            <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${backend.cls} cursor-default`}>
+              {backend.text}
+            </span>
+          </ThoughtCloud>
           <button
             onClick={runParity}
             disabled={busy !== null}
@@ -222,10 +225,16 @@ export const CppNativeEngineCard: React.FC = () => {
       {/* Render quality tiers */}
       <div className="space-y-2 font-mono text-xs">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="cc-panel-title">
-            <Gauge className="w-3.5 h-3.5" />
-            <span>Render Quality Tier</span>
-          </div>
+          <ThoughtCloud
+            label="Render Quality Tier"
+            subtitle="The raymarched black hole (true gravitational lensing) is already on at MEDIUM and above. CINEMATIC adds richer particles and exoplanet horizon plates; sharpness scales with your display's density — on a 125% screen MEDIUM and CINEMATIC render at the same resolution."
+            hint="applied live"
+          >
+            <div className="cc-panel-title cursor-default">
+              <Gauge className="w-3.5 h-3.5" />
+              <span>Render Quality Tier</span>
+            </div>
+          </ThoughtCloud>
           <span className="text-[9px] text-slate-500 truncate max-w-[220px]" title={gpu}>{gpu}</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
@@ -243,19 +252,20 @@ export const CppNativeEngineCard: React.FC = () => {
             </button>
           ))}
         </div>
-        <p className="text-[10px] text-slate-500">
-          The raymarched black hole (true gravitational lensing) is already on at MEDIUM and above.
-          CINEMATIC adds richer particles and exoplanet horizon plates; sharpness scales with your
-          display's density — on a 125% screen MEDIUM and CINEMATIC render at the same resolution.
-        </p>
       </div>
 
       {/* Build commands */}
       <div className="space-y-2 font-mono text-xs">
-        <div className="cc-panel-title">
-          <Terminal className="w-3.5 h-3.5" />
-          <span>Build Pipelines</span>
-        </div>
+        <ThoughtCloud
+          label="Build Pipelines"
+          subtitle="The C++ core is compiled into the desktop binary (no DLL loading) and drives Kepler orbits + telemetry batches; web falls back to WASM, then the TypeScript reference."
+          hint="copy a command to build it yourself"
+        >
+          <div className="cc-panel-title cursor-default">
+            <Terminal className="w-3.5 h-3.5" />
+            <span>Build Pipelines</span>
+          </div>
+        </ThoughtCloud>
         <div className="space-y-1.5 text-[11px]">
           {([
             ['desktop', 'Desktop App (Linux + Windows)', commands.desktop, 'text-emerald-400'],
@@ -277,11 +287,6 @@ export const CppNativeEngineCard: React.FC = () => {
             </div>
           ))}
         </div>
-        <p className="text-[10px] text-slate-500 flex items-center gap-1.5 pt-1">
-          <Zap className="w-3 h-3" />
-          The C++ core is compiled into the desktop binary (no DLL loading) and drives
-          Kepler orbits + telemetry batches; web falls back to WASM, then this TS reference.
-        </p>
       </div>
     </div>
   );

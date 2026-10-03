@@ -486,7 +486,10 @@ export class UniverseEngine {
      actually inside the disc */
   galaxyDive: { galaxyId: string; endInner: boolean } | null = null;
   beacon!: THREE.Sprite;
-  activeRealityId = 'sol-prime';
+  /* R102 — the independent-realities decree: the engine owns NO reality. An
+     id of null means the multiverse is empty (every folder deleted) and the
+     scene renders the bare giant sphere; no code path may assume a home. */
+  activeRealityId: string | null = null;
   /* a galaxy dive requested before the target reality's roster landed —
      executed by setReality once the stage is built */
   pendingGalaxyEntry: { realityId: string; galaxyId: string } | null = null;
@@ -929,7 +932,11 @@ export class UniverseEngine {
         this.simTwinOn = false;
         disableSimTwin();
       }
-      void enableDriver(this.bodies, this.simDays, this.activeRealityId);
+      /* R102 — no active reality, no session: an empty multiverse has no
+         roster to drive (the driver re-arms from setReality when one lands). */
+      if (this.activeRealityId) {
+        void enableDriver(this.bodies, this.simDays, this.activeRealityId);
+      }
     } else {
       disableDriver();
     }
@@ -941,7 +948,7 @@ export class UniverseEngine {
       resets to the divine plan, exactly as the clockwork heal does. */
   healLivingGravity(): void {
     this.livingField.heal();
-    if (this.universeDriverOn) {
+    if (this.universeDriverOn && this.activeRealityId) {
       void healDriver(this.bodies, this.simDays, this.activeRealityId);
     }
   }
@@ -1700,6 +1707,13 @@ export class UniverseEngine {
      registry itself so a device that never ran the web server still gets
      its skies. The crossfade + texture load run off the render loop. */
   async applyActiveSky(): Promise<void> {
+    /* R102 — no reality, no sky: the empty multiverse renders the bare dome
+       (the neutral surface), never a phantom home's photo */
+    if (!this.activeRealityId) {
+      this.activeSkySpec = null;
+      await this.surfaceManager.getPhotoDome().apply(null);
+      return;
+    }
     if (isDesktop()) {
       try {
         await ensureSkyFor(this.activeRealityId);
@@ -1724,8 +1738,31 @@ export class UniverseEngine {
   lastEntries?: { planetId: string; createdAt: number; updatedAt: number }[];
 
   /** Dimensional Barrier — strictly isolates state, star spectrum, corona, and local universe to active reality */
-  setReality(reality: RealityConfig, liveBodies?: CosmicBody[], liveEntries?: DiaryEntry[]) {
+  setReality(reality: RealityConfig | null, liveBodies?: CosmicBody[], liveEntries?: DiaryEntry[]) {
     perfMark('reality-rebuild-start');
+    /* R102 — null reality: the multiverse holds nothing (every folder was
+       deleted or none was forged). The engine drops its target and keeps
+       rendering the bare stage — no crash, no phantom home: the anchor
+       star's group and every reality group stand down until a real reality
+       lands. The universe driver stands down (its scope died with the
+       reality); a later setReality with a real config re-arms it. */
+    if (!reality) {
+      const wasDriving = this.universeDriverOn && driverState.enabled;
+      this.activeRealityId = null;
+      this.activeReality = null;
+      if (wasDriving) {
+        disableDriver();
+      }
+      if (this.anchorGroup) this.anchorGroup.visible = false;
+      if (this.realityGroups) {
+        const isMultiverseMode = this.cosmicStage === 'multiverse';
+        Object.keys(this.realityGroups).forEach((id) => {
+          if (this.realityGroups[id]) this.realityGroups[id].visible = isMultiverseMode;
+        });
+      }
+      return;
+    }
+    if (this.anchorGroup && !this.anchorGroup.visible) this.anchorGroup.visible = true;
     this.activeRealityId = reality.id;
     this.activeReality = reality;
 
@@ -1836,6 +1873,15 @@ export class UniverseEngine {
       this.pendingGalaxyEntry = null;
       const gal = (reality.galaxies ?? []).find((g) => g.id === pending.galaxyId);
       if (gal) this.beginGalaxyEntry(gal);
+    }
+    /* R102 — the driver follows existence: a reality landing in a
+       driver-armed multiverse (the R94 flip's default) drives from its
+       first landing — including the first reality forged into an EMPTY
+       multiverse. Placed after the roster build so the seed sees the
+       freshly built bodies, mirroring the boot order (setReality, then the
+       App's physics-toggle effect). */
+    if (this.universeDriverOn && !driverState.enabled) {
+      void enableDriver(this.bodies, this.simDays, this.activeRealityId!);
     }
     perfMeasure('reality-rebuild', 'reality-rebuild-start');
   }
@@ -2180,18 +2226,22 @@ this.updateBodies(dt);
       const gal = this.driverGalaxyScope as { id: string; bodies: DriverBody[] } | null;
       const wantId = gal ? gal.id : this.activeRealityId;
       const wantBodies = gal ? gal.bodies : this.bodies;
-      if (driverState.scopeId !== wantId) {
-        /* R95 — the activation may adopt a saved memory whose story sits
-           ahead of this boot's clock (the universe remembers): set the
-           engine clock to the memory's time. */
-        void activateScope(wantId, wantBodies, this.simDays).then((adopted) => {
-          if (adopted != null) {
-            this.simDays = adopted;
-            driverState.accumulatedDays = 0;
-          }
-        });
-      } else if (!driverState.pending) {
-        driverTick(wantBodies, this.lastSimDelta, this.simDays);
+      /* R102 — an empty multiverse has no scope to drive; the block waits
+         until a reality lands (setReality re-arms the session) */
+      if (wantId) {
+        if (driverState.scopeId !== wantId) {
+          /* R95 — the activation may adopt a saved memory whose story sits
+             ahead of this boot's clock (the universe remembers): set the
+             engine clock to the memory's time. */
+          void activateScope(wantId, wantBodies, this.simDays).then((adopted) => {
+            if (adopted != null) {
+              this.simDays = adopted;
+              driverState.accumulatedDays = 0;
+            }
+          });
+        } else if (!driverState.pending) {
+          driverTick(wantBodies, this.lastSimDelta, this.simDays);
+        }
       }
     }
     this.updateSpacetimeLens(dt);

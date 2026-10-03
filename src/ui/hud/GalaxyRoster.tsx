@@ -30,7 +30,9 @@ interface Props {
 export const GalaxyRoster: React.FC<Props> = ({ realityId, onEnterGalaxy, highlightGalaxyId }) => {
   const state = useUniverse();
   const reality = getReality(realityId, state.customRealityDescriptions);
-  const galaxies: GalaxyData[] = reality.galaxies ?? [];
+  /* R102 — the reality may have collapsed mid-session; the roster renders
+     its data from nothing rather than dereferencing a vanished world */
+  const galaxies: GalaxyData[] = reality?.galaxies ?? [];
 
   const [expanded, setExpanded] = useState<string | null>(highlightGalaxyId ?? null);
   const [newName, setNewName] = useState('');

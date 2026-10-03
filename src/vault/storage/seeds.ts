@@ -497,7 +497,29 @@ function seedVault(
   ];
 }
 
-export function createInitialSeed(newIdFn: () => string): UniverseState {
+export function createInitialSeed(newIdFn: () => string, homeExists = true): UniverseState {
+  /* R102 — the independent-realities decree: the shipped home seed is
+     CONTENT, not structure. Its cast belongs to the sol-prime folder; when
+     that folder is absent from src/realities (deleted at the source), a
+     fresh install boots the EMPTY multiverse — as if the seed never existed.
+     The caller (persist.ts) supplies the folder's existence; the vault layer
+     stays pure and never imports the realities tree. */
+  if (!homeExists) {
+    return {
+      activeRealityId: '',
+      realities: {},
+      bodies: [],
+      entries: [],
+      connections: [],
+      vault: [],
+      vaultTrash: [],
+      efs: createVfs(),
+      vaultUsers: [],
+      secrets: null,
+      audit: [],
+      visitedAt: Date.now(),
+    };
+  }
   const now = Date.now();
   const day = 86400000;
   const bodies = seedBodies(now, day);

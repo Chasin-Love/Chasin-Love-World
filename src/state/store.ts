@@ -66,9 +66,12 @@ export function emptyBucket(): RealityBucket {
 /** Lazy container materialization: a bucket for a reality with no stored
     content yet is seeded from its config's bodies/entries (the world cast it
     was forged with) and gets a FRESH EMPTY vault — realities are isolated by
-    construction and new ones start with an empty black hole. */
-export function ensureBucket(realityId: string): RealityBucket {
-  const id = realityId || 'sol-prime';
+    construction and new ones start with an empty black hole. R102: no
+    phantom home — an absent id returns a transient empty bucket instead of
+    conjuring a 'sol-prime' container for a reality that may not exist. */
+export function ensureBucket(realityId: string | undefined): RealityBucket {
+  const id = realityId;
+  if (!id) return emptyBucket();
   if (!state.realities) state.realities = {};
   if (!state.realities[id]) {
     const cfg = REALITIES.find((r) => r.id === id) ?? state.customRealities?.find((r: any) => r.id === id);
@@ -89,13 +92,15 @@ export function ensureBucket(realityId: string): RealityBucket {
   return state.realities[id];
 }
 
-/** The active reality's container — every action writes here. */
+/** The active reality's container — every action writes here. With no
+    active reality (the empty multiverse) this is a transient bucket whose
+    mutations are discarded — the multiverse picker owns the screen then. */
 export function bucket(): RealityBucket {
-  return ensureBucket(state.activeRealityId || 'sol-prime');
+  return state.activeRealityId ? ensureBucket(state.activeRealityId) : emptyBucket();
 }
 
 export function createSnapshot(s: UniverseState): UniverseState {
-  const active = s.realities?.[s.activeRealityId || 'sol-prime'] ?? emptyBucket();
+  const active = (s.activeRealityId && s.realities?.[s.activeRealityId]) || emptyBucket();
   const descJson = JSON.stringify(s.customRealityDescriptions ?? {});
   if (descJson !== descCache.json) {
     descCache = { json: descJson, view: { ...(s.customRealityDescriptions ?? {}) } };

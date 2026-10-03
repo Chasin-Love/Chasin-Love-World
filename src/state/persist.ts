@@ -4,10 +4,11 @@ import { STORAGE_KEYS } from '../platform/storageKeys';
 import type { DiaryEntry, UniverseState } from '../domain/universe';
 import type { VaultFile } from '../domain/vault';
 import { state, emptyBucket, bucket, refreshSnapshot, newId, listeners } from './store';
-import { setRuntimeRealities, computeAllRealities, RealityMetaOverride } from '../realities';
+import { setRuntimeRealities, computeAllRealities, RAW_REALITIES, RealityMetaOverride } from '../realities';
 import {
   putLocalPayload,
-  
+  delPayload,
+
   createInitialSeed, 
   sanitizeDiaryHtml,
   createVfs, 
@@ -57,6 +58,9 @@ export function normalizeVaultFiles(value: unknown): VaultFile[] {
 }
 
 export function loadState(): UniverseState {
+  /* R102 — the home seed is folder content: when the solPrime folder is gone
+     from the tree, a fresh install seeds the EMPTY multiverse instead */
+  const homeExists = RAW_REALITIES.some((r) => r.id === 'sol-prime');
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -67,7 +71,10 @@ export function loadState(): UniverseState {
       const hasFlat = Array.isArray(parsed.bodies);
       const hasContainers = Boolean(parsed.realities && typeof parsed.realities === 'object');
       if (parsed && (hasFlat || hasContainers)) {
-        if (!parsed.activeRealityId) parsed.activeRealityId = 'sol-prime';
+        /* R102 — no forced home: an absent activeRealityId is legal (the
+           empty multiverse). The flat-era migration below keeps 'sol-prime'
+           as the historical destination of v3 data; modern saves default to
+           the first known reality after the roster is computed. */
         if (!Array.isArray(parsed.customRealities)) parsed.customRealities = [];
         if (!Array.isArray(parsed.deletedRealityIds)) parsed.deletedRealityIds = [];
         if (!Array.isArray(parsed.binRealities)) parsed.binRealities = [];
@@ -100,16 +107,16 @@ export function loadState(): UniverseState {
           let healedCount = efsHeal(parsed.efs, parsed.vault);
 
           /* if vault was wiped by an empty rollback, restore initial seed files safely */
-          if (parsed.vault.length === 0 && parsed.vaultTrash.length === 0) {
-            const freshSeed = createInitialSeed(newId);
+          if (homeExists && parsed.vault.length === 0 && parsed.vaultTrash.length === 0) {
+            const freshSeed = createInitialSeed(newId, homeExists);
             parsed.vault = freshSeed.vault;
             healedCount += efsHeal(parsed.efs, parsed.vault);
           }
 
           /* ensure genesis shadow contains file nodes if it was created on an older version */
           parsed.efs?.shadows?.forEach((shadow) => {
-            if (shadow.name === 'genesis' && shadow.fileCount === 0) {
-              const freshSeed = createInitialSeed(newId);
+            if (homeExists && shadow.name === 'genesis' && shadow.fileCount === 0) {
+              const freshSeed = createInitialSeed(newId, homeExists);
               shadow.tree = JSON.parse(JSON.stringify(freshSeed.efs.nodes));
               shadow.fileCount = Object.values(shadow.tree).filter((n) => n.type === 'file').length;
               shadow.dirCount = Object.values(shadow.tree).filter((n) => n.type === 'dir').length;
@@ -141,6 +148,8 @@ export function loadState(): UniverseState {
                it belongs to the home reality (Sol Prime).
            Every other known reality receives its config-seeded container. */
         if (!parsed.realities || typeof parsed.realities !== 'object') {
+          /* v3 flat saves were always the home reality's data — the legacy
+             destination is a historical fact, not a structural dependency */
           const flatActive = parsed.activeRealityId || 'sol-prime';
           const clone = <T,>(list: T[]): T[] => (Array.isArray(list) ? list.map((x) => ({ ...x })) : []);
           parsed.realities = {
@@ -213,8 +222,33 @@ export function loadState(): UniverseState {
             };
           }
         }
-        if (!parsed.realities['sol-prime']) {
-          parsed.realities['sol-prime'] = emptyBucket();
+        /* R102 — zero trace at the source: a reality whose folder vanished
+           from src/realities (deleted at the source, not through the bin)
+           has no lawful restorer — it is not discovered, not custom, not in
+           the bin. Its stored container is a ghost, and the decree is that
+           a deleted reality leaves NOTHING behind: prune it on load. The
+           survivors keep their worlds; binned realities keep theirs (the bin
+           is the warehouse — restore is their way back). */
+        const restorable = new Set<string>();
+        for (const cfg of known) restorable.add(cfg.id);
+        for (const b of parsed.binRealities ?? []) restorable.add(b.id);
+        for (const key of Object.keys(parsed.realities)) {
+          if (restorable.has(key)) continue;
+          const ghost = parsed.realities[key];
+          /* encrypted payloads die with their owner (fire-and-forget — the
+             payload store swallows a missing ref) */
+          const refs = new Set<string>();
+          ghost?.vault?.forEach((f) => { if (f.payloadRef) refs.add(f.payloadRef); });
+          ghost?.vaultTrash?.forEach((t) => { if (t.item?.payloadRef) refs.add(t.item.payloadRef); });
+          refs.forEach((ref) => void delPayload(ref).catch(() => undefined));
+          delete parsed.realities[key];
+        }
+
+        /* R102 — default the active pointer to the first KNOWN reality, or to
+           none at all when the multiverse is empty — never to a phantom home.
+           A pointer at a reality that no longer exists re-lands on a survivor. */
+        if (!parsed.activeRealityId || !restorable.has(parsed.activeRealityId)) {
+          parsed.activeRealityId = known[0]?.id ?? '';
         }
 
         /* v4.1 — ownership repair. The first v4 migration attributed the old
@@ -222,18 +256,21 @@ export function loadState(): UniverseState {
            carry a realityId stamp written at seal time; a bucket whose vault
            holds only sol-prime-stamped (or unstamped legacy) files is holding
            them in trust — return them (with trash and the EFS tree) to the
-           home reality, unless the home vault already has content. */
+           home reality, unless the home vault already has content. The home
+           bucket participates only when it actually exists (R102: no phantom). */
         const home = parsed.realities['sol-prime'];
-        for (const [rid, b] of Object.entries(parsed.realities)) {
-          if (rid === 'sol-prime' || !b || !Array.isArray(b.vault) || b.vault.length === 0) continue;
-          const allForeign = b.vault.every((f) => !f.realityId || f.realityId === 'sol-prime');
-          if (allForeign && home.vault.length === 0) {
-            home.vault = b.vault;
-            home.vaultTrash = b.vaultTrash ?? [];
-            home.efs = b.efs ?? createVfs();
-            b.vault = [];
-            b.vaultTrash = [];
-            b.efs = createVfs();
+        if (home) {
+          for (const [rid, b] of Object.entries(parsed.realities)) {
+            if (rid === 'sol-prime' || !b || !Array.isArray(b.vault) || b.vault.length === 0) continue;
+            const allForeign = b.vault.every((f) => !f.realityId || f.realityId === 'sol-prime');
+            if (allForeign && home.vault.length === 0) {
+              home.vault = b.vault;
+              home.vaultTrash = b.vaultTrash ?? [];
+              home.efs = b.efs ?? createVfs();
+              b.vault = [];
+              b.vaultTrash = [];
+              b.efs = createVfs();
+            }
           }
         }
 
@@ -268,7 +305,7 @@ export function loadState(): UniverseState {
     /* module init runs before React mounts — defer so the toast host exists */
     setTimeout(() => toast('stored universe was corrupt — a fresh seed loaded. The original was preserved in recovery storage.', 'warn'), 2500);
   }
-  return primeState(createInitialSeed(newId));
+  return primeState(createInitialSeed(newId, homeExists));
 }
 
 function diaryPayloadId(id: string): string {

@@ -586,6 +586,24 @@ export function loadSession(realityId: string): SessionSave | null {
   return readMemory()[realityId] ?? null;
 }
 
+/** R102 — ZERO TRACE: a PURGED reality's session memory dies with it, so a
+    deleted universe never left so much as a drift stamp behind. The home
+    scope's memory is keyed by the reality id (plus any scoped children
+    under `${realityId}:`); galaxy-scope memories ('galaxy:${gid}') are keyed
+    by galaxy id, become unreachable the moment the reality's roster is
+    gone, and are never read again. */
+export function forgetSession(realityId: string): void {
+  const memory = readMemory();
+  let changed = false;
+  for (const key of Object.keys(memory)) {
+    if (key === realityId || key.startsWith(`${realityId}:`)) {
+      delete memory[key];
+      changed = true;
+    }
+  }
+  if (changed) writeMemory(memory);
+}
+
 /** Restore a saved session: configure from the saved states, cache the
     readback at the saved stamp. Returns the sim-days the engine should
     rewind/advance its clock to (the saved universe's own time). */

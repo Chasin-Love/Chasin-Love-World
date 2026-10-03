@@ -25,6 +25,10 @@ export const RealityAdvancedModal: React.FC<Props> = ({ realityId, focusGalaxyId
     return () => window.removeEventListener('keydown', h, true);
   }, [onClose]);
 
+  /* R102 — the reality collapsed while the editor was open: close instead
+     of rendering a phantom workbench */
+  if (!reality) return null;
+
   return (
     <div
       className="fixed inset-0 z-[105] flex items-center justify-center p-4 bg-slate-950/45 backdrop-blur-xl animate-fade-in"

@@ -46,8 +46,11 @@ export const CommandPalette: React.FC<{ onClose: () => void; api: PaletteApi }> 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const activeId = state.activeRealityId || 'sol-prime';
-  const active = REALITIES.find((r) => r.id === activeId) ?? REALITIES[0];
+  const activeId = state.activeRealityId ?? '';
+  /* R102 — undefined in the empty multiverse; the palette then lists only
+     cross-reality travel (the fast path to a first home) — world/diary/
+     commands sit behind an active reality around line-70+ consumers */
+  const active = REALITIES.find((r) => r.id === activeId);
 
   const commands = useMemo<Cmd[]>(() => {
     const out: Cmd[] = [];

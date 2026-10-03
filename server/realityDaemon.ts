@@ -163,9 +163,9 @@ class RealitySyncDaemon {
   public moveToBin(realityId: string, folderName?: string): { success: boolean; folderMoved?: string; error?: string } {
     this.ensureDirectories();
 
-    if (realityId === 'sol-prime' || folderName === 'solPrime' || folderName === 'sol-prime') {
-      return { success: false, error: 'Sol Prime is the primordial anchor and cannot be moved to Bin.' };
-    }
+    /* R102 — the independent-realities decree: ANY reality's folder can be
+       moved to the bin, solPrime included. The client decides; the daemon
+       carries it out (bin-into-itself stays refused). */
 
     try {
       const items = fs.readdirSync(this.realitiesDir, { withFileTypes: true });
@@ -173,7 +173,7 @@ class RealitySyncDaemon {
 
       for (const dirent of items) {
         if (!dirent.isDirectory()) continue;
-        if (dirent.name === 'bin' || dirent.name === '.bin' || dirent.name === 'solPrime') continue;
+        if (dirent.name === 'bin' || dirent.name === '.bin') continue;
 
         if (folderName && (dirent.name.toLowerCase() === folderName.toLowerCase() || dirent.name === folderName)) {
           targetFolder = dirent.name;
@@ -342,9 +342,8 @@ class RealitySyncDaemon {
   public renameRealityFolder(realityId: string, newName: string, folderName?: string): { success: boolean; newFolderName?: string; error?: string } {
     this.ensureDirectories();
 
-    if (realityId === 'sol-prime') {
-      return { success: false, error: 'Sol Prime cannot be renamed on disk' };
-    }
+    /* R102 — no reality is protected from rename either; the folder is the
+       reality's disk identity and the reality may re-christen it freely. */
 
     try {
       const cleanNew = newName.trim().replace(/[^a-zA-Z0-9]/g, '');
@@ -372,7 +371,7 @@ class RealitySyncDaemon {
 
       if (!oldFolderName) for (const dirent of items) {
         if (!dirent.isDirectory()) continue;
-        if (dirent.name === 'bin' || dirent.name === 'solPrime') continue;
+        if (dirent.name === 'bin') continue;
 
         const cleanRid = realityId.toLowerCase().replace(/[^a-z0-9]/g, '');
         const cleanDirName = dirent.name.toLowerCase().replace(/[^a-z0-9]/g, '');

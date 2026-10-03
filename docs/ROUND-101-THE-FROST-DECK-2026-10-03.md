@@ -168,8 +168,49 @@ between true gravity and the clockwork, and the twin lab's control; only its WOR
 redundant, and those now live in clouds. The Verify Twin button is honestly borderline —
 CI runs the same numerical proof on every push — but it stays as the pinned local receipt.)
 
-**3. Receipts**: typecheck clean; full verify ALL GREEN (21 gauntlets, `SMOKE TIER — wasm`,
-histL1 0.0712 vs the 0.12 pin, zero console errors, prod smoke green); `audit:arch --check`
-clean with the new ThoughtCloud file absorbed; the probe gained `frost-twin-cloud.png` (the
-hover manner, captured) and all eight captures re-taken green — one `.cc-root` timeout on
-the way was the known boot flake signature and cleared on the standalone re-run.
+**3. Receipts**: typecheck clean (the pre-existing `RealityAdvancedPanel.tsx` type errors are
+  unrelated to the frost deck); verify chain has ONE unrelated pre-existing failure
+  (`R92: Restore Ephemeris re-seeds the driving session` — a driver‑heal bug untouched by
+  this round; 20/21 gauntlets pass). Smoke green (`SMOKE TIER — wasm`, histL1 0.072,
+  zero console errors, prod smoke green); `audit:arch --check` clean with the new
+  ThoughtCloud file absorbed. The probe gained `frost-twin-cloud.png` (hover manner),
+  `frost-twin-cloud-below.png` (flip‑below with viewport 340 px), and nine captures
+  re‑taken green — the earlier `.cc-root` timeout was a machine‑idle occlusion‑throttle
+  (Chromium pauses CSS animations when headless pages are treated as backgrounded) and was
+  resolved with `--disable-backgrounding-occluded-windows` flags. The probe runs fully
+  deterministic now.
+
+---
+
+## R101.3 — THE CLOUDS NEVER COVER THEIR BUTTONS (same day, the author's ruling)
+
+The author's screenshot showed the bubble **covering its own control** — the mouse cannot
+click a button hiding under the widget — and asked: "if the floating Widget shows directly
+appear on button how can i suppose to click huh ?"
+
+The cause was a **viewport-clamp oscillation bug** in `ThoughtCloud.tsx` (the same
+bug in `ThinkingCloudTooltip.tsx` had been harmless). Each render measured the
+already‑shifted bubble and applied a replacement transform, which moved the bubble
+off‑center; the next render measured the shifted bubble again and applied the opposite
+correction, oscillating forever. React caught the infinite loop (`Maximum update depth
+exceeded`) and threw — the error boundary killed the console. The fix is **cumulative
+correction**: the clamp adds deltas, converging to zero, and the identical‑reference bail‑out
+ends the cycle. The effect depends only on `[open, below]` so it cannot chase its own
+`setState`. (`ThinkingCloudTooltip` got the same hardening.)
+
+**The placement law** (now encoded): the bubble **never covers its own trigger**. It prefers
+above; when the viewport has no honest room above (the trigger sits within `bubble‑height +
+28 px` of the top) it flips **below** the trigger instead of sliding onto it; the viewport
+clamp is a last‑resort straightener, not the placement. The probe added a short‑viewport
+test (`340 px`) to verify the flip fires and settled green.
+
+**Two more cards quieted** — the Physics Laws panel (CoreConsole) and the Astrophysics
+Simulation Core card (`CppNativeEngineCard.tsx`) now follow the same `ThoughtCloud` manner:
+each law button's explanation rises in a cloud on hover, the panel's long paragraph moves
+to the title's cloud, the core‑degradation ledger rides the tier badge's cloud. The cards
+stay on‑screen, visible and clickable, with no‑blur translucent fills where the old text
+lived.
+
+**Final receipts**: typecheck clean (the unrelated `RealityAdvancedPanel.tsx` errors are
+pre‑existing); verify chain unchanged (R92 driver‑heal failure persists); smoke passes;
+audit clean; nine visual captures (`frost-*`) all green, including the forced‑flip below.

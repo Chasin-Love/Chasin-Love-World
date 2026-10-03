@@ -10,7 +10,7 @@
 export const vaultActions = {
   /* --------------------- EFS — the Eventide Filesystem ------------------- */
   addVaultFiles(files: VaultFile[]) {
-    const activeRid = state.activeRealityId || 'sol-prime';
+    const activeRid = state.activeRealityId ?? '';
     const stamped = files.map((f) => ({ ...f, realityId: f.realityId ?? activeRid }));
     stamped.forEach((f) => {
       if (!efsNodeOf(bucket().efs, f)) {

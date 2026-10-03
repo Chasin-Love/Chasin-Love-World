@@ -77,7 +77,8 @@ export function recomputeRealities() {
 export function editableGalaxyRoster(realityId: string): GalaxyData[] {
   if (!state.customGalaxies) state.customGalaxies = {};
   if (!state.customGalaxies[realityId]) {
-    const generated = getReality(realityId, state.customRealityDescriptions).galaxies ?? [];
+    /* R102 — a roster edit against a collapsed reality seeds from nothing */
+    const generated = getReality(realityId, state.customRealityDescriptions)?.galaxies ?? [];
     state.customGalaxies[realityId] = generated.map((g) => ({ ...g }));
   }
   return state.customGalaxies[realityId];

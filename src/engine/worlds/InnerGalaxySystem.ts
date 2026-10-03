@@ -40,7 +40,7 @@ export class InnerGalaxySystem {
   private get universeDriverOn(): boolean { return this.eng.universeDriverActive; }
   private get driverGalaxyScope(): UniverseEngine['driverGalaxyScope'] { return this.eng.driverGalaxyScope; }
   private set driverGalaxyScope(v: UniverseEngine['driverGalaxyScope']) { this.eng.driverGalaxyScope = v; }
-  private get activeRealityId(): string { return this.eng.activeRealityId; }
+  private get activeRealityId(): string | null { return this.eng.activeRealityId; }
   private get galaxyStageNodes(): UniverseEngine['galaxyStageNodes'] { return this.eng.galaxyStageNodes; }
   private get galaxyNodes(): UniverseEngine['galaxyNodes'] { return this.eng.galaxyNodes; }
   private get innerColliderList(): THREE.Mesh[] { return this.eng.innerColliderList; }

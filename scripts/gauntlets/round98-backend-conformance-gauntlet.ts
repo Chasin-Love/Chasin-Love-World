@@ -141,9 +141,18 @@ check('R98: both backends refuse an empty new name (the delete-the-tree guard)',
   /New name contains no valid characters/.test(nodeDaemon) &&
   /New name contains no valid characters/.test(realitiesRs),
   'the empty-name guard must exist on BOTH sides');
-check('R98: both backends protect sol-prime from rename',
-  /realityId === 'sol-prime'/.test(nodeDaemon) && /reality_id == "sol-prime"/.test(realitiesRs),
-  'the canon reality must be protected on both sides');
+/* R102 — THE INDEPENDENT-REALITIES DECREE supersedes the R98 rename shield:
+   no reality is protected on the backend, sol-prime included. This check
+   proves the removal by MUTATION-TEST SPIRIT: if any sol-prime refusal ever
+   returns to either rename path, this fails. (The WRITE-DATA read-only
+   seed-mirror guard at routes/realities.ts + realities.rs stays — it
+   protects the committed data.json mirror, not the deletion law.) */
+check('R102: neither backend single-cases sol-prime in rename or move-to-bin (the decree)',
+  !/realityId === 'sol-prime'\) \{\s*return \{ success: false/.test(nodeDaemon) &&
+  !/reality_id == "sol-prime"/.test(realitiesRs) &&
+  !/Sol Prime is the primordial anchor/.test(nodeDaemon) &&
+  !/Sol Prime is the primordial anchor/.test(realitiesRs),
+  'a sol-prime special case reappeared in rename/move-to-bin — R102 forbids it');
 
 /* THE FILE SET. This is the drift that bit hardest: Node patches the display
  * name in BOTH index.ts and surface.ts; Rust patched only index.ts. A renamed

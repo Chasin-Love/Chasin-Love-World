@@ -1,5 +1,4 @@
 import { RealityConfig, RealityMetaOverride } from './types';
-import { solPrimeReality } from './solPrime';
 import { generateClustersForReality } from './clusterGenerator';
 import { generateGalaxiesForReality, prng, seedOf, inclinedOrbitElements } from './galaxyGenerator';
 import { GalaxyData } from './hierarchyTypes';
@@ -8,7 +7,6 @@ export * from './types';
 export * from './hierarchyTypes';
 export * from './clusterGenerator';
 export * from './galaxyGenerator';
-export * from './solPrime';
 
 // Dynamically discover all reality configurations across all subfolders
 const realityModules = import.meta.glob<{ [key: string]: any }>('./*/index.ts', { eager: true });
@@ -27,12 +25,12 @@ const WORLD_NAME_POOL = [
 
 /* realityId → disk folder name, derived from the build-time glob keys. This
    is the authoritative address map for base realities — bin operations send
-   the exact folder instead of guessing from display names. */
-const folderById = new Map<string, string>([['sol-prime', 'solPrime']]);
+   the exact folder instead of guessing from display names. R102: derived
+   ENTIRELY from discovery — no reality is hand-wired into the core. */
+const folderById = new Map<string, string>();
 
 function collectRawRealities(): any[] {
   const map = new Map<string, any>();
-  map.set('sol-prime', solPrimeReality);
 
   for (const [path, mod] of Object.entries(realityModules)) {
     // Ignore anything inside the bin recycle directory
@@ -246,8 +244,13 @@ export function setRuntimeRealities(realities: RealityConfig[]) {
   REALITIES = realities;
 }
 
-export function getReality(id: string, customDescriptions?: Record<string, string>): RealityConfig {
+/** Resolves a reality by id — the first reality is the fallback. R102: may
+    return undefined when the multiverse holds NO realities at all (every
+    folder deleted) — a first-class state the whole app must tolerate; the
+    boot path lands at the empty multiverse instead of dereferencing. */
+export function getReality(id: string, customDescriptions?: Record<string, string>): RealityConfig | undefined {
   const found = REALITIES.find((r) => r.id === id) || REALITIES[0];
+  if (!found) return undefined;
   if (customDescriptions && customDescriptions[found.id]) {
     return {
       ...found,

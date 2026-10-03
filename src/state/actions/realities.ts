@@ -5,7 +5,8 @@
     import { VAULT_HOME_FOLDERS } from '../../vault/storage/seeds';
     import { state, ensureBucket, EMPTY_DISK_SYNC } from '../store';
     import { getReality, REALITIES, RAW_REALITIES, createGalaxyData, RealityConfig } from '../../realities';
-    import { createVfs, seedVfs } from '../../vault';
+    import { createVfs, seedVfs, delPayload } from '../../vault';
+    import { forgetSession } from '../../physics/sessionDriver';
     import { realityApi, syncedRealityApi } from '../../platform/desktop/adapter';
     import { toast } from '../../ui/toast';
   import { notify, notifyNoPersist, audit, recomputeRealities, editableGalaxyRoster, commitGalaxyRoster, diskFolderFor, uniqueFolderFor, mirrorWarnable } from './shared';
@@ -14,6 +15,10 @@ export const realityActions = {
   /* -------------------------- Multiverse & Lore -------------------------- */
   switchReality(realityId: string) {
     const r = getReality(realityId, state.customRealityDescriptions);
+    /* R102 — a reality that no longer exists (its folder was deleted) cannot
+       be entered; the pointer stays where it is instead of pointing at a
+       phantom. */
+    if (!r) return;
     /* a pure pointer flip: every reality owns its world container, so the
        derived views re-point and nothing is reseeded, lost, or leaked */
     state.activeRealityId = r.id;
@@ -148,8 +153,10 @@ export const realityActions = {
   },
 
   async deleteReality(realityId: string) {
-    // Protect core default reality from deletion
-    if (realityId === 'sol-prime') return;
+    /* R102 — THE INDEPENDENT-REALITIES DECREE: no reality is load-bearing,
+       including the home one. Any reality can collapse into the Quantum Bin;
+       the app survives on the surviving realities, or on the empty
+       multiverse when the last one goes. */
 
     const doomedReality = REALITIES.find((r) => r.id === realityId) || RAW_REALITIES.find((r) => r.id === realityId);
 
@@ -198,11 +205,12 @@ export const realityActions = {
       state.customRealityMeta = next;
     }
     recomputeRealities();
-    // If the active reality was deleted, switch back to Sol-Prime
+    // If the active reality was deleted, fall back to a survivor — or to the
+    // empty multiverse when none remain (R102: '' is a legal active pointer).
     if (state.activeRealityId === realityId) {
-      const fallback = REALITIES[0] || RAW_REALITIES[0];
-      state.activeRealityId = fallback.id;
-      ensureBucket(fallback.id);
+      const fallback = REALITIES[0];
+      state.activeRealityId = fallback ? fallback.id : '';
+      if (fallback) ensureBucket(fallback.id);
     }
     /* the collapsed reality keeps its world container in the vault of the
        multiverse (restore brings everything back); purge erases it */
@@ -251,13 +259,33 @@ export const realityActions = {
     }
   },
 
+  /* R102 — ZERO TRACE: permanent erase destroys every trace of a reality in
+     one stroke — the world container, its encrypted vault payloads, its
+     diary attachments, its folder map and its N-body session memory. The one
+     thing kept is the `deletedRealityIds` tombstone: this session's build-
+     time glob still knows the folder existed, and without the marker a purge
+     would resurrect the reality in the UI until the next reload (the marker
+     is a dead id once the disk folder is wiped — on every later boot the
+     glob no longer matches anything). After this, the reality is as if it
+     never existed. */
   async purgeRealityFromBin(realityId: string) {
     if (!state.binRealities) return;
     const item = state.binRealities.find((b) => b.id === realityId);
     state.binRealities = state.binRealities.filter((b) => b.id !== realityId);
-    /* permanent erase: the reality's world container is destroyed with it */
+    forgetSession(realityId);
     if (state.realities && state.realities[realityId]) {
+      const doomed = state.realities[realityId];
+      const payloadRefs = new Set<string>();
+      doomed.vault.forEach((f) => { if (f.payloadRef) payloadRefs.add(f.payloadRef); });
+      doomed.vaultTrash.forEach((t) => { if (t.item?.payloadRef) payloadRefs.add(t.item.payloadRef); });
+      doomed.entries.forEach((e) => e.attachments?.forEach((a) => { if (a.payloadRef) payloadRefs.add(a.payloadRef); }));
+      payloadRefs.forEach((ref) => void delPayload(ref).catch(() => undefined));
       delete state.realities[realityId];
+    }
+    if (state.realityFolders) {
+      const next = { ...state.realityFolders };
+      delete next[realityId];
+      state.realityFolders = next;
     }
     audit(`[Multiverse Nexus] Permanently purged reality: ${item?.name ?? realityId}`);
     notify();
@@ -277,9 +305,24 @@ export const realityActions = {
     const count = state.binRealities.length;
     const purgedIds = state.binRealities.map((b) => b.id);
     state.binRealities = [];
-    /* permanent erase: purge every binned reality's world container */
-    if (state.realities) {
-      for (const id of purgedIds) delete state.realities[id];
+    /* permanent erase: every binned reality leaves zero trace (R102) —
+       deletedRealityIds tombstones stay (see purgeRealityFromBin) */
+    for (const id of purgedIds) {
+      forgetSession(id);
+      if (state.realities && state.realities[id]) {
+        const doomed = state.realities[id];
+        const payloadRefs = new Set<string>();
+        doomed.vault.forEach((f) => { if (f.payloadRef) payloadRefs.add(f.payloadRef); });
+        doomed.vaultTrash.forEach((t) => { if (t.item?.payloadRef) payloadRefs.add(t.item.payloadRef); });
+        doomed.entries.forEach((e) => e.attachments?.forEach((a) => { if (a.payloadRef) payloadRefs.add(a.payloadRef); }));
+        payloadRefs.forEach((ref) => void delPayload(ref).catch(() => undefined));
+        delete state.realities[id];
+      }
+      if (state.realityFolders) {
+        const next = { ...state.realityFolders };
+        delete next[id];
+        state.realityFolders = next;
+      }
     }
     audit(`[Multiverse Nexus] Emptied Quantum Bin (${count} realities purged)`);
     notify();
@@ -298,7 +341,10 @@ export const realityActions = {
       vault metadata — the "everything about this reality in one place"
       contract. Binary vault payloads stay in the encrypted payload store. */
   async exportRealityData(realityId?: string) {
-    const id = realityId || state.activeRealityId || 'sol-prime';
+    /* R102 — no phantom home: with no active reality there is simply nothing
+       to mirror */
+    const id = realityId || state.activeRealityId;
+    if (!id) return;
     const b = state.realities?.[id];
     if (!b) return;
     /* R83-2 — Sol Prime's data.json is the committed seed's mirror; a stale
@@ -381,13 +427,15 @@ export const realityActions = {
 
   /* -------------------- Major Galaxies of a Reality ---------------------- */
   /** Creates `count` new major galaxies around a reality — each becomes one
-      live ellipse orbit on the reality's ring in the multiverse view. */
+      live ellipse orbit on the reality's ring in the multiverse view.
+      R102: a collapsed reality no longer has a ring — no galaxies are forged. */
   addGalaxies(
     realityId: string,
     count = 1,
     opts?: { names?: string[]; type?: string; color?: string }
   ): GalaxyData[] {
     const r = getReality(realityId, state.customRealityDescriptions);
+    if (!r) return [];
     const roster = editableGalaxyRoster(realityId);
     const created: GalaxyData[] = [];
     for (let i = 0; i < Math.max(1, Math.min(24, count)); i++) {

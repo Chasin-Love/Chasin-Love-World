@@ -260,20 +260,25 @@ export const RealityAdvancedPanel: React.FC<PanelProps> = ({ realityId, focusGal
   const [identity, setIdentity] = useState<RealityMetaOverride>({});
   useEffect(() => {
     setIdentity({
-      name: reality.name,
-      codeName: reality.codeName,
-      spectral: reality.spectral,
-      colorA: reality.colorA,
-      colorB: reality.colorB,
-      starColor: reality.starColor,
+      name: reality?.name,
+      codeName: reality?.codeName,
+      spectral: reality?.spectral,
+      colorA: reality?.colorA,
+      colorB: reality?.colorB,
+      starColor: reality?.starColor,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realityId, reality.name, reality.codeName, reality.spectral, reality.colorA, reality.colorB, reality.starColor]);
+  }, [realityId, reality?.name, reality?.codeName, reality?.spectral, reality?.colorA, reality?.colorB, reality?.starColor]);
 
-  const [lore, setLore] = useState(reality.description);
-  useEffect(() => setLore(reality.description), [realityId, reality.description]);
+  const [lore, setLore] = useState(reality?.description ?? '');
+  useEffect(() => setLore(reality?.description ?? ''), [realityId, reality?.description]);
 
   const [savedFlash, setSavedFlash] = useState(false);
+
+  /* R102 — the reality may collapse while the panel is open; the mutation
+     helpers below all receive realityId, so standing down is safe */
+  if (!reality) return null;
+
   const identityDirty = ['name', 'codeName', 'spectral', 'colorA', 'colorB', 'starColor'].some(
     (k) => identity[k as keyof RealityMetaOverride] !== undefined && identity[k as keyof RealityMetaOverride] !== reality[k as keyof typeof reality]
   );

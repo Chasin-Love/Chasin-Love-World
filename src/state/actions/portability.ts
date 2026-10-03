@@ -6,6 +6,7 @@
     import { externalizeLargeDiaryAttachments, STORAGE_KEY, primeState, sanitizeDiaryEntries, normalizeVaultFiles, normalizeLegacyLock } from '../persist';
     import { STORAGE_KEYS } from '../../platform/storageKeys';
     import { getPayload, createInitialSeed, seedBodies, createVfs, efsBump, efsCreateShadow, efsDedup, efsDeleteShadow, efsScrub, efsHeal, EFS_ROOT, migrateLegacyVault } from '../../vault';
+  import { RAW_REALITIES } from '../../realities';
   import { notify, audit, recomputeRealities, DAY_MS } from './shared';
   import type { PayloadImportStatus } from './shared';
 
@@ -21,7 +22,10 @@ export const portabilityActions = {
     } catch {
       /* ignore */
     }
-    rebindState(primeState(createInitialSeed(newId)));
+    /* R102 — the clean slate honors the actually-shipped realities: when the
+       home folder is gone, the reset seeds the empty multiverse */
+    const homeExists = RAW_REALITIES.some((r) => r.id === 'sol-prime');
+    rebindState(primeState(createInitialSeed(newId, homeExists)));
     notify();
   },
 
@@ -79,18 +83,22 @@ export const portabilityActions = {
     if (!next.bodies.some((b) => b.id === 'eventide')) next.bodies.push(eventide);
 
     /* containerize: the imported flat snapshot becomes the container of the
-       reality it claims to be — imports never merge into another reality */
-    const importId = next.activeRealityId || 'sol-prime';
-    next.realities = {
-      [importId]: {
-        bodies: next.bodies ?? [],
-        entries: next.entries ?? [],
-        connections: next.connections ?? [],
-        vault: next.vault ?? [],
-        vaultTrash: next.vaultTrash ?? [],
-        efs: next.efs ?? createVfs(),
-      },
-    };
+       reality it claims to be — imports never merge into another reality.
+       R102: an import claiming no active home stays un-anchored (the empty
+       multiverse is a first-class state) */
+    const importId = next.activeRealityId ?? '';
+    next.realities = importId
+      ? {
+          [importId]: {
+            bodies: next.bodies ?? [],
+            entries: next.entries ?? [],
+            connections: next.connections ?? [],
+            vault: next.vault ?? [],
+            vaultTrash: next.vaultTrash ?? [],
+            efs: next.efs ?? createVfs(),
+          },
+        }
+      : {}; /* R102 — an un-anchored import claims no home bucket either */
     delete (next as any).bodies;
     delete (next as any).entries;
     delete (next as any).connections;
@@ -99,7 +107,7 @@ export const portabilityActions = {
     delete (next as any).efs;
 
     rebindState(next);
-    ensureBucket(state.activeRealityId || 'sol-prime');
+    if (state.activeRealityId) ensureBucket(state.activeRealityId);
     recomputeRealities();
     notify();
     queueMicrotask(() => void externalizeLargeDiaryAttachments());

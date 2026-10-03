@@ -54,7 +54,9 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
 
   const universeState = useUniverse();
   const allRealities: RealityConfig[] = REALITIES;
-  const activeReality = getReality(activeRealityId, universeState.customRealityDescriptions);
+  /* R102 — the active reality may be absent (empty multiverse or a pointer
+     at a collapsed world); every header/panel below guards on undefined */
+  const activeReality = activeRealityId ? getReality(activeRealityId, universeState.customRealityDescriptions) : undefined;
 
   const hierarchyStages = HIERARCHY_STAGES;
 
@@ -77,10 +79,8 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
 
   const handleDeleteReality = (e: React.MouseEvent, realityId: string) => {
     e.stopPropagation();
-    if (realityId === 'sol-prime') {
-      return;
-    }
-    /* two-step confirm — matches the Core Console's erase flow */
+    /* R102 — no reality is protected: the home reality collapses exactly
+       like any other (two-step confirm below) */
     if (confirmDeleteId !== realityId) {
       setConfirmDeleteId(realityId);
       return;
@@ -122,12 +122,12 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
 
           <div
             className="w-3 h-3 rounded-full animate-pulse shadow-[0_0_10px_currentColor] ring-1 ring-white/30"
-            style={{ backgroundColor: activeReality.colorA, color: activeReality.colorA }}
+            style={{ backgroundColor: activeReality?.colorA ?? '#6b7280', color: activeReality?.colorA ?? '#6b7280' }}
           />
           <div className="flex items-center gap-1.5 font-medium text-slate-200">
             <span className="text-cyan-300 font-mono uppercase tracking-wider text-[10px]">REALITY:</span>
-            <span className="text-white font-semibold drop-shadow-sm">{activeReality.name}</span>
-            <span className="text-slate-300/80 font-mono text-[10px]">({activeReality.spectral})</span>
+            <span className="text-white font-semibold drop-shadow-sm">{activeReality?.name ?? 'No active reality'}</span>
+            <span className="text-slate-300/80 font-mono text-[10px]">({activeReality?.spectral ?? 'empty multiverse'})</span>
           </div>
 
           {/* Galaxy context chip — enter & navigate any major galaxy of this reality */}
@@ -345,7 +345,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                 <span>DIMENSIONAL BARRIER: <strong className="text-white font-semibold">STRICT QUANTUM ISOLATION ACTIVE</strong></span>
               </div>
               <span className="text-[11px] text-slate-300/80 font-mono">
-                Current Anchor: <span className="text-cyan-300 font-semibold">{activeReality.name}</span>
+                Current Anchor: <span className="text-cyan-300 font-semibold">{activeReality?.name ?? 'None — forge or warp to a reality'}</span>
               </span>
             </div>
 
@@ -355,7 +355,6 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
               <div className="md:col-span-2 overflow-y-auto pr-2 space-y-2 max-h-[58vh] custom-scroll">
                 {allRealities.map((r) => {
                   const isActive = r.id === activeRealityId;
-                  const isProtected = r.id === 'sol-prime';
                   return (
                     <div
                       key={r.id}
@@ -413,8 +412,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                           </button>
                         )}
 
-                        {!isProtected && (
-                          confirmDeleteId === r.id ? (
+                        {confirmDeleteId === r.id ? (
                             <span className="flex items-center gap-1">
                               <button
                                 onClick={(e) => handleDeleteReality(e, r.id)}
@@ -438,8 +436,7 @@ export const MultiverseBar: React.FC<MultiverseBarProps> = ({
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                          )
-                        )}
+                          )}
 
                         <button
                           onClick={(e) => {

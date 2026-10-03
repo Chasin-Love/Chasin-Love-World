@@ -275,7 +275,7 @@ export default function App() {
           const clusterId = parts[1];
           const rId = parts[2];
           const r = getReality(rId, getState().customRealityDescriptions);
-          const cl = r.clusters?.find((c) => c.id === clusterId) ?? null;
+          const cl = r?.clusters?.find((c) => c.id === clusterId) ?? null;
           setHoverCluster(cl);
           setHoverRealityId(null);
           setHoverGalaxy(null);
@@ -295,8 +295,8 @@ export default function App() {
           const gid = parts[1];
           const rId = parts.slice(2).join(':');
           const r = getReality(rId, getState().customRealityDescriptions);
-          const gal = r.galaxies?.find((g) => g.id === gid) ?? null;
-          setHoverGalaxy(gal ? { galaxy: gal, realityName: r.name } : null);
+          const gal = r?.galaxies?.find((g) => g.id === gid) ?? null;
+          setHoverGalaxy(r && gal ? { galaxy: gal, realityName: r.name } : null);
           setHoverRealityId(null);
           setHoverCluster(null);
           if (x !== undefined && y !== undefined) {
@@ -409,8 +409,11 @@ export default function App() {
       onScaleLabel: (l) => setLabel(l),
       onSimDate: publishSimDate,
       onSelectReality: (realityId) => {
+        /* R102 — switchReality refuses a collapsed reality's id; the toast
+           is guarded the same way */
         actions.switchReality(realityId);
         const r = getReality(realityId, getState().customRealityDescriptions);
+        if (!r) return;
         toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
         chime(880);
         /* THE WEB DOOR (R76) — clicking a reality sphere is an explicit
@@ -427,10 +430,10 @@ export default function App() {
       },
       onSelectGalaxy: (galaxyId, realityId) => {
         const r = getReality(realityId, getState().customRealityDescriptions);
-        const gal = r.galaxies?.find((g) => g.id === galaxyId);
-        if (!gal) return;
+        const gal = r?.galaxies?.find((g) => g.id === galaxyId);
+        if (!r || !gal) return;
         /* entering another reality's galaxy carries the dimensional barrier over */
-        if ((getState().activeRealityId || 'sol-prime') !== realityId) {
+        if (getState().activeRealityId !== realityId) {
           actions.switchReality(realityId);
           toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
           chime(880);
@@ -456,12 +459,20 @@ export default function App() {
       /* The engine is loaded asynchronously, so the one-time reality-sync
          effect may have already run before engineRef was assigned. Initialize
          the active reality here as well; this builds the galaxy-stage roster
-         and a valid reality target on the first interaction. */
+         and a valid reality target on the first interaction. R102: with NO
+         active reality the engine boots onto the bare multiverse — null is
+         the honest target, not a phantom home. */
       const initialState = getState();
-      engine.setReality(getReality(initialState.activeRealityId || 'sol-prime', initialState.customRealityDescriptions));
+      const bootReality = initialState.activeRealityId
+        ? getReality(initialState.activeRealityId, initialState.customRealityDescriptions) ?? null
+        : null;
+      engine.setReality(bootReality);
+      /* R102 — the empty multiverse boots ON the giant sphere (there is no
+         home sky to land under); the warp runs behind the intro veil */
+      if (!bootReality) engine.zoomToMultiverse();
       /* Sky Studio: pull this reality's photo sky (its own folder) once the
          engine is live — setReality already applied the cached spec if any */
-      void ensureSkyFor(initialState.activeRealityId || 'sol-prime');
+      if (bootReality) void ensureSkyFor(bootReality.id);
       engine.setRendering(modeRef.current !== 'vault');
       loadedEngine = engine;
       perfMark('engine-ready');
@@ -633,7 +644,7 @@ export default function App() {
     return onSkyChanged((realityId) => {
       const eng = engineRef.current;
       if (!eng) return;
-      if ((getState().activeRealityId || 'sol-prime') === realityId) {
+      if (getState().activeRealityId === realityId) {
         void eng.applyActiveSky();
       }
     });
@@ -684,7 +695,12 @@ export default function App() {
   useEffect(() => {
     const eng = engineRef.current;
     if (!eng) return;
-    const r = getReality(state.activeRealityId || 'sol-prime', state.customRealityDescriptions);
+    /* R102 — activeRealityId '' (the empty multiverse) is a legal pointer;
+       the engine receives null and renders the bare stage until a reality
+       is forged or warped to */
+    const r = state.activeRealityId
+      ? getReality(state.activeRealityId, state.customRealityDescriptions) ?? null
+      : null;
     /* the live container (this reality's actual worlds/pages) feeds the
        engine — user-added bodies survive every warp */
     eng.setReality(r, state.bodies, state.entries);
@@ -723,8 +739,13 @@ export default function App() {
     if (!eng) return;
     if (skipFirstRebuild.current) { skipFirstRebuild.current = false; return; } /* constructor already built it */
     eng.rebuildMultiverse();
-    const r = getReality(state.activeRealityId || 'sol-prime', state.customRealityDescriptions);
+    const r = state.activeRealityId
+      ? getReality(state.activeRealityId, state.customRealityDescriptions) ?? null
+      : null;
     eng.setReality(r);
+    /* R102 — the reality you were inside just collapsed (or the last one
+       did): the traveler surfaces at the multiverse sphere */
+    if (!r) eng.zoomToMultiverse();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [galSig, metaSig, customIdsSig, deletedSig]);
 
@@ -852,6 +873,13 @@ export default function App() {
     if (paused) return 'time held — press space to release';
     return 'scroll — travel the scales · click — select · double-click — enter · ? — keys';
   }, [hoverBody, selectBody, mode, entered, paused, bodyOf]);
+
+  /* R102 — hover cards resolve their subject against the live reality list;
+     a reality collapsed mid-hover resolves to nothing and its card simply
+     stands down (no phantom names from a vanished world) */
+  const hoveredReality = hoverRealityId ? getReality(hoverRealityId, state.customRealityDescriptions) : undefined;
+  const hoveredClusterReality = hoverCluster ? getReality(hoverCluster.realityId, state.customRealityDescriptions) : undefined;
+  const lineageClusterReality = activeLineageCluster ? getReality(activeLineageCluster.realityId, state.customRealityDescriptions) : undefined;
 
   /* ------------------------------- render ------------------------------- */
 
@@ -1094,15 +1122,16 @@ export default function App() {
               onWarpReality: (id) => {
                 actions.switchReality(id);
                 const r = getReality(id, state.customRealityDescriptions);
+                if (!r) return;
                 toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
                 chime(880);
                 engineRef.current?.resetView();
               },
               onEnterGalaxy: (rid, gid) => {
                 const r = getReality(rid, state.customRealityDescriptions);
-                const gal = r.galaxies?.find((g) => g.id === gid);
-                if (!gal) return;
-                if ((getState().activeRealityId || 'sol-prime') !== rid) {
+                const gal = r?.galaxies?.find((g) => g.id === gid);
+                if (!r || !gal) return;
+                if (getState().activeRealityId !== rid) {
                   actions.switchReality(rid);
                   toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
                   chime(880);
@@ -1200,15 +1229,16 @@ export default function App() {
 
       {showMultiverseBar && (
         <MultiverseBar
-          activeRealityId={state.activeRealityId || 'sol-prime'}
+          activeRealityId={state.activeRealityId ?? ''}
           currentScaleLabel={label}
-          galaxies={getReality(state.activeRealityId || 'sol-prime', state.customRealityDescriptions).galaxies ?? []}
+          galaxies={(state.activeRealityId ? getReality(state.activeRealityId, state.customRealityDescriptions)?.galaxies : undefined) ?? []}
           activeGalaxyId={activeGalaxyId}
           onEnterGalaxy={(gid) => {
-            const rid = state.activeRealityId || 'sol-prime';
+            const rid = state.activeRealityId;
+            if (!rid) return;
             const r = getReality(rid, state.customRealityDescriptions);
-            const gal = r.galaxies?.find((g) => g.id === gid);
-            if (!gal) return;
+            const gal = r?.galaxies?.find((g) => g.id === gid);
+            if (!r || !gal) return;
             setActiveGalaxyId(gid);
             engineRef.current?.enterGalaxy(rid, gid);
             toast(`⌖ Diving into ${gal.name} — ${r.name}`);
@@ -1221,6 +1251,7 @@ export default function App() {
           onWarpReality={(id) => {
             actions.switchReality(id);
             const r = getReality(id, state.customRealityDescriptions);
+            if (!r) return;
             toast(`Quantum Warp: Switched to Reality ${r.name}`);
             chime(880);
             engineRef.current?.resetView();
@@ -1297,9 +1328,9 @@ export default function App() {
       )}
 
       {/* Hover Tooltip / HUD for Parallel Realities (Only active at Multiverse Macro Scale) */}
-      {hoverRealityId && mode === 'space' && label.includes('MULTIVERSE') && !hoverGalaxy && !advancedReality && !coreConsoleOpen && !hoverCluster && !activeLineageCluster && (
+      {hoveredReality && mode === 'space' && label.includes('MULTIVERSE') && !hoverGalaxy && !advancedReality && !coreConsoleOpen && !hoverCluster && !activeLineageCluster && (
         <RealityHoverCard
-          reality={getReality(hoverRealityId, state.customRealityDescriptions)}
+          reality={hoveredReality}
           screenPos={hoverScreenPos}
           disk={hoverDisk}
           onEditDescription={(r) => {
@@ -1308,6 +1339,7 @@ export default function App() {
           onWarp={(id) => {
             actions.switchReality(id);
             const r = getReality(id, state.customRealityDescriptions);
+            if (!r) return;
             toast(`Quantum Warp: Switched to Reality ${r.name}`);
             chime(880);
             engineRef.current?.resetView();
@@ -1329,9 +1361,9 @@ export default function App() {
           disk={hoverDisk}
           onEnter={(gid, rid) => {
             const r = getReality(rid, state.customRealityDescriptions);
-            const gal = r.galaxies?.find((g) => g.id === gid);
-            if (!gal) return;
-            if ((state.activeRealityId || 'sol-prime') !== rid) {
+            const gal = r?.galaxies?.find((g) => g.id === gid);
+            if (!r || !gal) return;
+            if (state.activeRealityId !== rid) {
               actions.switchReality(rid);
               toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
               chime(880);
@@ -1355,7 +1387,7 @@ export default function App() {
       {hoverCluster && mode === 'space' && label.includes('MULTIVERSE') && !advancedReality && !coreConsoleOpen && !activeLineageCluster && (
         <ClusterHoverCard
           cluster={hoverCluster}
-          realityName={getReality(hoverCluster.realityId, state.customRealityDescriptions).name}
+          realityName={hoveredClusterReality?.name ?? 'Collapsed Reality'}
           screenPos={hoverScreenPos}
           disk={hoverDisk}
           onInspectLineage={(cluster) => {
@@ -1365,6 +1397,7 @@ export default function App() {
           onWarp={(realityId) => {
             actions.switchReality(realityId);
             const r = getReality(realityId, state.customRealityDescriptions);
+            if (!r) return;
             toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
             chime(880);
             engineRef.current?.resetView();
@@ -1377,7 +1410,7 @@ export default function App() {
         <Suspense fallback={<AsyncOverlay label="OPENING LINEAGE" />}>
           <CosmicLineageModal
             cluster={activeLineageCluster}
-            realityName={getReality(activeLineageCluster.realityId, state.customRealityDescriptions).name}
+            realityName={lineageClusterReality?.name ?? 'Collapsed Reality'}
             onClose={() => setActiveLineageCluster(null)}
             onZoomToStage={(stageIndex) => {
               engineRef.current?.zoomToHierarchy(stageIndex);
@@ -1387,6 +1420,7 @@ export default function App() {
             onWarpToReality={(realityId) => {
               actions.switchReality(realityId);
               const r = getReality(realityId, state.customRealityDescriptions);
+              if (!r) return;
               toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
               chime(880);
               engineRef.current?.resetView();
@@ -1412,6 +1446,7 @@ export default function App() {
             onWarpToReality={(realityId) => {
               actions.switchReality(realityId);
               const r = getReality(realityId, state.customRealityDescriptions);
+              if (!r) return;
               toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
               chime(880);
               engineRef.current?.resetView();
@@ -1430,9 +1465,9 @@ export default function App() {
             onClose={() => setAdvancedReality(null)}
             onEnterGalaxy={(rid, gid) => {
             const r = getReality(rid, state.customRealityDescriptions);
-            const gal = r.galaxies?.find((g) => g.id === gid);
-            if (!gal) return;
-            if ((state.activeRealityId || 'sol-prime') !== rid) {
+            const gal = r?.galaxies?.find((g) => g.id === gid);
+            if (!r || !gal) return;
+            if (state.activeRealityId !== rid) {
               actions.switchReality(rid);
               toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
               chime(880);
@@ -1463,6 +1498,7 @@ export default function App() {
             onWarpReality={(id) => {
             actions.switchReality(id);
             const r = getReality(id, state.customRealityDescriptions);
+            if (!r) return;
             toast(`Quantum Warp: Switched to Reality ${r.name}`);
             chime(880);
             engineRef.current?.resetView();
@@ -1478,10 +1514,10 @@ export default function App() {
           }}
           onEnterGalaxy={(rid, gid) => {
             const r = getReality(rid, state.customRealityDescriptions);
-            const gal = r.galaxies?.find((g) => g.id === gid);
-            if (!gal) return;
+            const gal = r?.galaxies?.find((g) => g.id === gid);
+            if (!r || !gal) return;
             setCoreConsoleOpen(false);
-            if ((state.activeRealityId || 'sol-prime') !== rid) {
+            if (state.activeRealityId !== rid) {
               actions.switchReality(rid);
               toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
               chime(880);

@@ -644,7 +644,11 @@ export function DeepScan({ onClose }: { onClose: () => void }) {
   const state = useUniverse();
   const [idx, setIdx] = useState(0);
   const [done, setDone] = useState(false);
-  const all = useMemo(() => state.vault.filter((f) => (f.realityId ?? 'sol-prime') === (state.activeRealityId || 'sol-prime')), [state.vault, state.activeRealityId]);
+  /* R102 — files carry their birth reality id; the scan matches the actual
+     active pointer (unstamped legacy files stay attributed to the home
+     reality whose seed birthed them — never to a phantom default) */
+  const activeId = state.activeRealityId ?? '';
+  const all = useMemo(() => state.vault.filter((f) => (f.realityId ?? activeId) === activeId), [state.vault, activeId]);
   useEffect(() => {
     if (idx >= all.length) { setDone(true); return; }
     const t = setTimeout(() => setIdx((i) => i + 1), 70);

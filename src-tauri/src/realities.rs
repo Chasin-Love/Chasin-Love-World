@@ -85,8 +85,12 @@ pub struct BinInfo {
     pub trashed_at: f64,
 }
 
+/* R102 — the independent-realities decree: no reality folder is special to
+   the backend, solPrime included. Only the bin stays protected — it is the
+   system's recycle directory, not a reality. (The read-only SEED MIRROR rule
+   for data.json remains, enforced at its write-data site below.) */
 fn is_protected(name: &str) -> bool {
-    name == "solPrime" || name == "sol-prime" || name == "bin" || name == ".bin"
+    name == "bin" || name == ".bin"
 }
 
 fn resolve_folder(folder_name: Option<&str>, reality_id: Option<&str>) -> Result<String, String> {
@@ -159,12 +163,8 @@ pub fn list_bin() -> Result<Vec<BinInfo>, String> {
 }
 
 pub fn move_to_bin(reality_id: Option<String>, folder_name: Option<String>) -> Result<String, String> {
-    if reality_id.as_deref() == Some("sol-prime")
-        || folder_name.as_deref() == Some("solPrime")
-        || folder_name.as_deref() == Some("sol-prime")
-    {
-        return Err("Sol Prime is the primordial anchor and cannot be moved to Bin.".into());
-    }
+    /* R102 — any reality's folder can be binned, solPrime included; only the
+       bin-into-itself move stays refused (below) */
     let target = resolve_folder(folder_name.as_deref(), reality_id.as_deref())?;
     if target == "bin" || target == ".bin" {
         return Err("Refusing to move the bin directory into itself.".into());
@@ -271,9 +271,7 @@ pub fn empty_bin() -> Result<u32, String> {
 }
 
 pub fn rename_folder(reality_id: String, new_name: String) -> Result<String, String> {
-    if reality_id == "sol-prime" {
-        return Err("Sol Prime cannot be renamed on disk".into());
-    }
+    /* R102 — rename is free for every reality, the home one too */
     let clean_new: String = new_name.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
     if clean_new.is_empty() {
         return Err("New name contains no valid characters.".into());
