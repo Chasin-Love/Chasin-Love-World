@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Sparkles, Wand2, Plus } from 'lucide-react';
 
 interface ThinkingCloudTooltipProps {
@@ -98,32 +98,34 @@ export const ThinkingCloudTooltip: React.FC<ThinkingCloudTooltipProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  /* EDGE-AWARE PLACEMENT — near a screen/deck edge the centered cloud would
-     clip (the deck plate is overflow-hidden), so the cloud anchors to the
-     near edge instead: 'right' = cloud's right edge hugs the seal. */
-  const [flipX, setFlipX] = useState<'none' | 'left' | 'right'>('none');
-  const raise = () => {
-    setIsHovered(true);
-    const el = wrapRef.current;
-    if (el) {
-      const r = el.getBoundingClientRect();
-      setFlipX(r.right + 175 > window.innerWidth ? 'right' : r.left - 175 < 0 ? 'left' : 'none');
+  /* VIEWPORT CLAMP (R101.2) — the old edge-guess flipped the cloud by class
+     arithmetic (±175px, guessed) and still clipped: the anchor override left
+     the `-translate-x-1/2` utility alive, so flipped clouds kept a hidden
+     half-shift and rail/pod clouds lost their first word off-screen. Now the
+     MOUNTED cloud is measured and shifted by exactly whatever keeps it
+     inside the viewport — the shift rides `transform`, which composes with
+     the anchor classes' `translate`, so every position is clamp-safe. */
+  const cloudRef = useRef<HTMLDivElement>(null);
+  const [shift, setShift] = useState({ x: 0, y: 0 });
+  useLayoutEffect(() => {
+    if (!isHovered) {
+      setShift({ x: 0, y: 0 });
+      return;
     }
-  };
+    const el = cloudRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    let x = 0;
+    let y = 0;
+    if (r.left < 8) x = 8 - r.left;
+    else if (r.right > window.innerWidth - 8) x = window.innerWidth - 8 - r.right;
+    if (r.top < 8) y = 8 - r.top;
+    else if (r.bottom > window.innerHeight - 8) y = window.innerHeight - 8 - r.bottom;
+    setShift({ x, y });
+  }, [isHovered, position]);
 
-  /* puff chain anchor — the bubbles must always point at the seal */
-  const puffAnchor =
-    flipX === 'right'
-      ? 'right-4 left-auto'
-      : flipX === 'left'
-        ? 'left-4 right-auto'
-        : 'left-1/2 -translate-x-1/2';
-  const puffAnchor2 =
-    flipX === 'right'
-      ? 'right-8 left-auto'
-      : flipX === 'left'
-        ? 'left-8 right-auto'
-        : 'left-1/2 -translate-x-[14px]';
+  /* puff chain anchor — the dots always ride the trigger's side of the card */
+  const raise = () => setIsHovered(true);
 
   const sizeClasses = {
     sm: 'w-9 h-9 text-xs',
@@ -198,20 +200,20 @@ export const ThinkingCloudTooltip: React.FC<ThinkingCloudTooltipProps> = ({
           the seal; a chain of thinking-dots pulses between them. */}
       {isHovered && (
         <div
+          ref={cloudRef}
           className={`absolute ${posClasses} z-50 pointer-events-none select-none`}
           style={{
             transformOrigin: position === 'top' ? 'bottom center' : 'top center',
-            ...(flipX === 'right' ? { left: 'auto', right: '-6px' } : {}),
-            ...(flipX === 'left' ? { right: 'auto', left: '-6px' } : {}),
+            transform: shift.x !== 0 || shift.y !== 0 ? `translate(${shift.x}px, ${shift.y}px)` : undefined,
           }}
         >          {/* the thinking chain — three dots pulsing from the trigger;
               always on the trigger's side of the card */}
           {position === 'bottom' && (
             <div className="relative h-5" aria-hidden="true">
               {[
-                { cls: 'cc-thought-dot w-1.5 h-1.5', x: flipX === 'right' ? 'right-6' : flipX === 'left' ? 'left-6' : 'left-1/2 -translate-x-1/2' },
-                { cls: 'cc-thought-dot cc-thought-dot-2 w-2 h-2', x: flipX === 'right' ? 'right-8' : flipX === 'left' ? 'left-8' : 'left-1/2 -translate-x-1/2' },
-                { cls: 'cc-thought-dot w-2.5 h-2.5', x: flipX === 'right' ? 'right-10' : flipX === 'left' ? 'left-10' : 'left-1/2 -translate-x-1/2', style: { animationDelay: '0.56s' } },
+                { cls: 'cc-thought-dot w-1.5 h-1.5', x: 'left-1/2 -translate-x-1/2' },
+                { cls: 'cc-thought-dot cc-thought-dot-2 w-2 h-2', x: 'left-1/2 -translate-x-1/2' },
+                { cls: 'cc-thought-dot w-2.5 h-2.5', x: 'left-1/2 -translate-x-1/2', style: { animationDelay: '0.56s' } },
               ].map((d, i) => (
                 <span
                   key={i}
@@ -222,11 +224,9 @@ export const ThinkingCloudTooltip: React.FC<ThinkingCloudTooltipProps> = ({
             </div>
           )}
 
-          {/* THE CARD — solid smoked pane (no blur), precision corner accents */}
+          {/* THE CARD — frosted pane, precision corner accents */}
           <div
-            className={`cc-cloud-rise relative min-w-[250px] max-w-[320px] rounded-2xl bg-[#0a0d16]/95 border border-cyan-300/45 shadow-[0_18px_44px_rgba(0,0,0,0.55),0_0_34px_rgba(6,182,212,0.2),inset_0_1px_0_rgba(255,255,255,0.28)] text-left ${
-              flipX === 'right' ? 'ml-auto' : flipX === 'left' ? 'mr-auto' : ''
-            }`}
+            className={`cc-cloud-rise relative min-w-[250px] max-w-[320px] rounded-2xl bg-[#0a0d16]/88 border border-cyan-300/45 shadow-[0_18px_44px_rgba(0,0,0,0.55),0_0_34px_rgba(6,182,212,0.2),inset_0_1px_0_rgba(255,255,255,0.28)] text-left backdrop-blur-xl`}
           >
             {/* corner brackets — machined, not bubbly */}
             <span className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-t border-l border-cyan-300/70 rounded-tl-sm" aria-hidden="true" />

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Orbit, Play, Square, BadgeCheck, BadgeX, Activity, Globe } from 'lucide-react';
+import { Play, Square, BadgeCheck, BadgeX, Globe } from 'lucide-react';
 import { cosmosBridge, type CosmosStatus, type TwinParityReceipt } from '../../platform/native/cpp_bridge';
 import { simTwinState, simTwinTelemetry } from '../../physics/simTwin';
 import { driverState, driverTelemetry } from '../../physics/sessionDriver';
 import { actions, useUniverse } from '../../state';
 import { toast } from '../../ui/toast';
+import { ThoughtCloud } from './ThoughtCloud';
 
 const BACKEND_LABEL: Record<string, { text: string; cls: string }> = {
   'native-cpp': { text: 'NATIVE C++ SESSION', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' },
@@ -105,113 +106,57 @@ export const SimulatorTwinCard: React.FC = () => {
   };
 
   const backend = BACKEND_LABEL[status.backend] ?? BACKEND_LABEL.typescript;
+
+  /* R101.2 — THE QUIET CARD: only the name, the badges, three controls and
+     one line of live numbers stay on the card; every paragraph, the drift
+     list and the receipt's fine print rise in ThoughtClouds on hover. The
+     logic below this line is the R87/R88/R92/R94 contract, untouched. */
   const drifts = twinOn
     ? [...simTwinTelemetry.entries()].sort((a, b) => b[1].deviationAU - a[1].deviationAU).slice(0, 4)
     : [];
   const driverDrifts = driverOn
     ? [...driverTelemetry.entries()].sort((a, b) => b[1].deviationAU - a[1].deviationAU).slice(0, 4)
     : [];
+  const activeDrifts = driverOn ? driverDrifts : drifts;
+  const maxDriftAU = driverOn ? driverState.maxDriftAU : simTwinState.maxDriftAU;
   void tick; /* the poll just refreshes the module-map reads below */
 
   return (
-    <div className="cc-panel p-4 sm:p-5 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-white/12 pb-3 flex-wrap">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-violet-500/15 border border-violet-400/35 text-violet-300">
-            <Orbit className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-display text-[13px] font-semibold text-white tracking-wide">
-                NATIVE SIMULATOR TWIN
-              </h3>
-              <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${backend.cls}`}>
-                {backend.text}
-              </span>
-            </div>
-            <p className="font-mono text-[9px] text-slate-400">
-              stateful RK4 N-body session · SI units (m/kg/s) · verified against the TS twin
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={runTwin}
-          disabled={busy || twinOn || driverOn}
-          title={twinOn
-            ? 'The per-frame twin owns the session — stop it first'
-            : driverOn
-              ? 'The universe driver owns the session — stop true gravity first'
-              : 'Verify the session against the TS twin'}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/20 hover:bg-violet-500/30 border border-violet-400/40 text-violet-200 text-xs font-mono tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+    <div className="cc-panel p-4 sm:p-5 flex flex-col gap-3">
+      {/* Header — name + tier + driver state */}
+      <div className="flex items-start justify-between gap-2 flex-wrap">
+        <ThoughtCloud
+          label="Native Simulator Twin"
+          subtitle={'The same C++ core that solves your orbits hosts a stateful N-body simulator (mutual gravity, 4th-order Runge-Kutta, SI units). Verify Twin checks it against the TypeScript twin; the per-frame twin runs it alongside the live universe on its own clock.\nRead-only — this card never touches the rendered sky.'}
+          hint="the words live here — the card keeps only the numbers"
         >
-          <Play className={`w-3 h-3 ${busy ? 'animate-pulse' : ''}`} />
-          <span>{busy ? 'Running...' : 'Verify Twin'}</span>
-        </button>
-      </div>
-
-      <p className="font-mono text-[10px] text-slate-500 leading-relaxed">
-        The same C++ core that solves your orbits hosts a stateful N-body simulator
-        (mutual gravity, 4th-order Runge-Kutta). Verify Twin checks it against the
-        TypeScript twin; the per-frame twin runs it alongside the live universe on its own
-        clock and measures how far true N-body gravity drifts from the Kepler canon.
-        Read-only — the sky you see is still driven by the Kepler clockwork.
-      </p>
-
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 font-mono text-xs">
-        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-          <span className="cc-label block">Session Tier</span>
-          <span className="text-sm font-bold text-white tabular-nums">{status.backend}</span>
-        </div>
-        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-          <span className="cc-label block">Bodies</span>
-          <span className="text-sm font-bold text-cyan-300 tabular-nums">{receipt === null ? '—' : receipt.bodies}</span>
-        </div>
-        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-          <span className="cc-label block">Steps (days)</span>
-          <span className="text-sm font-bold text-emerald-300 tabular-nums">{receipt === null ? '—' : receipt.steps}</span>
-        </div>
-        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-          <span className="cc-label block">Max Relative Δ</span>
-          <span className="text-sm font-bold text-amber-300 tabular-nums">
-            {receipt === null ? '—' : receipt.maxDelta.toExponential(1)}
+          <h3 className="font-display text-[13px] font-semibold text-white tracking-wide cursor-default">
+            NATIVE SIMULATOR TWIN
+          </h3>
+        </ThoughtCloud>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${backend.cls}`}>
+            {backend.text}
+          </span>
+          <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${
+            driverOn
+              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+              : 'bg-white/5 text-slate-400 border-white/10'
+          }`}>
+            {driverOn ? 'DRIVING THE SKY' : 'CLOCKWORK'}
           </span>
         </div>
       </div>
 
-      {/* Twin receipt — the TS tier is its own reference, so it always reads verified */}
-      {receipt !== null && (
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-black/25 border border-white/10 font-mono text-[11px]">
-          {(receipt.maxDelta < 1e-9 || receipt.backend === 'typescript')
-            ? <BadgeCheck className="w-4 h-4 text-emerald-400" />
-            : <BadgeX className="w-4 h-4 text-amber-400" />}
-          <span className={(receipt.maxDelta < 1e-9 || receipt.backend === 'typescript') ? 'text-emerald-300' : 'text-amber-300'}>
-            {(receipt.maxDelta < 1e-9 || receipt.backend === 'typescript')
-              ? 'Simulator twin verified'
-              : 'Simulator twin drift detected'}
-            {' '}— active tier {receipt.backend} vs TS twin over {receipt.steps} steps
-          </span>
-        </div>
-      )}
-
-      {/* R92 — THE UNIVERSE DRIVER (the R91 decree, in shadow): the switch
-          that hands the rendered sky to true N-body gravity. The store flag
-          persists; the App effect carries it into the engine gate. */}
-      <div className="space-y-2 font-mono text-xs rounded-xl border border-violet-400/25 bg-violet-500/5 p-2.5">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="cc-panel-title">
-            <Globe className="w-3.5 h-3.5" />
-            <span>Universe Driver — true gravity</span>
-            <span className={`text-[9px] px-2 py-0.5 rounded-full border font-mono ${
-              driverOn
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
-                : 'bg-white/5 text-slate-400 border-white/10'
-            }`}>
-              {driverOn ? 'DRIVING THE SKY' : 'CLOCKWORK'}
-            </span>
-          </div>
+      {/* Controls — three quiet chips; hover each for its thought cloud */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <ThoughtCloud
+          label={driverOn ? 'Restore the Clockwork' : 'Drive the Sky'}
+          subtitle={driverOn
+            ? 'The session drives every world by real mutual gravity — the canon is the seed, the clockwork renders any stale frame, Restore Ephemeris re-seeds. Drift is the honest story of your universe, saved across restarts.'
+            : 'Flip this and the N-body session takes the sky: real mutual gravity with the full 10 M☉ vault, real chaos, the story saved across restarts. The clockwork remains seed, fallback and heal.'}
+          hint="one session per tier"
+        >
           <button
             onClick={toggleDriver}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-mono tracking-wider transition-all cursor-pointer ${
@@ -223,44 +168,13 @@ export const SimulatorTwinCard: React.FC = () => {
             <Globe className={`w-3 h-3 ${driverOn ? 'animate-pulse' : ''}`} />
             <span>{driverOn ? 'RESTORE CLOCKWORK' : 'DRIVE THE SKY'}</span>
           </button>
-        </div>
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          {driverOn
-            ? 'The session drives every world by real mutual gravity — the canon is the seed, the clockwork renders any stale frame, Restore Ephemeris re-seeds. Drift is the honest story of your universe, saved across restarts.'
-            : 'Flip this and the N-body session takes the sky: real mutual gravity with the full 10 M☉ vault, real chaos, the story saved across restarts. The clockwork remains seed, fallback and heal.'}
-        </p>
-        {driverOn && (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-3 text-[10px] text-slate-400 flex-wrap">
-              <span>steps run: <span className="text-white tabular-nums">{driverState.stepsRun}</span></span>
-              <span>session clock: <span className="text-white tabular-nums">{Math.floor(driverState.readbackDays)} d</span></span>
-              <span>memories saved: <span className="text-white tabular-nums">{driverState.savesRun}</span></span>
-              <span>max drift: <span className={`tabular-nums ${(driverState.maxDriftAU < 0.01 ? 'text-emerald-300' : driverState.maxDriftAU < 0.1 ? 'text-amber-300' : 'text-red-300')}`}>{driverState.maxDriftAU.toFixed(4)} AU</span></span>
-            </div>
-            {driverDrifts.length > 0 && (
-              <div className="space-y-0.5 text-[10px]">
-                {driverDrifts.map(([id, d]) => (
-                  <div key={id} className="flex items-center justify-between px-2 py-1 rounded-lg bg-abyss/45 border border-white/10">
-                    <span className="text-slate-300 truncate">{id}</span>
-                    <span className="tabular-nums text-slate-400">{d.deviationAU.toFixed(4)} AU</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {driverState.lastError && (
-              <p className="text-[10px] text-amber-300">⚠ {driverState.lastError}</p>
-            )}
-          </div>
-        )}
-      </div>
+        </ThoughtCloud>
 
-      {/* R88 — the per-frame twin */}
-      <div className="space-y-2 font-mono text-xs">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="cc-panel-title">
-            <Activity className="w-3.5 h-3.5" />
-            <span>Per-Frame Twin (live drift vs Kepler canon)</span>
-          </div>
+        <ThoughtCloud
+          label="Per-Frame Twin"
+          subtitle={'Runs the session alongside the live universe on its own clock and measures how far true N-body gravity drifts from the Kepler canon. The session is shared — Verify Twin rests while the per-frame twin owns it.'}
+          hint="read-only against the rendered sky"
+        >
           <button
             onClick={togglePerFrame}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-mono tracking-wider transition-all cursor-pointer ${
@@ -272,35 +186,86 @@ export const SimulatorTwinCard: React.FC = () => {
             {twinOn ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
             <span>{twinOn ? 'STOP TWIN' : 'RUN TWIN'}</span>
           </button>
-        </div>
-        {twinOn && (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-3 text-[10px] text-slate-400">
-              <span>steps run: <span className="text-white tabular-nums">{simTwinState.stepsRun}</span></span>
-              <span>twin clock: <span className="text-white tabular-nums">{Math.floor(simTwinState.twinDays)} d</span></span>
-              <span>max drift: <span className={`tabular-nums ${(simTwinState.maxDriftAU < 0.01 ? 'text-emerald-300' : simTwinState.maxDriftAU < 0.1 ? 'text-amber-300' : 'text-red-300')}`}>{simTwinState.maxDriftAU.toFixed(4)} AU</span></span>
-            </div>
-            {drifts.length > 0 && (
-              <div className="space-y-0.5 text-[10px]">
-                {drifts.map(([id, d]) => (
-                  <div key={id} className="flex items-center justify-between px-2 py-1 rounded-lg bg-abyss/45 border border-white/10">
-                    <span className="text-slate-300 truncate">{id}</span>
-                    <span className="tabular-nums text-slate-400">{d.deviationAU.toFixed(4)} AU</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {simTwinState.lastError && (
-              <p className="text-[10px] text-amber-300">⚠ {simTwinState.lastError}</p>
-            )}
-            <p className="text-[10px] text-slate-500">
-              Drift is the honest distance between true N-body gravity and the Kepler
-              canon — it grows as the clockwork and the simulation disagree. The session
-              is shared: Verify Twin rests while the per-frame twin owns it.
-            </p>
-          </div>
+        </ThoughtCloud>
+
+        <ThoughtCloud
+          label="Verify Twin"
+          subtitle="Checks the active tier against the TypeScript RK4 twin line-for-line — the same numerical half the round98 physics gauntlet executes in CI on every push. The TS tier trivially matches itself, so it always reads verified."
+          hint="also proven in CI"
+        >
+          <button
+            onClick={runTwin}
+            disabled={busy || twinOn || driverOn}
+            title={twinOn
+              ? 'The per-frame twin owns the session — stop it first'
+              : driverOn
+                ? 'The universe driver owns the session — stop true gravity first'
+                : 'Verify the session against the TS twin'}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/20 hover:bg-violet-500/30 border border-violet-400/40 text-violet-200 text-xs font-mono tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Play className={`w-3 h-3 ${busy ? 'animate-pulse' : ''}`} />
+            <span>{busy ? 'Running...' : 'Verify Twin'}</span>
+          </button>
+        </ThoughtCloud>
+
+        {/* the receipt — one quiet badge; the fine print in its cloud */}
+        {receipt !== null && (
+          <ThoughtCloud
+            label={(receipt.maxDelta < 1e-9 || receipt.backend === 'typescript') ? 'Simulator twin verified' : 'Simulator twin drift detected'}
+            subtitle={`Active tier ${receipt.backend} vs TS twin over ${receipt.steps} steps, ${receipt.bodies} bodies — max relative Δ ${receipt.maxDelta.toExponential(1)}.`}
+            hint={(receipt.maxDelta < 1e-9 || receipt.backend === 'typescript') ? 'parity holds' : 'check the tier'}
+          >
+            <span className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-mono ${
+              (receipt.maxDelta < 1e-9 || receipt.backend === 'typescript')
+                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30'
+                : 'bg-amber-500/15 text-amber-300 border-amber-400/30'
+            }`}>
+              {(receipt.maxDelta < 1e-9 || receipt.backend === 'typescript')
+                ? <BadgeCheck className="w-3.5 h-3.5" />
+                : <BadgeX className="w-3.5 h-3.5" />}
+              <span className="tabular-nums">Δ {receipt.maxDelta.toExponential(1)}</span>
+            </span>
+          </ThoughtCloud>
         )}
       </div>
+
+      {/* Live readout — one line of real numbers; the drift list in a cloud */}
+      {(driverOn || twinOn) && (
+        <div className="flex items-center gap-3 font-mono text-[10px] text-slate-400 flex-wrap">
+          <span>steps run <span className="text-white tabular-nums">{driverOn ? driverState.stepsRun : simTwinState.stepsRun}</span></span>
+          <span>clock <span className="text-white tabular-nums">{driverOn ? `${Math.floor(driverState.readbackDays)} d` : `${Math.floor(simTwinState.twinDays)} d`}</span></span>
+          <ThoughtCloud
+            label="Drift — the honest distance from the canon"
+            subtitle={
+              <span className="block space-y-1">
+                {driverOn && <span className="block text-slate-300">memories saved: <span className="text-white tabular-nums">{driverState.savesRun}</span></span>}
+                {activeDrifts.map(([id, d]) => (
+                  <span key={id} className="flex items-center justify-between gap-4">
+                    <span className="text-slate-300 truncate">{id}</span>
+                    <span className="tabular-nums text-slate-400">{d.deviationAU.toFixed(4)} AU</span>
+                  </span>
+                ))}
+                {activeDrifts.length === 0 && <span className="block">the readback is fresh — no per-body drift to list yet</span>}
+              </span>
+            }
+            hint="grows as the clockwork and the simulation disagree"
+          >
+            <span
+              className={`tabular-nums cursor-default ${
+                maxDriftAU < 0.01 ? 'text-emerald-300' : maxDriftAU < 0.1 ? 'text-amber-300' : 'text-red-300'
+              }`}
+            >
+              drift {maxDriftAU.toFixed(4)} AU ⌄
+            </span>
+          </ThoughtCloud>
+        </div>
+      )}
+      {driverOn && driverState.lastError && (
+        <p className="text-[10px] text-amber-300 font-mono">⚠ {driverState.lastError}</p>
+      )}
+      {twinOn && simTwinState.lastError && (
+        <p className="text-[10px] text-amber-300 font-mono">⚠ {simTwinState.lastError}</p>
+      )}
     </div>
   );
 };

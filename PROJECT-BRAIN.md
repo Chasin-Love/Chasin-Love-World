@@ -402,6 +402,20 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   and now waits for each view's unique marker text plus computed opacity 1 before
   screenshotting. Receipts: full verify ALL GREEN (histL1 0.0725, zero console errors),
   audit clean, all seven captures re-taken green under the honest wait.
+  **R101.2 (same day, the author's three-point follow-on):** THE WORDS RISE — (1) every
+  thought cloud now clamps to the viewport on BOTH axes: ThinkingCloudTooltip's class-
+  arithmetic edge-guess (whose surviving `-translate-x-1/2` half-shifted flipped clouds
+  off-screen, clipping pods' and rail clouds' first word) was replaced by measuring the
+  mounted cloud and shifting it by exactly the overflow; (2) THE QUIET CARD — the Native
+  Simulator Twin rebuilt in the anime thinking-bubble manner: the new ThoughtCloud widget
+  (`src/ui/console/ThoughtCloud.tsx`, frost bubble + thinking-dot chain, viewport-clamped)
+  carries every paragraph, the drift list and the receipt fine print on hover, while the
+  card keeps only name + WASM/DRIVING badges + three control chips + one live-numbers line
+  (the R87/R88/R92/R94 logic and all pinned literals untouched; ~70 % shorter card); (3)
+  the probe gained frost-twin-cloud.png (eight captures, all green). The card STAYS — it is
+  the universe driver's only face (the R91–R94 decree's user-facing switch); only its words
+  were redundant. Receipts: full verify ALL GREEN (histL1 0.0712, zero console errors),
+  audit clean.
   `docs/ROUND-101-THE-FROST-DECK-2026-10-03.md`
 - **R96 (this round, on branch `r96-the-tidy-house`):** the author's verdict on
   the tree — "the frontend looks genuinely good, but the backend is total mess"

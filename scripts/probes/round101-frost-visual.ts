@@ -95,6 +95,15 @@ async function main() {
     await page.screenshot({ path: path.join(OUT, 'frost-twin.png') });
     console.log('captured frost-twin.png');
 
+    /* the quiet card's manner (R101.2) — hover the title: the words rise
+       in a thought cloud while the card itself stays numbers-only */
+    await page.hover('#simulator-twin-card h3');
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: path.join(OUT, 'frost-twin-cloud.png') });
+    console.log('captured frost-twin-cloud.png');
+    await page.mouse.move(700, 500); /* leave the seal before the next step */
+    await page.waitForTimeout(400);
+
     /* the Backdrop Studio popover, anchored to the rail */
     await page.click('#cc-backdrop-btn');
     await page.waitForTimeout(900);

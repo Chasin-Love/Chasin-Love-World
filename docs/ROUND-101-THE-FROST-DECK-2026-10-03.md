@@ -137,3 +137,39 @@ riding its seal), a separator, then Twin Jump / Backdrop Studio / Forge, a separ
   histL1 0.0725 vs the 0.12 pin, zero console errors, prod smoke green);
   `audit:arch --check` clean (the pill-class deletion absorbed with no snapshot refresh —
   classes left both sides together).
+
+---
+
+## R101.2 — THE WORDS RISE (same day, the author's three-point follow-on)
+
+**1. Every cloud was clipping at the screen edges — measured, not guessed.** The pods'
+clouds lost their first word off-screen ("oolbar", "Core"): the old edge-guess flipped the
+cloud by class arithmetic and the anchor override left Tailwind's `-translate-x-1/2`
+(translate *property*) alive, so flipped clouds kept a hidden half-shift. `ThinkingCloudTooltip`
+now measures the MOUNTED cloud and shifts it by exactly what keeps it inside the viewport —
+the shift rides `transform`, which composes with the anchor classes' `translate`, and it
+clamps BOTH axes (a cloud above a scrolled-to-top card was trimming its own title). The
+flip machinery (flipX state, the ±175px guess, the puff-anchor variants) is deleted.
+
+**2. THE QUIET CARD — the Native Simulator Twin stops shouting.** The author's ruling: the
+card was "crowdy & messy — when I drag my mouse on them a floating thinking widget appears
+and all needed words show there." Built for exactly that: the new `ThoughtCloud`
+(`src/ui/console/ThoughtCloud.tsx`) — a hover bubble in the anime thinking-bubble manner
+(frost pane, corner brackets, a chain of thinking dots descending to the trigger,
+viewport-clamped on both axes). The card kept: the name, the WASM/DRIVING badges, three
+control chips (Drive the Sky / Run Twin / Verify Twin), one line of live numbers
+(steps · clock · drift ⌄ — the drift cloud carries the top-4 per-body list and memories
+saved), and the compact receipt badge (fine print in its cloud). The five paragraphs, the
+four metric tiles and the two full-width telemetry sections are gone into clouds. The
+R87/R88/R92/R94 logic and every gauntlet-pinned literal survived untouched; the card lost
+~70 % of its rendered height. (The author also asked whether the card is still needed at
+all: YES — it is the universe driver's only face, the R91–R94 decree's user-facing switch
+between true gravity and the clockwork, and the twin lab's control; only its WORDS were
+redundant, and those now live in clouds. The Verify Twin button is honestly borderline —
+CI runs the same numerical proof on every push — but it stays as the pinned local receipt.)
+
+**3. Receipts**: typecheck clean; full verify ALL GREEN (21 gauntlets, `SMOKE TIER — wasm`,
+histL1 0.0712 vs the 0.12 pin, zero console errors, prod smoke green); `audit:arch --check`
+clean with the new ThoughtCloud file absorbed; the probe gained `frost-twin-cloud.png` (the
+hover manner, captured) and all eight captures re-taken green — one `.cc-root` timeout on
+the way was the known boot flake signature and cleared on the standalone re-run.
