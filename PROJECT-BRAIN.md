@@ -311,9 +311,10 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ---
 
-## 8. CURRENT STATE (as of 2026-10-03 — main's tip is the **R96–R100 chain**, merged --no-ff from `r99-the-wheels-connected` on the author's word; R91–R95 shipped as v16.0.0)
+## 8. CURRENT STATE (as of 2026-10-04 — main's tip is **R104, the desktop rebirth**, merged --no-ff from `r104-the-desktop-rebirth` on the author's word after a hands-on test drive; the branch deleted after the merge — only main remains; R91–R95 shipped as v16.0.0)
 
-- **`main` is the blessed reference.** Its tip is the merged R96–R100 chain —
+- **`main` is the blessed reference.** Its tip is the R104 merge (the desktop
+  rebirth) on top of the merged R96–R103 chain —
   the tidy house, the engine divided, the real contract, the wheels connected,
   the self-contained exe — merged --no-ff and pushed on the author's word
   (2026-10-03, after a fresh full verify on the exact merged tree) — on top of
@@ -549,7 +550,10 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    `audit:arch --check` clean with in-commit snapshot refresh (three new probe
    instruments absorbed). `docs/ROUND-103-THE-WALL-CLOCK-JUTSU-2026-10-03.md`
 - **R104 (this round, on branch `r104-the-desktop-rebirth`, cut from main's
-  R103 tip — NOT merged; main untouched):** THE DESKTOP REBIRTH — the
+  R103 tip — **MERGED --no-ff into main on the author's word, 2026-10-04,
+  after the author's hands-on test drive of the built app: "everything is
+  working"; the branch deleted after the merge — only main remains**):
+  THE DESKTOP REBIRTH — the
   author's decree: the website is *"at its best shape"* but the installed
   desktop app is *"total disaster"* — *"delete and rebuild the desktop
   version from zero."* THE DIAGNOSIS BEFORE THE BLADE (measured-first): the
