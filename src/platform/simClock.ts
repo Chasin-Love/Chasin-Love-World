@@ -6,21 +6,40 @@
  */
 
 let current = '';
-const listeners = new Set<() => void>();
+let simDays = 0;
+const dateListeners = new Set<() => void>();
+const daysListeners = new Set<() => void>();
 
 export function publishSimDate(iso: string): void {
   if (iso === current) return;
   current = iso;
-  listeners.forEach((fn) => fn());
+  dateListeners.forEach((fn) => fn());
+}
+
+export function publishSimDays(days: number): void {
+  if (days === simDays) return;
+  simDays = days;
+  daysListeners.forEach((fn) => fn());
 }
 
 export function getSimDate(): string {
   return current;
 }
 
+export function getSimDays(): number {
+  return simDays;
+}
+
 export function subscribeSimDate(fn: () => void): () => void {
-  listeners.add(fn);
+  dateListeners.add(fn);
   return () => {
-    listeners.delete(fn);
+    dateListeners.delete(fn);
+  };
+}
+
+export function subscribeSimDays(fn: () => void): () => void {
+  daysListeners.add(fn);
+  return () => {
+    daysListeners.delete(fn);
   };
 }

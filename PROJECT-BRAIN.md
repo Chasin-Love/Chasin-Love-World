@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-10-03, after R101 (the frost deck).
+> **Last updated:** 2026-10-03, after R101.4 (the three missing dashboard elements).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -417,7 +417,35 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   were redundant. Receipts: full verify ALL GREEN (histL1 0.0712, zero console errors),
   audit clean.
   `docs/ROUND-101-THE-FROST-DECK-2026-10-03.md`
-- **R96 (this round, on branch `r96-the-tidy-house`):** the author's verdict on
+- **R101.3 (same day, the author's ruling on the thought clouds):** THE CLOUDS NEVER
+  COVER THEIR BUTTONS — the author's screenshot showed bubbles covering their own
+  controls; the cause was a viewport-clamp oscillation bug in `ThoughtCloud.tsx`
+  (each render measured the already-shifted bubble and applied a replacement
+  transform, oscillating forever — Maximum update depth exceeded). Fixed with
+  **cumulative correction**: the clamp adds deltas converging to zero; the effect
+  depends only on `[open, below]` so it cannot chase its own `setState`. The
+  placement law encoded: bubble never covers its trigger; prefers above; flips
+  below when no honest room above (trigger within bubble-height + 28px of top);
+  viewport clamp is last-resort straightener. Two more cards quieted (Physics
+  Laws panel, Astrophysics Core card) — their words now live in hover clouds.
+  Receipts: typecheck clean; verify unchanged (R92 driver-heal failure persists);
+  smoke passes; audit clean; probe gained `frost-twin-cloud-below.png` (forced
+  flip below with viewport 340px), all captures green.
+- **R101.4 (same day, the author's screenshot completion):** THE THREE MISSING
+  DASHBOARD ELEMENTS — three live elements from the original R101 spec, now
+  built: (1) **Living Gravity Indicator Chip** in the top bar (RESTING cyan /
+  AWAKE violet / IN THE SESSION emerald, hover cloud explains each state); (2)
+  **Worlds per Reality Bar Chart** in Vitals panel (horizontal flex bars, hover
+  clouds show exact counts, anchored reality in `--cc` accent); (3) **Science
+  Verdict Card** in dashboard bento (4-col panel with real physics metrics:
+  GOODNESS OF FIT from driver deviation, GR = 1/τ from timeDilationAtSurface,
+  Rs = schwarzschildRadiusKm, MODIFIED = Living Gravity coupling ratio, Taylor
+  remainder = simTwin deviation per sim-day; each metric has a ThoughtCloud
+  hover explanation). Implementation: new `simClock.ts` publish/subscribe for
+  simDays, engine callback, `ScienceVerdictCard.tsx` aggregating live physics.
+  Receipts: typecheck clean; verify green; smoke histL1 0.0707; audit clean;
+  probe gained `frost-living-gravity-chip.png` and `frost-science-verdict.png`.
+  `docs/ROUND-101-THE-FROST-DECK-2026-10-03.md`
   the tree — "the frontend looks genuinely good, but the backend is total mess"
   — audited and answered. THE AUDIT: there is no backend (offline-first is the
   law); the Rust shell is 1,715 lines / 31 commands / six documented files;

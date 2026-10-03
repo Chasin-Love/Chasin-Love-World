@@ -87,6 +87,7 @@ interface EngineCallbacks {
   onContext: (id: string, x: number, y: number) => void;
   onScaleLabel: (label: string) => void;
   onSimDate: (iso: string) => void;
+  onSimDays: (days: number) => void;
   onSelectReality?: (realityId: string) => void;
   onDoubleClickReality?: (realityId: string) => void;
   onSelectCluster?: (cluster: GalaxyClusterData) => void;
@@ -1760,6 +1761,13 @@ export class UniverseEngine {
           if (this.realityGroups[id]) this.realityGroups[id].visible = isMultiverseMode;
         });
       }
+      /* the empty multiverse HAS no home stage — the traveler must surface
+         at the multiverse sphere, not astride a collapsed web. A reality
+         arriving later re-shows the anchor and re-presses its own stage. */
+      this.cosmicStage = 'multiverse';
+      this.realityFocused = true;
+      this.rig.setZoomTarget(REALITY_FLOOR);
+      this.rig.setOrbit(null, 1.05);
       return;
     }
     if (this.anchorGroup && !this.anchorGroup.visible) this.anchorGroup.visible = true;
@@ -1966,6 +1974,7 @@ export class UniverseEngine {
     if (this.clockT - this.lastDateSent > 0.25) {
       this.lastDateSent = this.clockT;
       this.cb.onSimDate(new Date(this.epoch + this.simDays * DAY).toISOString());
+    this.cb.onSimDays(this.simDays);
     }
 
     /* KAMUI + PORTAL (R97) — the beat envelopes, the summon hold, the staged

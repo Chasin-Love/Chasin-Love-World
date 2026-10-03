@@ -119,6 +119,29 @@ async function main() {
     await page.mouse.move(700, 500); /* leave the seal before the next step */
     await page.waitForTimeout(400);
 
+    /* LIVING GRAVITY CHIP (R101.3) — hover the chip in the top bar.
+       The chip has one of three states: RESTING, AWAKE, IN THE SESSION. */
+    try {
+      const lgChip = page.locator('span[class*="flex items-center gap-1.5"]:has-text("IN THE SESSION"), span[class*="flex items-center gap-1.5"]:has-text("AWAKE"), span[class*="flex items-center gap-1.5"]:has-text("RESTING")').first();
+      await lgChip.hover();
+      await page.waitForTimeout(900);
+      await page.screenshot({ path: path.join(OUT, 'frost-living-gravity-chip.png') });
+      console.log('captured frost-living-gravity-chip.png');
+    } catch (e) {
+      console.log('Living Gravity chip not found (state may differ)');
+    }
+    await page.mouse.move(700, 500);
+    await page.waitForTimeout(400);
+
+    /* SCIENCE VERDICT CARD (R101.3) — scroll to it and capture */
+    await page.evaluate(`(() => {
+      const s = document.querySelector('.cc-root .overflow-y-auto');
+      if (s) s.scrollTop += 400;
+    })()`);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(OUT, 'frost-science-verdict.png') });
+    console.log('captured frost-science-verdict.png');
+
     /* THE FLIP LAW (R101.3) — shrink the viewport so the title sits ~110px
        from the top (no honest room above): the cloud must flip BELOW its
        trigger, never onto it. */

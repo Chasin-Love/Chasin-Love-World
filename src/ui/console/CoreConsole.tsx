@@ -18,6 +18,7 @@ import { TiltButton } from './TiltButton';
 import { RealityAdvancedPanel } from '../reality/RealityAdvancedPanel';
 import { ThinkingCloudTooltip } from '../lineage/ThinkingCloudTooltip';
 import { ThoughtCloud } from './ThoughtCloud';
+import { ScienceVerdictCard } from './ScienceVerdictCard';
 import { QuantumBinTab } from './QuantumBinTab';
 import { CppNativeEngineCard } from './CppNativeEngineCard';
 import { SimulatorTwinCard } from './SimulatorTwinCard';
@@ -1223,6 +1224,38 @@ export const CoreConsole: React.FC<Props> = ({
               ))}
             </div>
 
+            {/* LIVING GRAVITY INDICATOR — real-time state chip; hover for full explanation */}
+            <ThoughtCloud
+              label="Living Gravity"
+              subtitle={state.universeDriver !== false
+                ? 'TRUE GRAVITY DRIVES THE SKY — the N-body session owns the universe now. The Kepler clockwork is the fallback. Living Gravity stands down while the session drives; Restore Ephemeris re-seeds the session and the field together.'
+                : state.livingGravity
+                  ? 'Living Gravity AWAKE — true mutual N-body coupling in osculating elements (Gauss planetary equations). Orbits breathe and precess, bounded forever. The clockwork rests while the field drives.'
+                  : 'Living Gravity RESTING — the Kepler clockwork drives the sky. The field is dormant. Click to awaken true mutual gravity.'}
+              hint={state.universeDriver !== false ? 'in the session' : state.livingGravity ? 'awake' : 'resting'}
+            >
+              <span
+                className={`relative inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border font-mono text-[10px] tracking-wider cursor-default transition-all ${
+                  state.universeDriver !== false
+                    ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-200 shadow-[0_0_10px_rgba(16,185,129,0.25)]'
+                    : state.livingGravity
+                      ? 'bg-violet-500/20 border-violet-400/40 text-violet-200 shadow-[0_0_10px_rgba(167,139,250,0.25)]'
+                      : 'bg-cyan-500/15 border-cyan-400/30 text-cyan-200'
+                }`}
+              >
+                <span
+                  className={`relative w-1.5 h-1.5 rounded-full ${
+                    state.universeDriver !== false
+                      ? 'bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.8)]'
+                      : state.livingGravity
+                        ? 'bg-violet-400 animate-pulse shadow-[0_0_6px_rgba(167,139,250,0.8)]'
+                        : 'bg-cyan-400'
+                  }`}
+                />
+                <span>{state.universeDriver !== false ? 'IN THE SESSION' : state.livingGravity ? 'AWAKE' : 'RESTING'}</span>
+              </span>
+            </ThoughtCloud>
+
             {/* THE CLOCK CHIP — the traveler's wall clock over the universe's epoch */}
             <ClockChip />
           </div>
@@ -1370,6 +1403,11 @@ export const CoreConsole: React.FC<Props> = ({
                     </TiltButton>
                   </ThoughtCloud>
                 </div>
+              </motion.div>
+
+              {/* SCIENCE VERDICT — 4-col: the world's real physics report card */}
+              <motion.div variants={rise} className="lg:col-span-4">
+                <ScienceVerdictCard activeReality={activeReality} />
               </motion.div>
 
               {/* QUICK PODS — 4-col, lands directly under the radar.

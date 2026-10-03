@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-03T07:30:29.548Z",
-  "fileCount": 169,
+  "generatedAt": "2026-10-03T08:41:31.321Z",
+  "fileCount": 171,
   "deadExports": [
     {
       "symbol": "shadowReferencesFiles",
@@ -47,7 +47,7 @@
     "server/routes/sky.ts": 1,
     "server/skyStore.ts": 1,
     "src/App.tsx": 1,
-    "src/domain/universe.ts": 33,
+    "src/domain/universe.ts": 34,
     "src/domain/vault.ts": 18,
     "src/engine/blackhole/BlackHoleSystem.ts": 1,
     "src/engine/blackholeParams.ts": 5,
@@ -74,15 +74,15 @@
     "src/engine/worlds/BodyBuilders.ts": 1,
     "src/engine/worlds/InnerGalaxySystem.ts": 1,
     "src/physics/nbody.ts": 3,
-    "src/physics/physicsEngine.ts": 10,
-    "src/physics/sessionDriver.ts": 5,
-    "src/physics/simTwin.ts": 2,
+    "src/physics/physicsEngine.ts": 11,
+    "src/physics/sessionDriver.ts": 6,
+    "src/physics/simTwin.ts": 3,
     "src/platform/audio.ts": 4,
     "src/platform/desktop/adapter.ts": 7,
     "src/platform/native/cpp_bridge.ts": 6,
     "src/platform/performance.ts": 5,
     "src/platform/sentiment/sentiment.ts": 3,
-    "src/platform/simClock.ts": 2,
+    "src/platform/simClock.ts": 3,
     "src/platform/sky/skyRegistry.ts": 3,
     "src/platform/storageKeys.ts": 10,
     "src/platform/sync/realitySync.ts": 2,
@@ -117,6 +117,7 @@
     "src/ui/console/CppNativeEngineCard.tsx": 1,
     "src/ui/console/QuantumBinTab.tsx": 1,
     "src/ui/console/ScenicBackdrop.tsx": 1,
+    "src/ui/console/ScienceVerdictCard.tsx": 1,
     "src/ui/console/SimulatorTwinCard.tsx": 1,
     "src/ui/console/ThoughtCloud.tsx": 3,
     "src/ui/console/TiltButton.tsx": 1,
@@ -484,6 +485,7 @@
     "src/ui/console/CoreConsole.tsx → src/ui/console/CppNativeEngineCard.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/QuantumBinTab.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/ScenicBackdrop.tsx",
+    "src/ui/console/CoreConsole.tsx → src/ui/console/ScienceVerdictCard.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/SimulatorTwinCard.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/ThoughtCloud.tsx",
     "src/ui/console/CoreConsole.tsx → src/ui/console/TiltButton.tsx",
@@ -500,6 +502,11 @@
     "src/ui/console/QuantumBinTab.tsx → src/platform/sync/realitySync.ts",
     "src/ui/console/QuantumBinTab.tsx → src/state/index.ts",
     "src/ui/console/QuantumBinTab.tsx → src/ui/toast.ts",
+    "src/ui/console/ScienceVerdictCard.tsx → src/domain/universe.ts",
+    "src/ui/console/ScienceVerdictCard.tsx → src/physics/physicsEngine.ts",
+    "src/ui/console/ScienceVerdictCard.tsx → src/physics/sessionDriver.ts",
+    "src/ui/console/ScienceVerdictCard.tsx → src/physics/simTwin.ts",
+    "src/ui/console/ScienceVerdictCard.tsx → src/platform/simClock.ts",
     "src/ui/console/SimulatorTwinCard.tsx → src/physics/sessionDriver.ts",
     "src/ui/console/SimulatorTwinCard.tsx → src/physics/simTwin.ts",
     "src/ui/console/SimulatorTwinCard.tsx → src/platform/native/cpp_bridge.ts",
@@ -684,7 +691,7 @@
     "scripts/gauntlets/round88-per-frame-twin-gauntlet.ts": 106,
     "scripts/gauntlets/round90-reachable-twin-gauntlet.ts": 83,
     "scripts/gauntlets/round91-session-memory-gauntlet.ts": 167,
-    "scripts/gauntlets/round92-driver-shadow-gauntlet.ts": 167,
+    "scripts/gauntlets/round92-driver-shadow-gauntlet.ts": 171,
     "scripts/gauntlets/round93-real-moons-gauntlet.ts": 96,
     "scripts/gauntlets/round94-the-flip-gauntlet.ts": 125,
     "scripts/gauntlets/round95-steady-sky-gauntlet.ts": 192,
@@ -692,7 +699,8 @@
     "scripts/gauntlets/round98-physics-conformance-gauntlet.ts": 485,
     "scripts/gauntlets/stateSource.ts": 26,
     "scripts/probes/debug-cloud.ts": 137,
-    "scripts/probes/round101-frost-visual.ts": 172,
+    "scripts/probes/round101-frost-visual.ts": 195,
+    "scripts/probes/round102-independence-probe.ts": 141,
     "scripts/probes/round63-void-probe.ts": 280,
     "scripts/probes/round92-live-check.ts": 132,
     "scripts/probes/round95-physics-probe.ts": 134,
@@ -709,7 +717,7 @@
     "server/routes/realities.ts": 262,
     "server/routes/sky.ts": 94,
     "server/skyStore.ts": 251,
-    "src/App.tsx": 1586,
+    "src/App.tsx": 1587,
     "src/domain/universe.ts": 171,
     "src/domain/vault.ts": 176,
     "src/engine/blackholeParams.ts": 125,
@@ -719,7 +727,7 @@
     "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 2852,
+    "src/engine/engine.ts": 2861,
     "src/engine/kamui/KamuiPortalSystem.ts": 595,
     "src/engine/math.ts": 65,
     "src/engine/shaders.ts": 1542,
@@ -746,7 +754,7 @@
     "src/platform/native/cpp_bridge.ts": 1125,
     "src/platform/performance.ts": 115,
     "src/platform/sentiment/sentiment.ts": 117,
-    "src/platform/simClock.ts": 27,
+    "src/platform/simClock.ts": 46,
     "src/platform/sky/skyRegistry.ts": 288,
     "src/platform/storageKeys.ts": 34,
     "src/platform/sync/realitySync.ts": 145,
@@ -777,11 +785,12 @@
     "src/ui/bits.tsx": 144,
     "src/ui/console/BlackHoleTuningCard.tsx": 194,
     "src/ui/console/CommandPalette.tsx": 353,
-    "src/ui/console/CoreConsole.tsx": 1579,
+    "src/ui/console/CoreConsole.tsx": 1617,
     "src/ui/console/CoreSigil.tsx": 229,
     "src/ui/console/CppNativeEngineCard.tsx": 294,
     "src/ui/console/QuantumBinTab.tsx": 342,
     "src/ui/console/ScenicBackdrop.tsx": 354,
+    "src/ui/console/ScienceVerdictCard.tsx": 302,
     "src/ui/console/SimulatorTwinCard.tsx": 272,
     "src/ui/console/ThoughtCloud.tsx": 135,
     "src/ui/console/TiltButton.tsx": 83,
@@ -805,7 +814,7 @@
     "src/ui/lineage/ThinkingCloudTooltip.tsx": 271,
     "src/ui/reality/CreateRealityModal.tsx": 307,
     "src/ui/reality/RealityAdvancedModal.tsx": 84,
-    "src/ui/reality/RealityAdvancedPanel.tsx": 523,
+    "src/ui/reality/RealityAdvancedPanel.tsx": 528,
     "src/ui/syntax.ts": 195,
     "src/ui/toast.ts": 16,
     "src/ui/vault/MonacoCodeEditor.tsx": 156,
@@ -840,7 +849,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      2852
+      2861
     ],
     [
       "src/engine/stages/LevelStageSystem.ts",
@@ -851,12 +860,12 @@
       1659
     ],
     [
-      "src/App.tsx",
-      1586
+      "src/ui/console/CoreConsole.tsx",
+      1617
     ],
     [
-      "src/ui/console/CoreConsole.tsx",
-      1579
+      "src/App.tsx",
+      1587
     ],
     [
       "src/engine/shaders.ts",
@@ -1038,6 +1047,7 @@
     "window seams": [
       "scripts/probes/debug-cloud.ts:38",
       "scripts/probes/round101-frost-visual.ts:65",
+      "scripts/probes/round102-independence-probe.ts:89",
       "scripts/probes/round63-void-probe.ts:73",
       "scripts/probes/round63-void-probe.ts:88",
       "scripts/probes/round63-void-probe.ts:178",
@@ -1054,7 +1064,7 @@
       "scripts/smoke.ts:176",
       "scripts/smoke.ts:186",
       "scripts/smoke.ts:216",
-      "src/engine/engine.ts:428",
+      "src/engine/engine.ts:429",
       "src/platform/desktop/adapter.ts:5",
       "src/platform/performance.ts:72"
     ]

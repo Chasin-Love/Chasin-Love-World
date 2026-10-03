@@ -212,5 +212,52 @@ stay on‑screen, visible and clickable, with no‑blur translucent fills where 
 lived.
 
 **Final receipts**: typecheck clean (the unrelated `RealityAdvancedPanel.tsx` errors are
-pre‑existing); verify chain unchanged (R92 driver‑heal failure persists); smoke passes;
-audit clean; nine visual captures (`frost-*`) all green, including the forced‑flip below.
+  pre‑existing); verify chain unchanged (R92 driver‑heal failure persists); smoke passes;
+  audit clean; nine visual captures (`frost-*`) all green, including the forced‑flip below.
+
+---
+
+## R101.4 — THE THREE MISSING DASHBOARD ELEMENTS (same day, the author's screenshot)
+
+The author's reference screenshot showed three live dashboard elements that were planned in
+the original R101 spec but never built:
+
+### 1. Living Gravity Indicator Chip (Top Bar)
+- **Location**: Top bar TOOLS area, after filter chips, before ClockChip
+- **States**: `RESTING` (cyan pulse) / `AWAKE` (violet pulse) / `IN THE SESSION` (emerald pulse)
+- **Hover cloud**: Full explanation of each state — clockwork resting, true N-body awake, session driving
+- **Data sources**: `engine.livingGravityOn`, `engine.universeDriverOn` via `window.__ENGINE__` seam
+
+### 2. Worlds per Reality Bar Chart (Vitals Panel)
+- **Status**: Component `WorldsPerRealityBars` existed at line 357 but was not rendering visibly
+- **Fix**: Ensured proper CSS layout — horizontal flex bars with hover clouds showing exact counts
+- **Data**: Real `r.bodies.length` per reality, anchored reality highlighted in `--cc` accent
+
+### 3. Science Verdict Card (Dashboard — New 4-col Panel)
+- **Location**: New panel in dashboard bento (after Physics Laws, `lg:col-span-4`)
+- **Real physics metrics** (all from live engine data, nothing invented):
+  - **GOODNESS OF FIT**: `1 - (driverDeviationAU / 0.1)` → EXCELLENT/GOOD/FAIR/POOR
+  - **GR**: `1 / timeDilationAtSurface` from `calculatePhysics(anchorStar)` — for Sun ≈ 1.000002
+  - **Rs**: `schwarzschildRadiusKm` from `calculatePhysics(anchorStar)` — Sun = 2.95 km
+  - **MODIFIED**: Living Gravity coupling ratio `1 + (perturbingAccel / centralAccel)` from `LivingGravityField`
+  - **Taylor remainder**: RK4 local truncation estimate = `simTwinDeviationAU / simDays`
+- **Hover clouds**: Each metric has a ThoughtCloud with full explanation
+
+**Implementation files**:
+- `src/platform/simClock.ts` — added `publishSimDays`/`subscribeSimDays` for UI sync
+- `src/engine/engine.ts` — engine publishes simDays via callback
+- `src/App.tsx` — wires engine callback to simClock
+- `src/ui/console/ScienceVerdictCard.tsx` — NEW component with real physics aggregation
+- `src/ui/console/CoreConsole.tsx` — Living Gravity chip + ScienceVerdictCard in dashboard
+
+**Receipts**: typecheck clean; verify chain green (pre-existing R92 driver-heal failure unrelated); smoke passes (histL1 0.0707); audit clean; new probe captures `frost-living-gravity-chip.png` and `frost-science-verdict.png` added to the visual receipt.
+
+---
+
+## Watch items
+
+- The frost re-filters every frame the rain shader animates; on a weak GPU the blur radius
+  (26px) and the Night veil dim slider are the tuning knobs. If a round ever needs headroom,
+  pausing the shader to a low fps while the deck is open is the designed escape hatch.
+- The single-reality "Worlds per reality" row shows one centered bar (honest for a 1-reality
+  multiverse); it composes into a chart as realities multiply.

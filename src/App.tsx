@@ -12,7 +12,7 @@ import { startRealitySync } from './platform/sync/realitySync';
 import { ensureSkyFor, onSkyChanged } from './platform/sky/skyRegistry';
 import { computeAurora, onThisDay } from './platform/sentiment/sentiment';
 import { perfMark } from './platform/performance';
-import { publishSimDate } from './platform/simClock';
+import { publishSimDate, publishSimDays } from './platform/simClock';
 import { MultiverseBar } from './ui/hud/MultiverseBar';
 import { armKamuiBend, playKamuiBend } from './ui/kamuiBend';
 import { RealityHoverCard } from './ui/hud/RealityHoverCard';
@@ -408,6 +408,7 @@ export default function App() {
       onHoverEcho: (echo, x, y) => setEchoHover(echo ? { ...echo, x: x ?? 0, y: y ?? 0 } : null),
       onScaleLabel: (l) => setLabel(l),
       onSimDate: publishSimDate,
+      onSimDays: publishSimDays,
       onSelectReality: (realityId) => {
         /* R102 — switchReality refuses a collapsed reality's id; the toast
            is guarded the same way */
