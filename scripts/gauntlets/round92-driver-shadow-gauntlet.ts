@@ -105,8 +105,12 @@ const pkgSrc = read('../../package.json');
   const suppressed = /if \(this\.livingGravityOn && !this\.universeDriverOn\) \{\s*this\.updateLivingGravity\(\);\s*\}/.test(engineSrc);
   check('R92: the osculating-element writer stands down while the session drives', suppressed, 'two writers would fight over every body');
 
-  const heal = /healLivingGravity\(\): void \{\s*this\.livingField\.heal\(\);\s*if \(this\.universeDriverOn\) \{\s*void healDriver\(this\.bodies, this\.simDays, this\.activeRealityId\);/.test(engineSrc);
-  check('R92: Restore Ephemeris re-seeds the driving session (the decree heal)', heal, 'the heal misses the driver');
+  /* R102 — the heal is reality-gated now: with an empty multiverse there is
+     no scope to heal, so the driver heal fires only when a scope exists.
+     The R92 law (Restore Ephemeris re-seeds the driving session) is intact —
+     reality-gated, not removed. */
+  const heal = /healLivingGravity\(\): void \{\s*this\.livingField\.heal\(\);\s*if \(this\.universeDriverOn && this\.activeRealityId\) \{\s*void healDriver\(this\.bodies, this\.simDays, this\.activeRealityId\);/.test(engineSrc);
+  check('R92: Restore Ephemeris re-seeds the driving session (the decree heal, R102 reality-gated)', heal, 'the heal misses the driver');
 }
 
 /* ==== 4. THE SWITCH PERSISTS THROUGH THE STORE ==== */

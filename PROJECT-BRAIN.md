@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-10-03, after R101.4 (the three missing dashboard elements).
+> **Last updated:** 2026-10-03, after R102 (the independent realities).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -118,6 +118,11 @@ Anchor Star), 3 diary entries, and frozen cluster/galaxy literals. The full seed
 palettes, orbits and the entire shader library are embedded verbatim in `README.md`
 Appendix A. **`README.md` is the single source of truth for reconstruction and creative DNA —
 228 KB, built so the universe can be rebuilt from this repo alone.**
+**R102 amendment — the home is a SHIPPED reality, not a load-bearing one.** Since R102 (author's
+decree), every reality folder stands alone: deleting any of them — Sol-Prime included — leaves
+the project fully functional, booting onto the empty multiverse sphere; purge leaves zero trace
+of the deleted reality (container, payloads, session memory all die with it). The seed's
+*content* is still canon (its tables, palettes, orbits); only its structural privilege is gone.
 
 ---
 
@@ -446,6 +451,56 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   Receipts: typecheck clean; verify green; smoke histL1 0.0707; audit clean;
   probe gained `frost-living-gravity-chip.png` and `frost-science-verdict.png`.
   `docs/ROUND-101-THE-FROST-DECK-2026-10-03.md`
+- **R102 (this round, on branch `r102-the-independent-realities`):** THE
+  INDEPENDENT REALITIES — the author's decree: *"the back end and the reality
+  folders need to be separate completely… if a reality got compromised I can just
+  easily delete them and that virus is totally gone with the deleted file —
+  it's supposed to look like it doesn't even exist, not now, not before."*
+  Under the decree, **no reality is load-bearing — not even Sol-Prime, the
+  canonical home.**
+  THE CUT LIST (every place the home was wired into the core):
+  `src/realities/index.ts` dropped the static `solPrimeReality` import and the
+  forced `map.set('sol-prime', …)` / hardcoded `folderById` seed — discovery is
+  pure `import.meta.glob`; `getReality()` may now return `undefined` and every
+  caller was swept (typecheck-driven, ~40 sites). The engine's
+  `activeRealityId` is `string | null`; `setReality(null)` is legal (anchor
+  hidden, driver stands down, stage snaps to the multiverse); the boot frame's
+  `bootIntro` finalize no longer hard-opens the home — with no home it lands
+  on the multiverse sphere. `setUniverseDriver`/`healLivingGravity` are
+  reality-gated. The surface dome falls back to a `NEUTRAL_SURFACE` preset
+  instead of sol-prime's own. The store stops conjuring a phantom `'sol-prime'`
+  bucket; the snapshot's views are honestly empty. `persist.loadState`
+  reconciles the active pointer to a KNOWN reality or `''`, and prunes any
+  ghost container at load (a reality with no folder, no custom registry, no
+  bin entry leaves zero trace — payloads destroyed via `delPayload`).
+  `createInitialSeed` takes `homeExists` and seeds the EMPTY multiverse when
+  the folder is gone. The deletion guards die everywhere: the action, the
+  console card, the multiverse bar, the Node daemon, and the Rust twin
+  (`is_protected` now shields only `bin`/`.bin`).
+  ZERO-TRACE PURGE (the decree's virus test): bin-purge now destroys the
+  world container, every referenced encrypted payload (vault + vault trash +
+  diary attachments), the folder-map entry, AND the N-body session memory —
+  new `forgetSession(id)` in `sessionDriver.ts` wipes the scope's memory from
+  the locked key. `emptyRealityBin` sweeps the same way.
+  RECONCILED PINS (negatives proven by mutation): round98's old
+  "protect sol-prime from rename" pin inverted to the decree pin
+  (`R102: neither backend single-cases sol-prime in rename or move-to-bin`);
+  round92's heal pin updated to the reality-gated form. The R83-2 law stands:
+  the committed seed `data.json` mirror still refuses browser writes — that
+  guard protects the committed *file*, never the deletion right.
+  **MUTATION PROOF:** `scripts/probes/round102-independence-probe.ts` —
+  physically moves `src/realities/solPrime` out of the tree, boots a fresh
+  server, verifies the veil lifts, engine ignites, `activeRealityId === null`,
+  stage = multiverse, zero marbles, console + palette open, zero page/console
+  errors — then always restores the folder. ALL GREEN with captures in
+  `scripts/verify/independence/`. Receipts: typecheck clean; full verify ALL
+  GREEN (21 gauntlets; smoke 0.0690 standalone after one in-chain cold-boot
+  flake; prod smoke green); audit clean with in-commit snapshot refresh.
+  SESSION ARTIFACT, RECORDED: two interleaved commits (R101.3/R101.4) landed
+  mid-round carrying part of this round's edits; the close-out commit on top
+  carries the remainder (the boot snap + gauntlet reconciliations + captures).
+  The tree is the truth and it verifies green.
+  `docs/ROUND-102-THE-INDEPENDENT-REALITIES-2026-10-03.md`
   the tree — "the frontend looks genuinely good, but the backend is total mess"
   — audited and answered. THE AUDIT: there is no backend (offline-first is the
   law); the Rust shell is 1,715 lines / 31 commands / six documented files;

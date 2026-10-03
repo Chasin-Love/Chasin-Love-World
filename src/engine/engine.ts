@@ -2020,7 +2020,18 @@ export class UniverseEngine {
          formed behind the opaque veil; this finalize runs once on the first
          frame so nothing boot-related can linger (sleeping meteors, hidden
          sky, half-faded worlds, the old 0.075 dive-in zoom). The veil then
-         simply fades and you are home. */
+         simply fades and you are home.
+         R102: with NO home reality the quiet opening lands on the multiverse
+         — the anchor stays stowed, the camera goes where the spheres live. */
+      if (!this.activeRealityId) {
+        this.cosmicStage = 'multiverse';
+        this.realityFocused = true;
+        this.rig.setZoomTarget(REALITY_FLOOR);
+        this.rig.setOrbit(null, 1.05);
+        if (this.anchorGroup) this.anchorGroup.visible = false;
+        this.bootIntro = false;
+        this.birthK = 1;
+      } else {
       this.cosmicStage = 'web';
       this.realityFocused = false;
       this.birthK = 1;
@@ -2058,6 +2069,7 @@ export class UniverseEngine {
         this.rig.setOrbit(null, 1.12);
       }
       this.bootIntro = false;
+      }
     } else {
       /* THE LAW — other realities do not exist for a reality. The dial hits
          the membrane and it may shimmer, but it can never be crossed by
