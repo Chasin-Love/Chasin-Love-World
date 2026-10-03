@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-03T18:25:54.574Z",
+  "generatedAt": "2026-10-03T19:08:24.607Z",
   "fileCount": 177,
   "deadExports": [
     {
@@ -710,7 +710,7 @@
     "scripts/probes/round103-bughunt-probe.ts": 382,
     "scripts/probes/round103-gpu-lens-probe.ts": 111,
     "scripts/probes/round103-lens-recheck.ts": 111,
-    "scripts/probes/round104-desktop-perf-probe.ts": 314,
+    "scripts/probes/round104-desktop-perf-probe.ts": 388,
     "scripts/probes/round63-void-probe.ts": 280,
     "scripts/probes/round92-live-check.ts": 132,
     "scripts/probes/round95-physics-probe.ts": 134,
@@ -938,14 +938,14 @@
       "server/skyStore.ts:6",
       "server/skyStore.ts:7",
       "server/skyStore.ts:64",
-      "src-tauri/src/realities.rs:3",
-      "src-tauri/src/realities.rs:523"
+      "src-tauri/src/realities.rs:5",
+      "src-tauri/src/realities.rs:540"
     ],
     "generated-code imports": [
       "server/realityTemplates.ts:44",
       "server/realityTemplates.ts:81",
-      "src-tauri/src/realities.rs:423",
-      "src-tauri/src/realities.rs:434"
+      "src-tauri/src/realities.rs:437",
+      "src-tauri/src/realities.rs:448"
     ],
     "disk surface.ts imports": [],
     "native build path": [
@@ -1036,7 +1036,7 @@
       "src/state/actions/realities.ts:372",
       "src/state/actions/realities.ts:420",
       "src/ui/reality/CreateRealityModal.tsx:69",
-      "src-tauri/src/realities.rs:460"
+      "src-tauri/src/realities.rs:476"
     ],
     "localStorage keys": [
       "scripts/gauntlets/round91-session-memory-gauntlet.ts:108",
@@ -1046,6 +1046,9 @@
       "scripts/probes/round103-bughunt-probe.ts:155",
       "scripts/probes/round104-desktop-perf-probe.ts:120",
       "scripts/probes/round104-desktop-perf-probe.ts:121",
+      "scripts/probes/round104-desktop-perf-probe.ts:295",
+      "scripts/probes/round104-desktop-perf-probe.ts:296",
+      "scripts/probes/round104-desktop-perf-probe.ts:303",
       "src/platform/storageKeys.ts:6",
       "src/platform/storageKeys.ts:8",
       "src/platform/storageKeys.ts:11",
@@ -1091,9 +1094,10 @@
       "scripts/probes/round103-lens-recheck.ts:92",
       "scripts/probes/round104-desktop-perf-probe.ts:108",
       "scripts/probes/round104-desktop-perf-probe.ts:109",
-      "scripts/probes/round104-desktop-perf-probe.ts:175",
-      "scripts/probes/round104-desktop-perf-probe.ts:177",
-      "scripts/probes/round104-desktop-perf-probe.ts:181",
+      "scripts/probes/round104-desktop-perf-probe.ts:183",
+      "scripts/probes/round104-desktop-perf-probe.ts:187",
+      "scripts/probes/round104-desktop-perf-probe.ts:189",
+      "scripts/probes/round104-desktop-perf-probe.ts:193",
       "scripts/probes/round63-void-probe.ts:73",
       "scripts/probes/round63-void-probe.ts:88",
       "scripts/probes/round63-void-probe.ts:178",

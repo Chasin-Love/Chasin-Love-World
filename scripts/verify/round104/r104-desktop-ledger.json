@@ -3,10 +3,10 @@
  "exe": "C:\\Users\\Chasin-Love\\Desktop\\New folder ()\\Chasin Love World\\src-tauri\\target\\release\\my-universe.exe",
  "desktop": {
   "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0 ps_5_0, D3D11)",
-  "avgFps": 10.995038266795998,
-  "p95FrameMs": 103.79999999999927,
-  "frames": -70,
-  "gaps": 3,
+  "avgFps": 9.553373519352476,
+  "p95FrameMs": 187.5,
+  "frames": -100,
+  "gaps": 52,
   "invokes": 0,
   "invokeAvgMs": 0,
   "holeGeodesic": true,
@@ -15,35 +15,35 @@
   "witness": "[desktop] boot witness — GPU: ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0 ps_5_0, D3D11) · tier: medium · physics: native-cpp · webview: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0",
   "tierEvents": [
    {
-    "t": 1672.9000000022352,
+    "t": 2012,
     "detail": {
      "state": "active",
      "reason": "attached"
     }
    },
    {
-    "t": 2505.800000000745,
+    "t": 2978.800000000745,
     "detail": {
      "state": "active",
      "reason": "attached"
     }
    },
    {
-    "t": 2601.5,
+    "t": 3095.300000000745,
     "detail": {
      "state": "active",
      "reason": "attached"
     }
    },
    {
-    "t": 2686.60000000149,
+    "t": 3188.10000000149,
     "detail": {
      "state": "active",
      "reason": "attached"
     }
    },
    {
-    "t": 2780.2000000029802,
+    "t": 3327,
     "detail": {
      "state": "active",
      "reason": "attached"
@@ -153,5 +153,5 @@
    }
   ]
  },
- "lastRun": "2026-10-03T18:50:17.977Z"
+ "lastRun": "2026-10-03T19:19:21.926Z"
 }

@@ -49,18 +49,51 @@ untouched.
 
 wry's defaults are carried INSIDE the override (setting the field replaces them), and
 `--use-angle=d3d11` is the exact SwiftShader escape the project's own round63/GPU probes
-use. Everything else carried verbatim: identity, version 16.1.0, CSP, bundle, updater
-plugin (same minisign pubkey + endpoint), `tauri.updater.conf.json` (CI's `--config`
-overlay), `Cargo.toml` (devtools feature — the v15.0.0 lesson; `cc` build-dep; LTO release
-profile), `build.rs` (the R100 vswhere probe + static-CRT weld of `cosmos_engine.cpp`),
-and the four backend modules `cosmos.rs` / `store.rs` / `realities.rs` / `sky.rs` (the
-locked contract — the audit snapshot pins realities.rs line numbers; carried files keep
-them intact). `main.rs` and `lib.rs` re-authored fresh with the same 31-command surface
-byte-equal (12-space handler entries kept for the round98 parse). `Cargo.lock` regenerated
-fresh. Icons: the three shipped binaries REGENERATED through the R80 pipeline from
-`logo-master.jpg` — `public/favicon.png` came out **byte-identical** (the pipeline is
-deterministic; the website untouched), and the R86-purged 512×512 orphan was NOT
-resurrected.
+use. Identity, version 16.1.0, CSP, bundle, updater plugin (same minisign pubkey +
+endpoint) carried verbatim; `Cargo.toml` (devtools feature — the v15.0.0 lesson; `cc`
+build-dep; LTO release profile), `main.rs`, `lib.rs` (the 31-command surface byte-equal,
+12-space handler entries kept for the round98 parse) and `capabilities/default.json`
+written fresh. `Cargo.lock` regenerated fresh. Icons: the three shipped binaries
+REGENERATED through the R80 pipeline from `logo-master.jpg` — `public/favicon.png` came
+out **byte-identical** (the pipeline is deterministic; the website untouched), and the
+R86-purged 512×512 orphan was NOT resurrected.
+
+### Stage 2b — the decree completed: EVERYTHING under src-tauri re-authored
+
+The author ruled on the first pass: *"when I tell you to rebuild everything but first
+delete everything I really need EVERYTHING."* Stage 2 had resurrected six files verbatim
+from history under the "locked contract" banner — `build.rs`, `cosmos.rs`, `store.rs`,
+`realities.rs`, `sky.rs`, `tauri.updater.conf.json`. The ruling: the CONTRACT is what
+must survive a rebuild, not the historical bytes. Those six were deleted in their own
+commit (the tree does not compile on it — exactly like stage 1) and re-authored from
+zero:
+
+- **`cosmos.rs`** — derived from `src/platform/native/cosmos_engine.hpp` (the C++ header
+  IS the FFI contract), not from the old Rust file: every extern declaration mirrors the
+  header parameter-for-parameter, the stub module documented as the degradation path, the
+  kind/field tables annotated from the header's `#define`s.
+- **`build.rs`** — restructured into three honest functions (`core_source()`,
+  `find_cpp_compiler()`, `weld_core()`); the R100 machinery (vswhere probe, static-CRT
+  weld, AVX2/fast-math flags, CARGO_MANIFEST_DIR anchoring) re-expressed, same behavior.
+- **`store.rs`** — same on-disk formats the author's existing data lives in
+  (`universe-state.json`, `payloads/<id>.bin`, atomic tmp+rename), re-organized around a
+  single `valid_payload_id` guard and one `write_atomic` helper (the old file repeated
+  both three times).
+- **`realities.rs`** — the four copy-pasted folder-lookup loops FACTORED into one
+  `locate_folder()`; every behavioral pin kept exactly (the sanitize character class, the
+  rename derivation and its guard-before-destroy order, the both-modules patch loop, the
+  bin ops' containment guards, the R83-2 seed-mirror refusal with its exact message, the
+  R102 decree shape); the generated index.ts/surface.ts templates byte-identical (they
+  define what generated realities look like).
+- **`sky.rs`** — same registry/asset layout and caps (6 MB / 8 photos), the strict asset
+  whitelist re-expressed with its R98 defect history intact, fresh repair-pass docs.
+- **`tauri.updater.conf.json`** — re-typed.
+
+The proof the contract survived the total rewrite: **all seven shell-reading gauntlets
+green on the first run after the rewrite** (round79 sky, round84 inclination, round87
+simulator, round91 session-memory, round98 physics + backend conformance, round104
+shell), `cargo check` clean, and the audit snapshot refreshed for the shifted
+realities.rs line numbers.
 
 **Honesty from birth (the R98 law):** `src/platform/desktop/bootWitness.ts` — a
 once-per-session, desktop-gated console line naming the GPU renderer + quality tier +
@@ -156,11 +189,13 @@ the boot witness's three import edges: capability 4→5, adapter 7→8, cpp_brid
 ## 8. Receipts
 
 - Branch `r104-the-desktop-rebirth`: `c953a476` (the deletion) → `8ba899de` (the rebirth)
-  → `186b9e67` (the measurement) → this close-out.
-- Typecheck clean · cargo check green (`my-universe v16.1.0`) · `npm run desktop:build`
-  green (20.4 MB exe, C++ core welded) · round104 gauntlet 16/16 · probe ALL GREEN ·
-  audit `--check` clean · full `npm run verify` green on the final tree (22 gauntlets —
-  the 21 prior + round104 — smoke + prod smoke).
+  → `186b9e67` (the measurement) → `f02effee` (stage 2b: the carried files die too) →
+  the full re-authoring → this close-out.
+- Typecheck clean · cargo check green (`my-universe v16.1.0`, re-authored modules) ·
+  `npm run desktop:build` green (20.4 MB exe, C++ core welded) · round104 gauntlet 16/16
+  · all seven shell gauntlets green post-rewrite · probe ALL GREEN · audit `--check`
+  clean · full `npm run verify` green on the final tree (22 gauntlets — the 21 prior +
+  round104 — smoke + prod smoke).
 - Ledger + captures: `scripts/verify/round104/` (`r104-desktop-ledger.json`,
   `desktop-home.png`, `desktop-recipe-low.png`, `browser-ab-home.png`).
 - The website (`src/` besides `main.tsx`'s two-line witness call, `public/`, `server/`)

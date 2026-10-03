@@ -564,14 +564,25 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   main window carries `additionalBrowserArgs` = wry's defaults +
   **`--use-angle=d3d11`** (the exact SwiftShader escape the project's own
   probes use); identity/version/CSP/bundle/updater carried verbatim;
-  `build.rs` + the four backend modules (`cosmos/store/realities/sky.rs`)
-  carried VERBATIM (the locked contract — the audit snapshot's realities.rs
-  line numbers survive); `main.rs`/`lib.rs` re-authored with the 31-command
-  surface byte-equal (12-space handler entries for the round98 parse);
-  `Cargo.lock` regenerated; the three shipped icons REGENERATED through the
-  R80 pipeline from `logo-master.jpg` (`public/favicon.png` came out
-  BYTE-IDENTICAL — the website untouched; the R86-purged 512 orphan not
-  resurrected). HONESTY FROM BIRTH: `src/platform/desktop/bootWitness.ts` —
+  `main.rs`/`lib.rs` re-authored with the 31-command surface byte-equal
+  (12-space handler entries for the round98 parse); `Cargo.lock` regenerated;
+  the three shipped icons REGENERATED through the R80 pipeline from
+  `logo-master.jpg` (`public/favicon.png` came out BYTE-IDENTICAL — the
+  website untouched; the R86-purged 512 orphan not resurrected). **STAGE 2B —
+  THE DECREE COMPLETED (the author's ruling: "when I tell you to rebuild
+  everything but first delete everything I really need EVERYTHING"):** stage 2
+  had resurrected six files verbatim from history (`build.rs`, `cosmos.rs`,
+  `store.rs`, `realities.rs`, `sky.rs`, `tauri.updater.conf.json`); they were
+  deleted in their own commit (`f02effee`, tree does not compile on it —
+  exactly like stage 1) and RE-AUTHORED FROM ZERO — cosmos.rs derived from
+  cosmos_engine.hpp (the C++ header IS the FFI contract), build.rs restructured
+  into three functions, store.rs re-organized around one id-guard + one atomic
+  write helper, realities.rs's four copy-pasted lookup loops FACTORED into one
+  `locate_folder()`, sky.rs re-expressed with its R98 whitelist history — while
+  every behavioral pin, on-disk format, JSON shape and generated template
+  survived the rewrite: **all seven shell gauntlets green on the first run
+  after the rewrite** (79/84/87/91/98×2/104), cargo check clean, audit
+  snapshot refreshed for the shifted realities.rs line numbers. HONESTY FROM BIRTH: `src/platform/desktop/bootWitness.ts` —
   a once-per-session desktop-gated console line naming GPU renderer + tier +
   physics backend + webview version (web mode: a no-op). THE LAW LOCKED:
   `round104-desktop-shell-gauntlet.ts` (16 checks — GPU-first args,
