@@ -105,3 +105,35 @@ Reality modal was already glassmorphic (it predates the smoke era) — untouched
   pausing the shader to a low fps while the deck is open is the designed escape hatch.
 - The single-reality "Worlds per reality" row shows one centered bar (honest for a 1-reality
   multiverse); it composes into a chart as realities multiply.
+
+---
+
+## R101.1 — THE RAIL ABSORBS THE DOCK (same day, the author's follow-on)
+
+The author's verdict on the first frost build, with a crop of the bottom dock: *"change in
+style make all these in left side along with others so it can look great."* The four view
+tabs left the bottom pill bar and joined the tool seals on the left rail — one unified frost
+column: the four view seals on top (symbols only, full names in the thought clouds, the
+active seal burning in the tab accent via the existing `active` prop, the Bin's badge dot
+riding its seal), a separator, then Twin Jump / Backdrop Studio / Forge, a separator, Close.
+
+- The bottom dock is gone; the deck reclaims its bottom edge (`pb-4`). The `.cc-pillbar`/
+  `.cc-pill` CSS died with their last consumer and was deleted (deadCss law — deleted from
+  both sides in the same commit). The rail's entrance keyframe was renamed `ccRailIn` and
+  re-scoped to an X-slide only: the rail centers through Tailwind v4's `translate` property
+  (`-translate-y-1/2`), which composes with `transform` — animating the old translateY form
+  would have doubled the centering.
+- **The probe was caught lying and was fixed.** After the merge, two captures (realities in
+  one run, bin in another) came out visually empty while the dashboard was full — yet an
+  instrumented run proved the DOM always held the content at opacity 1 with zero console
+  errors. The lie: the probe's readiness check (`deck innerHTML.length > 3000`) is satisfied
+  by the EXITING view's content the instant the click lands, so the screenshot raced the
+  `AnimatePresence mode="wait"` swap. The fix makes the wait honest — each view waits for a
+  marker string only IT renders (`Multiverse Radar Scan` / `All Parallel Realities` /
+  `Reality Branches` / `QUANTUM RECYCLE BIN`) AND for the deck's first child to read
+  computed `opacity: 1`, then settles 600 ms. All seven captures re-taken green under the
+  honest wait; the app itself never had the bug.
+- Receipts: typecheck clean; full verify ALL GREEN (21 gauntlets, `SMOKE TIER — wasm`,
+  histL1 0.0725 vs the 0.12 pin, zero console errors, prod smoke green);
+  `audit:arch --check` clean (the pill-class deletion absorbed with no snapshot refresh —
+  classes left both sides together).

@@ -1556,57 +1556,8 @@ input[type='range'].pw-range::-webkit-slider-thumb {
 
 /* ---- R101 frost layout primitives (all float directly on the night → blur) */
 
-/* THE PILL BAR — the screenshot's bottom dock: one floating glass pill
-   holding the console's view tabs. Active pill reads the tab accent. */
-.cc-pillbar {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  padding: 0.35rem;
-  border-radius: 9999px;
-  background:
-    linear-gradient(165deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04) 50%),
-    rgba(8, 10, 18, 0.42);
-  -webkit-backdrop-filter: blur(28px) saturate(1.4);
-  backdrop-filter: blur(28px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  animation: ccPillIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-@keyframes ccPillIn {
-  from { opacity: 0; transform: translateY(14px) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-.cc-pill {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.5rem 0.95rem;
-  border-radius: 9999px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: rgba(203, 213, 225, 0.85);
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: color 0.25s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-}
-.cc-pill:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
-}
-.cc-pill[data-active='true'] {
-  color: rgb(var(--cc));
-  background: rgb(var(--cc) / 0.16);
-  border-color: rgb(var(--cc) / 0.45);
-  box-shadow: 0 0 18px rgb(var(--cc) / 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-}
-
-/* THE RAIL — the screenshot's left icon column: the deck's tools as a slim
+/* THE RAIL — the deck's ONE column on the left (R101.1: the view seals
+   joined the tool seals here; the R101 bottom dock is gone): a slim
    vertical frost sliver with hairline separators. */
 .cc-rail {
   display: flex;
@@ -1622,7 +1573,13 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   backdrop-filter: blur(26px) saturate(1.35);
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  animation: ccPillIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ccRailIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes ccRailIn {
+  /* X-slide only — the rail's vertical centering lives in Tailwind's
+     `translate` property (-translate-y-1/2), which composes with transform */
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 .cc-rail-sep {
   width: 20px;
@@ -1666,10 +1623,9 @@ input[type='range'].pw-range::-webkit-slider-thumb {
   }
   .tilt-btn { transform: none !important; }
   .cc-cloud-rise, .cc-thought-dot { animation: none; }
-  .cc-pillbar, .cc-rail { animation: none; }
+  .cc-rail { animation: none; }
   .cc-vital,
-  .cc-btn-glass,
-  .cc-pill {
+  .cc-btn-glass {
     transition: none;
   }
 }

@@ -39,13 +39,14 @@ interface Props {
 
 type Tab = 'dashboard' | 'realities' | 'hierarchy' | 'bin';
 
-/* THE VIEW DOCK — the bottom pill bar's registry. Full names for the cloud
-   chips, short names for the pill faces. */
-const TABS: Array<{ id: Tab; label: string; pill: string; sub: string; icon: React.ReactNode }> = [
-  { id: 'dashboard', label: 'Command Matrix', pill: 'Matrix', sub: 'Live multiverse telemetry & controls', icon: <Cpu className="w-3.5 h-3.5" /> },
-  { id: 'realities', label: 'Realities Grid', pill: 'Realities', sub: 'One card per parallel reality', icon: <Globe className="w-3.5 h-3.5" /> },
-  { id: 'hierarchy', label: 'Deep Hierarchy', pill: 'Hierarchy', sub: 'The 11-stage cosmological ladder', icon: <Layers className="w-3.5 h-3.5" /> },
-  { id: 'bin', label: 'Quantum Bin', pill: 'Bin', sub: 'Deleted realities rest in stasis', icon: <Trash2 className="w-3.5 h-3.5" /> },
+/* THE RAIL'S VIEW SEALS — the four console views living on the rail with
+   the tools (R101.1): symbols only, full names rise in the thought cloud,
+   the active seal burns in the tab accent, the Bin wears its live badge. */
+const TABS: Array<{ id: Tab; label: string; sub: string; icon: React.ReactNode }> = [
+  { id: 'dashboard', label: 'Command Matrix', sub: 'Live multiverse telemetry & controls', icon: <Cpu className="w-4 h-4" /> },
+  { id: 'realities', label: 'Realities Grid', sub: 'One card per parallel reality', icon: <Globe className="w-4 h-4" /> },
+  { id: 'hierarchy', label: 'Deep Hierarchy', sub: 'The 11-stage cosmological ladder', icon: <Layers className="w-4 h-4" /> },
+  { id: 'bin', label: 'Quantum Bin', sub: 'Deleted realities rest in stasis', icon: <Trash2 className="w-4 h-4" /> },
 ];
 
 /* Quantum Glass motion system — staggered deck entrance + tab transitions.
@@ -1010,6 +1011,32 @@ export const CoreConsole: React.FC<Props> = ({
         className="cc-rail absolute left-4 top-1/2 z-40 -translate-y-1/2"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* THE VIEW SEALS — the four console views, top of the rail (R101.1):
+            the active seal burns in the tab accent, the Bin wears its badge */}
+        {TABS.map((t) => {
+          const binCount = t.id === 'bin' ? (state.binRealities || []).length : 0;
+          return (
+            <span key={t.id} className="relative inline-flex">
+              <ThinkingCloudTooltip
+                onClick={() => setTab(t.id)}
+                icon={t.icon}
+                active={tab === t.id}
+                label={t.label}
+                subtitle={t.sub}
+                hint={tab === t.id ? 'Current view' : 'Switch view'}
+                position="right"
+                size="sm"
+                id={`cc-tab-${t.id}`}
+              />
+              {binCount > 0 && (
+                <span className="absolute -top-1 -right-1 z-10 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center pointer-events-none shadow-[0_0_10px_rgba(251,113,133,0.6)]">
+                  {binCount}
+                </span>
+              )}
+            </span>
+          );
+        })}
+        <span className="cc-rail-sep" aria-hidden="true" />
         {/* TWIN JUMP — always visible even when the twin card rests
             below the fold: one click lands on the Native Simulator Twin */}
         <ThinkingCloudTooltip
@@ -1102,7 +1129,7 @@ export const CoreConsole: React.FC<Props> = ({
 
       {/* THE FLOATING DECK — a slim bar and cards resting directly on the night */}
       <div
-        className="relative h-full flex flex-col pl-20 pr-4 sm:pr-8 lg:pr-12 pt-3 pb-3"
+        className="relative h-full flex flex-col pl-20 pr-4 sm:pr-8 lg:pr-12 pt-3 pb-4"
         onClick={(e) => e.stopPropagation()}
       >
 
@@ -1511,36 +1538,6 @@ export const CoreConsole: React.FC<Props> = ({
           )}
           </AnimatePresence>
         </div>
-
-        {/* THE PILL BAR — the view dock floating at the bottom of the deck
-            (the screenshot's Living-Room dock). The active pill reads the
-            tab accent through [data-active]; the Bin wears its live badge. */}
-        <nav className="shrink-0 self-center pt-3" aria-label="Console views">
-          <div className="cc-pillbar">
-            {TABS.map((t) => {
-              const binCount = t.id === 'bin' ? (state.binRealities || []).length : 0;
-              return (
-                <button
-                  key={t.id}
-                  id={`cc-tab-${t.id}`}
-                  data-active={tab === t.id}
-                  onClick={() => setTab(t.id)}
-                  title={t.sub}
-                  aria-label={t.label}
-                  className="cc-pill"
-                >
-                  {t.icon}
-                  <span className="hidden sm:inline">{t.pill}</span>
-                  {binCount > 0 && (
-                    <span className="absolute -top-1 -right-1 z-10 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center pointer-events-none shadow-[0_0_10px_rgba(251,113,133,0.6)]">
-                      {binCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </nav>
       </div>
 
       <CreateRealityModal

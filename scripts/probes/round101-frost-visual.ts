@@ -60,10 +60,29 @@ async function main() {
     await page.waitForSelector('.cc-root', { timeout: 30_000 });
     await page.waitForTimeout(2_500); /* deck entrance + stagger settle */
 
-    /* every pill-bar view */
+    /* every rail view — wait for THE VIEW'S OWN content to be mounted AND
+       fully entered (opacity 1) before capturing. innerHTML length alone
+       lies: the exiting view's content satisfies it mid-swap. Each view
+       carries a marker string only it renders. */
+    const MARKERS: Record<string, string> = {
+      dashboard: 'Multiverse Radar Scan',
+      realities: 'All Parallel Realities',
+      hierarchy: 'Reality Branches',
+      bin: 'QUANTUM RECYCLE BIN',
+    };
     for (const tab of ['dashboard', 'realities', 'hierarchy', 'bin']) {
       await page.click(`#cc-tab-${tab}`);
-      await page.waitForTimeout(1_400);
+      await page.waitForFunction(
+        (marker: string) => {
+          const sc = document.querySelector('.cc-root .overflow-y-auto');
+          if (!sc?.textContent?.includes(marker)) return false;
+          const el = sc.firstElementChild as HTMLElement | null;
+          return !!el && getComputedStyle(el).opacity === '1';
+        },
+        MARKERS[tab],
+        { timeout: 15_000 },
+      );
+      await page.waitForTimeout(600);
       await page.screenshot({ path: path.join(OUT, `frost-${tab}.png`) });
       console.log(`captured frost-${tab}.png`);
     }

@@ -390,6 +390,18 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   re-captured green. Scope lines: HUD + hover cards + Command Palette untouched (HoloCard
   CSS is gauntlet-pinned); ScenicBackdrop untouched (it is what the frost blurs); zero new
   deps, zero engine/physics/state changes.
+  **R101.1 (same day, the author's follow-on):** THE RAIL ABSORBS THE DOCK — the four view
+  tabs left the bottom pill bar and joined the tools on the left rail (one unified frost
+  column: view seals on top with the active seal burning in the tab accent + the Bin badge,
+  separators, then Twin Jump / Studio / Forge / Close); the dock and its `.cc-pillbar`/
+  `.cc-pill` CSS deleted together (deadCss law); the rail's entrance keyframe re-scoped to
+  an X-slide (`ccRailIn`) because the rail centers via Tailwind v4's `translate` property,
+  which composes with `transform`. The probe was caught lying — its `innerHTML > 3000`
+  readiness check was satisfied by the EXITING view mid-swap, producing two visually-empty
+  captures while an instrumented run proved the DOM always held the content at opacity 1 —
+  and now waits for each view's unique marker text plus computed opacity 1 before
+  screenshotting. Receipts: full verify ALL GREEN (histL1 0.0725, zero console errors),
+  audit clean, all seven captures re-taken green under the honest wait.
   `docs/ROUND-101-THE-FROST-DECK-2026-10-03.md`
 - **R96 (this round, on branch `r96-the-tidy-house`):** the author's verdict on
   the tree — "the frontend looks genuinely good, but the backend is total mess"
