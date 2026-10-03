@@ -1,3 +1,21 @@
+# THE DESKTOP PIPELINE — REBORN in R104 alongside the shell it builds.
+#
+# Three jobs, one ritual:
+#   build   — the installers (Windows NSIS, Linux deb+AppImage), signed when
+#             the updater signing secret exists, unsigned (dormant updater)
+#             when it doesn't. The C++ core is welded in by build.rs (cc
+#             crate) — MSVC is preinstalled on windows-latest, GCC on ubuntu.
+#   wasm    — R89's everywhere-core: the same C++ physics compiled to
+#             WebAssembly, committed back to the tree on main pushes and
+#             attached to every v* release.
+#   release — on a v* tag only: collects the installers + the WASM artifact,
+#             generates latest.json (what every installed app polls for
+#             updates), and publishes the GitHub Release.
+#
+# The dist the desktop bundles must also boot as a plain prod page — the
+# v15.0.0 black screen was a prod-only chunk-order TDZ that every dev-mode
+# gate missed; the Linux leg runs the prod smoke as the guard.
+
 name: Desktop Build (Linux + Windows)
 
 on:
@@ -44,7 +62,7 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # Linux: Tauri v2 system dependencies (WebKitGTK etc.)
+      # Tauri v2 system dependencies for the Linux build (WebKitGTK etc.).
       # ubuntu-latest is 24.04 (noble) — libappindicator3 was replaced by the
       # ayatana variant there; installing BOTH names breaks apt with
       # "libayatana-appindicator3-1 : Conflicts: libappindicator3-1".
@@ -70,8 +88,9 @@ jobs:
             echo "::warning::TAURI_SIGNING_PRIVATE_KEY secret not found on this repo — building UNSIGNED; the auto-updater stays dormant until the repository secret exists."
           fi
 
-      # The C++ core is compiled into the Tauri binary by build.rs (cc crate);
-      # MSVC is preinstalled on windows-latest, GCC on ubuntu-latest.
+      # The signed build passes the updater overlay (createUpdaterArtifacts);
+      # the GPU-first window configuration lives in the committed
+      # tauri.conf.json — the installer is born with it either way.
       - name: Build desktop app signed (updater artifacts included)
         if: steps.signing.outputs.present == 'true'
         env:
@@ -83,9 +102,8 @@ jobs:
         if: steps.signing.outputs.present != 'true'
         run: echo "No TAURI_SIGNING_PRIVATE_KEY secret — building unsigned; the auto-updater stays dormant until the secret is added." && npm run desktop:build -- ${{ matrix.targets }}
 
-      # The dist the desktop bundles must also boot as a plain prod page —
-      # the v15.0.0 black screen was a prod-only chunk-order TDZ that every
-      # dev-mode gate missed.
+      # The bundled dist must boot exactly as a plain prod page — this gate
+      # exists because dev-mode checks could never see prod-only breaks.
       - name: Production web smoke (bundled dist must boot)
         if: runner.os == 'Linux'
         run: npx playwright install --with-deps chromium && npm run prod:smoke
@@ -143,8 +161,8 @@ jobs:
           git commit -m "chore(wasm): rebuild the C++ core artifact [skip ci]"
           git push
 
-  # Publishes the built installers as a GitHub Release when a v* tag is pushed.
-  # Pull-request and plain-push runs stop after the build matrix above.
+  # Publishes the built installers as a GitHub Release when a v* tag is
+  # pushed. Pull-request and plain-push runs stop after the build matrix.
   release:
     needs: [build, wasm]
     if: startsWith(github.ref, 'refs/tags/v')

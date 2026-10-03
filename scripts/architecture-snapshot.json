@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-03T19:08:24.607Z",
+  "generatedAt": "2026-10-03T19:29:17.123Z",
   "fileCount": 177,
   "deadExports": [
     {
@@ -719,7 +719,7 @@
     "scripts/smoke.ts": 325,
     "scripts/tools/generate-architecture-diagram.ts": 207,
     "scripts/tools/make-icons.mjs": 406,
-    "scripts/tools/make-latest-json.mjs": 86,
+    "scripts/tools/make-latest-json.mjs": 100,
     "server/index.ts": 103,
     "server/paths.ts": 35,
     "server/realityDaemon.ts": 463,
