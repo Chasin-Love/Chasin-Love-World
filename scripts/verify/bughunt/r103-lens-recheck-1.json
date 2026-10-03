@@ -1,0 +1,36 @@
+{
+ "focusId": null,
+ "zoomT": 0.25958767181506426,
+ "tZoomT": 0.26,
+ "distToHole": 318.4191720544218,
+ "lensCur": 1,
+ "lensTarget": 1,
+ "uLensCount": 8,
+ "uLensBend": 1,
+ "holeId": "eventide",
+ "holeRadius": 2.6,
+ "geodesic": false,
+ "quadVisible": false,
+ "uTime": 0,
+ "uCamPos": [
+  0,
+  0,
+  0
+ ],
+ "uCenter": [
+  0,
+  0,
+  0
+ ],
+ "uRs": 0.8,
+ "uScale": 2.015,
+ "uCriticalB": 0,
+ "uDiskBright": 5,
+ "uLensing": 2.4,
+ "bh": {
+  "stoodDown": false,
+  "disabled": false,
+  "flaps": 0
+ },
+ "frame": 1056
+}

@@ -7,7 +7,7 @@ Regrouped in R96 (chronological flatness → purpose).
 | Resident | Count | What it is |
 | :-- | :-- | :-- |
 | `gauntlets/` | 19 | Per-round regression gates (R16 → R95). Each asserts source-level invariants of one round — mostly `readFileSync` + assertions on `src/` text, some pure math. **All 19 run inside `npm run verify`.** |
-| `probes/` | 4 | Standalone diagnostics, run by hand when hunting. **NOT in the verify chain.** |
+| `probes/` | 9 | Standalone diagnostics, run by hand when hunting. **NOT in the verify chain.** |
 | `tools/` | 5 | Build & release machinery: the WASM core, icons, updater manifest, architecture diagram, Windows toolchain. |
 | top level | 4 + 1 | `audit-architecture.ts` (+ its frozen `architecture-snapshot.json`), `smoke.ts`, `prod-smoke.ts`, and `verify/` (the golden frames those gates compare against). |
 
@@ -75,6 +75,11 @@ against `architecture-snapshot.json` (exit 1 on drift).
 - `round92-live-check.ts` — Playwright live receipt (nine PASSes incl. the session stepping under a live sky); writes `verify/r92-*.png` (cwd-relative — run from the repo root).
 - `round95-physics-probe.ts` — THE honest probe: drives the real `driverTick` headlessly (argv[2] = sim-days, default 400). Regexes can't tell you an integrator is stable; this can.
 - `round95-steady-sky-live.ts` — three real minutes in headless Chromium over `window.__ENGINE__`.
+- `round101-frost-visual.ts` — the frost-deck visual receipt (Ctrl+K drive, four views, hover clouds); writes `verify/frost/*.png`.
+- `round102-independence-probe.ts` — the R102 mutation proof: physically stashes `src/realities/solPrime`, boots empty-multiverse, restores; writes `verify/independence/`.
+- `round103-bughunt-probe.ts` — the instrumented Kamui-cycle receipt: rAF gap recorder + tier-event tap + 100 ms timeline sampler; asserts the R103 WALL-CLOCK law (eject/summon complete in real seconds) and the lens witness; `R103_GPU=1` pins headless Chromium onto the real adapter; writes `verify/bughunt/`.
+- `round103-gpu-lens-probe.ts` — is the geodesic tier alive on the real GPU? renderer string, live raymarch uniforms, settled capture.
+- `round103-lens-recheck.ts` — the smoke-exact drive with sequential settled shots (mid-flight screenshot artifact excluder).
 
 **tools/ (build & release)**
 - `build-wasm.sh` — emscripten build of `src/platform/native/cosmos_engine.cpp` → `public/wasm/`; pins the full bridge export surface + HEAPF64 (their absence once silently degraded the whole WASM tier to TypeScript).
@@ -86,3 +91,4 @@ against `architecture-snapshot.json` (exit 1 on drift).
 **verify/ (golden assets)**
 - `reference-hole.png` + `reference-metrics.json` — the smoke gate's reference frame.
 - `r63-probe.png`, `r92-1/2/3-*.png` — probe receipts, re-captured by hand.
+- `frost/`, `independence/`, `bughunt/` — the R101/R102/R103 probe capture sets (receipts, re-taken by probe runs).

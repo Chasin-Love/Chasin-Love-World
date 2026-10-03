@@ -1,0 +1,26 @@
+{
+ "gpu": "ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+ "geodesic": true,
+ "quadVisible": true,
+ "uTime": 3.67,
+ "uCamPos": [
+  55,
+  51,
+  70
+ ],
+ "uCenter": [
+  -249,
+  16,
+  -11
+ ],
+ "uCriticalB": 4.497,
+ "bh": {
+  "stoodDown": false,
+  "disabled": false,
+  "flaps": 0,
+  "count": 5
+ },
+ "uLensCount": 8,
+ "uLensBend": 1,
+ "focusId": null
+}

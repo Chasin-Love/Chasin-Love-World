@@ -15,6 +15,10 @@ import { setCameraMemory, type CameraMemory } from '../cameraMemory';
 import type { CameraRig } from '../cameraRig';
 import type { RuntimeBody, UniverseEngine } from '../engine';
 
+/* R103 — the witness latch: the non-geodesic attach names itself ONCE per
+   session, not once per hole (a reality can carry several). */
+let nonGeodesicWitnessed = false;
+
 export class BlackHoleSystem {
   constructor(private eng: UniverseEngine) {}
 
@@ -65,7 +69,26 @@ export class BlackHoleSystem {
     container.add(visual.group);
     this.blackHoles.push(visual);
     if (geodesic) setRaymarchStatus(override === 'on' ? 'forced' : 'active', 'attached');
-    else setRaymarchStatus('off', override === 'off' ? 'override-off' : 'tier-low');
+    else {
+      const reason = override === 'off' ? 'override-off' : 'tier-low';
+      setRaymarchStatus('off', reason);
+      /* R103 — THE WITNESS (the R98 law: degradation is a VALUE, never a
+         shrug). Without the geodesic tier the hole renders as a bare pit and
+         the spacetime-bending look is simply GONE — the author's "the lens
+         disappeared on localhost". Until now only the Black Hole Studio card
+         could say so; a traveler staring at the pit had no sentence naming
+         why. Name it once per session, with the way back. */
+      if (!nonGeodesicWitnessed) {
+        nonGeodesicWitnessed = true;
+        console.warn(
+          `[universe] the geodesic black-hole tier is NOT live (${reason === 'override-off'
+            ? 'the Studio switch is OFF — my-universe:blackhole:tier:v1'
+            : 'the GPU probed as low-power or software-rendered'
+          }) — the lensed Eventide look is off this session. ` +
+          `The Black Hole Studio tier switch can force it ('on'); the dome's sky-bend is unaffected.`,
+        );
+      }
+    }
     return visual;
   }
 

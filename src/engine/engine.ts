@@ -1952,7 +1952,24 @@ export class UniverseEngine {
       this.clock.getDelta();
       return;
     }
-    const dt = Math.min(0.05, this.clock.getDelta());
+    /* R103 — ONE FRAME, TWO CLOCKS. `dt` (capped 50 ms) keeps the physics and
+       the camera gentle — an integrator must never see a 0.4 s step. But the
+       KAMUI is theater scored against its own voice (R82: the summon speaks
+       5.0 s + 1.0 s gulp, the eject 1.9 s — synthesized on the AudioContext
+       WALL clock). Feeding the choreography the capped dt made the timeline
+       frame-paced: on any heavy stretch (the geodesic march's fill-rate on an
+       iGPU, a big overlay mount) each frame could only pay 50 ms of story, so
+       the 1.9 s eject crawled for many wall seconds while its voice finished
+       on schedule — the author's "the reverse Kamui sticks at the last
+       second, the screen freezes, the audio is always right" (measured on a
+       slow pipeline: 19.7 s wall for the 1.9 s eject). The jutsu now rides
+       the wall: a stalling frame makes the curve JUMP to the moment the voice
+       already reached, never stretch — the smooth, uninterrupted parabola of
+       the design. A wide 0.5 s sanity cap keeps a hidden-tab resume from
+       teleporting whole choreographies. */
+    const rawDt = this.clock.getDelta();
+    const wallDt = Math.min(0.5, rawDt);
+    const dt = Math.min(0.05, rawDt);
     this.clockT += dt;
     /* R94 — the galaxy scope is re-decided every frame by updateLevels
        (below); clear it here so a camera that left the realm stops wanting it. */
@@ -1979,11 +1996,13 @@ export class UniverseEngine {
 
     /* KAMUI + PORTAL (R97) — the beat envelopes, the summon hold, the staged
        stage-warp and the portal phases live in kamui/KamuiPortalSystem; these
-       four calls hold the exact per-frame order the monolith ran. */
-    this.kamuiPortal.updateKamuiBeats(dt);
-    this.kamuiPortal.updatePortalHold(dt);
-    this.kamuiPortal.updateStageWarp(dt);
-    this.kamuiPortal.updatePortalPhases(dt);
+       four calls hold the exact per-frame order the monolith ran.
+       R103 — they ride wallDt (the wall clock), not the physics-capped dt:
+       the choreography is scored with the voice, real seconds only. */
+    this.kamuiPortal.updateKamuiBeats(wallDt);
+    this.kamuiPortal.updatePortalHold(wallDt);
+    this.kamuiPortal.updateStageWarp(wallDt);
+    this.kamuiPortal.updatePortalPhases(wallDt);
 
     const targetFov = 50 - this.coreT * 4;
     this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, dt * 4);
@@ -2222,7 +2241,7 @@ export class UniverseEngine {
       focusMax,
     });
 this.updateBodies(dt);
-    this.applyKamuiFrame(dt);
+    this.applyKamuiFrame(wallDt); /* R103 — the theater rides the wall clock (see the two-clock note above) */
     /* R92 decree law: while the driver owns the sky, Living Gravity's
        osculating-element writer stands down — the session IS the living
        gravity now (mutual, real, the vault at its full 10 M☉). The toggle

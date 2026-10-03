@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-10-03, after R102 (the independent realities).
+> **Last updated:** 2026-10-03, after R103 (the wall-clock jutsu).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -501,6 +501,51 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   carries the remainder (the boot snap + gauntlet reconciliations + captures).
   The tree is the truth and it verifies green.
   `docs/ROUND-102-THE-INDEPENDENT-REALITIES-2026-10-03.md`
+- **R103 (this round, on branch `r103-the-wall-clock-jutsu`):** THE WALL-CLOCK
+  JUTSU — the author's two complaints: the spacetime bending around the black
+  hole missing on localhost, and the reverse Kamui sticking at its last second
+  while the audio always plays right. INVESTIGATED WITH INSTRUMENTS (the R98
+  law), one root found and fixed, one myth retired by GPU truth. THE BUG
+  (measured, not guessed): the Kamui choreography ran on the physics-capped dt
+  (≤ 50 ms per frame — the initial-commit clamp), so under any slow rendering
+  stretch the 1.9 s eject took **19.7 measured wall seconds** (a 2 fps
+  software-GL pipeline; the author's iGPU dev sessions hit the same wall
+  whenever the geodesic march + portal pass stack up) while the R82 voice —
+  synthesized on the AudioContext WALL clock — finished on schedule. The
+  repair is the TWO-CLOCK TICK: `rawDt` → `wallDt = min(0.5, rawDt)` drives
+  the four choreography updates and `applyKamuiFrame` (the theater now tracks
+  real seconds, resuming at the point of its curve the voice already reached —
+  the author's smooth-parabola uninterrupted return), while physics, the rig,
+  the session driver and every relaxation keep the capped dt. Post-fix
+  measurements: eject 1.64 s wall and summon 5.02 s wall **on the author's own
+  Intel/D3D11 silicon**, 19.7 → 4.94 s on the tar-pit pipeline; zero console
+  errors; the R77 "dead click after a reverse" window is now wall-bounded.
+  THE LENS, ACQUITTED: on the real GPU the geodesic tier attaches, uniforms
+  are driven (`uCriticalB` 4.497), the dome's capture shadow + well render
+  even in software, and the lensed disk shows in capture; the author's
+  missing-lens is a STATE (software-GL session / Studio tier `off` / quality
+  `low`), not a regression — and it now SPEAKS: a once-per-session console
+  witness names `tier-low`/`override-off` with the remedy (BlackHoleSystem).
+   HARNESS REPAIR, measured-first: the smoke's 40 s camera-settle window lies
+   below the rig's wall-clock asymptote under software GL (measured worst 51 s
+   on a quiet machine; nothing in the tick's easing changed) —
+   `SETTLE_TIMEOUT_MS` → 150 s with the rationale recorded, PLUS the §9-
+   recommended boot-retry guard (a red carrying the cold-boot signature gets
+   ONE fresh retry on a rebooted server; a red without it fails at once).
+   DISCOVERY QUEUED TO THE AUTHOR (not
+  acted on): the R20/53 55 ms breaker is unreachable BY CONSTRUCTION — the
+  guard averages the same capped dt, and 0.05 < 0.055 can never trip; re-arming
+  it would auto-hide the lens on slow machines (the opposite of this round's
+  purpose), so the call is the author's (round doc §7). Receipts: typecheck
+  clean; round17/18/63/72 head gauntlets green (pinned bodies byte-untouched —
+  only call-site arguments moved); bug probe ALL GREEN on the real GPU, 4/5→green
+   on SwiftShader with the witness firing; standalone smoke GREEN
+   (histL1 0.0681 vs 0.12, zero console errors); **full verify exit 0 on the
+   final tree** (21 gauntlets, smoke green first attempt, prod smoke green;
+   two mid-session in-chain reds were the documented cold-boot race, the new
+   retry guard reporting honestly);
+   `audit:arch --check` clean with in-commit snapshot refresh (three new probe
+   instruments absorbed). `docs/ROUND-103-THE-WALL-CLOCK-JUTSU-2026-10-03.md`
   the tree — "the frontend looks genuinely good, but the backend is total mess"
   — audited and answered. THE AUDIT: there is no backend (offline-first is the
   law); the Rust shell is 1,715 lines / 31 commands / six documented files;
@@ -1034,6 +1079,15 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    (a failed boot can leave its own port debris behind). It has recurred
    enough: the boot-retry guard in `scripts/smoke.ts` is now the recommended
    tiny round.
+   **R103 addendum (RESOLVED):** the flake's settle sibling is closed — the
+   rig eases on the capped dt, so under software GL the focus flight's wall
+   clock ran past the smoke's 40 s window (measured worst 51 s on a quiet
+   machine); `SETTLE_TIMEOUT_MS` is now 150 s with the rationale inline.
+   **R103 discovery, awaiting the author's call:** the R20/53 55 ms geodesic
+   breaker can never trip (it averages the capped `dt`; 0.05 < 0.055) — dead
+   since inception, gauntlet-pinned in form. Re-arming it on wall dt would
+   auto-hide the lens on slow machines — the reverse of R103's purpose —
+   so it stands as-is until the author rules (re-arm vs retire with honors).
 
 ---
 

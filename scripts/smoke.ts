@@ -38,7 +38,13 @@ const MAX_HIST_L1 = 0.12;        // 16-bin luminance histogram L1 distance
 const MAX_SHADOW_DELTA = 0.08;   // central shadow luminance band vs reference
 const MAX_MEAN_DELTA = 0.04;     // whole-frame luminance band vs reference
 const MAX_BRIGHT_DELTA = 0.06;   // central bright-pixel fraction (the white band) vs reference
-const SETTLE_TIMEOUT_MS = 40_000;
+/* R103 — measured rationale: the rig eases on the physics-capped dt (50 ms per
+   RENDERED frame), so on a software-GL pipeline (~2 fps headless) the focus
+   flight converges in wall-clock asymptote — measured 51 s worst case on the
+   author's laptop on a quiet machine (this bound was hit at 40 s twice while
+   the standalone re-run was green). 150 s ≈ 3× the measured worst; the gate
+   gates the FRAME, never the speed of slow hardware. */
+const SETTLE_TIMEOUT_MS = 150_000;
 
 interface FrameMetrics { mae: number; shadow: number; mean: number; bright: number }
 
@@ -263,13 +269,16 @@ async function main(): Promise<void> {
     if (errors.length) {
       console.error(`\n● SMOKE RED — ${errors.length} problem(s):`);
       for (const e of errors.slice(0, 20)) console.error('  ' + e);
+      failureText = errors.join(' | ');
       process.exitCode = 1;
     } else if (ok) {
       console.log('\n● SMOKE GREEN — clean boot, zero console errors, reference frame matches');
     }
   } catch (err) {
-    console.error('\n● SMOKE RED —', err instanceof Error ? err.message : String(err));
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('\n● SMOKE RED —', msg);
     if (errors.length) console.error(errors.slice(0, 20).map((e) => '  ' + e).join('\n'));
+    failureText = `${msg}${errors.length ? ' | ' + errors.join(' | ') : ''}`;
     process.exitCode = 1;
   } finally {
     await browser.close();
@@ -277,4 +286,39 @@ async function main(): Promise<void> {
   }
 }
 
-main();
+/* R103 — THE BOOT-RETRY GUARD (the §9 watch item, taken). The cold-boot flake
+   has SIX sightings (R84 diagnosis, R96, R97 close-out, R99 ×2, R103 ×2): the
+   page boots before the dev server's HMR socket finishes binding, yielding
+   ERR_CONNECTION_REFUSED storms / "Execution context was destroyed"
+   (mid-boot navigation) / a never-settled flight on a degraded first attempt —
+   always with code byte-identical between red and green runs. One fresh retry
+   against a REBOOTED server clears it by construction. A failure WITHOUT the
+   flake signature still fails in one attempt, as it always has. */
+let failureText = '';
+const FLAKE_SIGNATURES = [
+  'Execution context was destroyed',
+  'ERR_CONNECTION_REFUSED',
+  'WebSocket',
+  'did not become healthy',
+  'never settled within',
+];
+
+async function mainWithRetry(): Promise<void> {
+  const captureMode = process.argv.includes('--capture'); /* a capture writes the reference — never "retried" */
+  const attempts = captureMode ? 1 : 2;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    process.exitCode = 0;
+    failureText = '';
+    await main();
+    if (process.exitCode !== 1) return;
+    const flake = FLAKE_SIGNATURES.some((s) => failureText.includes(s));
+    if (!flake || attempt === attempts) return;
+    console.warn('\n…SMOKE FLAKE SIGNATURE (documented boot-race family) — one fresh retry on a rebooted server…');
+    /* the killed server can still answer /api/health while its port drains —
+       give the OS a beat to close it or the "fresh" attempt attaches to a
+       dying process and reloads mid-boot (the flake feeding itself) */
+    await new Promise((r) => setTimeout(r, 5_000));
+  }
+}
+
+mainWithRetry();
