@@ -1,14 +1,146 @@
-| Folder | What it is | Can you touch it? |
-| --- | --- | --- |
-| .git | Git's database — your entire version history. | Never edit. |
-| .github | CI recipe — typecheck + desktop installers on every push. | Edit when changing builds. |
-| .zcode | Local AI-tooling session data (leftover plans). Untracked. | Safe to delete. |
-| .freebuff | External dev-tool state. Untracked from git (R52). | Safe to delete. |
-| dist | Compiled output of npm run build. Regenerable, safe to delete. | Regenerable. |
-| docs | ARCHITECTURE.md — the authoritative architecture record. ROUND-*.md are per-round build reports. verify/ holds the bundle baseline. | Read/reference. |
-| node_modules | Installed npm dependencies. | Regenerable (npm install). |
-| public | Static assets served as-is: the vendored Python runtime (pyodide/) and fonts (fonts/). | Keep — this is your offline capability. |
-| scripts | The housekeepers (R96): gauntlets/ (19 per-round regression gates — ALL run in npm run verify), probes/ (4 hand-run diagnostics), tools/ (WASM core, icons, updater manifest, diagram), and the top-level gates: audit-architecture.ts + its frozen snapshot, smoke.ts, prod-smoke.ts, verify/ (golden frames). See scripts/README.md. | Run via npm run verify / audit:arch. |
-| server | The Node side: dev server, reality folder API, disk daemon. Desktop replaces it natively. | Source — editable. |
-| src | The app itself: React UI, the 3D engine, physics, realities, encrypted vault, everything you see on screen. | Source — editable. |
-| src-tauri | The desktop shell: Rust commands, app config, icons — and where the C++ core gets compiled into the binary. | Source — editable. |
+NOTE.TXT — WHAT IS WHAT (the author's quick-reference guide)
+Last updated: 2026-10-04, after R104 (the desktop rebirth). Keep this honest.
+
+=================================================================================
+PART 1 — THE ONE IDEA THAT EXPLAINS THE WHOLE REPO
+=================================================================================
+
+This repo is ONE app with TWO delivery vehicles:
+
+    src/            = THE APP ITSELF. ~90% of the product: the React UI, the 3D
+                      engine, the physics, the realities, the encrypted vault,
+                      the state. Everything you see and touch on screen.
+                      Both the website AND the desktop app run THIS folder.
+
+    server/         = the WEBSITE's backend arm. A browser tab is not allowed
+                      to touch your disk by itself, so in browser mode this
+                      Express server does the file operations (reality folders,
+                      sky photos) and hands them to the app over HTTP.
+
+    src-tauri/      = the DESKTOP's backend arm + the shell. The Rust layer can
+                      touch the disk natively, so it does the same jobs as
+                      server/ through 31 commands — no HTTP, no server — plus
+                      it owns the window, the webview, the icons, the updater,
+                      and the C++ physics core welded into the exe (R100).
+
+SO: "is src-tauri the actual backend?" — YES, for the desktop it IS (your
+instinct was right). And server/ is the backend for the website. There is no
+single central backend and never will be: the app is offline-first, the client
+owns all truth, zero cloud (PROJECT-DESCRIPTION.md says it verbatim:
+"Zero backend, zero cloud — the client owns all truth"). The word "backend"
+here only ever means "the native arm that does what a browser can't."
+
+Who shares what: src-tauri does NOT copy the app — it WRAPS it. The desktop
+window loads the same src/ code (bundled into dist/), and only the file
+operations + physics cross into native code. That is why deleting server/
+kills the website but not the desktop, and why src-tauri was rebuilt from zero
+in R104 without touching the website.
+
+=================================================================================
+PART 2 — WHO OWNS WHAT (website vs desktop)
+=================================================================================
+
+  FOLDER      WEBSITE                    DESKTOP
+  ----------  -------------------------  ----------------------------------------
+  src/        runs it                    runs it (same code, bundled)
+  public/     serves it                  bundled inside the installer
+              (pyodide = vault Python,   (so Python works offline there too;
+               wasm/ = browser physics,   wasm/ unused — desktop welds the C++
+               fonts/ = typography)       into the exe instead, R100)
+  server/     its dev host + file API    not used (Rust commands replace it)
+  src-tauri/  not used                   the shell + the desktop backend
+  scripts/    quality machinery for BOTH (gauntlets, probes, audit, smoke);
+              desktop-owned pieces inside it: make-latest-json.mjs (updater
+              manifest), setup-windows-toolchain.ps1 (MSVC installer),
+              make-icons.mjs (regenerates desktop icons AND the web favicon),
+              round104-desktop-perf-probe.ts (launches the exe and measures it)
+  .github/    desktop.yml builds the desktop installers on every push; the
+              wasm job builds the browser's physics
+
+Bottom line: nothing outside src-tauri/ is "part of the desktop app" except
+the CI pipeline and the updater tool — but public/ and src/ ride INSIDE the
+desktop app, because it is the same app.
+
+=================================================================================
+PART 3 — EVERY ROOT FILE, WHAT IT IS
+=================================================================================
+
+  FOLDERS
+  ------
+  .git            Git's database — your entire version history. Never edit.
+  .github         CI recipes. desktop.yml = build installers + releases;
+                  the wasm job = browser physics build. Edit when changing builds.
+  .zcode          ZCode (the AI tool) session data — leftover plans. Untracked.
+  .freebuff       External dev-tool state (a project-id file). Untracked (R52).
+  .vite           Vite's disposable cache (pre-bundled deps). Regenerates on
+                  npm run dev. Gitignored. Safe to delete.
+  dist            Compiled output of npm run build — what the website host
+                  serves AND what the desktop installer wraps. Regenerable.
+  docs            ARCHITECTURE.md (the architecture record) + ROUND-*.md
+                  (per-round reports) + research corpus. Read/reference.
+  node_modules    Installed npm dependencies. Regenerable (npm install).
+  public          Offline assets (see Part 2). Keep — this is the offline law.
+  scripts         The housekeepers: gauntlets/ (22 regression gates, ALL run in
+                  npm run verify), probes/ (11 hand-run diagnostics), tools/
+                  (wasm build, icons, updater manifest, diagram, toolchain),
+                  audit-architecture.ts + frozen snapshot, smoke.ts,
+                  prod-smoke.ts, verify/ (golden frames). See scripts/README.md.
+  server          The website's backend arm (see Part 1). Editable source.
+  src             THE APP ITSELF (see Part 1). Editable source.
+  src-tauri       The desktop's backend arm + shell (see Part 1). REBORN in
+                  R104 from zero, GPU-first. Editable source.
+
+  FILES
+  -----
+  index.html           The single HTML page everything mounts into. The app
+                       has no other pages — React swaps what's on screen.
+  package.json         The dependency LIST + the npm commands (dev, build,
+                       verify, desktop:build...). Human-edited.
+  package-lock.json    The EXACT pinned versions of every dependency, so every
+                       install on every machine is identical. Auto-generated —
+                       never hand-edit, always commit it.
+  tsconfig.json        TypeScript's compiler rules — strict mode, where types
+                       live. This is why `npm run typecheck` is the type law.
+  vite.config.js       The BUNDLER's recipe (Vite): dev server on :3000, how
+                       the app is compiled into dist/, chunk splitting.
+                       (.vite/ is its cache — see folders above.)
+  .gitignore           Files git must never track (caches, secrets, .env).
+  .zcodeignore         The SAME idea but for the ZCode AI tool: which folders
+                       the assistant should ignore when reading/searching the
+                       repo. Top block syncs from .gitignore; the rest is the
+                       tool's defaults. Harmless to keep.
+  AGENTS.md            The 10-second law sheet ANY AI must read before touching
+                       anything (read PROJECT-BRAIN, the laws, verify first).
+  PROJECT-BRAIN.md     THE FULL BRAIN: identity, laws, current state, roadmap,
+                       glossary, traps. The deep instruction file for AI —
+                       AGENTS.md is its short front door.
+  PROJECT-DESCRIPTION.md  The short description of the project, ready to paste
+                       ("Your life, as a universe" + elevator pitch + the
+                       technical 20-second version). Quote it verbatim.
+  README.md            THE RESURRECTION BLUEPRINT (235 KB): everything needed
+                       to rebuild the universe from this repo alone — seeds,
+                       palettes, orbits, ALL shader code verbatim.
+  DEPLOY.md            THE SHIPPING MANUAL: how to put the website on a free
+                       host (Cloudflare Pages, click by click), how to run the
+                       Node web server, and how desktop releases go out
+                       (push a v* tag → CI builds installers → GitHub Release).
+  THIRD-PARTY-NOTICES.md  Legal credits for code we use: the black hole
+                       renderer is a verbatim port of dgreenheck/webgpu-black-
+                       hole (MIT), plus font licenses. Never delete — it is
+                       the honest "this part came from the internet" file.
+  note.txt             This file.
+
+=================================================================================
+PART 4 — WHAT DIED AND WHAT WAS BORN IN R104 (the desktop rebirth)
+=================================================================================
+
+The old desktop app was horrible because its shell launched the webview with
+ZERO GPU configuration — it silently fell to software rendering (~2.9 fps).
+R104 deleted src-tauri/ ENTIRELY and rebuilt every file from zero, GPU-first
+(the webview is forced onto the real GPU through ANGLE D3D11). The two desktop
+infrastructure files outside it (desktop.yml, make-latest-json.mjs) were also
+reborn. Proof: the installed app now renders on the real Intel GPU, the black-
+hole lens attaches, and the desktop beats the browser pipeline ~6× on the same
+machine. The boot witness line in the console names the GPU every launch —
+if it ever says "SwiftShader" or "software", that is the sound of the bug
+returning. See docs/ROUND-104-THE-DESKTOP-REBIRTH-2026-10-03.md.

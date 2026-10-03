@@ -1,19 +1,25 @@
-//! FFI surface to the C++ simulation core (src/platform/native/cosmos_engine.cpp).
+//! The Rust side of the C++ simulation core's FFI — REBORN in R104, derived
+//! directly from `src/platform/native/cosmos_engine.hpp` (the header IS the
+//! contract: every declaration below mirrors an `extern "C"` export there,
+//! parameter for parameter; `physicsEngine.ts` stays the TS reference the C++
+//! must stay numerically identical to).
 //!
-//! Two compile modes (set by build.rs):
-//! - `cosmos_cpp`: the real C++ core is compiled into the binary via cc and
-//!   the extern declarations below link against it.
-//! - `cosmos_stub`: no C++ compiler was available (bare `cargo check` host);
-//!   Rust-side stubs keep the crate type-correct. A binary built this way
-//!   reports `backend: "stub"` and never claims native physics.
+//! Two compile modes, decided by build.rs:
+//! - `cosmos_cpp` — build.rs found a C++ toolchain and welded
+//!   `cosmos_engine.cpp` into this binary via the `cc` crate; the extern
+//!   declarations below link against it directly (no dlopen, ever).
+//! - `cosmos_stub` — no toolchain (a bare `cargo check` host): the stub
+//!   module keeps the crate type-correct. A binary built this way reports
+//!   `backend: "stub"` through `cosmos_status` and never claims native
+//!   physics — degradation is a value, never a shrug.
 
 #![allow(dead_code)]
 
 #[allow(unused_imports)]
 use std::ffi::{c_char, c_double, c_int};
 
-/// Body kind encoding — must mirror COSMOS_KIND_* in cosmos_engine.hpp and
-/// the `kind` mapping in cpp_bridge.ts.
+/// Body-kind encoding, fixed by `COSMOS_KIND_*` in cosmos_engine.hpp and
+/// mirrored by the `kind` mapping in src/platform/native/cpp_bridge.ts.
 pub const KIND_STAR: i32 = 0;
 pub const KIND_PLANET: i32 = 1;
 pub const KIND_DWARF: i32 = 2;
@@ -21,14 +27,23 @@ pub const KIND_NEBULA: i32 = 3;
 pub const KIND_HOLE: i32 = 4;
 pub const KIND_VAULT: i32 = 5;
 
+/// Telemetry fields per body from `cosmos_physics_batch` — fixed by
+/// `COSMOS_PHYSICS_FIELD_COUNT` in the header, mirroring BodyPhysicsData in
+/// src/physics/physicsEngine.ts in exact order.
 pub const PHYSICS_FIELD_COUNT: usize = 41;
 
+/* The real core — one `extern "C"` block per export family, in the order the
+   header declares them. */
 #[cfg(cosmos_cpp)]
 pub(crate) mod ffi {
     use std::ffi::{c_char, c_double, c_int, c_void};
 
     extern "C" {
+        /* Engine identity for honest telemetry (never hard-coded in JS). */
         pub fn cosmos_version() -> *const c_char;
+
+        /* Single-body Kepler solve — the port of calculateKeplerPosition.
+           `out` receives 5 written doubles: x, y, z, radius, trueAnomaly. */
         pub fn cosmos_orbit_position(
             a: c_double,
             eccentricity: c_double,
@@ -38,6 +53,11 @@ pub(crate) mod ffi {
             speed: c_double,
             out: *mut c_double,
         );
+
+        /* Batch Kepler positions for n bodies. node/arg_peri carry the R84
+           ascending-node elements; NULL or per-entry 0 means the historical
+           node-at-X plane. Outputs: out_xyz (3n), out_radius (n),
+           out_true_anomaly (n). */
         pub fn cosmos_kepler_batch(
             a: *const c_double,
             e: *const c_double,
@@ -52,6 +72,10 @@ pub(crate) mod ffi {
             out_radius: *mut c_double,
             out_true_anomaly: *mut c_double,
         );
+
+        /* Full astrophysics telemetry batch — the port of calculatePhysics.
+           ids are NUL-terminated body-id pointers for profile lookup; out is
+           n × PHYSICS_FIELD_COUNT doubles, row-major per body. */
         pub fn cosmos_physics_batch(
             ids: *const *const c_char,
             orbit_a: *const c_double,
@@ -64,11 +88,15 @@ pub(crate) mod ffi {
             sim_time_sec: c_double,
             out: *mut c_double,
         );
+
+        /* Terrain value-noise fbm — bit-exact port of cpuFbm. */
         pub fn cosmos_terrain_fbm(x: c_double, y: c_double) -> c_double;
+
+        /* RK4 ops/sec benchmark on an internal simulator instance. */
         pub fn cosmos_benchmark_rk4(n_bodies: c_int, iterations: c_int) -> c_double;
-        /* the handle-based N-body simulator + single-orbit helpers (v1 FFI,
-           exported from cosmos_engine.cpp; stubs mirror them for type-check
-           hosts without a C++ toolchain) */
+
+        /* The handle-based N-body session family (R87/R91): one live
+           simulator owned by the caller, RK4 inside, SI units throughout. */
         pub fn cosmos_create_simulator() -> *mut c_void;
         pub fn cosmos_destroy_simulator(handle: *mut c_void);
         pub fn cosmos_add_body(
@@ -86,9 +114,9 @@ pub(crate) mod ffi {
             out_pos: *mut c_double,
             out_vel: *mut c_double,
         );
-        /* R91 — batched session read (one call for every body):
-           out holds 6*count doubles row-major (px,py,pz,vx,vy,vz);
-           returns the number of bodies written (<= count). */
+        /* R91 — the batched session read: one call returns every body.
+           `out` holds 6 × count doubles row-major (px,py,pz,vx,vy,vz); the
+           return value is the number of bodies actually written (≤ count). */
         pub fn cosmos_get_body_states(
             handle: *mut c_void,
             count: u32,
@@ -98,6 +126,9 @@ pub(crate) mod ffi {
     }
 }
 
+/* The type-correct stand-in for toolchain-less hosts. Every stub answers the
+   same signature with the same zero-value semantics the real core would give
+   an empty universe — callers honor returned counts, never assumptions. */
 #[cfg(cosmos_stub)]
 pub(crate) mod ffi {
     use std::ffi::{c_char, c_double, c_int, c_void};
@@ -105,6 +136,7 @@ pub(crate) mod ffi {
     pub unsafe fn cosmos_version() -> *const c_char {
         b"stub\0".as_ptr() as *const c_char
     }
+
     pub unsafe fn cosmos_orbit_position(
         _a: c_double, _e: c_double, _phase: c_double, _incl: c_double,
         _days: c_double, _speed: c_double, out: *mut c_double,
@@ -114,6 +146,7 @@ pub(crate) mod ffi {
             *out.add(3) = 0.0; *out.add(4) = 0.0;
         }
     }
+
     pub unsafe fn cosmos_kepler_batch(
         _a: *const c_double, _e: *const c_double, _phase: *const c_double,
         _incl: *const c_double, _speed: *const c_double, n: c_int,
@@ -126,6 +159,7 @@ pub(crate) mod ffi {
         if !out_radius.is_null() { std::slice::from_raw_parts_mut(out_radius, n).fill(0.0); }
         if !out_anomaly.is_null() { std::slice::from_raw_parts_mut(out_anomaly, n).fill(0.0); }
     }
+
     pub unsafe fn cosmos_physics_batch(
         _ids: *const *const c_char, _a: *const c_double, _r: *const c_double,
         _k: *const c_int, _h: *const c_int, _p: *const c_double, _s: *const c_double,
@@ -134,8 +168,13 @@ pub(crate) mod ffi {
         let n = n.max(0) as usize;
         if !out.is_null() { std::slice::from_raw_parts_mut(out, n * 41).fill(0.0); }
     }
+
     pub unsafe fn cosmos_terrain_fbm(_x: c_double, _y: c_double) -> c_double { 0.0 }
     pub unsafe fn cosmos_benchmark_rk4(_n: c_int, _i: c_int) -> c_double { 0.0 }
+
+    /* A stub host owns no simulator: create hands back NULL and lib.rs's
+       session gate turns that into "simulator unavailable in this build" —
+       the refusal is the feature. */
     pub unsafe fn cosmos_create_simulator() -> *mut c_void { std::ptr::null_mut() }
     pub unsafe fn cosmos_destroy_simulator(_h: *mut c_void) {}
     pub unsafe fn cosmos_add_body(
@@ -153,8 +192,8 @@ pub(crate) mod ffi {
     pub unsafe fn cosmos_get_body_states(
         _h: *mut c_void, _count: u32, out: *mut c_double,
     ) -> u32 {
-        /* the stub owns no session: zero the offered capacity (defensive —
-           callers honor the returned count, which is 0) and claim nothing */
+        /* zero the offered capacity defensively — callers honor the
+           returned count, which is 0 here */
         if !out.is_null() && _count > 0 {
             std::slice::from_raw_parts_mut(out, _count as usize * 6).fill(0.0);
         }
@@ -163,6 +202,8 @@ pub(crate) mod ffi {
     pub unsafe fn cosmos_time_dilation(_radius: c_double, _mass: c_double) -> c_double { 0.0 }
 }
 
+/// The core's own version string (COSMOS_VERSION_STRING from the header —
+/// "2.0.0" today), surfaced through cosmos_status for honest telemetry.
 pub fn version_string() -> String {
     unsafe {
         let ptr = ffi::cosmos_version();

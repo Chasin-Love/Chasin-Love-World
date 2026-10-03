@@ -1,37 +1,34 @@
-//! Desktop persistence: universe state JSON + binary payload store, both in
-//! the OS app-data directory. The webview frontend reaches these through the
-//! `store_*` commands; the semantics mirror src/vault/storage/indexedDB.ts
-//! so the adapter swap is invisible to the rest of the app.
+//! Desktop persistence — REBORN in R104. The universe state JSON and the
+//! binary payload store live in the OS app-data directory, and the webview
+//! reaches them only through the `store_*` commands in lib.rs. The on-disk
+//! layout is a compatibility contract (the author's existing data lives in
+//! it): `<app-data>/universe-state.json` and `<app-data>/payloads/<id>.bin`,
+//! written atomically (tmp file + rename) so a crash never half-writes a
+//! universe. The semantics mirror src/vault/storage/indexedDB.ts so the
+//! adapter swap stays invisible to the rest of the app.
 
 use serde::Serialize;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
-fn base_dir() -> Result<PathBuf, String> {
-    let dir = dirs().ok_or_else(|| "could not resolve app-data dir".to_string())?;
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir)
-}
+/* ------------------------------ where things live ------------------------ */
 
-/// Public accessor for other modules (realities.rs production fallback).
-pub fn app_data_root() -> PathBuf {
-    base_dir().unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
-}
-
-fn payload_dir() -> Result<PathBuf, String> {
-    let dir = base_dir()?.join("payloads");
+/// The store root. Windows: `%APPDATA%\MyUniverse`. Everywhere else:
+/// `$XDG_DATA_HOME/MyUniverse` or `~/.local/share/MyUniverse`.
+fn root() -> Result<PathBuf, String> {
+    let dir = app_data_dir().ok_or_else(|| "could not resolve app-data dir".to_string())?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }
 
 #[cfg(target_os = "windows")]
-fn dirs() -> Option<PathBuf> {
+fn app_data_dir() -> Option<PathBuf> {
     std::env::var("APPDATA").ok().map(|d| PathBuf::from(d).join("MyUniverse"))
 }
 
 #[cfg(not(target_os = "windows"))]
-fn dirs() -> Option<PathBuf> {
+fn app_data_dir() -> Option<PathBuf> {
     std::env::var("XDG_DATA_HOME")
         .ok()
         .map(|d| PathBuf::from(d).join("MyUniverse"))
@@ -42,7 +39,44 @@ fn dirs() -> Option<PathBuf> {
         })
 }
 
-/* ------------------------------- state JSON ------------------------------ */
+fn state_file() -> Result<PathBuf, String> {
+    Ok(root()?.join("universe-state.json"))
+}
+
+fn payload_file(id: &str) -> Result<PathBuf, String> {
+    Ok(root()?.join("payloads").join(format!("{id}.bin")))
+}
+
+fn payloads_dir() -> Result<PathBuf, String> {
+    let dir = root()?.join("payloads");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Payload ids become filenames, so they are validated like filenames: no
+/// empty ids, no path separators, no traversal. One guard, all three verbs.
+fn valid_payload_id(id: &str) -> bool {
+    !id.is_empty() && !id.contains('/') && !id.contains('\\') && !id.contains("..")
+}
+
+/// Write bytes to `path` through a tmp sibling + rename — the atomic pattern
+/// every store write uses.
+fn write_atomic(path: &PathBuf, bytes: &[u8]) -> Result<(), String> {
+    let tmp = path.with_extension("tmp");
+    {
+        let mut f = fs::File::create(&tmp).map_err(|e| e.to_string())?;
+        f.write_all(bytes).map_err(|e| e.to_string())?;
+        f.sync_all().ok();
+    }
+    fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
+/* --------------------------------- the API -------------------------------- */
+
+/// The root other modules resolve against (realities.rs production tree).
+pub fn app_data_root() -> PathBuf {
+    root().unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+}
 
 #[derive(Serialize)]
 pub struct StateSnapshot {
@@ -52,14 +86,12 @@ pub struct StateSnapshot {
     pub migrated_from_webview: bool,
 }
 
-/// Read the persisted universe state. `migratedFromWebview` tells the frontend
-/// whether the localStorage `my-universe:v4` snapshot still needs importing.
+/// Read the persisted universe state. `migratedFromWebview` tells the
+/// frontend whether the localStorage `my-universe:v4` snapshot still needs
+/// importing (false since the R79 hotfix closed the adoption loop).
 pub fn state_read() -> Result<StateSnapshot, String> {
-    let path = base_dir()?.join("universe-state.json");
-    let json = match fs::read_to_string(&path) {
-        Ok(s) => Some(s),
-        Err(_) => None,
-    };
+    let path = state_file()?;
+    let json = fs::read_to_string(&path).ok();
     Ok(StateSnapshot {
         json,
         path: path.to_string_lossy().into_owned(),
@@ -67,52 +99,30 @@ pub fn state_read() -> Result<StateSnapshot, String> {
     })
 }
 
-/// Atomically write the universe state (tmp file + rename).
 pub fn state_write(json: String) -> Result<(), String> {
-    let path = base_dir()?.join("universe-state.json");
-    let tmp = base_dir()?.join("universe-state.json.tmp");
-    {
-        let mut f = fs::File::create(&tmp).map_err(|e| e.to_string())?;
-        f.write_all(json.as_bytes()).map_err(|e| e.to_string())?;
-        f.sync_all().ok();
-    }
-    fs::rename(&tmp, &path).map_err(|e| e.to_string())
+    write_atomic(&state_file()?, json.as_bytes())
 }
 
-/* ------------------------------- payloads -------------------------------- */
-
-/// Store raw payload bytes under payloads/<id>.bin. Called with the binary
-/// body via Tauri's raw IPC (tauri::ipc::Request).
 pub fn payload_put(id: String, bytes: Vec<u8>) -> Result<(), String> {
-    if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
+    if !valid_payload_id(&id) {
         return Err("invalid payload id".into());
     }
-    let path = payload_dir()?.join(format!("{}.bin", id));
-    let tmp = payload_dir()?.join(format!("{}.bin.tmp", id));
-    {
-        let mut f = fs::File::create(&tmp).map_err(|e| e.to_string())?;
-        f.write_all(&bytes).map_err(|e| e.to_string())?;
-        f.sync_all().ok();
-    }
-    fs::rename(&tmp, &path).map_err(|e| e.to_string())
+    payloads_dir()?;
+    write_atomic(&payload_file(&id)?, &bytes)
 }
 
 pub fn payload_get(id: String) -> Result<Option<Vec<u8>>, String> {
-    if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
+    if !valid_payload_id(&id) {
         return Err("invalid payload id".into());
     }
-    let path = payload_dir()?.join(format!("{}.bin", id));
-    match fs::read(&path) {
-        Ok(bytes) => Ok(Some(bytes)),
-        Err(_) => Ok(None),
-    }
+    Ok(fs::read(payload_file(&id)?).ok())
 }
 
 pub fn payload_delete(id: String) -> Result<(), String> {
-    if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
+    if !valid_payload_id(&id) {
         return Err("invalid payload id".into());
     }
-    let path = payload_dir()?.join(format!("{}.bin", id));
+    let path = payload_file(&id)?;
     if path.exists() {
         fs::remove_file(&path).map_err(|e| e.to_string())?;
     }

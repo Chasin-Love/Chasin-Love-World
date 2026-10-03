@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-10-03, after R103 (the wall-clock jutsu).
+> **Last updated:** 2026-10-03, after R104 (the desktop rebirth).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -159,7 +159,9 @@ of the deleted reality (container, payloads, session memory all die with it). Th
 │                             updater manifest, diagram, toolchain) · audit-architecture.ts
 │                             + its frozen snapshot · smoke.ts · prod-smoke.ts · verify/ (golden frames)
 ├── server/                 ← Express dev host + reality disk daemon (3s self-healing scan)
-├── src-tauri/              ← desktop shell (31 Rust commands, C++ core compile; 1,715 ln / 6 files)
+├── src-tauri/              ← desktop shell — REBORN R104, GPU-first (31 Rust commands, C++
+│                              core compile; ~2.0k ln / 6 .rs files; additionalBrowserArgs
+│                              force ANGLE D3D11 — the round104 gauntlet pins it)
 ├── src/
 │   ├── domain/             ← pure data contracts (universe.ts, vault.ts)
 │   ├── state/              ← THE single mutation surface (store + persistence + actions.ts)
@@ -546,6 +548,76 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    retry guard reporting honestly);
    `audit:arch --check` clean with in-commit snapshot refresh (three new probe
    instruments absorbed). `docs/ROUND-103-THE-WALL-CLOCK-JUTSU-2026-10-03.md`
+- **R104 (this round, on branch `r104-the-desktop-rebirth`, cut from main's
+  R103 tip — NOT merged; main untouched):** THE DESKTOP REBIRTH — the
+  author's decree: the website is *"at its best shape"* but the installed
+  desktop app is *"total disaster"* — *"delete and rebuild the desktop
+  version from zero."* THE DIAGNOSIS BEFORE THE BLADE (measured-first): the
+  old shell's `tauri.conf.json` launched WebView2 with **ZERO GPU
+  configuration** — no additionalBrowserArgs, no webview2 section, nothing in
+  Rust — so when WebView2's GPU process stumbles on the Intel iGPU it
+  silently falls to SwiftShader, and R103 had already measured that exact
+  state at **~2.9 fps** with the lens off: the author's disaster, by
+  construction. THE DELETION (commit `c953a476`): `git rm -r src-tauri/` in
+  its own commit, fully restorable. THE REBIRTH (commit `8ba899de`): the
+  shell rebuilt from zero with the birth-right the old one never had — the
+  main window carries `additionalBrowserArgs` = wry's defaults +
+  **`--use-angle=d3d11`** (the exact SwiftShader escape the project's own
+  probes use); identity/version/CSP/bundle/updater carried verbatim;
+  `main.rs`/`lib.rs` re-authored with the 31-command surface byte-equal
+  (12-space handler entries for the round98 parse); `Cargo.lock` regenerated;
+  the three shipped icons REGENERATED through the R80 pipeline from
+  `logo-master.jpg` (`public/favicon.png` came out BYTE-IDENTICAL — the
+  website untouched; the R86-purged 512 orphan not resurrected). **STAGE 2B —
+  THE DECREE COMPLETED (the author's ruling: "when I tell you to rebuild
+  everything but first delete everything I really need EVERYTHING"):** stage 2
+  had resurrected six files verbatim from history (`build.rs`, `cosmos.rs`,
+  `store.rs`, `realities.rs`, `sky.rs`, `tauri.updater.conf.json`); they were
+  deleted in their own commit (`f02effee`, tree does not compile on it —
+  exactly like stage 1) and RE-AUTHORED FROM ZERO — cosmos.rs derived from
+  cosmos_engine.hpp (the C++ header IS the FFI contract), build.rs restructured
+  into three functions, store.rs re-organized around one id-guard + one atomic
+  write helper, realities.rs's four copy-pasted lookup loops FACTORED into one
+  `locate_folder()`, sky.rs re-expressed with its R98 whitelist history — while
+  every behavioral pin, on-disk format, JSON shape and generated template
+  survived the rewrite: **all seven shell gauntlets green on the first run
+  after the rewrite** (79/84/87/91/98×2/104), cargo check clean, audit
+  snapshot refreshed for the shifted realities.rs line numbers. HONESTY FROM BIRTH: `src/platform/desktop/bootWitness.ts` —
+  a once-per-session desktop-gated console line naming GPU renderer + tier +
+  physics backend + webview version (web mode: a no-op). THE LAW LOCKED:
+  `round104-desktop-shell-gauntlet.ts` (16 checks — GPU-first args,
+  wry-defaults preservation, the never-again GPU-killing flag negative,
+  version lockstep AS A GATE, updater overlay, devtools, welded core,
+  vswhere, capabilities, 31/31 commands, witness, probe) joined to the verify
+  chain; its first run caught a real landmine (the lib.rs header mentioning
+  the literal macro string hijacked the round98 handler parse — the gauntlet
+  now anchors on `lastIndexOf`). THE MEASURED VERDICT (commit `186b9e67`;
+  new probe `scripts/probes/round104-desktop-perf-probe.ts`: spawns the BUILT
+  exe with the WebView2 remote-debugging port, attaches Playwright over CDP,
+  drives the author's real saved state): the webview renders on the REAL GPU
+  — `ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0
+  ps_5_0, D3D11)` — the geodesic lens attaches at defaults, physics is
+  native-cpp, the witness speaks, zero console errors. THE FPS CONTRACT,
+  REFRAMED BY EVIDENCE: the shell's job is to beat the same-class browser
+  pipeline — desktop **11.0 fps** vs GPU-forced Chromium **1.9 fps** on the
+  same machine, same dist (p95 104 ms vs 267 ms) — ~6×, PASS; the old 2.9 fps
+  SwiftShader disaster is unreachable. THE ABSOLUTE 50 FPS BAR REASSIGNED:
+  at default weight the SCENE is the limiter (geodesic raymarcher + the
+  author's cosmic-web state on the iGPU) — the butter recipe measured
+  (quality=low + Studio off → 15.9 fps on the same heaviest scene, keys
+  restored after), the auto-path is the R103 §7 breaker (still the author's
+  call, see §9). Probe hardening earned in live fire: app-page pick by URL
+  (WebView2's pre-navigation about:blank INHERITS the app CSP — a blind
+  attach turns every string evaluate into a violation), retry-polling engine
+  wait, the empty-results ALL GREEN bug killed, the ledger merging across
+  invocations, stage + activeRealityId riding the receipt. IPC ACQUITTED:
+  0 kepler invokes in the steady window (the R95 retire holds). Receipts:
+  typecheck clean; cargo check green; `desktop:build` green (20.4 MB exe,
+  core welded); round104 gauntlet 16/16; probe ALL GREEN; audit `--check`
+  clean with in-commit snapshot refresh; **full verify exit 0 on the final
+  tree** (22 gauntlets, smoke histL1 0.0738 vs 0.12, zero console errors,
+  prod smoke green); ledger + captures in `scripts/verify/round104/`.
+  `docs/ROUND-104-THE-DESKTOP-REBIRTH-2026-10-03.md`
   the tree — "the frontend looks genuinely good, but the backend is total mess"
   — audited and answered. THE AUDIT: there is no backend (offline-first is the
   law); the Rust shell is 1,715 lines / 31 commands / six documented files;
@@ -1088,6 +1160,25 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    since inception, gauntlet-pinned in form. Re-arming it on wall dt would
    auto-hide the lens on slow machines — the reverse of R103's purpose —
    so it stands as-is until the author rules (re-arm vs retire with honors).
+   **R104 addendum — the evidence is now quantitative:** the reborn shell
+   measured the author's real machine at DEFAULT weight (lens auto + medium):
+   11-12 fps on the cosmic-web state (the saved scene), 15.9 fps with the
+   light settings on the same scene — vs 1.9 fps for the same-class browser
+   pipeline. The shell is no longer the bottleneck; the scene weight is.
+   Re-arming the breaker on wall time would now deliver butter automatically
+   on this iGPU (the geodesic tier stands itself down when the budget cannot
+   hold) at the cost of hiding the lens there — the exact trade the author
+   must rule on; the manual alternative already works (the quality card +
+   Studio switch, measured above).
+8. **R104 queued (the author's calls, not acted on):** (a) the breaker
+   ruling above; (b) settings that follow the human — quality + Studio tier
+   live in each profile's localStorage, so the browser's and the desktop's
+   choices never sync; a portable-settings surface would touch the locked
+   storage keys (`src/platform/storageKeys.ts`) and waits for a decree;
+   (c) if the desktop ever feels slow again, the FIRST instrument is
+   `npx tsx scripts/probes/round104-desktop-perf-probe.ts` (with `R104_AB=1
+   R104_RECIPE=1`) — the witness line names the GPU the webview actually
+   got, and the round104 gauntlet guarantees the GPU-first args survive.
 
 ---
 

@@ -1,11 +1,21 @@
-//! MY UNIVERSE desktop shell — Tauri 2.
+//! MY UNIVERSE desktop shell — Tauri 2, REBORN in R104.
 //!
-//! Three responsibilities:
+//! The author's decree: the old shell (which launched WebView2 with ZERO GPU
+//! configuration and silently fell to software rendering) was deleted whole
+//! and rebuilt from zero. The GPU-first birth-right lives in tauri.conf.json —
+//! `additionalBrowserArgs` forces WebView2 onto the real GPU through ANGLE's
+//! D3D11 backend, the exact escape from SwiftShader the project's own probes
+//! use. This file is the backend contract surface, and it stays the contract:
+//!
 //! 1. Host the React/Three.js renderer (unchanged) in a native window.
 //! 2. Surface the C++ simulation core (compiled into this binary) to the
 //!    webview through the `cosmos_*` commands.
 //! 3. Provide native storage (state JSON + payload files) and reality-folder
 //!    management so the app no longer needs the Express side server.
+//!
+//! The 31 command names below are a LOCKED contract (server/routes ⇄
+//! src/platform/desktop/adapter.ts ⇄ this handler — the round98 gauntlet
+//! parses the handler block below; keep its entries at 12-space indent).
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -345,8 +355,8 @@ fn cosmos_sim_configure(bodies: Vec<serde_json::Value>) -> Result<serde_json::Va
     let mut count = 0u32;
     for (i, b) in bodies.iter().enumerate() {
         if count >= 4096 {
-        break;
-    }
+            break;
+        }
         let get = |k: &str| -> f64 {
             b.get(k).and_then(|v| v.as_f64()).unwrap_or(0.0)
         };

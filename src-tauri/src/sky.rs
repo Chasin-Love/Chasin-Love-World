@@ -1,18 +1,18 @@
-//! Sky Studio — the Tauri port of server/skyStore.ts, contract-identical.
-//!
+//! Sky Studio — REBORN in R104, the desktop twin of server/skyStore.ts.
 //! Every reality owns its skies inside its OWN folder (total isolation):
 //!
 //!   <realities>/<folder>/sky.json          ← registry (active + roster + settings)
 //!   <realities>/<folder>/assets/<id>.<ext> ← the uploaded image bytes
 //!
-//! All path components pass through the same sanitize + containment rules
-//! as every other reality-folder API (realities::sanitize_folder_name /
+//! Every path component crosses the same sanitize + containment discipline
+//! as the rest of the reality-folder APIs (realities::sanitize_folder_name /
 //! realities::is_inside over realities::realities_dir()).
 //!
 //! The asset bytes are NOT served over HTTP on desktop — the webview has no
-//! route for them. `sky_asset` returns raw bytes and the renderer wraps them
-//! in an object URL (see skyRegistry.ts). No base64: 6 MB photos cross the
-//! IPC bridge as raw arrays once and are cached as blob URLs.
+//! route into the realities tree. `sky_asset` hands back raw bytes and the
+//! renderer wraps them in an object URL (see skyRegistry.ts). No base64 on
+//! the way out: 6 MB photos cross the IPC bridge as raw arrays once and are
+//! cached as blob URLs.
 
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -20,9 +20,15 @@ use std::path::PathBuf;
 
 use crate::realities::{is_inside, realities_dir, sanitize_folder_name};
 
-const MAX_PHOTO_BYTES: usize = 6 * 1024 * 1024; /* 6 MB — matches the web contract */
+/* --------------------------------- the caps ---------------------------------
+   User-visible limits, contract-locked with the web server (the round98
+   conformance gauntlet reads both sides): 6 MB per photo, 8 photos per sky. */
+const MAX_PHOTO_BYTES: usize = 6 * 1024 * 1024;
 const MAX_PHOTOS: usize = 8;
 
+/// Upload MIME → stored extension. Node maps image/jpeg → jpg; this table
+/// must store the same extension or the two backends write different
+/// filenames for the same upload.
 const EXT_BY_MIME: &[(&str, &str)] = &[
     ("image/png", "png"),
     ("image/jpeg", "jpg"),
@@ -31,6 +37,7 @@ const EXT_BY_MIME: &[(&str, &str)] = &[
     ("image/avif", "avif"),
 ];
 
+/// Extension → mime, for the renderer's blob typing (parity with the web).
 #[allow(dead_code)]
 const MIME_BY_EXT: &[(&str, &str)] = &[
     ("png", "image/png"),
@@ -40,6 +47,8 @@ const MIME_BY_EXT: &[(&str, &str)] = &[
     ("gif", "image/gif"),
     ("avif", "image/avif"),
 ];
+
+/* --------------------------------- the shapes ------------------------------- */
 
 #[derive(Serialize, Clone)]
 pub struct SkyPhoto {
@@ -63,7 +72,7 @@ pub struct SkySettings {
 
 impl Default for SkySettings {
     fn default() -> Self {
-        /* blend 1.0 — R79 one-sky law: the photo IS the sky by default,
+        /* blend defaults to 1.0 — the R79 one-sky law: the photo IS the sky,
            contract-identical with server/skyStore.ts */
         Self { blend: 1.0, dim: 0.45, blur: 0.12, vignette: 0.55, drift: 0.3 }
     }
@@ -84,6 +93,8 @@ impl Default for SkyManifest {
     }
 }
 
+/* --------------------------------- the plumbing ----------------------------- */
+
 fn now_millis() -> f64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -91,15 +102,17 @@ fn now_millis() -> f64 {
         .as_millis() as f64
 }
 
-/// Resolve + harden a reality folder. `ensure` recreates a lost folder so an
-/// upload can still land the user's photo (same policy as the web server).
-fn resolve_sky_dir(folder_raw: Option<&str>, ensure: bool) -> Result<PathBuf, String> {
+/// Resolve + harden a reality folder for sky work. `ensure` recreates a lost
+/// folder so an upload can still land the user's photo (the web server's
+/// same policy); reads refuse instead of conjuring.
+fn sky_dir_for(folder_raw: Option<&str>, ensure: bool) -> Result<PathBuf, String> {
     let folder = folder_raw.map(sanitize_folder_name).unwrap_or_default();
     if folder.is_empty() {
         return Err("Unknown or unsafe reality folder".into());
     }
-    let dir = realities_dir()?.join(&folder);
-    if !is_inside(&realities_dir()?, &dir) {
+    let root = realities_dir()?;
+    let dir = root.join(&folder);
+    if !is_inside(&root, &dir) {
         return Err("Unknown or unsafe reality folder".into());
     }
     if !dir.exists() {
@@ -114,7 +127,7 @@ fn resolve_sky_dir(folder_raw: Option<&str>, ensure: bool) -> Result<PathBuf, St
     Ok(dir)
 }
 
-fn manifest_path(dir: &PathBuf) -> PathBuf {
+fn registry_path(dir: &PathBuf) -> PathBuf {
     dir.join("sky.json")
 }
 
@@ -126,16 +139,18 @@ fn assets_dir(dir: &PathBuf) -> Result<PathBuf, String> {
     Ok(a)
 }
 
-fn read_sky_manifest(folder: Option<&str>) -> SkyManifest {
-    let dir = match resolve_sky_dir(folder, false) {
+/// Read the registry, tolerating hand-edited files: unknown fields ignored,
+/// broken entries dropped, a broken file answered with the default manifest
+/// (the web reader's same repair pass).
+fn read_registry(folder: Option<&str>) -> SkyManifest {
+    let dir = match sky_dir_for(folder, false) {
         Ok(d) => d,
         Err(_) => return SkyManifest::default(),
     };
-    let raw = match fs::read_to_string(manifest_path(&dir)) {
+    let raw = match fs::read_to_string(registry_path(&dir)) {
         Ok(s) => s,
         Err(_) => return SkyManifest::default(),
     };
-    /* repair pass: tolerate hand-edited files (mirrors the web reader) */
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct RawPhoto {
@@ -177,35 +192,38 @@ fn read_sky_manifest(folder: Option<&str>) -> SkyManifest {
     }
 }
 
-fn write_sky_manifest(dir: &PathBuf, manifest: &SkyManifest) -> Result<(), String> {
+fn write_registry(dir: &PathBuf, manifest: &SkyManifest) -> Result<(), String> {
     let json = serde_json::to_string_pretty(manifest).map_err(|e| e.to_string())?;
-    fs::write(manifest_path(dir), json).map_err(|e| e.to_string())
+    fs::write(registry_path(dir), json).map_err(|e| e.to_string())
 }
 
-/// Drop registry entries whose asset file vanished (hand-deleted files).
-fn prune_missing_photos(dir: &PathBuf, mut manifest: SkyManifest) -> SkyManifest {
+/// Drop registry entries whose asset file vanished (hand-deleted files), and
+/// clear the active pointer if its photo was among them.
+fn pruned(dir: &PathBuf, mut manifest: SkyManifest) -> SkyManifest {
     let before = manifest.photos.len();
     manifest.photos.retain(|p| dir.join(&p.file).exists());
     if manifest.photos.len() != before {
-        let still = manifest.photos.iter().any(|p| Some(&p.id) == manifest.active_id.as_ref());
-        if !still {
+        let active_still_here = manifest
+            .photos
+            .iter()
+            .any(|p| Some(&p.id) == manifest.active_id.as_ref());
+        if !active_still_here {
             manifest.active_id = None;
         }
     }
     manifest
 }
 
+/* ---------------------------------- the verbs ------------------------------- */
+
 pub fn get_sky_status(folder: Option<String>) -> Result<SkyManifest, String> {
-    let dir = resolve_sky_dir(folder.as_deref(), false)
-        .map_err(|_| String::new())
-        .unwrap_or_default();
-    if !dir.as_os_str().is_empty() && dir.is_dir() {
-        let m = prune_missing_photos(&dir, read_sky_manifest(folder.as_deref()));
-        write_sky_manifest(&dir, &m).ok(); /* persist the prune, like the web */
-        Ok(m)
-    } else {
-        Ok(SkyManifest::default())
-    }
+    let dir = match sky_dir_for(folder.as_deref(), false) {
+        Ok(d) => d,
+        Err(_) => return Ok(SkyManifest::default()),
+    };
+    let m = pruned(&dir, read_registry(folder.as_deref()));
+    write_registry(&dir, &m).ok(); /* persist the prune, like the web */
+    Ok(m)
 }
 
 pub fn add_sky_photo(
@@ -215,18 +233,15 @@ pub fn add_sky_photo(
     data_base64: Option<String>,
     ensure: bool,
 ) -> Result<serde_json::Value, String> {
-    let dir = resolve_sky_dir(folder.as_deref(), ensure)?;
+    let dir = sky_dir_for(folder.as_deref(), ensure)?;
     let mime = mime.unwrap_or_default();
     let ext = EXT_BY_MIME
         .iter()
         .find(|(m, _)| *m == mime)
         .map(|(_, e)| e.to_string())
         .ok_or_else(|| format!("Unsupported image type: {}", mime))?;
-    let b64 = data_base64.unwrap_or_default();
-    if b64.is_empty() {
-        return Err("Empty upload".into());
-    }
-    let bytes = decode_base64(&b64).ok_or_else(|| "Corrupt upload payload".to_string())?;
+    let bytes = decode_base64(data_base64.unwrap_or_default().as_bytes())
+        .ok_or_else(|| "Corrupt upload payload".to_string())?;
     if bytes.is_empty() {
         return Err("Empty upload".into());
     }
@@ -237,7 +252,7 @@ pub fn add_sky_photo(
         ));
     }
 
-    let mut manifest = prune_missing_photos(&dir, read_sky_manifest(folder.as_deref()));
+    let mut manifest = pruned(&dir, read_registry(folder.as_deref()));
     if manifest.photos.len() >= MAX_PHOTOS {
         return Err(format!("This sky already holds {} photos — remove one first", MAX_PHOTOS));
     }
@@ -251,7 +266,7 @@ pub fn add_sky_photo(
             .subsec_nanos() as u64
     );
     let photo = SkyPhoto {
-        file: format!("assets/{}.{}", id, ext),
+        file: format!("assets/{id}.{ext}"),
         name: name.unwrap_or_else(|| "photo".into()).chars().take(80).collect(),
         mime,
         size: bytes.len() as u64,
@@ -259,7 +274,7 @@ pub fn add_sky_photo(
         id: id.clone(),
     };
 
-    let target = assets_dir(&dir)?.join(format!("{}.{}", id, ext));
+    let target = assets_dir(&dir)?.join(format!("{id}.{ext}"));
     if !is_inside(&dir, &target) {
         return Err("Unsafe asset path".into());
     }
@@ -269,13 +284,13 @@ pub fn add_sky_photo(
     if first && manifest.active_id.is_none() {
         manifest.active_id = Some(id);
     }
-    write_sky_manifest(&dir, &manifest)?;
+    write_registry(&dir, &manifest)?;
     Ok(serde_json::json!({ "success": true, "photo": photo, "manifest": manifest }))
 }
 
 pub fn remove_sky_photo(folder: Option<String>, photo_id: String) -> Result<serde_json::Value, String> {
-    let dir = resolve_sky_dir(folder.as_deref(), false)?;
-    let mut manifest = prune_missing_photos(&dir, read_sky_manifest(folder.as_deref()));
+    let dir = sky_dir_for(folder.as_deref(), false)?;
+    let mut manifest = pruned(&dir, read_registry(folder.as_deref()));
     let photo = manifest
         .photos
         .iter()
@@ -290,20 +305,20 @@ pub fn remove_sky_photo(folder: Option<String>, photo_id: String) -> Result<serd
     if manifest.active_id.as_deref() == Some(photo_id.as_str()) {
         manifest.active_id = None;
     }
-    write_sky_manifest(&dir, &manifest)?;
+    write_registry(&dir, &manifest)?;
     Ok(serde_json::json!({ "success": true, "manifest": manifest }))
 }
 
 pub fn set_active_sky_photo(folder: Option<String>, photo_id: Option<String>) -> Result<serde_json::Value, String> {
-    let dir = resolve_sky_dir(folder.as_deref(), false)?;
-    let mut manifest = prune_missing_photos(&dir, read_sky_manifest(folder.as_deref()));
+    let dir = sky_dir_for(folder.as_deref(), false)?;
+    let mut manifest = pruned(&dir, read_registry(folder.as_deref()));
     if let Some(id) = &photo_id {
         if !manifest.photos.iter().any(|p| &p.id == id) {
             return Err("No such photo in this sky".into());
         }
     }
     manifest.active_id = photo_id;
-    write_sky_manifest(&dir, &manifest)?;
+    write_registry(&dir, &manifest)?;
     Ok(serde_json::json!({ "success": true, "manifest": manifest }))
 }
 
@@ -311,8 +326,10 @@ pub fn update_sky_settings(
     folder: Option<String>,
     patch: Option<SkySettings>,
 ) -> Result<serde_json::Value, String> {
-    let dir = resolve_sky_dir(folder.as_deref(), false)?;
-    let mut manifest = prune_missing_photos(&dir, read_sky_manifest(folder.as_deref()));
+    let dir = sky_dir_for(folder.as_deref(), false)?;
+    let mut manifest = pruned(&dir, read_registry(folder.as_deref()));
+    /* every slider clamps to [0, 1] — a hand-rolled client cannot push the
+       sky's blend outside the range the shader expects */
     let clamp = |v: f64| -> f64 { v.max(0.0).min(1.0) };
     if let Some(p) = patch {
         manifest.settings = SkySettings {
@@ -323,43 +340,26 @@ pub fn update_sky_settings(
             drift: clamp(p.drift),
         };
     }
-    write_sky_manifest(&dir, &manifest)?;
+    write_registry(&dir, &manifest)?;
     Ok(serde_json::json!({ "success": true, "manifest": manifest }))
 }
 
 /// Raw bytes of one sky asset. The renderer wraps these in an object URL —
 /// the Tauri webview has no HTTP route into the realities tree.
+///
+/// The name whitelist is strict: only generated sky asset names ever leave
+/// the disk. Brought to parity with server/routes/sky.ts in R98 (its regex:
+/// /^sky-[a-z0-9-]+\.(png|jpe?g|webp|gif|avif)$/i) after three real defects
+/// died there: the fixed-offset extension window rejected every 5-character
+/// extension (the extension is found by SEARCHING for the dot now, never by
+/// slicing), `.jpeg` was missing from the accepted set entirely, and the
+/// empty stem `sky-.png` slipped through an all() over an empty range. Both
+/// backends accept or reject the same set — compare case-insensitively,
+/// because Node's regex carries the `i` flag and parity is cheaper than an
+/// argument.
 pub fn sky_asset(folder: String, file: String) -> Result<Vec<u8>, String> {
-    let dir = resolve_sky_dir(Some(&folder), false)?;
-    /* strict whitelist — only generated sky asset names ever leave the disk.
-       R98 — brought to parity with server/routes/sky.ts, which accepts
-       /sky-[a-z0-9-]+\.(png|jpe?g|webp|gif|avif)$/i. Three real defects:
-
-         1. THE EXTENSION WINDOW WAS OFF BY ONE FOR EVERY 5-CHAR EXTENSION.
-            The old code matched the last 4 bytes against patterns that INCLUDE
-            the leading dot (`b".png"`, `b".gif"`) — so only 4-character
-            extensions ever passed. `.jpeg`, `.webp` and `.avif` are 5
-            characters: their last four bytes are `jpeg`/`webp`/`avif`, with no
-            dot, and matched nothing. A `.jpeg` sky therefore loaded in the web
-            build and silently failed on the desktop, while MIME_BY_EXT below
-            cheerfully listed all of them. The extension is now stripped by
-            searching for the dot rather than fixed-offset slicing.
-         2. `.jpeg` was absent from the accepted list entirely, though Node
-            serves it and the MIME table maps it.
-         3. `sky-.png` was ACCEPTED: `all()` over an empty range is vacuously
-            true, where Node's `[a-z0-9-]+` rejects an empty stem. Fixed by the
-            length floor — `sky-` (4) + ≥1 stem char + `.` + a ≥3-char
-            extension — and by requiring a stem character at all.
-
-       Neither the old nor the new form was a path escape: the is_inside check
-       below still holds either way. These were contract drift — the same asset
-       behaving differently per backend, which is the class the round-98
-       conformance gauntlet now pins. */
+    let dir = sky_dir_for(Some(&folder), false)?;
     let valid = {
-        /* Node's regex carries the `i` flag, so it accepts `SKY-`/`SKY-x.PNG`
-           as readily as lowercase. Generated names are always lowercase, but
-           parity is cheaper than an argument: compare case-insensitively and
-           let both backends accept or reject the same set. */
         let lower = file.to_ascii_lowercase();
         let stem_and_ext = lower.strip_prefix("sky-").unwrap_or("");
         match stem_and_ext.rfind('.') {
@@ -382,7 +382,11 @@ pub fn sky_asset(folder: String, file: String) -> Result<Vec<u8>, String> {
     fs::read(&path).map_err(|_| "No such sky asset".to_string())
 }
 
-fn decode_base64(input: &str) -> Option<Vec<u8>> {
+/* --------------------------------- base64 -----------------------------------
+   A small standard-alphabet decoder (padding and line breaks tolerated, any
+   other non-alphabet byte rejects the payload) — the uploads arrive base64
+   over the JSON IPC and land as raw bytes on disk. */
+fn decode_base64(input: &[u8]) -> Option<Vec<u8>> {
     const REV: &[i8; 256] = &{
         let mut t = [-1i8; 256];
         let alphabet = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -396,7 +400,7 @@ fn decode_base64(input: &str) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(input.len() / 4 * 3);
     let mut buf: u32 = 0;
     let mut bits: u32 = 0;
-    for ch in input.bytes() {
+    for &ch in input {
         if ch == b'=' || ch == b'\r' || ch == b'\n' {
             continue;
         }

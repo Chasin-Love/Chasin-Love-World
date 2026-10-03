@@ -1,15 +1,30 @@
-//! Reality folder management — the Tauri port of src/server/realityDaemon.ts
-//! with the same sanitize + containment rules as src/server/paths.ts.
-//! In dev this operates on the project's src/realities tree; in production the
-//! tree lives in the app-data dir (custom realities are always authoritative
-//! in localStorage — the disk mirror is a developer convenience).
+//! Reality folder management — REBORN in R104. The desktop twin of the
+//! server's reality daemon (server/realityDaemon.ts + server/paths.ts): the
+//! same sanitize rules, the same containment guards before every destructive
+//! call, the same on-disk tree. In dev it operates on the project's
+//! src/realities tree; in production the tree lives in the app-data dir.
+//! Custom realities are always authoritative in localStorage — the disk
+//! mirror is the durable half.
+//!
+//! R102 stands here: NO reality folder is special to this backend, the home
+//! one included. The only protected name is the bin itself — the system's
+//! recycle directory, not a reality.
 
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/* --------------------------- name + path hygiene -------------------------- */
+
+/// Folder names become directories on disk: keep [A-Za-z0-9-_], refuse the
+/// empty and dot forms. This is the exact class the Node side enforces in
+/// server/paths.ts — the two backends must never disagree about what a
+/// folder name is allowed to be.
 pub(crate) fn sanitize_folder_name(raw: &str) -> String {
-    let segment: String = raw.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
+    let segment: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
     if segment.is_empty() || segment == "." || segment == ".." {
         String::new()
     } else {
@@ -17,6 +32,8 @@ pub(crate) fn sanitize_folder_name(raw: &str) -> String {
     }
 }
 
+/// True only when `child` sits strictly inside `parent` (both canonicalized;
+/// a child equal to the parent is refused — the tree is the boundary).
 pub(crate) fn is_inside(parent: &Path, child: &Path) -> bool {
     match (parent.canonicalize(), child.canonicalize()) {
         (Ok(p), Ok(c)) => c.starts_with(&p) && c != p,
@@ -24,39 +41,48 @@ pub(crate) fn is_inside(parent: &Path, child: &Path) -> bool {
     }
 }
 
-/// The desktop twin of `ident()` in server/realityTemplates.ts — the generated
-/// module declares `export const <name>Reality`, so a folder like "my-reality"
-/// would emit an invalid identifier, and because every reality is compiled
-/// together through one eager glob, one bad file white-screens the whole app.
-/// fold_folder_name sanitizes to `[A-Za-z0-9_]`; this folds to identifier-safe.
+/// The desktop twin of `ident()` in server/realityTemplates.ts — the
+/// generated module declares `export const <name>Reality`, so a folder like
+/// "my-reality" would emit an invalid identifier, and because every reality
+/// is compiled together through one eager glob, one bad file white-screens
+/// the whole app. Folds to an identifier-safe stem (leading digit →
+/// underscore prefix; empty → "reality").
 pub(crate) fn ident_of(folder: &str) -> String {
     let cleaned: String = folder
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })
         .collect();
     let cleaned = if cleaned.chars().next().is_some_and(|c| c.is_ascii_digit()) {
-        format!("_{}", cleaned)
+        format!("_{cleaned}")
     } else {
         cleaned
     };
     if cleaned.is_empty() { "reality".to_string() } else { cleaned }
 }
 
+/// The bin (and its hidden twin) is the recycle directory, never a reality.
+fn is_protected(name: &str) -> bool {
+    name == "bin" || name == ".bin"
+}
+
+/* ------------------------------ tree discovery ---------------------------- */
+
+/// Where the realities tree lives, in priority order:
+/// 1. `MYU_REALITIES_DIR` — explicit override (dev convenience / CI);
+/// 2. the project tree two levels above src-tauri (dev);
+/// 3. the app-data mirror (production).
 pub(crate) fn realities_dir() -> Result<PathBuf, String> {
-    // 1. Explicit override (dev convenience / CI).
     if let Ok(dir) = std::env::var("MYU_REALITIES_DIR") {
         let p = PathBuf::from(dir);
         fs::create_dir_all(&p).map_err(|e| e.to_string())?;
         return Ok(p);
     }
-    // 2. Dev: the project tree two levels above src-tauri.
     if let Ok(cwd) = std::env::current_dir() {
         let candidate = cwd.join("..").join("src").join("realities");
         if candidate.join("solPrime").exists() || candidate.is_dir() {
             return Ok(candidate);
         }
     }
-    // 3. Production: app-data mirror.
     let dir = crate::store::app_data_root().join("realities");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
@@ -67,6 +93,8 @@ fn bin_dir() -> Result<PathBuf, String> {
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }
+
+/* ------------------------------- the shapes ------------------------------- */
 
 #[derive(Serialize)]
 pub struct FolderInfo {
@@ -85,50 +113,72 @@ pub struct BinInfo {
     pub trashed_at: f64,
 }
 
-/* R102 — the independent-realities decree: no reality folder is special to
-   the backend, solPrime included. Only the bin stays protected — it is the
-   system's recycle directory, not a reality. (The read-only SEED MIRROR rule
-   for data.json remains, enforced at its write-data site below.) */
-fn is_protected(name: &str) -> bool {
-    name == "bin" || name == ".bin"
+fn folder_id_key(s: &str) -> String {
+    s.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>().to_lowercase()
 }
 
-fn resolve_folder(folder_name: Option<&str>, reality_id: Option<&str>) -> Result<String, String> {
-    let dir = realities_dir()?;
-    let items = fs::read_dir(&dir).map_err(|e| e.to_string())?;
-    let mut fallback = String::new();
-    for entry in items.flatten() {
+/// ONE factored lookup for the four verbs that hunt a folder by name or id
+/// (resolve / restore / purge / rename): a single pass over the directory
+/// that skips protected + non-dir entries and accepts a folder when either
+/// key matches — the display name case-insensitively, or the reality id
+/// alphanumerically-normalized, or the id verbatim. First match wins (the
+/// same per-entry priority the pre-rebirth lookups had).
+fn locate_folder(
+    dir: &Path,
+    skip_protected: bool,
+    folder_name: Option<&str>,
+    reality_id: Option<&str>,
+) -> Option<String> {
+    for entry in fs::read_dir(dir).ok()?.flatten() {
+        if !entry.path().is_dir() {
+            continue;
+        }
         let name = entry.file_name().to_string_lossy().into_owned();
-        if !entry.path().is_dir() || is_protected(&name) {
+        if skip_protected && is_protected(&name) {
             continue;
         }
         if let Some(f) = folder_name {
             if name.eq_ignore_ascii_case(f) {
-                return Ok(name);
+                return Some(name);
             }
         }
         if let Some(rid) = reality_id {
-            let clean = |s: &str| -> String { s.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>().to_lowercase() };
-            if clean(&name) == clean(rid) || name == rid {
-                return Ok(name);
+            if folder_id_key(&name) == folder_id_key(rid) || name == rid {
+                return Some(name);
             }
         }
     }
-    if let Some(f) = folder_name {
-        fallback = sanitize_folder_name(f);
+    None
+}
+
+/// Resolve a caller's folder reference to a real folder name, falling back to
+/// the sanitized folder_name for create-style flows that target a folder
+/// which may not exist yet.
+fn resolve_folder(folder_name: Option<&str>, reality_id: Option<&str>) -> Result<String, String> {
+    if let Some(found) = locate_folder(&realities_dir()?, true, folder_name, reality_id) {
+        return Ok(found);
     }
+    let fallback = folder_name.map(sanitize_folder_name).unwrap_or_default();
     if fallback.is_empty() {
-        return Err(format!("No folder found for {}", reality_id.or(folder_name).as_deref().unwrap_or("?")));
+        return Err(format!(
+            "No folder found for {}",
+            reality_id.or(folder_name).as_deref().unwrap_or("?")
+        ));
     }
     Ok(fallback)
 }
+
+/* -------------------------------- listing --------------------------------- */
 
 pub fn list_folders() -> Result<Vec<FolderInfo>, String> {
     let dir = realities_dir()?;
     let mut out = Vec::new();
     for entry in fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+        if !entry.path().is_dir() {
+            continue;
+        }
         let name = entry.file_name().to_string_lossy().into_owned();
-        if !entry.path().is_dir() || is_protected(&name) {
+        if is_protected(&name) {
             continue;
         }
         out.push(FolderInfo {
@@ -147,7 +197,7 @@ pub fn list_bin() -> Result<Vec<BinInfo>, String> {
         if !entry.path().is_dir() {
             continue;
         }
-        let trashed = entry
+        let trashed_at = entry
             .metadata()
             .and_then(|m| m.modified())
             .ok()
@@ -156,15 +206,18 @@ pub fn list_bin() -> Result<Vec<BinInfo>, String> {
             .unwrap_or(0.0);
         out.push(BinInfo {
             folder_name: entry.file_name().to_string_lossy().into_owned(),
-            trashed_at: trashed,
+            trashed_at,
         });
     }
     Ok(out)
 }
 
+/* -------------------------------- the bin ---------------------------------
+   Every destructive verb checks containment BEFORE it destroys — the guard
+   after the rm is not a guard. R102: any reality can be binned, restored,
+   purged or renamed; the refusal below only stops the bin eating itself. */
+
 pub fn move_to_bin(reality_id: Option<String>, folder_name: Option<String>) -> Result<String, String> {
-    /* R102 — any reality's folder can be binned, solPrime included; only the
-       bin-into-itself move stays refused (below) */
     let target = resolve_folder(folder_name.as_deref(), reality_id.as_deref())?;
     if target == "bin" || target == ".bin" {
         return Err("Refusing to move the bin directory into itself.".into());
@@ -185,33 +238,17 @@ pub fn move_to_bin(reality_id: Option<String>, folder_name: Option<String>) -> R
 }
 
 pub fn restore_from_bin(reality_id: Option<String>, folder_name: Option<String>) -> Result<String, String> {
-    let dir = bin_dir()?;
-    let mut target = String::new();
-    for entry in fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
-        if !entry.path().is_dir() {
-            continue;
-        }
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if let Some(f) = folder_name.as_deref() {
-            if name.eq_ignore_ascii_case(f) {
-                target = name;
-                break;
-            }
-        }
-        if let Some(rid) = reality_id.as_deref() {
-            let clean = |s: &str| -> String { s.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>().to_lowercase() };
-            if clean(&name) == clean(rid) || name == rid {
-                target = name;
-                break;
-            }
-        }
-    }
-    if target.is_empty() {
-        return Err(format!("No trashed folder found for {}", reality_id.or(folder_name).as_deref().unwrap_or("?")));
-    }
-    let src = bin_dir()?.join(&target);
+    let bin = bin_dir()?;
+    let target = locate_folder(&bin, false, folder_name.as_deref(), reality_id.as_deref())
+        .ok_or_else(|| {
+            format!(
+                "No trashed folder found for {}",
+                reality_id.or(folder_name).as_deref().unwrap_or("?")
+            )
+        })?;
+    let src = bin.join(&target);
     let dst = realities_dir()?.join(&target);
-    if !is_inside(&bin_dir()?, &src) || !is_inside(&realities_dir()?, &dst) {
+    if !is_inside(&bin, &src) || !is_inside(&realities_dir()?, &dst) {
         return Err("Resolved path escaped the realities tree; refused.".into());
     }
     if dst.exists() {
@@ -222,46 +259,25 @@ pub fn restore_from_bin(reality_id: Option<String>, folder_name: Option<String>)
 }
 
 pub fn purge_from_bin(reality_id: Option<String>, folder_name: Option<String>) -> Result<(), String> {
-    let dir = bin_dir()?;
-    let mut target = String::new();
-    for entry in fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
-        if !entry.path().is_dir() {
-            continue;
-        }
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if let Some(f) = folder_name.as_deref() {
-            if name.eq_ignore_ascii_case(f) {
-                target = name;
-                break;
-            }
-        }
-        if let Some(rid) = reality_id.as_deref() {
-            let clean = |s: &str| -> String { s.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>().to_lowercase() };
-            if clean(&name) == clean(rid) || name == rid {
-                target = name;
-                break;
-            }
-        }
-    }
-    if target.is_empty() {
-        return Err("Folder not found in bin".into());
-    }
-    let path = bin_dir()?.join(&target);
-    if !is_inside(&dir, &path) {
+    let bin = bin_dir()?;
+    let target = locate_folder(&bin, false, folder_name.as_deref(), reality_id.as_deref())
+        .ok_or_else(|| "Folder not found in bin".to_string())?;
+    let path = bin.join(&target);
+    if !is_inside(&bin, &path) {
         return Err("Resolved path escaped the bin tree; refused.".into());
     }
     fs::remove_dir_all(&path).map_err(|e| e.to_string())
 }
 
 pub fn empty_bin() -> Result<u32, String> {
-    let dir = bin_dir()?;
+    let bin = bin_dir()?;
     let mut count = 0u32;
-    for entry in fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+    for entry in fs::read_dir(&bin).map_err(|e| e.to_string())?.flatten() {
         if !entry.path().is_dir() {
             continue;
         }
         let path = entry.path();
-        if !is_inside(&dir, &path) {
+        if !is_inside(&bin, &path) {
             continue;
         }
         fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
@@ -270,8 +286,12 @@ pub fn empty_bin() -> Result<u32, String> {
     Ok(count)
 }
 
+/* -------------------------------- renaming -------------------------------- */
+
 pub fn rename_folder(reality_id: String, new_name: String) -> Result<String, String> {
-    /* R102 — rename is free for every reality, the home one too */
+    /* R102 — rename is free for every reality, the home one too. The on-disk
+       identity derives the same way the Node daemon derives it: strip every
+       non-alphanumeric, then lowercase the first character. */
     let clean_new: String = new_name.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
     if clean_new.is_empty() {
         return Err("New name contains no valid characters.".into());
@@ -281,25 +301,12 @@ pub fn rename_folder(reality_id: String, new_name: String) -> Result<String, Str
     let new_folder: String = first.to_string() + &chars.as_str().to_string();
 
     let dir = realities_dir()?;
-    let items = fs::read_dir(&dir).map_err(|e| e.to_string())?;
-    let mut old = String::new();
-    for entry in items.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if !entry.path().is_dir() || is_protected(&name) {
-            continue;
-        }
-        let clean = |s: &str| -> String { s.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>().to_lowercase() };
-        if clean(&name) == clean(&reality_id) || name == reality_id {
-            old = name;
-            break;
-        }
-    }
-    if old.is_empty() {
-        return Err(format!("Could not find reality folder for {}", reality_id));
-    }
+    let old = locate_folder(&dir, true, None, Some(&reality_id))
+        .ok_or_else(|| format!("Could not find reality folder for {}", reality_id))?;
     if old == new_folder {
         return Ok(new_folder);
     }
+
     let src = dir.join(&old);
     let dst = dir.join(&new_folder);
     if !is_inside(&dir, &src) || !is_inside(&dir, &dst) {
@@ -310,40 +317,38 @@ pub fn rename_folder(reality_id: String, new_name: String) -> Result<String, Str
     }
     fs::rename(&src, &dst).map_err(|e| e.to_string())?;
 
-    // Patch the name field in BOTH generated modules (same file set as the Node
-    // daemon). R98: this patched index.ts only, so renaming a world on the
-    // desktop left surface.ts holding the old name — one world, two names, one
-    // per backend. Both templates carry `name:`, so both must be rewritten.
+    /* Patch the display name in BOTH generated modules — the same file set
+       the Node daemon patches. The R98 defect taught why both: a rename that
+       touched only index.ts left surface.ts holding the old name, one world
+       with two names depending on the backend. Both templates carry a `name`
+       field, so both are rewritten. The replacement splices a JSON string
+       literal over the ENTIRE quoted span (quotes included): the old naive
+       \' splice let a trailing backslash escape the closing quote, corrupt
+       the module, and the eager glob white-screened the app. */
     for file in ["index.ts", "surface.ts"] {
         let module_path = dst.join(file);
         if !module_path.exists() {
             continue;
         }
         let content = fs::read_to_string(&module_path).map_err(|e| e.to_string())?;
-        if let Some(start) = content.find("name:") {
-            if let Some(q1) = content[start..].find(['\'', '"']) {
-                let q1 = start + q1;
-                let quote = content.as_bytes()[q1] as char;
-                if let Some(len) = content[q1 + 1..].find(quote) {
-                /* JSON.stringify the name (function replacement like the
-                   Node daemon): a trailing backslash in the old naive
-                   \' splice escaped the closing quote and corrupted the
-                   module — eager glob then white-screened the app. The
-                   literal replaces the ENTIRE quoted span, quotes included. */
-                let name_literal = serde_json::to_string(&new_name).unwrap_or_else(|_| "\"\"".into());
-                let mut patched = String::from(&content[..q1]);
-                patched.push_str(&name_literal);
-                patched.push_str(&content[q1 + 1 + len..]);
-                    fs::write(&module_path, patched).map_err(|e| e.to_string())?;
-                }
-            }
-        }
+        let Some(start) = content.find("name:") else { continue };
+        let Some(q1off) = content[start..].find(['\'', '"']) else { continue };
+        let q1 = start + q1off;
+        let quote = content.as_bytes()[q1] as char;
+        let Some(len) = content[q1 + 1..].find(quote) else { continue };
+        let name_literal = serde_json::to_string(&new_name).unwrap_or_else(|_| "\"\"".into());
+        let mut patched = String::from(&content[..q1]);
+        patched.push_str(&name_literal);
+        patched.push_str(&content[q1 + 1 + len..]);
+        fs::write(&module_path, patched).map_err(|e| e.to_string())?;
     }
     Ok(new_folder)
 }
 
+/* ----------------------------- folder creation ---------------------------- */
+
 /// Create a new reality folder on disk with index.ts + surface.ts templates
-/// matching the server.ts create-folder generator (UniverseSurfaceConfig
+/// matching the server's create-folder generator (UniverseSurfaceConfig
 /// schema). Returns the folder name.
 #[allow(clippy::too_many_arguments)]
 pub fn create_folder(
@@ -368,6 +373,8 @@ pub fn create_folder(
         .map(sanitize_folder_name)
         .unwrap_or_default();
     if folder.is_empty() {
+        /* derive from the display name: keep word characters, split on
+           separators, camelCase the tail — "my first world" → "myFirstWorld" */
         let raw: String = name
             .trim()
             .chars()
@@ -393,7 +400,13 @@ pub fn create_folder(
         folder = words.join("");
     }
     if folder.is_empty() {
-        folder = format!("reality_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+        folder = format!(
+            "reality_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        );
     }
 
     let dir = realities_dir()?;
@@ -411,14 +424,15 @@ pub fn create_folder(
             .to_lowercase()
     });
     let ident = ident_of(&folder);
-    let var_name = format!("{}Reality", ident);
-    let surface_var = format!("{}Surface", ident);
+    let var_name = format!("{ident}Reality");
+    let surface_var = format!("{ident}Surface");
+    /* every user-controlled value crosses as a JSON string literal (JSON is a
+       subset of TS expression syntax for strings). Raw single-quote splices
+       were the injection hole the Round-1 fix closed on the server — a
+       crafted color like x',evil(),y would execute inside the generated
+       module; the same fix lives here. */
     let esc = |s: &str| -> String { serde_json::to_string(s).unwrap_or_else(|_| "\"\"".into()) };
 
-    /* Every user-controlled value crosses as a JSON string literal (JSON is a
-       subset of TS expression syntax for strings). Raw single-quote splices
-       here were the desktop twin of the Round-1 injection fix — a crafted
-       color like x',evil(),y executed inside the generated module. */
     let surface = format!(
         "import {{ UniverseSurfaceConfig }} from '../types';\n\nexport const {sv}: UniverseSurfaceConfig = {{\n  realityId: {cid},\n  name: {name},\n  colorA: {ca},\n  colorB: {cb},\n  deepColor: '#030108',\n  starColor: {sc},\n  webFilaments: {ca},\n  nebulaIntensity: 1.0,\n  dustLaneIntensity: 0.8,\n  starDensity: 0.85,\n}};\n",
         sv = surface_var,
@@ -456,12 +470,14 @@ pub fn create_folder(
     Ok(folder)
 }
 
+/* ------------------------------ the data mirror ---------------------------- */
+
 /// Write a reality's world database to its own folder (data.json) — the
-/// desktop twin of the server's POST /api/realities/write-data. Same
-/// resolve → contain → skip-identical semantics; `data_json` is the caller's
-/// data object, serialized by the adapter before it crosses the bridge.
-/// (The Node daemon's in-memory markRecentlyWritten has no desktop twin —
-/// the Tauri daemon status carries no operations log.)
+/// desktop twin of the server's POST /api/realities/write-data, with the
+/// same resolve → contain → skip-identical semantics. `data_json` is the
+/// caller's data object, serialized by the adapter before it crosses the
+/// bridge. (The Node daemon's in-memory markRecentlyWritten has no desktop
+/// twin — the Tauri daemon status carries no operations log.)
 pub fn write_data(
     reality_id: Option<String>,
     folder_name: Option<String>,
@@ -474,9 +490,10 @@ pub fn write_data(
     }
 
     let target = resolve_folder(folder_name.as_deref(), reality_id.as_deref())?;
-    /* R83-2: Sol Prime is the read-only seed — boot truth is index.ts and a
-       stale browser generation must never churn its committed mirror (the
-       server twin refuses too; same guard as move_to_bin). */
+    /* R83-2: the committed seed is boot truth — its data.json mirror is
+       read-only to the browser on BOTH backends. (R102 removed every other
+       special case; this one protects the committed FILE, never the deletion
+       right.) */
     if target == "solPrime" || target == "sol-prime"
         || reality_id.as_deref() == Some("sol-prime")
         || folder_name.as_deref() == Some("solPrime")
@@ -494,16 +511,16 @@ pub fn write_data(
     if let (Some(obj), Some(rid)) = (next.as_object_mut(), reality_id.as_deref()) {
         obj.insert("realityId".into(), serde_json::Value::String(rid.into()));
     }
-    let now = std::time::SystemTime::now()
+    let mirrored_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
     if let Some(obj) = next.as_object_mut() {
-        obj.insert("mirroredAt".into(), serde_json::Value::Number(now.into()));
+        obj.insert("mirroredAt".into(), serde_json::Value::Number(mirrored_at.into()));
     }
 
-    /* data.json is not a module — Vite ignores it — but keep writes honest:
-       skip when the content is identical (minus the timestamp). */
+    /* data.json is not a module — Vite ignores it — but writes stay honest:
+       skip when the content is identical minus the timestamp. */
     let data_file = folder.join("data.json");
     let mut skip = false;
     if let Ok(prev_raw) = fs::read_to_string(&data_file) {
@@ -523,15 +540,19 @@ pub fn write_data(
     Ok(format!("src/realities/{}/data.json", target))
 }
 
+/* ----------------------------- the seed roster ----------------------------- */
+
+/// The two starter bodies a brand-new reality boots with (star + planet),
+/// matching the server's create-folder generator. Same rule as the module
+/// templates: interpolated text crosses as JSON literals, never raw
+/// quote-splices — the palette colors are string literals inside the bodies
+/// array and the id is sanitized but escaped anyway, so the invariant holds
+/// unconditionally.
 fn default_bodies_json(clean_id: &str, name: &str, color_a: &str, color_b: &str) -> String {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    /* Same rule as the module templates: interpolated text crosses as JSON
-       literals, never raw quote-splices. The palette colors are string
-       literals inside the bodies array; the id is sanitized but escaped
-       anyway so the invariant holds unconditionally. */
     let ca = serde_json::to_string(color_a).unwrap_or_else(|_| "\"\"".into());
     let cb = serde_json::to_string(color_b).unwrap_or_else(|_| "\"\"".into());
     let core_name = serde_json::to_string(&format!("{name} Core Star")).unwrap_or_else(|_| "\"\"".into());
