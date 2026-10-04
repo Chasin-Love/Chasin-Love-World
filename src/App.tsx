@@ -9,6 +9,7 @@ import { PhysicsHUD } from './ui/PhysicsHUD';
 import { ErrorBoundary, IcLink, ToastHost, useUniverse } from './ui/bits';
 import { toast } from './ui/toast';
 import { startRealitySync } from './platform/sync/realitySync';
+import { fetchDiskTombstones } from './platform/desktop/adapter';
 import { ensureSkyFor, onSkyChanged } from './platform/sky/skyRegistry';
 import { computeAurora, onThisDay } from './platform/sentiment/sentiment';
 import { perfMark } from './platform/performance';
@@ -252,6 +253,18 @@ export default function App() {
     let cancelled = false;
     let loadedEngine: UniverseEngine | null = null;
     let boot: (() => void) | null = null;
+    /* R105 — adopt disk tombstones at boot: a deleted reality must never
+       boot back into the multiverse (a wiped / fresh / corrupt saved state
+       would otherwise re-seed it straight from the compiled bundle). Fired
+       alongside the engine import; if it lands after the constructor build,
+       the existence-sync effect below performs the rebuild — both orders end
+       in the same honest multiverse. */
+    void (async () => {
+      try {
+        const tombstoned = await fetchDiskTombstones();
+        if (!cancelled && tombstoned.length) actions.adoptDiskTombstones(tombstoned);
+      } catch { /* best-effort — the realitySync poll is the safety net */ }
+    })();
     void import('./engine/engine').then(({ UniverseEngine }) => {
       if (cancelled || !canvasRef.current || engineRef.current) return;
       const engine = new UniverseEngine(canvasRef.current, getState().bodies, {
@@ -729,7 +742,12 @@ export default function App() {
      whenever a reality or galaxy is created/edited/deleted, so the scene is
      always literal: a bubble exists iff the reality exists, an ellipse exists
      iff that galaxy exists. Deps are value signatures (the store hands out
-     fresh array identities on every keystroke — identity deps would over-fire). */
+     fresh array identities on every keystroke — identity deps would over-fire).
+     engineReady re-fires this once after the async boot (the same law the
+     physics toggles above obey): the engine ignites AFTER mount, so without
+     this dep the skip guard below is never consumed at boot — the first real
+     change of the session (typically the first delete) steals it and silently
+     skips its own rebuild, leaving a ghost marble in the multiverse. */
   const galSig = useMemo(() => JSON.stringify(state.customGalaxies ?? {}), [state.customGalaxies]);
   const metaSig = useMemo(() => JSON.stringify(state.customRealityMeta ?? {}), [state.customRealityMeta]);
   const customIdsSig = useMemo(() => (state.customRealities ?? []).map((r) => r.id).join(','), [state.customRealities]);
@@ -748,7 +766,7 @@ export default function App() {
        did): the traveler surfaces at the multiverse sphere */
     if (!r) eng.zoomToMultiverse();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galSig, metaSig, customIdsSig, deletedSig]);
+  }, [galSig, metaSig, customIdsSig, deletedSig, engineReady]);
 
   /* keep the living structure in sync — new worlds form, dissolved worlds vanish,
      and moons always mirror the diary pages of their planet. Signature-guarded:

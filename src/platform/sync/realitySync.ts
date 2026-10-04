@@ -63,8 +63,15 @@ async function tickBody() {
 
   const [status, binRes] = await Promise.all([
     realityApi<DaemonStatus>('/api/realities/daemon-status', undefined, 'GET'),
-    realityApi<{ bin: BinFolderInfo[] }>('/api/realities/bin', undefined, 'GET'),
+    realityApi<{ bin: BinFolderInfo[]; tombstoned?: string[] }>('/api/realities/bin', undefined, 'GET'),
   ]);
+
+  /* R105 — adopt any disk tombstones the poll reveals: the boot adoption's
+     safety net and the cross-session catcher (idempotent — the action skips
+     ids already tombstoned or re-created) */
+  if (binRes?.tombstoned?.length) {
+    actions.adoptDiskTombstones(binRes.tombstoned);
+  }
 
   if (status) {
     const wasOffline = consecutiveFailures > 0;

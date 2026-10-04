@@ -334,6 +334,57 @@ export const realityActions = {
     }
   },
 
+  /* R105 — THE PERMANENT-DEATH TOMBSTONE ADOPTION. The disk side records
+     every deliberate deletion as bin/.tombstones/<id>.tombstone (both
+     backends write the same ledger); this action merges unknown records
+     into deletedRealityIds, prunes any container a fresh seed may have
+     conjured for the resurrected pack, and recomputes — so even a wiped /
+     fresh-installed / corrupt saved state can never resurrect a deleted
+     reality (the compiled desktop bundle always carries its packs; this
+     record is what keeps them dead). Ids the traveler has re-created are
+     skipped: creation outranks a tombstone. Called at boot (App.tsx) and on
+     every realitySync poll as the safety net. */
+  adoptDiskTombstones(ids: string[]) {
+    if (!ids?.length) return;
+    if (!state.deletedRealityIds) state.deletedRealityIds = [];
+    let changed = false;
+    for (const id of ids) {
+      if (!id || state.customRealities?.some((r) => r.id === id)) continue;
+      if (state.deletedRealityIds.includes(id)) continue;
+      state.deletedRealityIds = [...state.deletedRealityIds, id];
+      changed = true;
+      /* a fresh seed may have conjured a full container for the resurrected
+         pack — the zero-trace purge leg erases it (payloads included) */
+      if (state.realities && state.realities[id]) {
+        const doomed = state.realities[id];
+        const payloadRefs = new Set<string>();
+        doomed.vault.forEach((f) => { if (f.payloadRef) payloadRefs.add(f.payloadRef); });
+        doomed.vaultTrash.forEach((t) => { if (t.item?.payloadRef) payloadRefs.add(t.item.payloadRef); });
+        doomed.entries.forEach((e) => e.attachments?.forEach((a) => { if (a.payloadRef) payloadRefs.add(a.payloadRef); }));
+        payloadRefs.forEach((ref) => void delPayload(ref).catch(() => undefined));
+        delete state.realities[id];
+      }
+      forgetSession(id);
+      if (state.realityFolders) {
+        const next = { ...state.realityFolders };
+        delete next[id];
+        state.realityFolders = next;
+      }
+    }
+    if (!changed) return;
+    recomputeRealities();
+    /* if the resurrected pack was booted INTO (a fresh seed makes the home
+       reality active), the traveler surfaces at a survivor or the empty
+       multiverse — the same law deleteReality obeys */
+    if (state.activeRealityId && state.deletedRealityIds.includes(state.activeRealityId)) {
+      const fallback = REALITIES[0];
+      state.activeRealityId = fallback ? fallback.id : '';
+      if (fallback) ensureBucket(fallback.id);
+    }
+    audit('[Multiverse Nexus] Adopted disk tombstones — deleted realities stay deleted');
+    notify();
+  },
+
   /* --------------------- per-reality disk mirror ------------------------- */
 
   /** Mirrors a reality's world database into its own folder on disk

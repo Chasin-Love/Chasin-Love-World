@@ -2,8 +2,9 @@
 
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
-> **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-10-04, after R105 (the sealed floor).
+> **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).> **Last updated:** 2026-10-04, after R105 — both rounds (the sealed floor and
+> THE VANISHED MARBLE) now on main, merged as **Version 20**.
+
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -309,12 +310,12 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | THE FLIP | R94 *(same branch — THE ARC IS COMPLETE, verified 2026-10-01)* | The decree lands: the universe BOOTS on true N-body gravity — absent flag = ON in both derivations (App + card; the console switch restores the clockwork on demand; devices without the core get the clockwork through the freshness law automatically). EVERYTHING EVERYWHERE with one session per tier: `activateScope` swaps the session by proximity — the engine declares the camera's realm each frame (home, or `galaxy:${id}` from updateInnerSystem); activating saves the resting scope's memory and resumes the target's own with a BOUNDED CATCH-UP BURST (250-day chunks of 1000 × 0.25-day sub-steps — moon orbits resolved; a 5-real-minute absence ≈ 8 calls; beyond 100,000 days the memory re-seeds). THE INNER SEAM: the STAR leads each galaxy scope's roster and its ensemble (corona, halos, belt) follows its real barycenter wobble — big with a 10 M☉ companion; planets consume the readback at index+1; inner moons (deterministic ids, both the natural court and diary moons) ride the R93 world→local seam; the home seam is scope-checked (inside a galaxy the home session rests, its sky on Kepler). UI honesty: the Physics Laws panel wears "TRUE GRAVITY · DRIVING" and rests the Living Gravity toggle ("Gravity · In the Session"); Restore Ephemeris' tooltip admits it re-seeds the session. The R88 gauntlet needed no rewrite (it guards simTwin.ts, the untouched lab); the R91/R92/R93 checks were consciously reconciled to the evolved contract. LIVE RECEIPT: the app BOOTS DRIVING, the session steps from frame one, the clockwork reverts on demand, zero console errors — eight PASSes. round94-the-flip-gauntlet (14 checks) in the chain; full verify green — 18 gauntlets + smoke + prod smoke, with the boot smoke itself running on the session-driven sky. THE MERGE (--no-ff) AND THE v16.0.0 TAG AWAIT THE AUTHOR'S WORD. `docs/ROUND-94-THE-FLIP-2026-10-01.md` |
 | THE STEADY SKY | R95 *(same branch — the stability round, verified 2026-10-01)* | R94 was real and **unstable** — worlds plunged, moons flew, the sky flickered. Measured: **R94's sky survived ~40 sim-days.** FIVE faults, and the deepest was neither the seed table nor the softening: **(1) THE SUBSTEP LAW — the tick ran the physics 24× ahead of the clock.** `simStep(dt, iterations)` advances `dt × iterations` (every tier steps the same dt once per iteration), but `driverTick` passed the WHOLE 2-day span as `dt` with 24 sub-steps — so the readback's stamp and the integrator's real time disagreed by 24×, the star's barycentric arc never closed (it walked straight off the origin), and the planets wound up on enormous fictional eccentricities. `catchUpSession` already divided; the tick did not. Fixed by `.simStep(dt / DRIVER_SUBSTEPS, DRIVER_SUBSTEPS)`. (2) **No central mass**: the home roster began at the first planet and `buildBody` never renders the anchor, so the session had **no star at all**. THE STAR LEADS EVERY ROSTER: index 0 is the star (engine-registered via `setScopeStar`, already leading, or synthesized); planets read at index+1, the anchor group follows index 0. (3) **Cinematic speeds vs real gravity**: the canon table's 2–4× outer periods are hyperbolic seeds. THE ORBIT-TRUE SEED keeps each world's canon position/direction/plane but re-seeds speed as the circular-orbit speed √(GM/r); the barycenter frame centres VELOCITY ONLY (a full barycentric origin shift would put the session ~23 units from the clockwork canon and slide the sky on every crossfade — and the star's resulting bounded wobble is physics, the real thing the anchor group has always shown). (4) **THE VAULT + HILL TEMPERS**: a vault's in-session mass is what its own canon orbit implies (v²·r/G), **and ≤ 1/1000 of the star** — 0.1 M☉ is not a stable companion in a real planetary system (it scattered the inner worlds out within ~600 sim-days, found by elimination with `R95_NO_VAULT=1`); at 0.001 M☉ the vault sits deep in its own Hill sphere, still a real body tugging the star. The 10 M☉ display law stays untouched in physicsEngine (a separate quantity; both are pinned). (5) **Impossible moons** (the R93 amendment): the canon 14–30-day moon laps are unbound at real gravity, so moons left the roster and render as parent-session-position + their own R84 inclined orbit — permanent, home AND galaxy. (6) **A per-frame snap**: the 2.5-day trust window was narrower than one frame's sim-delta — *that* was the flicker. THE STEADY SEAM: the crossfade (`drvBlend`, up 0.4 s / down 0.15 s from frozen last positions) plus an **8-day trust window**; THE LIVING RINGS (hover ellipses rebuilt ~1 Hz from the session's **osculating elements**, unbound states refusing rather than faking a ring); the C++ Kepler cache retires while the session is fresh. REALM HIDING eases the home system out during a galaxy dive — this killed the "three black holes" bug — with dive-gate HYSTERESIS (enter 1600 / leave 2000). SOFTENING 1e4 → **1e12** m² (ε = 1000 km) in the C++ core and TS twin in lockstep. The universe remembers honestly: `resetUniverse` forgets the session memory, memories carry a **seedLaw stamp** (now **3** — law-2 memories re-seed once), a memory ahead of the boot clock is **ADOPTED**, and the tick accumulates BEFORE the pending guard. `setSimTwin` refuses engine-side while the session drives. **THE RECEIPTS:** `scripts/round95-physics-probe.ts` (NEW) drives the REAL `driverTick` headlessly — R94 ~40 days → +substep ~594 → **+Hill temper 5000+ days, zero detonation**; it is what found every real bug, because the 21-check regex gauntlet passed on a sky that died in 40 days (**no regex can tell you whether an integrator is stable**). round95-steady-sky-gauntlet (25 checks — the doc's first count was off by one) in the chain; R87's two softening pins updated `1e4` → `1e12` (that pin exists to hold the twin in lockstep — changing the constant MUST change it). LIVE: headless Chromium, 3 minutes, every body's radius held within [0.2×, 4×], clock advancing, frame loop alive, star bounded. Two harness bugs recorded in the round doc: a page-side `import('/src/physics/sessionDriver.ts')` returns a **SECOND module instance** that never sees the engine's session (faked three failures — observe `window.__ENGINE__` instead), and `page.evaluate` given a **string** evaluates it as an expression. Honest limits: the probe stays TS-tier by design, 5000 days is not forever, galaxy scopes are probe-untested. Chaos is the point — Restore Ephemeris remains the one heal. POST-SESSION COMPLETION (the same evening, begun on the author's own hand): emsdk 6.0.10 installed at `~/Desktop/emsdk` and `public/wasm/` built from this tree — the branch's first local artifact — which surfaced and killed two latent dev-tier bugs on first contact: the dev import arrived as `/wasm/…?import` and 404'd (Vite's injectQuery rewrite; `loadWasm` now imports an absolute runtime URL) and emscripten 4+ no longer exposes HEAPF64 on the module (`build-wasm.sh` now pins it beside ccall/cwrap — without it the tier silently fell back to TypeScript and the session never drove). The artifact was rebuilt and the live receipt ran **ALL GREEN ON THE COMPILED CORE** — boots DRIVING, crossfade full, readback whole, three real minutes, zero console errors — and the architecture snapshot was refreshed (the R95 plan's one dropped receipt; audit clean). CI (emsdk 3.1.74) remains the canonical release receipt. `docs/ROUND-95-THE-STEADY-SKY-2026-10-01.md` |
 
----
+---## 8. CURRENT STATE (as of 2026-10-04 — main's tip is **Version 20**: R105, THE VANISHED MARBLE, merged --no-ff from `r105-the-vanished-marble` on the author's word, on top of R105, the sealed floor — which had already landed at main's tip — on top of **R104, the desktop rebirth**, merged --no-ff from `r104-the-desktop-rebirth` on the author's word after a hands-on test drive; R91–R95 shipped as v16.0.0)
 
-## 8. CURRENT STATE (as of 2026-10-04 — **R105, the sealed floor, is IN FLIGHT on branch `r105-the-sealed-floor`** on top of main's tip: **R104, the desktop rebirth**, merged --no-ff from `r104-the-desktop-rebirth` on the author's word after a hands-on test drive; the branch deleted after the merge — only main remains; R91–R95 shipped as v16.0.0)
 
-- **`main` is the blessed reference.** Its tip is the R104 merge (the desktop
-  rebirth) on top of the merged R96–R103 chain —
+- **`main` is the blessed reference.** Its tip is the **Version 20** merge
+  (R105: the vanished marble + the sealed floor) on top of the R104 merge (the
+  desktop rebirth) on top of the merged R96–R103 chain —
   the tidy house, the engine divided, the real contract, the wheels connected,
   the self-contained exe — merged --no-ff and pushed on the author's word
   (2026-10-03, after a fresh full verify on the exact merged tree) — on top of
@@ -362,6 +363,62 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (`r82-the-voice`, `r85-the-six-seams`, `r87-native-simulator`,
   `r88-per-frame-twin`, `the-real-universe`) are historical signposts, fully
   contained in main.)
+- **R105 (this round, on branch `r105-the-vanished-marble`, cut from main's R104 tip):**
+  THE VANISHED MARBLE — the author's report after test-driving the R102 decree on the
+  R104 desktop: *"I can delete all the folders but I can't delete Sol-Prime… even after
+  I delete them I can see the reflection in the multiverse giants view."* THREE verified
+  findings, three closures. **(1) THE GHOST MARBLE:** the multiverse scene's ONLY runtime
+  rebuild — App.tsx's EXISTENCE SYNC effect — carried a `skipFirstRebuild` guard that the
+  engine's ASYNC arrival never consumed at mount (`if (!eng) return` bailed before the
+  guard), so the guard was STOLEN by the first real change of every session — typically
+  the first `deleteReality` — which returned WITHOUT rebuilding: the deleted reality's
+  glass sphere + galaxy disc + orbit rings + click collider kept rendering on the
+  multiverse stage (hover resolved it through `getReality`'s survivor fallback to the
+  wrong universe) until some unrelated sig change or a restart. Fixed by carrying
+  `engineReady` in the effect's deps — the exact law the physics-toggles effect above it
+  has obeyed since Round 14 — so the engine's arrival consumes the guard and the FIRST
+  delete/edit/rename/create of every session performs its rebuild. **(2) THE LYING DISK
+  LEG:** in the compiled desktop app a committed pack (Sol-Prime included) has no folder
+  in the app-data tree, so both backend twins' bin verbs errored "Directory … does not
+  exist", the app toasted "could not reach the bin", and the 5-retry queue burned — for
+  a deletion whose state side had fully landed. Now a bin verb resolving to NOTHING on
+  disk is a success no-op on BOTH twins in one commit (R98 lockstep): realityDaemon's
+  move/restore/purge gained explicit nothing-on-disk branches; realities.rs returns
+  `BinOutcome {target, noop}` shaped by lib.rs as `{success:true, noop:true}`. **(3) THE
+  RESURRECTION WINDOW:** R102's tombstone-in-state was the ONLY thing keeping a deleted
+  pack dead on desktop — a wiped/fresh/corrupt state re-seeded it straight from the
+  bundle (the R102 comment's premise "the glob no longer matches anything" is true only
+  in dev). THE TOMBSTONE LEDGER: both twins record every deliberate deletion as
+  `bin/.tombstones/<id>.tombstone` (move writes, purge writes AND KEEPS — permanent
+  death, restore clears — the reality may live again, empty keeps all — the last word),
+  the bin lists carry an additive `tombstoned: string[]`, dot-directories are filtered
+  from every listing AND from empty-bin itself (the live check's catch: emptyBin
+  measured EATING the ledger, count 1 — fixed on both twins, re-measured 0, ledger
+  survives), and the client adopts the ledger at boot + on every realitySync poll
+  through the new `adoptDiskTombstones(ids)` action (skips re-created ids: creation
+  outranks a tombstone; prunes any freshly-seeded phantom container payload-and-all;
+  forgetSession; recompute; surfaces the traveler if the pack was booted into).
+  RECEIPTS: round105-vanished-marble gauntlet (17 checks, in the verify chain after
+  round104) — mutation-proven three ways, and it caught its own vacuous empty-bin pin
+  during construction (a lazy whole-file regex satisfied by the getStatus filter — the
+  R98 disease; every lifecycle pin is now scoped by a bodyBetween slice);
+  round105-vanished-marble probe (13 assertions) deletes Sol-Prime through the REAL UI
+  (Core Console → Realities Grid → Collapse → Confirm Erase, all-DOM clicks —
+  Playwright's actioned clicks measurably lose races with the card's hover/layout
+  animations) on a fresh server + headless Chromium with a document token defeating any
+  Vite full-reload, and grants THE RECEIPT only on the SAME engine instance that
+  rendered the marble (ghost gone, traveler at the multiverse, folder in the bin,
+  tombstone written, persisted state carrying the bin entry, zero errors) — ALL GREEN
+  twice back-to-back, and with engineReady removed it fails at exactly THE RECEIPT
+  naming the stolen guard; live daemon scratch checks 9/9; tsc clean; cargo check
+  green; round98 conformance + round104 shell ALL GREEN; audit --check clean after the
+  in-commit --snapshot refresh; full verify green (23 gauntlets, smoke, prod smoke).
+  NOT TOUCHED: getReality's survivor fallback (load-bearing R102 contract — with
+  ghosts dead it has nothing to mis-resolve), the restore flow, the R83-2 seed guard.
+  Limits: the probe is the dev/web tier (the desktop legs are gauntlet-pinned +
+  compile-verified; a built-exe probe receipt waits for the author's call); the ledger
+  dies only with the machine's app data itself.
+  `docs/ROUND-105-THE-VANISHED-MARBLE-2026-10-04.md`
 - **R101 (this round, on branch `r101-the-frost-deck`):** THE FROST DECK — the author's
   decree, with a visionOS-manner frosted-glass dashboard screenshot: *"time to upgrade our
   core console to these style & manner"*. The Core Console consciously REVERSES its R8-era
@@ -1084,13 +1141,13 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (21 checks) in the verify chain. Smoke reference held (green 0.066–0.074 histL1; one
   cold-boot flake diagnosed, never reproduced). `docs/ROUND-84-THE-ASCENDING-NODES-
   2026-09-30.md`.
-- **Verification status:** `npm run verify` ALL GREEN (typecheck; all **21
+- **Verification status:** `npm run verify` ALL GREEN (typecheck; all **23
   gauntlets** — the R98 physics gate now carries 91 checks including the
-  executed-artifact numerical half and the wiring pins — smoke + prod-smoke,
-  zero console errors) — re-verified per round, most recently at R101 (the
-  frost deck: a clean single run after the legibility fixes — every gauntlet
-  green, `SMOKE TIER — wasm`, histL1 0.0699 against
-  the 0.12 pin);
+  executed-artifact numerical half and the wiring pins, and R105 joined the
+  chain with 17 mutation-proven checks — smoke + prod-smoke,
+  zero console errors) — re-verified per round, most recently at R105 (the
+  vanished marble: every gauntlet green, `SMOKE TIER — wasm`, healthy frame
+  pins);
   `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R100
   snapshot** (zero dead exports; absorbed in-commit on every structural change);
   `desktop:check` **compiles the REAL C++ core as of R100** — the author's
@@ -1218,6 +1275,16 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    hold) at the cost of hiding the lens there — the exact trade the author
    must rule on; the manual alternative already works (the quality card +
    Studio switch, measured above).
+   **R105 addendum — a NEW smoke-red signature joined the family:** the Vite
+   HMR socket answering **400 Unexpected response** instead of
+   connection-refused — meaning a ZOMBIE dev server (an orphaned `node.exe`
+   child of a shell-spawned `npm run dev`: killing the shell does not kill
+   the child on Windows) is squatting on :24678 and rejecting the fresh
+   server's token. The frame stays HEALTHY (histL1 green both runs — the red
+   is pure socket noise); the first instrument is
+   `netstat -ano | findstr :24678` (also the probe ports 3997/3999) — kill
+   the orphan and re-run. Queued: a tree-kill (`taskkill /T`) in the
+   probes'/smoke's server cleanup, so the orphans stop being born.
 8. **R104 queued (the author's calls, not acted on):** (a) the breaker
    ruling above; (b) settings that follow the human — quality + Studio tier
    live in each profile's localStorage, so the browser's and the desktop's
@@ -1288,6 +1355,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | **Einstein lensing** | Per-body halo bending of the sky; local, melts at 6·b_c; toggleable, absent = ON |
 | **EFS** | Eventide Filesystem — the vault's copy-on-write inode fs with shadows/dedup/scrub |
 | **Quantum Bin** | The recycle bin for deleted realities (`src/realities/bin/` + disk daemon) |
+| **The Tombstone Ledger** | R105's disk-side permanent-death record (`bin/.tombstones/<id>.tombstone`, written by BOTH backend twins on delete/purge, cleared by restore, kept by empty) — the client adopts it at boot + poll, so a deleted reality can never return, even against a wiped state |
 | **Core Mode / Core Console** | The management deck entered via the Anchor Star (realities grid, bin, lineage) |
 | **Gauntlet** | `scripts/roundNN-gauntlet.ts` — asserts source-level invariants of a round; part of verification |
 | **Universe Surface** | The 460,000-unit dome where galaxies/clusters live; the funnel is the hole's dent in it |

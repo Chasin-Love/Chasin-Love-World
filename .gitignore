@@ -42,3 +42,6 @@ __pycache__/
 
 # Stray run logs (R100 cleanup — the two that had gathered at the root)
 *.log
+
+# R105 — the permanent-death tombstone ledger (runtime disk state, never source)
+src/realities/bin/.tombstones/

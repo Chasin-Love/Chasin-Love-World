@@ -272,3 +272,14 @@ export async function flushDiskQueue(): Promise<number> {
   }
   return opQueue.length;
 }
+
+/**
+ * R105 — the disk side's permanent-death record: every id the backends have
+ * tombstoned (bin/.tombstones/<id>.tombstone). Adopted at boot and on the
+ * sync poll so a wiped / fresh / corrupt saved state can never resurrect a
+ * deleted reality. Empty on any failure — adoption is best-effort by design.
+ */
+export async function fetchDiskTombstones(): Promise<string[]> {
+  const res = await realityApi<{ tombstoned?: string[] }>('/api/realities/bin', undefined, 'GET');
+  return res?.tombstoned ?? [];
+}
