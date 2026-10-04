@@ -27,11 +27,13 @@ export function realitiesRouter(): Router {
     try {
       const binDir = path.join(process.cwd(), 'src', 'realities', 'bin');
       if (!fs.existsSync(binDir)) {
-        return res.json({ success: true, bin: [] });
+        return res.json({ success: true, bin: [], tombstoned: realityDaemon.listTombstones() });
       }
       const items = fs.readdirSync(binDir, { withFileTypes: true });
       const bin = items
-        .filter((d) => d.isDirectory())
+        /* R105 — dot-directories (.tombstones, the permanent-death ledger)
+           are system records, never binned realities */
+        .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
         .map((d) => {
           const folderPath = path.join(binDir, d.name);
           const stats = fs.statSync(folderPath);
@@ -41,7 +43,9 @@ export function realitiesRouter(): Router {
             trashedAt: stats.mtimeMs,
           };
         });
-      res.json({ success: true, bin });
+      /* R105 — the disk-side permanent-death record, adopted by the client
+         so a wiped state can never resurrect a deleted reality */
+      res.json({ success: true, bin, tombstoned: realityDaemon.listTombstones() });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

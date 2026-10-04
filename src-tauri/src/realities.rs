@@ -213,6 +213,12 @@ pub fn list_bin() -> Result<Vec<BinInfo>, String> {
         if !entry.path().is_dir() {
             continue;
         }
+        /* R105 — dot-directories (.tombstones, the permanent-death ledger)
+           are system records, never binned realities */
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with('.') {
+            continue;
+        }
         let trashed_at = entry
             .metadata()
             .and_then(|m| m.modified())
@@ -221,9 +227,75 @@ pub fn list_bin() -> Result<Vec<BinInfo>, String> {
             .map(|d| d.as_millis() as f64)
             .unwrap_or(0.0);
         out.push(BinInfo {
-            folder_name: entry.file_name().to_string_lossy().into_owned(),
+            folder_name: name,
             trashed_at,
         });
+    }
+    Ok(out)
+}
+
+/* ----------------------- R105 permanent-death tombstones -------------------
+   A tombstone is an empty file, bin/.tombstones/<realityId>.tombstone — the
+   disk-side record that this reality id was deleted ON PURPOSE. The client
+   adopts tombstoned ids at boot (App.tsx) and on every sync poll
+   (realitySync), so even a wiped / fresh-installed / corrupt saved state can
+   never resurrect a deleted reality: the compiled desktop bundle always
+   carries its packs, and this record is what keeps them dead. Written by
+   move-to-bin and purge (a purge keeps it — permanent death), removed by
+   restore, KEPT by empty. The Node twin (server/realityDaemon.ts) writes the
+   same files with the same filename rule: the id verbatim, only when it is
+   already filename-safe ([A-Za-z0-9._-]+). */
+
+fn is_tombstone_safe_id(id: &str) -> bool {
+    !id.is_empty()
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_')
+}
+
+fn tombstone_path(reality_id: &Option<String>) -> Option<PathBuf> {
+    let id = reality_id.as_deref()?.trim();
+    if !is_tombstone_safe_id(id) {
+        return None;
+    }
+    Some(bin_dir().ok()?.join(".tombstones").join(format!("{id}.tombstone")))
+}
+
+fn write_tombstone(reality_id: &Option<String>) {
+    let Some(path) = tombstone_path(reality_id) else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        if let Err(e) = fs::create_dir_all(dir) {
+            eprintln!("[realities] tombstone write failed: {e}");
+            return;
+        }
+    }
+    if let Err(e) = fs::write(&path, "") {
+        eprintln!("[realities] tombstone write failed: {e}");
+    }
+}
+
+fn remove_tombstone(reality_id: &Option<String>) {
+    if let Some(path) = tombstone_path(reality_id) {
+        let _ = fs::remove_file(path);
+    }
+}
+
+pub fn list_tombstones() -> Result<Vec<String>, String> {
+    let dir = match bin_dir() {
+        Ok(dir) => dir.join(".tombstones"),
+        Err(_) => return Ok(Vec::new()),
+    };
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut out = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if let Some(id) = name.strip_suffix(".tombstone") {
+            out.push(id.to_string());
+        }
     }
     Ok(out)
 }
@@ -248,12 +320,14 @@ pub fn move_to_bin(reality_id: Option<String>, folder_name: Option<String>) -> R
            failure: erroring here made the app lie ("could not reach the bin")
            and burn the retry queue for a deletion that had already fully
            happened. (Node twin: realityDaemon.moveToBin's same branch.) */
+        write_tombstone(&reality_id);
         return Ok(BinOutcome { target, noop: true });
     }
     if dst.exists() {
         fs::remove_dir_all(&dst).map_err(|e| e.to_string())?;
     }
     fs::rename(&src, &dst).map_err(|e| e.to_string())?;
+    write_tombstone(&reality_id);
     Ok(BinOutcome { target, noop: false })
 }
 
@@ -266,10 +340,9 @@ pub fn restore_from_bin(reality_id: Option<String>, folder_name: Option<String>)
                failure: a committed pack restored in the compiled app never
                had a folder here; the state-side restore that already ran IS
                the whole truth. (Node twin: restoreFromBin's same branch.) */
-            return Ok(BinOutcome {
-                target: reality_id.unwrap_or_default(),
-                noop: true,
-            });
+            let target = reality_id.clone().unwrap_or_default();
+            remove_tombstone(&reality_id);
+            return Ok(BinOutcome { target, noop: true });
         }
     };
     let src = bin.join(&target);
@@ -281,6 +354,7 @@ pub fn restore_from_bin(reality_id: Option<String>, folder_name: Option<String>)
         fs::remove_dir_all(&dst).map_err(|e| e.to_string())?;
     }
     fs::rename(&src, &dst).map_err(|e| e.to_string())?;
+    remove_tombstone(&reality_id);
     Ok(BinOutcome { target, noop: false })
 }
 
@@ -293,10 +367,9 @@ pub fn purge_from_bin(reality_id: Option<String>, folder_name: Option<String>) -
                failure: a committed pack purged in the compiled app never had
                a folder here; the zero-trace purge that already ran in state
                IS the whole truth. (Node twin: purgeFromBin's same branch.) */
-            return Ok(BinOutcome {
-                target: reality_id.unwrap_or_default(),
-                noop: true,
-            });
+            let target = reality_id.clone().unwrap_or_default();
+            write_tombstone(&reality_id);
+            return Ok(BinOutcome { target, noop: true });
         }
     };
     let path = bin.join(&target);
@@ -304,6 +377,9 @@ pub fn purge_from_bin(reality_id: Option<String>, folder_name: Option<String>) -
         return Err("Resolved path escaped the bin tree; refused.".into());
     }
     fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
+    /* R105 — a purge KEEPS its tombstone: the reality is permanently dead
+       and the record is what keeps it dead across state wipes. */
+    write_tombstone(&reality_id);
     Ok(BinOutcome { target, noop: false })
 }
 
@@ -314,13 +390,22 @@ pub fn empty_bin() -> Result<u32, String> {
         if !entry.path().is_dir() {
             continue;
         }
-        let path = entry.path();
+        /* R105 — the .tombstones ledger (dot-directories) is NEVER emptied:
+           it IS the record that keeps the emptied realities dead forever */
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with('.') {
+            continue;
+        }
+        let path = bin.join(&name);
         if !is_inside(&bin, &path) {
             continue;
         }
         fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
         count += 1;
     }
+    /* R105 — the tombstones (bin/.tombstones) are KEPT: emptying the bin is
+       the last word, and the records are what keep the emptied realities
+       dead forever. */
     Ok(count)
 }
 

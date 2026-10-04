@@ -9,6 +9,7 @@ import { PhysicsHUD } from './ui/PhysicsHUD';
 import { ErrorBoundary, IcLink, ToastHost, useUniverse } from './ui/bits';
 import { toast } from './ui/toast';
 import { startRealitySync } from './platform/sync/realitySync';
+import { fetchDiskTombstones } from './platform/desktop/adapter';
 import { ensureSkyFor, onSkyChanged } from './platform/sky/skyRegistry';
 import { computeAurora, onThisDay } from './platform/sentiment/sentiment';
 import { perfMark } from './platform/performance';
@@ -252,6 +253,18 @@ export default function App() {
     let cancelled = false;
     let loadedEngine: UniverseEngine | null = null;
     let boot: (() => void) | null = null;
+    /* R105 — adopt disk tombstones at boot: a deleted reality must never
+       boot back into the multiverse (a wiped / fresh / corrupt saved state
+       would otherwise re-seed it straight from the compiled bundle). Fired
+       alongside the engine import; if it lands after the constructor build,
+       the existence-sync effect below performs the rebuild — both orders end
+       in the same honest multiverse. */
+    void (async () => {
+      try {
+        const tombstoned = await fetchDiskTombstones();
+        if (!cancelled && tombstoned.length) actions.adoptDiskTombstones(tombstoned);
+      } catch { /* best-effort — the realitySync poll is the safety net */ }
+    })();
     void import('./engine/engine').then(({ UniverseEngine }) => {
       if (cancelled || !canvasRef.current || engineRef.current) return;
       const engine = new UniverseEngine(canvasRef.current, getState().bodies, {

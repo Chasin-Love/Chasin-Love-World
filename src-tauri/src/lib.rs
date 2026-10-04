@@ -209,7 +209,11 @@ fn store_payload_delete(id: String) -> Result<(), String> {
 #[tauri::command]
 fn reality_bin_list() -> Result<serde_json::Value, String> {
     let bin = realities::list_bin()?;
-    Ok(serde_json::json!({ "success": true, "bin": bin }))
+    /* R105 — the disk-side permanent-death record, adopted by the client so a
+       wiped state can never resurrect a deleted reality (Node twin: the
+       /api/realities/bin route carries the same field). */
+    let tombstoned = realities::list_tombstones()?;
+    Ok(serde_json::json!({ "success": true, "bin": bin, "tombstoned": tombstoned }))
 }
 
 #[tauri::command]

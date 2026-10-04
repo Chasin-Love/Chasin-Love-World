@@ -217,6 +217,7 @@ class RealitySyncDaemon {
            to make the app lie ("could not reach the bin") and burn the retry
            queue for a deletion that had already fully happened. */
         this.log('MOVE_TO_BIN', `Nothing on disk to move for ${targetFolder} — the disk side of this deletion is already total`);
+        this.writeTombstone(realityId);
         return { success: true, noop: true };
       }
 
@@ -226,6 +227,7 @@ class RealitySyncDaemon {
       }
 
       fs.renameSync(srcPath, destPath);
+      this.writeTombstone(realityId);
       this.log('MOVE_TO_BIN', `Moved ${targetFolder} to src/realities/bin/${targetFolder}`);
       return { success: true, folderMoved: targetFolder };
     } catch (err: any) {
@@ -265,6 +267,7 @@ class RealitySyncDaemon {
            pack restored in the compiled app never had a folder here; the
            state-side restore that already ran IS the whole truth. */
         this.log('RESTORE_FROM_BIN', `Nothing on disk to restore for ${realityId || folderName} — the disk side of this restore is already total`);
+        this.removeTombstone(realityId);
         return { success: true, noop: true };
       }
 
@@ -279,6 +282,7 @@ class RealitySyncDaemon {
       }
 
       fs.renameSync(srcPath, destPath);
+      this.removeTombstone(realityId);
       this.log('RESTORE_FROM_BIN', `Restored ${targetFolder} from bin back to src/realities/${targetFolder}`);
       return { success: true, folderRestored: targetFolder };
     } catch (err: any) {
@@ -318,6 +322,7 @@ class RealitySyncDaemon {
            pack purged in the compiled app never had a folder here; the
            zero-trace purge that already ran in state IS the whole truth. */
         this.log('PURGE_BIN', `Nothing on disk to purge for ${realityId || folderName} — the disk side of this purge is already total`);
+        this.writeTombstone(realityId);
         return { success: true, noop: true };
       }
 
@@ -326,6 +331,9 @@ class RealitySyncDaemon {
         return { success: false, error: 'Resolved path escaped the bin tree; refused.' };
       }
       fs.rmSync(targetPath, { recursive: true, force: true });
+      /* R105 — a purge KEEPS its tombstone: the reality is permanently dead
+         and the record is what keeps it dead across state wipes. */
+      this.writeTombstone(realityId);
       this.log('PURGE_BIN', `Permanently erased src/realities/bin/${targetFolder}`);
       return { success: true };
     } catch (err: any) {
@@ -341,7 +349,9 @@ class RealitySyncDaemon {
       let count = 0;
 
       for (const dirent of items) {
-        if (dirent.isDirectory()) {
+        /* R105 — the .tombstones ledger (dot-directories) is NEVER emptied:
+           it IS the record that keeps the emptied realities dead forever */
+        if (dirent.isDirectory() && !dirent.name.startsWith('.')) {
           const target = path.join(this.binDir, dirent.name);
           if (!isInside(this.binDir, target)) continue;
           fs.rmSync(target, { recursive: true, force: true });
@@ -349,10 +359,67 @@ class RealitySyncDaemon {
         }
       }
 
+      /* R105 — the tombstones are KEPT: emptying the bin is the last word,
+         and the records are what keep the emptied realities dead forever. */
       this.log('EMPTY_BIN', `Purged ${count} realities from bin`);
       return { success: true, count };
     } catch (err: any) {
       return { success: false, count: 0, error: err.message };
+    }
+  }
+
+  /* ------------------ R105 permanent-death tombstones --------------------- */
+  /* A tombstone is an empty file, bin/.tombstones/<realityId>.tombstone —
+     the disk-side record that this reality id was deleted ON PURPOSE. The
+     client adopts tombstoned ids at boot (App.tsx) and on every sync poll
+     (realitySync), so even a wiped / fresh-installed / corrupt saved state
+     can never resurrect a deleted reality: the compiled desktop bundle
+     always carries its packs, and this record is what keeps them dead.
+     Written by move-to-bin and purge (a purge keeps it — permanent death),
+     removed by restore, KEPT by empty — emptied realities stay dead forever.
+     The Rust twin (src-tauri/src/realities.rs) writes the same files with
+     the same filename rule: the id verbatim, only when it is already
+     filename-safe ([A-Za-z0-9._-]+). */
+  private tombstonesDir(): string {
+    return path.join(this.binDir, '.tombstones');
+  }
+
+  private static isTombstoneSafeId(id: string): boolean {
+    return /^[A-Za-z0-9._-]+$/.test(id);
+  }
+
+  private writeTombstone(realityId?: string | null) {
+    const id = (realityId ?? '').trim();
+    if (!id || !RealitySyncDaemon.isTombstoneSafeId(id)) return;
+    try {
+      const dir = this.tombstonesDir();
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, `${id}.tombstone`), '');
+      this.log('TOMBSTONE_WRITE', `bin/.tombstones/${id}.tombstone — this reality stays deleted`);
+    } catch (err: any) {
+      this.log('TOMBSTONE_ERROR', err.message);
+    }
+  }
+
+  private removeTombstone(realityId?: string | null) {
+    const id = (realityId ?? '').trim();
+    if (!id || !RealitySyncDaemon.isTombstoneSafeId(id)) return;
+    try {
+      fs.rmSync(path.join(this.tombstonesDir(), `${id}.tombstone`), { force: true });
+      this.log('TOMBSTONE_CLEAR', `bin/.tombstones/${id}.tombstone cleared — the reality may live again`);
+    } catch (err: any) {
+      this.log('TOMBSTONE_ERROR', err.message);
+    }
+  }
+
+  public listTombstones(): string[] {
+    try {
+      return fs
+        .readdirSync(this.tombstonesDir())
+        .filter((f) => f.endsWith('.tombstone'))
+        .map((f) => f.slice(0, -'.tombstone'.length));
+    } catch {
+      return [];
     }
   }
 
@@ -457,7 +524,9 @@ class RealitySyncDaemon {
 
       const bin = fs.readdirSync(this.binDir, { withFileTypes: true });
       for (const b of bin) {
-        if (b.isDirectory()) {
+        /* R105 — dot-directories (the .tombstones ledger) are system records,
+           never binned realities */
+        if (b.isDirectory() && !b.name.startsWith('.')) {
           binFolders.push(b.name);
         }
       }
