@@ -3,7 +3,8 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-10-03, after R104 (the desktop rebirth).
+> **Last updated:** 2026-10-04, after R105 (THE VANISHED MARBLE — on branch
+> `r105-the-vanished-marble`, awaiting the author's merge).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -311,7 +312,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ---
 
-## 8. CURRENT STATE (as of 2026-10-04 — main's tip is **R104, the desktop rebirth**, merged --no-ff from `r104-the-desktop-rebirth` on the author's word after a hands-on test drive; the branch deleted after the merge — only main remains; R91–R95 shipped as v16.0.0)
+## 8. CURRENT STATE (as of 2026-10-04 — main's tip is **R104, the desktop rebirth**, merged --no-ff from `r104-the-desktop-rebirth` on the author's word after a hands-on test drive; the branch deleted after the merge — only main remains; R91–R95 shipped as v16.0.0. R105, THE VANISHED MARBLE, is on branch `r105-the-vanished-marble`, fully verified, awaiting the author's test drive and merge)
 
 - **`main` is the blessed reference.** Its tip is the R104 merge (the desktop
   rebirth) on top of the merged R96–R103 chain —
@@ -359,6 +360,62 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (`r82-the-voice`, `r85-the-six-seams`, `r87-native-simulator`,
   `r88-per-frame-twin`, `the-real-universe`) are historical signposts, fully
   contained in main.)
+- **R105 (this round, on branch `r105-the-vanished-marble`, cut from main's R104 tip):**
+  THE VANISHED MARBLE — the author's report after test-driving the R102 decree on the
+  R104 desktop: *"I can delete all the folders but I can't delete Sol-Prime… even after
+  I delete them I can see the reflection in the multiverse giants view."* THREE verified
+  findings, three closures. **(1) THE GHOST MARBLE:** the multiverse scene's ONLY runtime
+  rebuild — App.tsx's EXISTENCE SYNC effect — carried a `skipFirstRebuild` guard that the
+  engine's ASYNC arrival never consumed at mount (`if (!eng) return` bailed before the
+  guard), so the guard was STOLEN by the first real change of every session — typically
+  the first `deleteReality` — which returned WITHOUT rebuilding: the deleted reality's
+  glass sphere + galaxy disc + orbit rings + click collider kept rendering on the
+  multiverse stage (hover resolved it through `getReality`'s survivor fallback to the
+  wrong universe) until some unrelated sig change or a restart. Fixed by carrying
+  `engineReady` in the effect's deps — the exact law the physics-toggles effect above it
+  has obeyed since Round 14 — so the engine's arrival consumes the guard and the FIRST
+  delete/edit/rename/create of every session performs its rebuild. **(2) THE LYING DISK
+  LEG:** in the compiled desktop app a committed pack (Sol-Prime included) has no folder
+  in the app-data tree, so both backend twins' bin verbs errored "Directory … does not
+  exist", the app toasted "could not reach the bin", and the 5-retry queue burned — for
+  a deletion whose state side had fully landed. Now a bin verb resolving to NOTHING on
+  disk is a success no-op on BOTH twins in one commit (R98 lockstep): realityDaemon's
+  move/restore/purge gained explicit nothing-on-disk branches; realities.rs returns
+  `BinOutcome {target, noop}` shaped by lib.rs as `{success:true, noop:true}`. **(3) THE
+  RESURRECTION WINDOW:** R102's tombstone-in-state was the ONLY thing keeping a deleted
+  pack dead on desktop — a wiped/fresh/corrupt state re-seeded it straight from the
+  bundle (the R102 comment's premise "the glob no longer matches anything" is true only
+  in dev). THE TOMBSTONE LEDGER: both twins record every deliberate deletion as
+  `bin/.tombstones/<id>.tombstone` (move writes, purge writes AND KEEPS — permanent
+  death, restore clears — the reality may live again, empty keeps all — the last word),
+  the bin lists carry an additive `tombstoned: string[]`, dot-directories are filtered
+  from every listing AND from empty-bin itself (the live check's catch: emptyBin
+  measured EATING the ledger, count 1 — fixed on both twins, re-measured 0, ledger
+  survives), and the client adopts the ledger at boot + on every realitySync poll
+  through the new `adoptDiskTombstones(ids)` action (skips re-created ids: creation
+  outranks a tombstone; prunes any freshly-seeded phantom container payload-and-all;
+  forgetSession; recompute; surfaces the traveler if the pack was booted into).
+  RECEIPTS: round105-vanished-marble gauntlet (17 checks, in the verify chain after
+  round104) — mutation-proven three ways, and it caught its own vacuous empty-bin pin
+  during construction (a lazy whole-file regex satisfied by the getStatus filter — the
+  R98 disease; every lifecycle pin is now scoped by a bodyBetween slice);
+  round105-vanished-marble probe (13 assertions) deletes Sol-Prime through the REAL UI
+  (Core Console → Realities Grid → Collapse → Confirm Erase, all-DOM clicks —
+  Playwright's actioned clicks measurably lose races with the card's hover/layout
+  animations) on a fresh server + headless Chromium with a document token defeating any
+  Vite full-reload, and grants THE RECEIPT only on the SAME engine instance that
+  rendered the marble (ghost gone, traveler at the multiverse, folder in the bin,
+  tombstone written, persisted state carrying the bin entry, zero errors) — ALL GREEN
+  twice back-to-back, and with engineReady removed it fails at exactly THE RECEIPT
+  naming the stolen guard; live daemon scratch checks 9/9; tsc clean; cargo check
+  green; round98 conformance + round104 shell ALL GREEN; audit --check clean after the
+  in-commit --snapshot refresh; full verify green (23 gauntlets, smoke, prod smoke).
+  NOT TOUCHED: getReality's survivor fallback (load-bearing R102 contract — with
+  ghosts dead it has nothing to mis-resolve), the restore flow, the R83-2 seed guard.
+  Limits: the probe is the dev/web tier (the desktop legs are gauntlet-pinned +
+  compile-verified; a built-exe probe receipt waits for the author's call); the ledger
+  dies only with the machine's app data itself.
+  `docs/ROUND-105-THE-VANISHED-MARBLE-2026-10-04.md`
 - **R101 (this round, on branch `r101-the-frost-deck`):** THE FROST DECK — the author's
   decree, with a visionOS-manner frosted-glass dashboard screenshot: *"time to upgrade our
   core console to these style & manner"*. The Core Console consciously REVERSES its R8-era
@@ -1043,13 +1100,13 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (21 checks) in the verify chain. Smoke reference held (green 0.066–0.074 histL1; one
   cold-boot flake diagnosed, never reproduced). `docs/ROUND-84-THE-ASCENDING-NODES-
   2026-09-30.md`.
-- **Verification status:** `npm run verify` ALL GREEN (typecheck; all **21
+- **Verification status:** `npm run verify` ALL GREEN (typecheck; all **23
   gauntlets** — the R98 physics gate now carries 91 checks including the
-  executed-artifact numerical half and the wiring pins — smoke + prod-smoke,
-  zero console errors) — re-verified per round, most recently at R101 (the
-  frost deck: a clean single run after the legibility fixes — every gauntlet
-  green, `SMOKE TIER — wasm`, histL1 0.0699 against
-  the 0.12 pin);
+  executed-artifact numerical half and the wiring pins, and R105 joined the
+  chain with 17 mutation-proven checks — smoke + prod-smoke,
+  zero console errors) — re-verified per round, most recently at R105 (the
+  vanished marble: every gauntlet green, `SMOKE TIER — wasm`, healthy frame
+  pins);
   `npm audit` 0 vulnerabilities; `audit:arch --check` **clean at the R100
   snapshot** (zero dead exports; absorbed in-commit on every structural change);
   `desktop:check` **compiles the REAL C++ core as of R100** — the author's
@@ -1174,6 +1231,16 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    hold) at the cost of hiding the lens there — the exact trade the author
    must rule on; the manual alternative already works (the quality card +
    Studio switch, measured above).
+   **R105 addendum — a NEW smoke-red signature joined the family:** the Vite
+   HMR socket answering **400 Unexpected response** instead of
+   connection-refused — meaning a ZOMBIE dev server (an orphaned `node.exe`
+   child of a shell-spawned `npm run dev`: killing the shell does not kill
+   the child on Windows) is squatting on :24678 and rejecting the fresh
+   server's token. The frame stays HEALTHY (histL1 green both runs — the red
+   is pure socket noise); the first instrument is
+   `netstat -ano | findstr :24678` (also the probe ports 3997/3999) — kill
+   the orphan and re-run. Queued: a tree-kill (`taskkill /T`) in the
+   probes'/smoke's server cleanup, so the orphans stop being born.
 8. **R104 queued (the author's calls, not acted on):** (a) the breaker
    ruling above; (b) settings that follow the human — quality + Studio tier
    live in each profile's localStorage, so the browser's and the desktop's
@@ -1244,6 +1311,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 | **Einstein lensing** | Per-body halo bending of the sky; local, melts at 6·b_c; toggleable, absent = ON |
 | **EFS** | Eventide Filesystem — the vault's copy-on-write inode fs with shadows/dedup/scrub |
 | **Quantum Bin** | The recycle bin for deleted realities (`src/realities/bin/` + disk daemon) |
+| **The Tombstone Ledger** | R105's disk-side permanent-death record (`bin/.tombstones/<id>.tombstone`, written by BOTH backend twins on delete/purge, cleared by restore, kept by empty) — the client adopts it at boot + poll, so a deleted reality can never return, even against a wiped state |
 | **Core Mode / Core Console** | The management deck entered via the Anchor Star (realities grid, bin, lineage) |
 | **Gauntlet** | `scripts/roundNN-gauntlet.ts` — asserts source-level invariants of a round; part of verification |
 | **Universe Surface** | The 460,000-unit dome where galaxies/clusters live; the funnel is the hole's dent in it |
