@@ -17,6 +17,9 @@
      4. the camera sits at the multiverse stage (the giant sphere)
      5. the multiverse renders zero reality marbles
      6. a Core Console opens on that empty multiverse (Forge path exists)
+     7. R105 THE SEALED FLOOR: sustained inward wheel pushes at the
+        multiverse floor NEVER carry the traveler into the web — the stage
+        holds, and the anchor star never resurrects itself
 
    Run:  npx tsx scripts/probes/round102-independence-probe.ts
    (always spawns its own server on $SMOKE_PORT or 3999 — a server started
@@ -102,6 +105,26 @@ async function main(): Promise<void> {
     expect('zero reality marbles render', marbles === 0, `realityMarbles=${marbles}`);
 
     await page.screenshot({ path: path.join(OUT, 'empty-multiverse-boot.png') });
+
+    /* R105 — THE SEALED FLOOR, the runtime receipt: the old floor-return
+       carried a hard inward push through the multiverse floor into the web
+       (the phantom single-anchor-star view). The decree deleted it whole.
+       Drive the traveler exactly as the author did — sustained wheel-up
+       (negative deltaY = zoom IN toward the core) at the floor — and the
+       stage must hold. The push rides the wheel handler on the canvas
+       (tZoomT += zoomVel·dt), so a burst of notches builds real inward
+       velocity, the exact condition the deleted crossing keyed on. */
+    await page.mouse.move(800, 450);
+    for (let i = 0; i < 30; i++) {
+      await page.mouse.wheel(0, -600);
+      await page.waitForTimeout(70);
+    }
+    await page.waitForTimeout(2500); /* let the velocity glide decay honestly */
+    const stageAfterPush = await page.evaluate(() => (window as any).__ENGINE__?.cosmicStage ?? '?');
+    expect('R105: sustained inward pushes at the floor NEVER enter the web', stageAfterPush === 'multiverse', `cosmicStage=${stageAfterPush}`);
+    const anchorVisible = await page.evaluate(() => Boolean((window as any).__ENGINE__?.anchorGroup?.visible));
+    expect('R105: the anchor star never resurrects itself without a reality', !anchorVisible, 'anchorGroup.visible=true with no reality');
+    await page.screenshot({ path: path.join(OUT, 'sealed-floor-hold.png') });
 
     /* THE FORGE DOOR — the console must open on the empty multiverse so the
        author can forge the next universe (Ctrl+K → "console" → Enter) */

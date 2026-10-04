@@ -25,7 +25,7 @@ import type { CosmicBody } from '../../domain/universe';
 import { REALITIES, type GalaxyClusterData, type GalaxyData, type RealityConfig } from '../../realities';
 import {
   WEB_CEILING,
-  MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, REALITY_FLOOR,
+  MULTIVERSE_FLOOR_CLAMP, REALITY_FLOOR,
 } from '../systems/stageThresholds';
 import { SCALE_BANDS, highScaleLabel } from '../systems/levelSystem';
 import type { InnerSystem, RuntimeBody, UniverseEngine } from '../engine';

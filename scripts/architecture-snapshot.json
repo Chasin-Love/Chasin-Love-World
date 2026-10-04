@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-03T19:29:17.123Z",
+  "generatedAt": "2026-10-04T06:41:39.597Z",
   "fileCount": 177,
   "deadExports": [
     {
@@ -686,7 +686,7 @@
     "scripts/gauntlets/round17-gauntlet.ts": 488,
     "scripts/gauntlets/round18-kamui-gauntlet.ts": 198,
     "scripts/gauntlets/round63-void-gauntlet.ts": 150,
-    "scripts/gauntlets/round72-stage-arrival-gauntlet.ts": 92,
+    "scripts/gauntlets/round72-stage-arrival-gauntlet.ts": 114,
     "scripts/gauntlets/round73-throat-gauntlet.ts": 51,
     "scripts/gauntlets/round74-herald-gauntlet.ts": 93,
     "scripts/gauntlets/round75-bridge-gauntlet.ts": 87,
@@ -706,7 +706,7 @@
     "scripts/gauntlets/stateSource.ts": 26,
     "scripts/probes/debug-cloud.ts": 137,
     "scripts/probes/round101-frost-visual.ts": 195,
-    "scripts/probes/round102-independence-probe.ts": 144,
+    "scripts/probes/round102-independence-probe.ts": 167,
     "scripts/probes/round103-bughunt-probe.ts": 382,
     "scripts/probes/round103-gpu-lens-probe.ts": 111,
     "scripts/probes/round103-lens-recheck.ts": 111,
@@ -737,7 +737,7 @@
     "src/engine/cameraMemory.ts": 109,
     "src/engine/cameraRig.ts": 415,
     "src/engine/capability.ts": 135,
-    "src/engine/engine.ts": 2892,
+    "src/engine/engine.ts": 2896,
     "src/engine/kamui/KamuiPortalSystem.ts": 595,
     "src/engine/math.ts": 65,
     "src/engine/shaders.ts": 1542,
@@ -860,7 +860,7 @@
   "locLeaders": [
     [
       "src/engine/engine.ts",
-      2892
+      2896
     ],
     [
       "src/engine/stages/LevelStageSystem.ts",
@@ -1066,7 +1066,7 @@
     "window seams": [
       "scripts/probes/debug-cloud.ts:38",
       "scripts/probes/round101-frost-visual.ts:65",
-      "scripts/probes/round102-independence-probe.ts:91",
+      "scripts/probes/round102-independence-probe.ts:94",
       "scripts/probes/round103-bughunt-probe.ts:116",
       "scripts/probes/round103-bughunt-probe.ts:119",
       "scripts/probes/round103-bughunt-probe.ts:121",

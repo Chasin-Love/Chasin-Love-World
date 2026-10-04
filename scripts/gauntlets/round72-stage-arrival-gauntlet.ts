@@ -7,8 +7,12 @@
  * dial hold still while the tear builds, and the throat hands the other
  * stage over exactly as the summon expires (the mirror of the R67 portal
  * handoff). The eject face keeps its instant burst — its decay IS the
- * arrival — and the reverse come always lands back in the cosmic web, never
- * written to the home stellar system.
+ * arrival.
+ *
+ * R105 reconciliation — THE SEALED FLOOR: the author's decree deleted the
+ * zoom-velocity floor-return whole (with no realities it landed in the
+ * phantom single-anchor-star web). Section 5 now guards its ABSENCE: zoom
+ * never enters a reality, explicit Kamui doors only.
  *
  * Pure-source mirrors of the round's invariants. Checked without a GPU.
  */
@@ -75,16 +79,34 @@ const thrSrc = readFileSync(new URL('../../src/engine/systems/stageThresholds.ts
   check('R72: both membrane crossing gates refuse while a warp is in flight', gates, 'gate guards missing');
 }
 
-/* ==== 5. the reverse come lands in the cosmic web, never the home page ==== */
+/* ==== 5. THE SEALED FLOOR (R105 authorial decree) ==== */
 {
-  const landing = /this\.beginStageWarp\('toWeb', 0\.72\);/.test(engSrc);
-  check('R72: the multiverse floor return still lands at the cosmic web dial (0.72)', landing, 'web landing lost');
-}
+  /* Reconciliation: the R72 floor-return — the dial pushed through the
+     multiverse floor carrying the traveler into the web — is DELETED WHOLE
+     by the author's decree. With no realities it landed in the phantom
+     single-anchor-star web, and the law is now absolute: zoom never enters
+     a reality; the only bridges are the explicit Kamui doors (the marble
+     click, the palette, the stepper). The floor clamp is the last word.
+     (These pins read raw source, so the surviving comments deliberately
+     avoid the deleted literals — R104's lesson.) */
+  const noThresholds = !/MULTIVERSE_FLOOR_RETURN|RETURN_ZOOM_VEL/.test(engSrc)
+    && !/MULTIVERSE_FLOOR_RETURN|RETURN_ZOOM_VEL/.test(thrSrc);
+  check('R105: the floor-return crossing and its two thresholds are deleted whole (engine + thresholds)', noThresholds, 'the floor return survives');
 
-/* ==== 6. the reverse come is fireable ==== */
-{
-  const threshold = /export const RETURN_ZOOM_VEL = -0\.02;/.test(thrSrc);
-  check('R72: the way home asks the same push as the way out (-0.02, matched to +0.02)', threshold, 'threshold not matched');
+  /* 240-char window: measured against the real guard shape (threshold +
+     velocity + liveness gates + condition close ≈ 145 chars on the R72
+     crossing) — a tighter window proved VACUOUS under mutation. */
+  const noVelocityEntry = !/this\.rig\.zoomVelocity <[\s\S]{0,240}beginStageWarp\('toWeb'/.test(engSrc);
+  check('R105: no inward-velocity condition carries the traveler into the web', noVelocityEntry, 'a velocity-keyed floor crossing survives');
+
+  /* the ONLY velocity-gated crossing left in the family is the web-ceiling
+     push — it EXITS to the multiverse (outward `>`), it never enters */
+  const exitOnly = (engSrc.match(/this\.rig\.zoomVelocity [<>]/g) ?? []).length === 1
+    && /this\.rig\.zoomVelocity > 0\.02/.test(engSrc);
+  check('R105: the family\'s one velocity-gated crossing is the outward web-ceiling exit', exitOnly, 'a second velocity gate appeared');
+
+  const clampHeld = /if \(this\.rig\.tZoomT < MULTIVERSE_FLOOR_CLAMP\) this\.rig\.setZoomTarget\(MULTIVERSE_FLOOR_CLAMP\);/.test(engSrc);
+  check('R105: the multiverse floor clamp is the last word at the membrane', clampHeld, 'the floor clamp was lost with the crossing');
 }
 
 console.log(failures === 0 ? '\nR72 STAGE ARRIVAL GAUNTLET — ALL GREEN' : `\nR72 STAGE ARRIVAL GAUNTLET — ${failures} RED`);

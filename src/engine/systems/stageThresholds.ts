@@ -17,15 +17,15 @@ const WEB_EDGE_TRIGGER = 0.855;
 /** Outward zoom velocity (dial/s) required to cross at a stage edge. */
 const WARP_ZOOM_VEL = 0.05;
 
-/* ---- multiverse floor: the way back to the web ---- */
+/* ---- multiverse floor: a wall, not a door (R105) ---- */
 
-/** Soft floor the rig is held at inside the multiverse. */
+/** Soft floor the rig is held at inside the multiverse. R105 authorial
+    decree — THE SEALED FLOOR: pushing through it no longer crosses into the
+    web. The old push-through crossing (a 0.802 return threshold gated by a
+    −0.02 inward zoom velocity) was deleted whole — with no realities it
+    landed in the phantom single-anchor-star web; zoom never enters a
+    reality, explicit Kamui doors only (the marble click, the palette, the
+    stepper). */
 export const MULTIVERSE_FLOOR_CLAMP = 0.8;
-/** Crossing below this while pushing inward carries the dial back to the web. */
-export const MULTIVERSE_FLOOR_RETURN = 0.802;
-/** Inward zoom velocity (dial/s) required to cross back. R72: matched to the
-    web-side push (0.02) — at -0.05 the way home asked twice the effort and
-    the reverse come read as if it did not exist. */
-export const RETURN_ZOOM_VEL = -0.02;
 /** Reality marble frame releases below this zoom. */
 export const REALITY_FLOOR = 0.787;

@@ -3,7 +3,7 @@
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
 > **Reference state:** branch `main` (the author has blessed `main` as the absolute reference).
-> **Last updated:** 2026-10-03, after R104 (the desktop rebirth).
+> **Last updated:** 2026-10-04, after R105 (the sealed floor).
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
 
@@ -311,7 +311,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ---
 
-## 8. CURRENT STATE (as of 2026-10-04 — main's tip is **R104, the desktop rebirth**, merged --no-ff from `r104-the-desktop-rebirth` on the author's word after a hands-on test drive; the branch deleted after the merge — only main remains; R91–R95 shipped as v16.0.0)
+## 8. CURRENT STATE (as of 2026-10-04 — **R105, the sealed floor, is IN FLIGHT on branch `r105-the-sealed-floor`** on top of main's tip: **R104, the desktop rebirth**, merged --no-ff from `r104-the-desktop-rebirth` on the author's word after a hands-on test drive; the branch deleted after the merge — only main remains; R91–R95 shipped as v16.0.0)
 
 - **`main` is the blessed reference.** Its tip is the R104 merge (the desktop
   rebirth) on top of the merged R96–R103 chain —
@@ -336,7 +336,10 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   **Correction (verified in R72):** the earlier claim that R71 step 2's slice table sat on
   `main` was stale — `src/engine/systems/stageSlices.ts` does NOT exist on `main`; the Ten
   Slices work lives only on the branches below.
-- **In flight (branches, not final):** `r71-ten-slices` carries R68/R69 explorer-upgrade work
+- **In flight (branches, not final):** `r105-the-sealed-floor` (this round —
+  the author's decree that zooming into the core may never enter a reality;
+  full verify green on the branch, awaiting the author's test drive and
+  merge). `r71-ten-slices` carries R68/R69 explorer-upgrade work
   (cameraRig orbit/glide grammar, touch grammar, 3.5 s summon, ROUND-68/69 docs) plus R71
   step 3 ("zoom never crosses"; changes in `engine.ts`, `stageThresholds.ts`, `kamuiPhases.ts`,
   `cameraRig.ts`, round18 gauntlet) and uncommitted step-3 transform scripts. `r85-the-six-seams`
@@ -549,6 +552,44 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    retry guard reporting honestly);
    `audit:arch --check` clean with in-commit snapshot refresh (three new probe
    instruments absorbed). `docs/ROUND-103-THE-WALL-CLOCK-JUTSU-2026-10-03.md`
+- **R105 (this round, on branch `r105-the-sealed-floor`):** THE SEALED
+  FLOOR — the author's bug report and decree: with zero realities (legal
+  since R102), zooming hard into the Astral Core pushed the dial through the
+  multiverse floor and the "multiverse floor return" fired a zoom-velocity
+  Kamui INTO a reality's cosmic web with NO reality (the crossing had no
+  `activeReality` guard), landing in the phantom view — empty web, and the
+  lone default-palette anchor star resurrecting itself from camera distance
+  alone (`anchorGroup.visible = sysW > 0.02` re-evaluated every frame with no
+  reality guard, overriding `setReality(null)`'s one-time hide; "no Galaxy no
+  planets just single anchor star", the author's exact symptom — the empty
+  boot's degenerate focus even RESTS the camera inside the Astral Core's
+  glass shell, one inward scroll from the crossing). Asked, the author ruled
+  **DELETE ENTIRELY** — not just the empty case. THE CUT: the floor-return
+  block deleted whole (the floor clamp stays — the membrane is a wall now,
+  pushing into the core stops there), `MULTIVERSE_FLOOR_RETURN` /
+  `RETURN_ZOOM_VEL` die in stageThresholds.ts ("a wall, not a door"), the
+  anchor/belt per-frame visibility writes gain the `!!this.activeReality`
+  gate (the round95-pinned `sysW`/`homeRealmW` lines byte-identical — zero
+  reconciliation there), and the web→multiverse ceiling push STAYS (it
+  exits; it never enters). Entering a reality is now exclusively the
+  explicit Kamui doors (marble click / palette / stepper) — the AGENTS.md
+  R71 law enforced without exception. GAUNTLET RECONCILED: round72's
+  section 5 (which pinned the deleted crossing verbatim) rebuilt as the
+  sealed-floor NEGATIVE pins (thresholds absent from engine + thresholds; no
+  `zoomVelocity <` reaching a toWeb call within a 240-char window; exactly
+  one velocity-gated crossing left in the family — the outward ceiling exit;
+  clamp held) — and the first mutation run caught OUR OWN VACUOUS PIN (a
+  120-char window too tight for the ~145-char guard shape stayed green on
+  the mutated tree; widened with the measurement recorded — R98's lesson
+  caught in the act). RUNTIME PROOF: the R102 independence probe gained
+  assertion 7 — after the empty boot, 30 sustained inward wheel notches at
+  the floor (the author's own gesture, wheel-up = zoom-in) — ALL GREEN on
+  the fix, and RED (`cosmicStage=web`) with the old crossing temporarily
+  restored, then green again: the probe reproduces the author's bug on the
+  old code. Receipts: typecheck clean; full verify exit 0 (22 gauntlets,
+  smoke histL1 0.0716 vs 0.12 on the wasm tier, zero console errors, prod
+  smoke green); audit `--check` clean after an in-commit snapshot refresh.
+  `docs/ROUND-105-THE-SEALED-FLOOR-2026-10-04.md`
 - **R104 (this round, on branch `r104-the-desktop-rebirth`, cut from main's
   R103 tip — **MERGED --no-ff into main on the author's word, 2026-10-04,
   after the author's hands-on test drive of the built app: "everything is
@@ -1124,6 +1165,9 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    first frame (a one-time hitch — a shader warm-up would be its own round).
 3. **Finish R71 "Ten Slices"** — the slice system's consumers: the hierarchy stepper firing
    explicit cross-slice Kamui, edge membrane affordances, gauntlet pins for the new law.
+   (R105 note: the "zoom never crosses" law is now enforced on `main` for the
+   multiverse floor — the velocity-triggered crossing is deleted; the
+   branch's slice machinery remains its own ruling.)
 4. **The Signage Wave** (the recommended next theme, from the experience report):
    first-run guided onboarding (double-click a world → write an entry → see the moon → `?`),
    an in-app legend for click-gestures, a one-click whole-universe backup/restore file,

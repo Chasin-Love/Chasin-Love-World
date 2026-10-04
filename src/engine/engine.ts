@@ -51,7 +51,7 @@ import { ensureSkyFor, getActiveSkySpec, type ActiveSkySpec } from '../platform/
 import { type AuroraSignal } from '../platform/sentiment/sentiment';
 import {
   WEB_CEILING,
-  MULTIVERSE_FLOOR_CLAMP, MULTIVERSE_FLOOR_RETURN, RETURN_ZOOM_VEL, REALITY_FLOOR,
+  MULTIVERSE_FLOOR_CLAMP, REALITY_FLOOR,
 } from './systems/stageThresholds';
 import { SCALE_BANDS, highScaleLabel } from './systems/levelSystem';
 import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING, KAMUI_TRIGGER_DURATION, KAMUI_REVERSE_DURATION, KAMUI_VACUUM_WINDOW, KAMUI_BEATS, kamuiBeatEase } from './systems/kamuiPhases';
@@ -2119,14 +2119,14 @@ export class UniverseEngine {
           this.grabCooldown = 0.6;
         }
         if (this.rig.tZoomT < MULTIVERSE_FLOOR_CLAMP) this.rig.setZoomTarget(MULTIVERSE_FLOOR_CLAMP);
-        /* pushed through the multiverse's floor — the dial carries you back
-           out into the web (this crossing IS a Kamui) */
-        if (
-          this.rig.tZoomT <= MULTIVERSE_FLOOR_RETURN && this.rig.zoomVelocity < RETURN_ZOOM_VEL && this.grabCooldown <= 0 && !this.stageWarp
-          && !this.dragging && this.portal.phase === 'idle'
-        ) {
-          this.beginStageWarp('toWeb', 0.72);
-        }
+        /* R105 authorial decree — THE SEALED FLOOR: the old floor-return is
+           deleted whole. Pushing the dial through the multiverse floor used
+           to fire the 0.72 warp into the web — a zoom crossing INTO a
+           reality (with no realities it landed in the phantom
+           single-anchor-star web). Zoom never crosses cosmological slices;
+           the ONLY way in is the explicit Kamui doors (the marble click, the
+           palette, the stepper). The floor is a wall now: the clamp above is
+           the last word. */
       }
       /* galaxy focus releases, in a ladder:
          inner system → zoom out → back to that galaxy's frame (in front of
@@ -2623,10 +2623,14 @@ this.updateBodies(dt);
     this.coronaMat.uniforms.uTime.value = this.clockT;
     this.coronaMat.uniforms.uBoost.value = (1 - this.coreT * 0.55) * (0.92 + 0.08 * Math.sin(this.clockT * 0.8));
 
-    this.anchorGroup.visible = sysW > 0.02;
+    /* R105 decree companion: with NO active reality there is no home system —
+       the anchor and its belt can never fade in from camera distance alone
+       (setReality(null) hides them once; this per-frame write is the one that
+       must stay honest). */
+    this.anchorGroup.visible = !!this.activeReality && sysW > 0.02;
     /* the belt sleeps through the birth too */
     const birthDark = this.bootIntro && this.clockT < 2.4;
-    this.belt.visible = sysW > 0.02 && !birthDark;
+    this.belt.visible = !!this.activeReality && sysW > 0.02 && !birthDark;
     this.belt.rotation.y = this.simDays * 0.0016;
 
     /* the rocks tumble on their own axes — only worked while anyone can see them */
