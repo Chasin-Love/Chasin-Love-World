@@ -214,20 +214,36 @@ fn reality_bin_list() -> Result<serde_json::Value, String> {
 
 #[tauri::command]
 fn reality_move_to_bin(reality_id: Option<String>, folder_name: Option<String>) -> Result<serde_json::Value, String> {
-    let moved = realities::move_to_bin(reality_id, folder_name)?;
-    Ok(serde_json::json!({ "success": true, "folderMoved": moved }))
+    /* R105 — a noop outcome (nothing on disk to move — a committed pack in
+       the compiled app has no folder in this tree) is a SUCCESS: the
+       state-side deletion is the whole truth. The Node twin shapes its own
+       response identically. */
+    let out = realities::move_to_bin(reality_id, folder_name)?;
+    if out.noop {
+        Ok(serde_json::json!({ "success": true, "noop": true }))
+    } else {
+        Ok(serde_json::json!({ "success": true, "folderMoved": out.target }))
+    }
 }
 
 #[tauri::command]
 fn reality_restore(reality_id: Option<String>, folder_name: Option<String>) -> Result<serde_json::Value, String> {
-    let restored = realities::restore_from_bin(reality_id, folder_name)?;
-    Ok(serde_json::json!({ "success": true, "folderRestored": restored }))
+    let out = realities::restore_from_bin(reality_id, folder_name)?;
+    if out.noop {
+        Ok(serde_json::json!({ "success": true, "noop": true }))
+    } else {
+        Ok(serde_json::json!({ "success": true, "folderRestored": out.target }))
+    }
 }
 
 #[tauri::command]
 fn reality_purge(reality_id: Option<String>, folder_name: Option<String>) -> Result<serde_json::Value, String> {
-    realities::purge_from_bin(reality_id, folder_name)?;
-    Ok(serde_json::json!({ "success": true }))
+    let out = realities::purge_from_bin(reality_id, folder_name)?;
+    if out.noop {
+        Ok(serde_json::json!({ "success": true, "noop": true }))
+    } else {
+        Ok(serde_json::json!({ "success": true }))
+    }
 }
 
 #[tauri::command]

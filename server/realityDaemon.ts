@@ -160,7 +160,7 @@ class RealitySyncDaemon {
     }
   }
 
-  public moveToBin(realityId: string, folderName?: string): { success: boolean; folderMoved?: string; error?: string } {
+  public moveToBin(realityId: string, folderName?: string): { success: boolean; folderMoved?: string; noop?: boolean; error?: string } {
     this.ensureDirectories();
 
     /* R102 — the independent-realities decree: ANY reality's folder can be
@@ -210,7 +210,14 @@ class RealitySyncDaemon {
         return { success: false, error: 'Resolved path escaped the realities tree; refused.' };
       }
       if (!fs.existsSync(srcPath)) {
-        return { success: false, error: `Directory ${srcPath} does not exist.` };
+        /* R105 — nothing on disk to move is a COMPLETED deletion, not a
+           failure: in the compiled desktop app a committed pack (Sol-Prime
+           included) has no folder here at all — its only body is the bundle,
+           and the state-side tombstone is the whole truth. Erroring here used
+           to make the app lie ("could not reach the bin") and burn the retry
+           queue for a deletion that had already fully happened. */
+        this.log('MOVE_TO_BIN', `Nothing on disk to move for ${targetFolder} — the disk side of this deletion is already total`);
+        return { success: true, noop: true };
       }
 
       // If destination exists, clean it first
@@ -227,7 +234,7 @@ class RealitySyncDaemon {
     }
   }
 
-  public restoreFromBin(realityId: string, folderName?: string): { success: boolean; folderRestored?: string; error?: string } {
+  public restoreFromBin(realityId: string, folderName?: string): { success: boolean; folderRestored?: string; noop?: boolean; error?: string } {
     this.ensureDirectories();
 
     try {
@@ -253,7 +260,12 @@ class RealitySyncDaemon {
       }
 
       if (!targetFolder) {
-        return { success: false, error: `No trashed folder found for ${realityId || folderName}` };
+        /* R105 — nothing trashed on disk is a completed restore, not a
+           failure (desktop twin: realities.rs restore_from_bin). A committed
+           pack restored in the compiled app never had a folder here; the
+           state-side restore that already ran IS the whole truth. */
+        this.log('RESTORE_FROM_BIN', `Nothing on disk to restore for ${realityId || folderName} — the disk side of this restore is already total`);
+        return { success: true, noop: true };
       }
 
       const srcPath = path.join(this.binDir, targetFolder);
@@ -275,7 +287,7 @@ class RealitySyncDaemon {
     }
   }
 
-  public purgeFromBin(realityId: string, folderName?: string): { success: boolean; error?: string } {
+  public purgeFromBin(realityId: string, folderName?: string): { success: boolean; noop?: boolean; error?: string } {
     this.ensureDirectories();
 
     try {
@@ -301,7 +313,12 @@ class RealitySyncDaemon {
       }
 
       if (!targetFolder) {
-        return { success: false, error: `Folder not found in bin` };
+        /* R105 — nothing in the bin to erase is a completed purge, not a
+           failure (desktop twin: realities.rs purge_from_bin). A committed
+           pack purged in the compiled app never had a folder here; the
+           zero-trace purge that already ran in state IS the whole truth. */
+        this.log('PURGE_BIN', `Nothing on disk to purge for ${realityId || folderName} — the disk side of this purge is already total`);
+        return { success: true, noop: true };
       }
 
       const targetPath = path.join(this.binDir, targetFolder);

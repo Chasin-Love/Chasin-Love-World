@@ -729,7 +729,12 @@ export default function App() {
      whenever a reality or galaxy is created/edited/deleted, so the scene is
      always literal: a bubble exists iff the reality exists, an ellipse exists
      iff that galaxy exists. Deps are value signatures (the store hands out
-     fresh array identities on every keystroke — identity deps would over-fire). */
+     fresh array identities on every keystroke — identity deps would over-fire).
+     engineReady re-fires this once after the async boot (the same law the
+     physics toggles above obey): the engine ignites AFTER mount, so without
+     this dep the skip guard below is never consumed at boot — the first real
+     change of the session (typically the first delete) steals it and silently
+     skips its own rebuild, leaving a ghost marble in the multiverse. */
   const galSig = useMemo(() => JSON.stringify(state.customGalaxies ?? {}), [state.customGalaxies]);
   const metaSig = useMemo(() => JSON.stringify(state.customRealityMeta ?? {}), [state.customRealityMeta]);
   const customIdsSig = useMemo(() => (state.customRealities ?? []).map((r) => r.id).join(','), [state.customRealities]);
@@ -748,7 +753,7 @@ export default function App() {
        did): the traveler surfaces at the multiverse sphere */
     if (!r) eng.zoomToMultiverse();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galSig, metaSig, customIdsSig, deletedSig]);
+  }, [galSig, metaSig, customIdsSig, deletedSig, engineReady]);
 
   /* keep the living structure in sync — new worlds form, dissolved worlds vanish,
      and moons always mirror the diary pages of their planet. Signature-guarded:
