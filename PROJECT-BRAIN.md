@@ -2,9 +2,9 @@
 
 > **Purpose:** the one file to hand to ANY AI (chat or coding agent) so it understands this
 > project in one read — what it is, what it is NOT, where it stands, and where it is going.
-> **Reference state:** branch `main` remains the author's blessed reference. **Last updated:**
-> 2026-10-05 during the R106 audit on experimental branch `codex/r106-project-audit`;
-> `main` remains Version 20 until the author chooses to merge.
+> **Reference state:** `main` is the author's blessed reference at R107 commit `0723578d`.
+> **Last updated:** 2026-10-05 after the author-authorized R106/R107 fast-forward;
+> the merge is local and has not been pushed to `origin/main`.
 
 > **Maintenance law:** at the end of every round, the agent of that round updates §8 (current
 > state) and §9 (where it's going) of this file. A stale brain is a dead brain.
@@ -319,10 +319,11 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ---
 
-## 8. CURRENT STATE (as of 2026-10-05 — `main` remains Version 20; R107 is under review on `codex/r106-project-audit`)
+## 8. CURRENT STATE (as of 2026-10-05 — R106/R107 are merged locally to `main` at `0723578d`)
 
 
-- **`main` is the blessed reference.** Its tip is the **Version 20** merge
+- **`main` is the blessed reference.** Its tip is R107 commit **`0723578d`**,
+  the author-authorized R106/R107 fast-forward, on top of the **Version 20** merge
   (R105: the vanished marble + the sealed floor) on top of the R104 merge (the
   desktop rebirth) on top of the merged R96–R103 chain —
   the tidy house, the engine divided, the real contract, the wheels connected,
@@ -346,8 +347,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   **Correction (verified in R72):** the earlier claim that R71 step 2's slice table sat on
   `main` was stale — `src/engine/systems/stageSlices.ts` does NOT exist on `main`; the Ten
   Slices work lives only on the branches below.
-- **In flight (branches, not final):** `codex/r106-project-audit` (this audit;
-  main remains untouched until the author chooses to merge). `r71-ten-slices` carries R68/R69 explorer-upgrade work
+- **In flight (branches, not final):** `r71-ten-slices` carries R68/R69 explorer-upgrade work
   (cameraRig orbit/glide grammar, touch grammar, 3.5 s summon, ROUND-68/69 docs) plus R71
   step 3 ("zoom never crosses"; changes in `engine.ts`, `stageThresholds.ts`, `kamuiPhases.ts`,
   `cameraRig.ts`, round18 gauntlet) and uncommitted step-3 transform scripts. `r85-the-six-seams`
@@ -1149,7 +1149,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   (21 checks) in the verify chain. Smoke reference held (green 0.066–0.074 histL1; one
   cold-boot flake diagnosed, never reproduced). `docs/ROUND-84-THE-ASCENDING-NODES-
   2026-09-30.md`.
-- **R106 — THE LENS ANSWERS (prior experimental round):** the quality-change
+- **R106 — THE LENS ANSWERS (merged to `main` at `0723578d`):** the quality-change
   handler and tier-switch handler had separate rules: quality changes disabled
   geodesic lensing at low tier even under Always On, and could re-enable it
   after explicit Off. Attach, quality, override, and recoverable-breaker paths
@@ -1169,7 +1169,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   R107 resolves R103's dead breaker measurement while preserving its protected
   threshold and permanent three-strike disarm.
   `docs/ROUND-106-THE-LENS-ANSWERS-2026-10-05.md`.
-- **R107 — SIGNED SKY LENS (current experimental round):** the background map had
+- **R107 — SIGNED SKY LENS (merged to `main` at `0723578d`):** the background map had
   clipped negative source angles, removing the secondary image; an artificial 4–6·b_c
   fade truncated long-range deflection; and point-source stars used the inverse
   image-to-source map. The sky now keeps the signed inverse map, uses a
@@ -1256,7 +1256,7 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
    regression gates.
 10. **Linux release baseline.** CI currently builds on ubuntu-latest 24.04. Evaluate the
    oldest supported LTS separately and re-check the workflow's platform workarounds.
-11. **Deterministic sky-lens visual receipt — completed in R107.**
+11. **Deterministic sky-lens visual receipt — completed in R107 and merged to `main` at `0723578d`.**
    `npx tsx scripts/probes/round107-sky-lens-visual-probe.ts` compiles the production
    lens GLSL and checks one known source against both signed image positions on hardware;
    it reports the renderer so SwiftShader cannot masquerade as a GPU result. Re-run when
