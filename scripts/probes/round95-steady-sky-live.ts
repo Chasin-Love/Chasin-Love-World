@@ -30,6 +30,7 @@
 import { chromium } from 'playwright';
 import { spawn, type ChildProcess } from 'child_process';
 import { fileURLToPath } from 'url';
+import { terminateProcessTree } from '../tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.SMOKE_PORT) || 3000;
@@ -45,12 +46,13 @@ async function serverHealthy(): Promise<boolean> {
 
 async function ensureServer(): Promise<ChildProcess | null> {
   if (await serverHealthy()) return null;
-  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: false });
+  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: process.platform !== 'win32' });
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1500));
     if (await serverHealthy()) return proc;
   }
+  await terminateProcessTree(proc);
   throw new Error('dev server did not become healthy within 90s');
 }
 
@@ -109,17 +111,18 @@ const radiusFn = (): Radius[] | null => {
 
 async function main() {
   const server = await ensureServer();
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  let browser: import('playwright').Browser | null = null;
   const consoleErrors: string[] = [];
-  page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
-  page.on('pageerror', (e) => consoleErrors.push(String(e)));
-  page.on('response', (res) => { if (res.status() === 404) consoleErrors.push(`404 ${res.url()}`); });
 
   /* canon radii per roster slot — home system law: star at origin, then the
      seed-table widths (seeds.ts, read at runtime from the page is overkill;
      the bounds test uses generous factors) */
   try {
+    browser = await chromium.launch();
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+    page.on('pageerror', (e) => consoleErrors.push(String(e)));
+    page.on('response', (res) => { if (res.status() === 404) consoleErrors.push(`404 ${res.url()}`); });
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     /* boot + the 4.4 s title sequence + the first crossfade ramp. The
        crossfade reaches 1 over 0.4 s of RENDERED frames, and the first
@@ -246,8 +249,8 @@ async function main() {
     /* 5 — clean console */
     check('live: zero console/page errors across the whole hold', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
   } finally {
-    await browser.close();
-    if (server) server.kill();
+    await browser?.close();
+    await terminateProcessTree(server);
   }
 
   if (failures > 0) {

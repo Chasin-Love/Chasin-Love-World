@@ -33,7 +33,7 @@ const SECONDS_PER_DAY = 86400;
     full clock rate) — real cadence, gentle IPC. */
 const FIRE_THRESHOLD_DAYS = 2;
 
-export interface SimTwinDrift {
+interface SimTwinDrift {
   deviationAU: number;
   /** twin position in scene units — for cards that want to draw it */
   twinPosScene: [number, number, number];

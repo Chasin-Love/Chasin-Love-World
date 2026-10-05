@@ -20,6 +20,7 @@ import { chromium } from 'playwright';
 import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { terminateProcessTree } from '../tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.SMOKE_PORT) || 3000;
@@ -34,12 +35,13 @@ async function serverHealthy(): Promise<boolean> {
 
 async function ensureServer(): Promise<ChildProcess | null> {
   if (await serverHealthy()) return null;
-  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: false });
+  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: process.platform !== 'win32' });
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1500));
     if (await serverHealthy()) return proc;
   }
+  await terminateProcessTree(proc);
   throw new Error('dev server did not become healthy within 90s');
 }
 
@@ -51,14 +53,14 @@ function check(name: string, ok: boolean, detail: unknown = '') {
 
 async function main() {
   const server = await ensureServer();
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-  const consoleErrors: string[] = [];
-  page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
-  page.on('pageerror', (e) => consoleErrors.push(String(e)));
-  page.on('response', (res) => { if (res.status() === 404) consoleErrors.push(`404 ${res.url()}`); });
-
+  let browser: import('playwright').Browser | null = null;
   try {
+    browser = await chromium.launch();
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    const consoleErrors: string[] = [];
+    page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+    page.on('pageerror', (e) => consoleErrors.push(String(e)));
+    page.on('response', (res) => { if (res.status() === 404) consoleErrors.push(`404 ${res.url()}`); });
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(10000); /* boot + intro */
     await page.screenshot({ path: 'scripts/verify/r92-1-boot.png' });
@@ -116,8 +118,8 @@ async function main() {
 
     check('live: zero console/page errors across the whole drive', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
   } finally {
-    await browser.close();
-    if (server) server.kill();
+    await browser?.close();
+    await terminateProcessTree(server);
   }
 
   if (failures > 0) {

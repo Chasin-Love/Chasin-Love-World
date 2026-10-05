@@ -47,14 +47,14 @@ const TIER_OPTIONS: Array<{ v: RaymarchOverride; label: string }> = [
 /** What the engine's last tier transition means for the eye watching the hole. */
 const STATUS_TEXT: Record<RaymarchStatus['state'], Record<string, string>> = {
   active: { attached: 'geodesic lensing live', 're-armed': 'geodesic lensing re-armed', auto: 'geodesic lensing live', 'quality-restore': 'geodesic lensing restored' },
-  forced: { attached: 'lensing live (Always On)', 'override-on': 'lensing forced (Always On)' },
+  forced: { attached: 'lensing live (Always On)', 'override-on': 'lensing forced (Always On)', 'quality-restore': 'lensing restored (Always On)' },
   fallback: {
     boot: 'hole hidden (booting…)',
     'frame-budget': 'hole hidden — frame budget; fly away & return to retry',
     'frame-budget-3-strikes': 'hole hidden — frame budget (3 strikes this session)',
     'shader-error': 'hole hidden — shader failure this session',
   },
-  off: { 'tier-low': 'hole hidden — quality tier too low', 'override-off': 'hole hidden — switch is Off' },
+  off: { 'tier-low': 'hole hidden — quality tier too low', 'software-renderer': 'hole hidden — software rendering cannot run this effect', 'override-off': 'hole hidden — switch is Off' },
 };
 
 function statusLine(s: RaymarchStatus): string {

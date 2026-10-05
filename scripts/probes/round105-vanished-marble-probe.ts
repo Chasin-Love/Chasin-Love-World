@@ -35,6 +35,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { mkdirSync, existsSync, rmSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { terminateProcessTree } from '../tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SRC_FOLDER = path.join(ROOT, 'src/realities/solPrime');
@@ -59,12 +60,13 @@ async function serverHealthy(): Promise<boolean> {
 }
 
 async function spawnServer(): Promise<ChildProcess> {
-  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: false, env: { ...process.env, PORT: String(PORT) } });
+  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: process.platform !== 'win32', env: { ...process.env, PORT: String(PORT) } });
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1500));
     if (await serverHealthy()) return proc;
   }
+  await terminateProcessTree(proc);
   throw new Error('dev server did not become healthy within 120s');
 }
 
@@ -270,7 +272,7 @@ async function main(): Promise<void> {
     if (failed.length) process.exitCode = 1;
   } finally {
     if (browser) await browser.close().catch(() => undefined);
-    server?.kill();
+    await terminateProcessTree(server);
     await new Promise((r) => setTimeout(r, 1500));
     /* restore no matter what: the folder returns from the bin, the tombstone
        is erased — the mutation is the test, not the product */

@@ -15,6 +15,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { mkdirSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { terminateProcessTree } from '../tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.SMOKE_PORT) || 3000;
@@ -30,37 +31,38 @@ async function serverHealthy(): Promise<boolean> {
 
 async function ensureServer(): Promise<ChildProcess | null> {
   if (await serverHealthy()) return null;
-  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: false });
+  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: process.platform !== 'win32' });
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1500));
     if (await serverHealthy()) return proc;
   }
+  await terminateProcessTree(proc);
   throw new Error('dev server did not become healthy within 90s');
 }
 
 async function main() {
   const server = await ensureServer();
   mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch({
+  let browser: import('playwright').Browser | null = null;
+  try {
     /* R101.3 — no-throttle flags: when the physical machine is in active use,
        Chromium occlusion-throttles the headless page (rAF + CSS-animation
        timeline freeze) and the deck's entrance never advances past frame 0 —
        the console mounts at opacity 0 and every capture starves. These flags
        keep the probe's page rendering like a foreground page. */
-    args: [
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      '--disable-background-timer-throttling',
-    ],
-  });
-  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
-  await page.bringToFront();
-  const probeErrors: string[] = [];
-  page.on('console', (m) => { if (m.type() === 'error') probeErrors.push(m.text()); });
-  page.on('pageerror', (e) => probeErrors.push(`PAGEERROR: ${e.message}`));
-
-  try {
+    browser = await chromium.launch({
+      args: [
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-background-timer-throttling',
+      ],
+    });
+    const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    await page.bringToFront();
+    const probeErrors: string[] = [];
+    page.on('console', (m) => { if (m.type() === 'error') probeErrors.push(m.text()); });
+    page.on('pageerror', (e) => probeErrors.push(`PAGEERROR: ${e.message}`));
     await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.waitForFunction('Boolean(window.__ENGINE__)', undefined, { timeout: 60_000 });
     await page.waitForTimeout(3_500); /* scene warm-up — the sky must be alive first */
@@ -183,8 +185,8 @@ async function main() {
 
     console.log('FROST VISUAL PROBE — all captures written to scripts/verify/frost/');
   } finally {
-    await browser.close();
-    server?.kill();
+    await browser?.close();
+    await terminateProcessTree(server);
   }
 }
 

@@ -11,7 +11,7 @@ import { terrainVert, terrainFrag, skyFrag } from '../shaders';
 import { MOOD_HEX, type AuroraSignal } from '../../platform/sentiment/sentiment';
 import type { RuntimeBody, UniverseEngine } from '../engine';
 
-export interface ShootingMeteor {
+interface ShootingMeteor {
   pos: THREE.Vector3;
   vel: THREE.Vector3;
   len: number;

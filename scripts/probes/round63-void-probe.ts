@@ -23,12 +23,15 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
+import { terminateProcessTree } from '../tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.SMOKE_PORT) || 3000;
 const BASE = `http://127.0.0.1:${PORT}`;
 const VERIFY_DIR = path.join(ROOT, 'scripts/verify');
-const PROBE = path.join(VERIFY_DIR, 'r63-probe.png');
+const PROBE = process.env.R63_PROBE_OUT
+  ? path.resolve(ROOT, process.env.R63_PROBE_OUT)
+  : path.join(VERIFY_DIR, 'r63-probe.png');
 /* the user's reference screenshot (dgreenheck's webgpu-black-hole look) —
    shadow center/radius estimated by eye in normalized image coordinates */
 const REFERENCE_IMAGE = 'C:/Users/Chasin-Love/.zcode/cli/image-cache/sess_ca2f9fc1-2f77-48f3-b656-034d96344e5b/image-ee27525fe30d59cc0a8fb405acda2807.png';
@@ -45,19 +48,14 @@ async function serverHealthy(): Promise<boolean> {
 
 async function ensureServer(): Promise<ChildProcess | null> {
   if (await serverHealthy()) return null;
-  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: false });
+  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: process.platform !== 'win32' });
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1500));
     if (await serverHealthy()) return proc;
   }
+  await terminateProcessTree(proc);
   throw new Error('dev server did not become healthy within 90s');
-}
-
-function killServer(proc: ChildProcess): void {
-  if (!proc.pid) return;
-  if (process.platform === 'win32') spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
-  else proc.kill('SIGTERM');
 }
 
 const RENDERER_FN = `(() => {
@@ -86,13 +84,14 @@ async function waitSettled(page: import('playwright').Page, what: string): Promi
    geodesic hole currently in front of the camera */
 const HOLE_STATE_FN = `(() => {
   const e = window.__ENGINE__;
-  if (!e || !e.blackHoles) return null;
+  const blackHoles = e && e.bhSys && e.bhSys.blackHoles;
+  if (!blackHoles) return null;
   const cam = e.camera;
   const V3 = cam.position.constructor;
   const fwd = new V3();
   cam.getWorldDirection(fwd);
   let best = null;
-  for (const v of e.blackHoles) {
+  for (const v of blackHoles) {
     const q = v.group.children[0];
     const m = q && q.material;
     if (!v.geodesic || !q || !q.visible || !m || !m.uniforms) continue;
@@ -158,23 +157,24 @@ const fmt = (r: { lum: number[]; bmr: number }) => `${r.lum.map((v) => v.toFixed
 
 async function main(): Promise<void> {
   const serverProc = await ensureServer();
-  /* the geodesic tier stands down on software rasterizers — headless Chromium
-     defaults to SwiftShader, so force the real GPU through ANGLE D3D11 and,
-     if the renderer still reports software, relaunch headed as a last resort */
-  let browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=d3d11', '--enable-gpu'] });
-  let page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
-  const renderer = await page.evaluate(RENDERER_FN) as string;
-  if (SW_RASTERIZERS.some((s) => renderer.toLowerCase().includes(s))) {
-    console.log(`R63 PROBE — headless GPU path unavailable (${renderer}); relaunching headed`);
-    await browser.close();
-    browser = await chromium.launch({ headless: false, args: ['--use-angle=d3d11'] });
-    page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-    await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
-  } else {
-    console.log(`R63 PROBE — GPU path: ${renderer}`);
-  }
+  let browser: import('playwright').Browser | null = null;
   try {
+    /* the geodesic tier stands down on software rasterizers — headless Chromium
+       defaults to SwiftShader, so force the real GPU through ANGLE D3D11 and,
+       if the renderer still reports software, relaunch headed as a last resort */
+    browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=d3d11', '--enable-gpu'] });
+    let page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    const renderer = await page.evaluate(RENDERER_FN) as string;
+    if (SW_RASTERIZERS.some((s) => renderer.toLowerCase().includes(s))) {
+      console.log(`R63 PROBE — headless GPU path unavailable (${renderer}); relaunching headed`);
+      await browser.close();
+      browser = await chromium.launch({ headless: false, args: ['--use-angle=d3d11'] });
+      page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+      await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    } else {
+      console.log(`R63 PROBE — GPU path: ${renderer}`);
+    }
     await page.waitForFunction('Boolean(window.__ENGINE__)', undefined, { timeout: 60_000 });
     /* focusOn only lands its hole composition from the 'web' stage, and the
        boot's reality rebuilds clear any focus set before they finish — so
@@ -215,7 +215,7 @@ async function main(): Promise<void> {
         portalPhase: e.portal ? e.portal.phase : 'n/a',
         zoomT: r.zoomT, tZoomT: r.tZoomT, phi: r.phi, tPhi: r.tPhi, theta: r.theta, tTheta: r.tTheta,
         vaults: (e.bodies || []).filter((b) => b.data && b.data.kind === 'vault').map((b) => b.data.id),
-        blackHoles: (e.blackHoles || []).length,
+        blackHoles: e.bhSys ? e.bhSys.blackHoles.length : 0,
       };
     })()`) as Record<string, unknown>;
     console.log(`R63 DEBUG — ${JSON.stringify(dbg)}`);
@@ -271,8 +271,8 @@ async function main(): Promise<void> {
     console.error('\n● R63 PROBE RED —', err instanceof Error ? err.message : String(err));
     process.exitCode = 1;
   } finally {
-    await browser.close();
-    if (serverProc) killServer(serverProc);
+    await browser?.close();
+    await terminateProcessTree(serverProc);
   }
 }
 

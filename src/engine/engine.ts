@@ -27,9 +27,9 @@ import { KamuiPortalSystem } from './kamui/KamuiPortalSystem';
 import { InnerGalaxySystem } from './worlds/InnerGalaxySystem';
 import { BodyBuilders } from './worlds/BodyBuilders';
 import { LevelStageSystem } from './stages/LevelStageSystem';
-import { getBlackHoleParams } from './blackholeParams';
-import { canUseRaymarchBlackHole, probeCapability, pixelRatioFor, getQualityTier, QUALITY_CHANGE_EVENT } from './capability';
+import { canUseRaymarchBlackHole, isSoftwareRasterizer, probeCapability, pixelRatioFor, getQualityTier, QUALITY_CHANGE_EVENT } from './capability';
 import { getRaymarchOverride, setRaymarchStatus, RAYMARCH_OVERRIDE_EVENT } from './blackholeTier';
+import { resolveRaymarchPolicy } from './raymarchPolicy';
 import { CameraRig } from './cameraRig';
 import { getCameraMemory, setCameraMemory, clearCameraMemory, type CameraMemory } from './cameraMemory';
 import type { CosmicBody, DiaryEntry } from '../domain/universe';
@@ -66,11 +66,11 @@ import { KAMUI_ENTRY_HOLD, KAMUI_ENTRY_FRAMING, KAMUI_TRIGGER_DURATION, KAMUI_RE
    flat around a black hole, which is the one thing Einstein's field equations
    make impossible.
 
-   pointsVert now lifts each vertex to world space and bends its direction
-   from the camera (lensBendWorld), so stars arc, pile up at the shadow edge
-   and vanish into the capture region exactly as the surface does. It needs
-   the lens header ahead of it, so the three chunks are composed here once and
-   every point material reuses the identical string (one program, not N). */
+   point clouds store source positions, so their vertex path solves the
+   forward lens equation (lensImageWorld) for the primary image. Dome and
+   photo fragments do the inverse map when sampling each pixel. The shared
+   uniforms keep the two representations tied to the same mass and shadow.
+   The lens header is composed here once and every point material reuses it. */
 const POINTS_VERT_LENSED = `#define LENS_WORLD\n${LENS_UNIFORMS_GLSL}\n${LENS_WARP_GLSL}\n${LENS_POINT_GLSL}\n${pointsVert}`;
 
 interface EngineCallbacks {
@@ -336,15 +336,9 @@ export class UniverseEngine {
   private lensTarget = 1;
   private lensVecs: THREE.Vector4[] = Array.from({ length: 16 }, () => new THREE.Vector4());
   private lensRims: number[] = new Array(16).fill(0);
-  /* Round 16 — 1.0 = black hole (exact Schwarzschild optics + capture shadow) */
+  private lensCaptureAngles: number[] = new Array(16).fill(0);
+  /* 1.0 = black-hole image map with a measured capture edge when available. */
   private lensStrong: number[] = new Array(16).fill(0);
-  /* ROUND 66 — THE LIVING LENS: per-hole world velocity for the sky's
-     drag-and-swirl (the water-around-the-cone law). Velocities are MEASURED
-     from the real per-frame displacement and smoothed (orbital motion is
-     steady) — no hardcoded speed anywhere. w carries the disk's spin sign. */
-  private lensVels: THREE.Vector4[] = Array.from({ length: 16 }, () => new THREE.Vector4());
-  private lensVelPrev = new Map<string, { p: THREE.Vector3; v: THREE.Vector3 }>();
-  private _lensVelInst = new THREE.Vector3();
   private _lensDir = new THREE.Vector3();
   private _lensFwd = new THREE.Vector3();
   private _lensPos = new THREE.Vector3();  /* ROUND 61 — world pos of inner-system holes */
@@ -633,46 +627,37 @@ export class UniverseEngine {
     this.bhSys.pixelRatioBase = this.renderer.getPixelRatio();
     this.bhSys.pixelRatioApplied = this.bhSys.pixelRatioBase;
     this.bhSys.holePixelRatioDamp = this.bhSys.pixelRatioBase;
+    const applyRaymarchPolicy = (activationReason: 'auto' | 'override-on' | 'quality-restore') => {
+      const decision = resolveRaymarchPolicy({
+        override: getRaymarchOverride(),
+        tierCapable: canUseRaymarchBlackHole(),
+        softwareRenderer: isSoftwareRasterizer(),
+        disabledReason: this.bhSys.raymarchDisabled
+          ? (this.bhSys.raymarchDisableReason ?? 'shader-error')
+          : null,
+        stoodDown: this.bhSys.raymarchStoodDown,
+        activationReason,
+      });
+      if (decision.clearStandDown) this.bhSys.raymarchStoodDown = false;
+      this.bhSys.setGeodesicAll(decision.enabled);
+      setRaymarchStatus(decision.state, decision.reason);
+    };
     /* tier changes (settings UI) re-apply the pixel ratio live */
     this.onQualityChange = () => {
       const next = pixelRatioFor(getQualityTier(), 99);
       this.bhSys.pixelRatioBase = Math.min(window.devicePixelRatio, next);
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, next));
       this.composer?.setPixelRatio(Math.min(window.devicePixelRatio, next));
-      /* Round 53 — stand the geodesic tier down only when the NEW tier
-         genuinely cannot run it (low / software GL). The old
-         `!== 'cinematic'` test was a Version-3 leftover: at medium — the
-         DEFAULT tier — merely touching the quality dial tore the lensed
-         renderer down for the session, contradicting the documented
-         on-at-medium+ policy. A round-trip back to a capable tier re-arms
-         it (unless the shader failed or the breaker holds it down). */
-      if (!canUseRaymarchBlackHole()) {
-        this.bhSys.setGeodesicAll(false);
-        setRaymarchStatus('off', 'tier-low');
-      } else if (!this.bhSys.raymarchDisabled && !this.bhSys.raymarchStoodDown && this.bhSys.blackHoles.length > 0) {
-        this.bhSys.setGeodesicAll(true);
-        setRaymarchStatus(getRaymarchOverride() === 'on' ? 'forced' : 'active', 'quality-restore');
-      }
+      /* One resolver preserves Auto/Always On/Off through every live quality
+         change while retaining both permanent disarms and software safety. */
+      applyRaymarchPolicy('quality-restore');
       if (getQualityTier() === 'cinematic' && this.exoPlates.length === 0) this.buildExoplanetPlates();
     };
     window.addEventListener(QUALITY_CHANGE_EVENT, this.onQualityChange);
     /* Round 53 — the Studio card's tier switch lands here (blackholeTier) */
     this.onTierOverride = () => {
       const v = getRaymarchOverride();
-      if (v === 'off') {
-        this.bhSys.setGeodesicAll(false);
-        setRaymarchStatus('off', 'override-off');
-      } else if (v === 'on') {
-        if (this.bhSys.raymarchDisabled) { setRaymarchStatus('fallback', 'shader-error'); return; }
-        this.bhSys.raymarchStoodDown = false;
-        this.bhSys.setGeodesicAll(true);
-        setRaymarchStatus('forced', 'override-on');
-      } else if (!this.bhSys.raymarchDisabled && !this.bhSys.raymarchStoodDown) {
-        this.bhSys.setGeodesicAll(true);
-        setRaymarchStatus('active', 'auto');
-      } else {
-        setRaymarchStatus('fallback', this.bhSys.raymarchDisabled ? 'shader-error' : 'frame-budget');
-      }
+      applyRaymarchPolicy(v === 'on' ? 'override-on' : 'auto');
     };
     window.addEventListener(RAYMARCH_OVERRIDE_EVENT, this.onTierOverride);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -761,6 +746,7 @@ export class UniverseEngine {
       /* any shader failure permanently disarms the geodesic tier this
          session — the hole hides itself (Round 55: no stand-in exists) */
       this.bhSys.raymarchDisabled = true;
+      this.bhSys.raymarchDisableReason = 'shader-error';
       this.bhSys.raymarchStoodDown = false;
       this.bhSys.setGeodesicAll(false);
       setRaymarchStatus('fallback', 'shader-error');
@@ -954,14 +940,11 @@ export class UniverseEngine {
     }
   }
 
-  /** Per-frame lensing driver — each massive body's direction from the
-      camera becomes a lens ON THE UNIVERSE SURFACE: the celestial dome and
-      the background star shells bend around it. The halo is always THE SIZE
-      OF THE BODY'S OWN SILHOUETTE (θ_f = halo multiplier × asin(R/d)) — a
-      black hole's disc is a hollow in the surface of reality, and only the
-      surface in contact with it bends — so nothing can ever dwarf the
-      universe at one distance and vanish at another. The bodies themselves
-      are never touched.
+  /** Per-frame lensing driver — each massive body's world-space direction
+      from the camera feeds the shared sky map. The black-hole branch uses
+      the body's angular Schwarzschild scale and the marcher's measured
+      capture edge; ordinary masses keep the bounded halo map. Bodies are
+      never moved by the lens renderer.
 
       ROUND 61 — THE WHOLE UNIVERSE BENDS, not just the home system. The
       lens roster is the home anchor's bodies AND every real hole living in
@@ -977,16 +960,13 @@ export class UniverseEngine {
     this.lensCur += (this.lensTarget - this.lensCur) * Math.min(1, dt * 4);
     this.camera.getWorldDirection(this._lensFwd);
     const cap = this.lensVecs.length;
-    /* ROUND 66 — the living lens: the swirl follows the disk's own spin */
-    const swirlSign = Math.sign(getBlackHoleParams().rotSpeed) || 1;
     let n = 0;
-    /* 1 — every hole and vault, anywhere in the scene, first — measured with
-       its real velocity so the sky can be dragged by the motion. */
+    /* 1 — every hole and vault, anywhere in the scene, first. */
     for (const b of this.bodies) {
       if (b.data.kind !== 'hole' && b.data.kind !== 'vault') continue;
       if (n >= cap) break;
-      this.trackLensVelocity(b.data.id, b.group.position, dt, n, swirlSign);
-      n = this.pushSurfaceLens(n, b.group.position, b.data.radius, b.lensHalo ?? lensHaloFor(b.data.kind), 1);
+      b.group.getWorldPosition(this._lensPos);
+      n = this.pushSurfaceLens(n, this._lensPos, b.data.radius, b.lensHalo ?? lensHaloFor(b.data.kind), 1, this.blackHoleCaptureRadiusWorld(b.group));
     }
     if (n < cap) {
       for (const node of this.galaxyStageNodes) {
@@ -996,45 +976,34 @@ export class UniverseEngine {
           if (p.data.kind !== 'hole' && p.data.kind !== 'vault') continue;
           if (n >= cap) break;
           p.group.getWorldPosition(this._lensPos);
-          this.trackLensVelocity(p.data.id, this._lensPos, dt, n, swirlSign);
-          n = this.pushSurfaceLens(n, this._lensPos, p.data.radius, lensHaloFor(p.data.kind), 1);
+          n = this.pushSurfaceLens(n, this._lensPos, p.data.radius, lensHaloFor(p.data.kind), 1, this.blackHoleCaptureRadiusWorld(p.group));
         }
         if (n >= cap) break;
       }
     }
-    /* 2 — the ordinary masses: stars and worlds bending gently around
-       their own silhouettes, exactly as before (no drag — near-field motion
-       is a hole thing). */
+    /* 2 — ordinary masses: stars and worlds use their bounded weak halo. */
     for (const b of this.bodies) {
       if (b.data.kind === 'hole' || b.data.kind === 'vault') continue;
       if (n >= cap) break;
       const halo = b.lensHalo ?? 0;
       if (halo <= 0) continue;
-      this.lensVels[n].set(0, 0, 0, 0);
-      n = this.pushSurfaceLens(n, b.group.position, b.data.radius, halo, 0);
+      b.group.getWorldPosition(this._lensPos);
+      n = this.pushSurfaceLens(n, this._lensPos, b.data.radius, halo, 0);
     }
-    this.surfaceManager.setLenses(this.lensVecs, this.lensRims, this.lensStrong, this.lensVels, n, this.lensCur);
+    this.surfaceManager.setLenses(this.lensVecs, this.lensRims, this.lensStrong, this.lensCaptureAngles, n, this.lensCur);
   }
 
-  /* ROUND 66 — measure one hole's real world velocity (smoothed; orbital
-     motion is steady, so the measurement eases instead of jitering) and
-     stage its vec4 slot: xyz = velocity in world units/s, w = the disk's
-     spin sign. Called even when the lens is culled behind the view, so the
-     measurement stays alive while the hole is out of sight. */
-  private trackLensVelocity(key: string, worldPos: THREE.Vector3, dt: number, slot: number, swirlSign: number): void {
-    let rec = this.lensVelPrev.get(key);
-    if (!rec) {
-      rec = { p: worldPos.clone(), v: new THREE.Vector3() };
-      this.lensVelPrev.set(key, rec);
-      this.lensVels[slot].set(0, 0, 0, swirlSign);
-      return;
-    }
-    if (dt > 1e-4) {
-      this._lensVelInst.copy(worldPos).sub(rec.p).divideScalar(dt);
-      rec.v.lerp(this._lensVelInst, 0.12);
-    }
-    rec.p.copy(worldPos);
-    this.lensVels[slot].set(rec.v.x, rec.v.y, rec.v.z, swirlSign);
+  /** Read the renderer's live capture boundary in world units. The fallback
+      in the shared shader uses the analytic Schwarzschild value until this
+      visual has supplied a measured raymarch impact parameter. */
+  private blackHoleCaptureRadiusWorld(group: THREE.Group): number {
+    const visual = group.userData.bh as { group?: THREE.Group } | undefined;
+    const quad = visual?.group?.children[0] as THREE.Mesh | undefined;
+    const material = quad?.material as THREE.ShaderMaterial | undefined;
+    const critical = material?.uniforms?.uCriticalB?.value;
+    const scale = material?.uniforms?.uScale?.value;
+    const radius = Number(critical) * Number(scale);
+    return Number.isFinite(radius) && radius > 0 ? radius : 0;
   }
 
   /** ONE surface-lens slot writer — the single law every lens obeys,
@@ -1045,7 +1014,7 @@ export class UniverseEngine {
       the lens's position in WORLD space (inner-system holes pass through
       their rotated galaxy node, so a local position would bend the wrong
       patch of sky). */
-  private pushSurfaceLens(n: number, worldPos: THREE.Vector3, radius: number, halo: number, strong: number): number {
+  private pushSurfaceLens(n: number, worldPos: THREE.Vector3, radius: number, halo: number, strong: number, captureRadiusWorld = 0): number {
     this._lensDir.copy(worldPos).sub(this.camera.position);
     const dist = this._lensDir.length();
     /* AUDIT 2026-09-28 — NaN firewall: one bad body position (a physics
@@ -1061,6 +1030,9 @@ export class UniverseEngine {
     if (!Number.isFinite(rim)) return n;
     this.lensRims[n] = rim;
     this.lensStrong[n] = strong;
+    this.lensCaptureAngles[n] = strong > 0.5 && captureRadiusWorld > 0
+      ? Math.asin(Math.min(1, captureRadiusWorld / dist))
+      : 0;
     this.lensVecs[n].set(this._lensDir.x, this._lensDir.y, this._lensDir.z, halo * rim);
     return n + 1;
   }
@@ -1978,7 +1950,9 @@ export class UniverseEngine {
     /* Round 20 — the geodesic tier's one-way circuit breaker: while a
        raymarched hole is actually on stage, sustained frame overruns stand
        it down for the session and the proven composite returns. */
-    this.bhSys.guardRaymarch(dt);
+    /* Physics dt is capped at 50 ms, below the breaker’s 55 ms budget.
+       Give the breaker the separately capped wall-frame sample instead. */
+    this.bhSys.guardRaymarch(wallDt);
 
     /* ROUND 61 — the camera checkpoint (idle quiescence only; see the field
        block above). Cheap: a rig snapshot + a throttled localStorage write. */

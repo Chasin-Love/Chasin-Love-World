@@ -82,7 +82,7 @@ const SESSION_BODY_CAP = 4096;
  *        law-2 sky survives ~600 sim-days; the law-3 sky survives 5000+. */
 const SEED_LAW = 3;
 
-export interface DriverDrift {
+interface DriverDrift {
   deviationAU: number;
   driverPosScene: [number, number, number];
   canonPosScene: [number, number, number];
@@ -114,7 +114,7 @@ export const driverState = {
   lastError: null as string | null,
 };
 
-export interface DriverRosterEntry {
+interface DriverRosterEntry {
   id: string;
   /** R95 — bodies only (the star leads at index 0). R93's integrated moons
    *  ride their parent's session position with the ornament closed-form. */

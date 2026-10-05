@@ -5,23 +5,21 @@ import { NOISE } from '../shaders';
 /* Round 14 — masses bend the UNIVERSE SURFACE (the celestial canvas), never
    the bodies themselves. Each lens arrives as vec4(xyz = unit world direction
    to the mass as seen by the camera, w = halo angle in radians).
-   Round 16 — black holes get TRUE SCHWARZSCHILD OPTICS (uLensStrong): the
-   exact image equation with the second-order strong-field term and the real
-   capture shadow. Everything else keeps the proven weak-field law.
+   Round 107 — black holes use a signed second-order point-lens map for the
+   background. Point-source vertices solve its forward image equation; sky
+   fragments sample the inverse map. The captured shadow uses the raymarcher's
+   measured boundary when available. This background approximation is not a
+   full null-geodesic trace.
    This is the only place curvature is drawn: a diagram is not the sky,
    a body is never bent. */
 export const LENS_UNIFORMS_GLSL = /* glsl */ `
 uniform vec4 uLenses[16];   /* xyz = direction to the mass, w = halo angle (rad) */
-uniform float uLensRim[16]; /* each mass's own apparent silhouette angle (rad) */
-uniform float uLensStrong[16]; /* 1.0 = black hole: exact Schwarzschild optics */
-/* ROUND 66 — THE LIVING LENS: xyz = the hole's measured world velocity
-   (units/s), w = the disk's spin sign — the sky near a moving, spinning
-   hole is dragged and swirled (the water-around-the-cone law). */
-uniform vec4 uLensVel[16];
+uniform float uLensRim[16]; /* weak lens: apparent radius; hole: angular Schwarzschild radius */
+uniform float uLensStrong[16]; /* 1.0 = black hole: black-hole sky lens map */
+uniform float uLensCapture[16]; /* measured angular capture radius; 0 = Schwarzschild fallback */
 uniform int uLensCount;
 uniform float uLensBend;
-uniform float uLensScale;   /* ROUND 58 — the march's lensing factor (2.4): the
-                               sky's bend is exactly continuous with the quad's */
+uniform float uLensScale;   /* the black-hole raymarch's far-field mass scale */
 `;
 
 export const LENS_WARP_GLSL = /* glsl */ `
@@ -49,31 +47,21 @@ vec3 lensReconstruct(vec3 L, vec3 d, float cosA, float ang2){
   return normalize(L * cos(ang2) + perpDir * sin(ang2));
 }
 
-/* Round 16 — the lens law, two modes.
+/* Round 107 — map each observed direction θ to the background/source
+   direction β = θ − α(θ). The black-hole branch uses the standard weak-field
+   Schwarzschild deflection through second order. Crucially β stays SIGNED:
+   when β crosses zero the tangent direction flips, producing the secondary
+   image on the opposite side and an Einstein ring for exact alignment.
+   The previous max(β, 0) silently deleted that image. There is no arbitrary
+   six-shadow-radius cutoff: the deflection itself decays as 1/θ, so the
+   Einstein-scale image survives at ordinary camera distances.
 
-   HOLE MODE (uLensStrong = 1) — EXACT SCHWARZSCHILD OPTICS.
-   The sampled image angle θ maps to its source angle β through the exact
-   thin-lens relation β = θ − θ_E²/θ with θ_E² = 2·rs_ang (rs_ang = 0.62·rim,
-   the composite's rs = 0.62 R), plus the SECOND-ORDER strong-field correction
-
-        α(θ) = 2 rs/θ + (15π/16)(rs/θ)²          (Iyer & Petters 2007)
-
-   which tightens the bend correctly as θ approaches the critical angle.
-   CAPTURE — image angles below the critical impact parameter
-
-        b_c = (3√3/2) rs ≈ 2.598 rs               (Darwin 1959)
-
-   have NO image: the function returns LENS_CAPTURE and the caller paints the
-   true black of the shadow. The map's source angle β(θ) is monotone with
-   dβ/dθ = 1 + (θ_E² − 2c·rs²)/θ² ≥ 1 − 0.58 > 0 at θ ≥ b_c, and β(b_c) ≈
-   1.39 rs > 0 — the forward map CANNOT fold at any distance, for any hole.
-   Background stars therefore pile into real arc-densification (magnification
-   ≈ 2.4 at the shadow edge) and stream around the hole exactly as in the
-   NASA/Interstellar reference — emergent from the equation, never painted.
-
-   WEAK MODE — the Round 14 law: displacement anchored to the silhouette,
-   decaying 1/θ toward the halo edge, capped at 0.85× the distance — the
-   map cannot fold, so the giant flat-disc artifact is impossible. */
+   The near-field shadow edge comes from the same marcher's measured critical
+   impact parameter when available. The second-order weak-field map is an
+   approximation outside that capture region; the accretion disk continues
+   to use its existing raymarch. This is not a claim of full null-geodesic
+   tracing for the background. Ordinary stars retain their existing bounded
+   visual halo map. */
 vec3 applyLensBend(vec3 d){
   for (int i = 0; i < 16; i++) {
     if (i >= uLensCount) break;
@@ -83,62 +71,27 @@ vec3 applyLensBend(vec3 d){
     float m = halo / rim;
     float cosA = clamp(dot(d, L), -1.0, 1.0);
     float ang = acos(cosA);
-    if (lensPerpLen(d, L) < 1e-5) continue; /* looking straight into the mass */
     if (uLensStrong[i] > 0.5) {
-      /* ---- hole mode: the real equations ---- */
-      float rsA = 0.62 * rim;                     /* rs = 0.62 R, matching the composite */
-      float bc = 2.5980762 * rsA;                 /* b_c = (3√3/2) rs — the true shadow edge */
+      /* ---- black-hole mode ---- */
+      float measuredBc = uLensCapture[i];
+      float rsA = measuredBc > 0.0
+        ? measuredBc / 2.5980762
+        : rim * max(uLensScale, 0.0);             /* analytic fallback without a live marcher */
+      float bc = measuredBc > 0.0 ? measuredBc : 2.5980762 * rsA;
       /* captured — no image exists here (gated by the damped toggle: when
          the lens is released, no capture occurs and the sky heals whole) */
-      if (ang < bc && uLensBend > 0.02) return LENS_CAPTURE;
-      float thE2 = 2.0 * rsA;                     /* Einstein area of the point-mass lens */
-      /* ROUND 58 — the TRUE gradual law, scaled by the march's lensing
-         factor (uLensScale = the panel's Grav. Lensing) so the sky's bend is
-         EXACTLY continuous with the geodesic quad at its edge — both are
-         2·L·rs/b in their own units.
-         ROUND 66 — THE LENS IS LOCAL: the user's verdict on the 1/θ-forever
-         tail is in — a hole in the sky must bend the sky AROUND ITSELF, not
-         paint vast arcs across the whole universe. The deflection stays at
-         full strength through the quad's own coverage (the march owns every
-         ray inside ~3.8·b_c, so the handoff is untouched) and then melts to
-         EXACTLY zero at 6·b_c — one C¹ smoothstep, no band, no layer, no
-         edge: the whirlpool hugs the hole. */
-      float confine = 1.0 - smoothstep(4.0, 6.0, ang / bc);
-      float disp = (thE2 / ang + 2.9452431 * rsA * rsA / (ang * ang)) * uLensScale * uLensBend * confine;
+      if (ang < bc * uLensBend && uLensBend > 0.02) return LENS_CAPTURE;
+      if (lensPerpLen(d, L) < 1e-5) continue; /* exact axis is captured above */
+      float effectiveRsA = rsA * uLensBend;
+      float disp = 2.0 * effectiveRsA / ang
+        + 2.9452431 * effectiveRsA * effectiveRsA / (ang * ang);
       if (disp < 1e-6) continue;
-      float ang2 = max(ang - disp, 0.0);          /* β — monotone, fold-proof by the math above */
+      float beta = ang - disp;                    /* signed β preserves opposite-side and wrapped images */
+      float ang2 = beta;
       d = lensReconstruct(L, d, cosA, ang2);
-      /* ROUND 66 — THE LIVING LENS: the water-around-the-cone law. The hole
-         moves (translation) and spins (rotation), and the sky near it is
-         DRAGGED — never a static flat ring of bending. Two near-field
-         motions, both inside the same confinement as the radial bend and
-         both scaled by the hole's REAL measured velocity, so a faster hole
-         stirs harder and a stationary one stirs nothing:
-         DRAG — the sampled sky streams along the hole's motion: the wake,
-           space compressing ahead and stretching behind the moving hole;
-         SWIRL — the sampled sky rotates around the hole's sightline: the
-           vortex the spin winds up, signed with the disk's own rotation
-           (sin(ang) lever — no swirl on the sightline itself). */
-      vec4 lvel = uLensVel[i];
-      float speed = length(lvel.xyz);
-      float near = confine * confine;
-      if (speed > 1e-4) {
-        float fall = near / (1.0 + 3.0 * (ang / bc) * (ang / bc));
-        float drag = min(0.16, speed * 0.012) * fall * uLensBend;
-        if (drag > 1e-4) d = normalize(d + (lvel.xyz / speed) * drag);
-      }
-      if (abs(lvel.w) > 0.01) {
-        float fall = near / (1.0 + 3.0 * (ang / bc) * (ang / bc));
-        float cosL = clamp(dot(d, L), -1.0, 1.0);
-        vec3 tang = d - L * cosL;
-        float tl = length(tang);
-        if (tl > 1e-4) {
-          float swirl = lvel.w * 0.16 * fall * uLensBend * tl;
-          d = normalize(d + (cross(L, d) / tl) * swirl);
-        }
-      }
     } else {
       /* ---- weak mode: the Round 14 law ---- */
+      if (lensPerpLen(d, L) < 1e-5) continue;
       float x = ang / rim;
       float fade = 1.0 - smoothstep(m * 0.62, m, x);   /* melts to zero at the halo edge */
       if (fade < 0.003) continue;
@@ -173,8 +126,12 @@ float lensWellDarken(vec3 dir){
   for (int i = 0; i < 16; i++) {
     if (i >= uLensCount) break;
     if (uLensStrong[i] < 0.5) continue;
-    float rsA = 0.62 * max(uLensRim[i], 1e-6);
-    float bc = 2.5980762 * rsA;                  /* b_c = (3√3/2) rs */
+    float measuredBc = uLensCapture[i];
+    float rsA = measuredBc > 0.0
+      ? measuredBc / 2.5980762
+      : max(uLensRim[i], 1e-6) * max(uLensScale, 0.0);
+    float bc = (measuredBc > 0.0 ? measuredBc : 2.5980762 * rsA)
+      * max(uLensBend, 1e-4);
     float ang = acos(clamp(dot(dir, uLenses[i].xyz), -1.0, 1.0));
     float x = max(ang, bc * 0.25) / bc;
     float well = 1.0 / (x * x);                  /* the deflection's own shape */
@@ -186,66 +143,73 @@ float lensWellDarken(vec3 dir){
 }
 `;
 
-/* For vertex stages (star shells, nebula points): uniforms + warp + a helper
-   that bends a point's direction on the celestial sphere and restores its
-   original radius, so background stars curve around the masses — the black
-   hole's halo strongest of all. */
+/* Geometry points store SOURCE directions, so their vertex path must solve
+   the forward lens equation for an IMAGE direction. The dome/photo fragment
+   path above does the inverse operation (image pixel → source sample). Using
+   applyLensBend on a star vertex had applied that inverse map in the wrong
+   direction and pulled stars toward the hole. */
+export const LENS_POINT_GLSL = /* glsl */ `
+float lensBlackHoleDeflection(float theta, float rsA){
+  float t = max(theta, 1e-6);
+  float q = rsA / t;
+  return 2.0 * q + 2.9452431 * q * q;
+}
+vec3 lensImageWorld(vec3 worldPos){
+  vec3 delta = worldPos - cameraPosition;
+  float dist = length(delta);
+  if (dist < 1e-4) return worldPos;
+  vec3 d = delta / dist;
+  for (int i = 0; i < 16; i++) {
+    if (i >= uLensCount) break;
+    vec3 L = uLenses[i].xyz;
+    float cosA = clamp(dot(d, L), -1.0, 1.0);
+    float beta = acos(cosA);
+    float rim = max(uLensRim[i], 1e-6);
+    if (uLensStrong[i] > 0.5) {
+      float strength = clamp(uLensBend, 0.0, 1.0);
+      if (strength < 1e-4 || lensPerpLen(d, L) < 1e-5) continue;
+      float bcFull = uLensCapture[i] > 0.0
+        ? uLensCapture[i]
+        : 2.5980762 * rim * max(uLensScale, 0.0);
+      float rsA = (uLensCapture[i] > 0.0 ? bcFull / 2.5980762 : rim * max(uLensScale, 0.0)) * strength;
+      float bc = max(bcFull * strength, 1e-6);
+      float lo = bc * 1.0001;
+      /* The primary image can cross the antipode for a source behind the
+         lens. Keep the scalar root unwrapped; lensReconstruct's sin/cos maps
+         it back onto the sphere without pinning the source to π. */
+      float hi = max(beta + 2.0 * sqrt(max(2.0 * rsA, 0.0)), lo * 2.0);
+      for (int j = 0; j < 12; j++) {
+        float mid = 0.5 * (lo + hi);
+        float mapped = mid - lensBlackHoleDeflection(mid, rsA);
+        if (mapped < beta) lo = mid;
+        else hi = mid;
+      }
+      d = lensReconstruct(L, d, cosA, 0.5 * (lo + hi));
+    } else {
+      if (lensPerpLen(d, L) < 1e-5) continue;
+      float x = beta / rim;
+      float fade = 1.0 - smoothstep((uLenses[i].w / rim) * 0.62, uLenses[i].w / rim, x);
+      float pull = min(0.85 * rim / max(x, 0.35), beta * 0.85) * fade * uLensBend;
+      d = lensReconstruct(L, d, cosA, beta + pull);
+    }
+  }
+  return cameraPosition + d * dist;
+}
+vec3 lensBendWorld(vec3 worldPos){ return lensImageWorld(worldPos); }
+`;
+
+/* Vertex stages operate on world-space source positions. The shared well is
+   evaluated on the resulting image direction so a lensed source is not
+   darkened at its unlensed position. */
 export const LENS_VERT_GLSL = /* glsl */ `
 ${LENS_UNIFORMS_GLSL}
 ${LENS_WARP_GLSL}
-/* ROUND 61 — the star shells share the well: a background star dims by the
-   same one-law curve as the dome as its direction pours toward the hole,
-   so no shell can disagree with the sky it lives in (the "layers" sin).
-   Exactly zero beyond 4·b_c — the outer sky is untouched. */
+${LENS_POINT_GLSL}
 float lensWellFactor(vec3 worldPos){
   vec3 dir = worldPos - cameraPosition;
   float dist = length(dir);
   if (dist < 1e-4) return 1.0;
   return 1.0 - lensWellDarken(dir / dist);
-}
-vec3 lensBentPosition(vec3 position){
-  float r = length(position);
-  if (r < 1e-4) return position;
-  vec3 dir = position / r;
-  dir = applyLensBend(dir);
-  /* CAPTURED — a background star whose direction falls inside the true
-     shadow has NO IMAGE: it is placed behind the camera and clipped away,
-     so stars visibly vanish crossing the shadow, exactly as real lensing
-     videos show. With the lens damped off, no capture occurs and the sky
-     releases whole. */
-  if (dir.x < -0.99 && dir.y < -0.99 && dir.z < -0.99) {
-    return cameraPosition - normalize(position) * r * 0.5;
-  }
-  return dir * r;
-}
-`;
-
-/* Round 52 — WORLD-SPACE STAR LENSING for object-space point clouds.
-
-   lensBentPosition() above bends a vertex's direction from the ORIGIN, which
-   is exact for a sky shell centred on the camera — but wrong for the star
-   clouds that live inside offset groups (a galaxy's dense starfield, a
-   cluster's halo, a level's dust). Those must bend as seen from the CAMERA:
-
-     worldPos → direction from the camera → applyLensBend → back out at the
-     SAME distance, so size, depth and parallax are untouched and only the
-     direction moves — which is precisely what curvature does to a background
-     star, and why the sky now arcs around a mass instead of sliding under it.
-
-   A captured direction has no image at all: it is mirrored to the far side of
-   the camera, where the frustum clips it, so the shadow holds no star.
-
-   Compose this AFTER LENS_UNIFORMS_GLSL and LENS_WARP_GLSL (it calls
-   applyLensBend and lensCaptured), and BEFORE the point vertex shader that
-   uses lensBendWorld — see POINTS_VERT_LENSED in engine.ts. */
-export const LENS_POINT_GLSL = /* glsl */ `
-vec3 lensBendWorld(vec3 worldPos){
-  vec3 delta = worldPos - cameraPosition;
-  float dist = length(delta);
-  if (dist < 1e-4) return worldPos;
-  vec3 bent = applyLensBend(delta / dist);
-  if (lensCaptured(bent)) return cameraPosition - delta;
-  return cameraPosition + bent * dist;
 }
 `;
 

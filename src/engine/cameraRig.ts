@@ -107,6 +107,7 @@ export class CameraRig {
   private pinchD = 0;
   private pinchX = 0;
   private pinchY = 0;
+  private pinching = false;
 
   private canvas: HTMLCanvasElement;
 
@@ -116,6 +117,8 @@ export class CameraRig {
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
     canvas.addEventListener('touchstart', this.onTouchStart, { passive: true });
     canvas.addEventListener('touchmove', this.onTouchMove, { passive: true });
+    canvas.addEventListener('touchend', this.onTouchEnd, { passive: true });
+    canvas.addEventListener('touchcancel', this.onTouchEnd, { passive: true });
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
   }
@@ -140,12 +143,26 @@ export class CameraRig {
 
   private onTouchStart = (e: TouchEvent) => {
     if (e.touches.length === 2) {
+      this.pinching = true;
       this.pinchD = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       this.pinchX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       this.pinchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       this.dragging = false; this.panning = false;
       this.orbitVX = 0; this.orbitVY = 0; this.panVel.set(0, 0, 0);
     }
+  };
+  private onTouchEnd = (e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      /* If a third touch ended, rebase the surviving pair so its next move
+         does not apply the distance accumulated while three touches were down. */
+      this.pinchD = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      this.pinchX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      this.pinchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      this.pinching = true;
+      return;
+    }
+    this.pinchD = 0;
+    this.pinching = false;
   };
   private onTouchMove = (e: TouchEvent) => {
     if (e.touches.length !== 2) return;
@@ -229,6 +246,17 @@ export class CameraRig {
   /** live wheel velocity (zoomT/s) — the engine reads it to detect the user
       pulling at a stage's edge, which is what carries the dial across */
   get zoomVelocity(): number { return this.zoomVel; }
+  /** True only after commanded motion, inertial movement, and held controls end. */
+  get isSettled(): boolean {
+    const heldPan = Object.values(this.panKeys).some(Boolean);
+    return !this.dragging && !this.panning && !this.pinching && !heldPan
+      && Math.abs(this.zoomT - this.tZoomT) < 1e-4
+      && Math.abs(this.theta - this.tTheta) < 1e-4
+      && Math.abs(this.phi - this.tPhi) < 1e-4
+      && Math.abs(this.zoomVel) < 1e-5
+      && Math.abs(this.orbitVX) < 1e-4 && Math.abs(this.orbitVY) < 1e-4
+      && this.panVel.lengthSq() < 1e-6;
+  }
   setOrbit(theta: number | null, phi: number | null) {
     if (theta !== null) this.tTheta = theta;
     if (phi !== null) this.tPhi = clamp(phi, PHI_MIN, PHI_MAX);
@@ -408,6 +436,8 @@ export class CameraRig {
     this.canvas.removeEventListener('wheel', this.onWheel);
     this.canvas.removeEventListener('touchstart', this.onTouchStart);
     this.canvas.removeEventListener('touchmove', this.onTouchMove);
+    this.canvas.removeEventListener('touchend', this.onTouchEnd);
+    this.canvas.removeEventListener('touchcancel', this.onTouchEnd);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
   }

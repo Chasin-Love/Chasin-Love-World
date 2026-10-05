@@ -6,16 +6,16 @@ Regrouped in R96 (chronological flatness → purpose).
 
 | Resident | Count | What it is |
 | :-- | :-- | :-- |
-| `gauntlets/` | 19 | Per-round regression gates (R16 → R95). Each asserts source-level invariants of one round — mostly `readFileSync` + assertions on `src/` text, some pure math. **All 19 run inside `npm run verify`.** |
-| `probes/` | 9 | Standalone diagnostics, run by hand when hunting. **NOT in the verify chain.** |
-| `tools/` | 5 | Build & release machinery: the WASM core, icons, updater manifest, architecture diagram, Windows toolchain. |
+| `gauntlets/` | 25 gates + 2 shared readers | Per-round regression gates (R16 → R107). Each asserts source-level invariants of one round — mostly `readFileSync` + assertions on `src/` text, some pure math. **All 25 gates run inside `npm run verify`.** |
+| `probes/` | 12 | Standalone diagnostics, run by hand when hunting. **NOT in the verify chain.** |
+| `tools/` | 6 | Build, release, and process-tree cleanup machinery: WASM core, icons, updater manifest, architecture diagram, Windows toolchain. |
 | top level | 4 + 1 | `audit-architecture.ts` (+ its frozen `architecture-snapshot.json`), `smoke.ts`, `prod-smoke.ts`, and `verify/` (the golden frames those gates compare against). |
 
 ## The verify chain (`npm run verify`)
 
 ```
 typecheck (tsc --noEmit)
-  → 21 gauntlets  round16 → round98-backend-conformance (source invariants + math)
+  → 25 gauntlets  round16 → round107-frame-budget (source invariants + math)
   → smoke         (headless boot, zero console errors,
                    frame match vs verify/reference-hole.png)
   → prod:smoke    (serves the built dist/, asserts the boot again)
@@ -66,9 +66,13 @@ against `architecture-snapshot.json` (exit 1 on drift).
 - `round95-steady-sky-gauntlet.ts` — the substep law, orbit-true seed, vault temper, crossfade seam, softening lockstep; reads `probes/round95-physics-probe.ts`.
 - `round98-physics-conformance-gauntlet.ts` — the C++/WASM tier against the TypeScript law, value for value: per-body profiles, the 41-field contract (checked against the emitter's own indices), and the committed artifact's freshness. **Staleness severity follows reachability** — WARN while `physicsBatch` has no production caller, hard FAIL the moment one appears.
 - `round98-backend-conformance-gauntlet.ts` — the Node daemon against the Rust Tauri shell: every route has a command and an adapter arm, sanitisation parity, rename file-set parity, containment before destructive per bin op, Sky Studio caps/MIME, asset whitelist parity.
+- `round104-desktop-shell-gauntlet.ts` — desktop launch and GPU policy contract.
+- `round105-vanished-marble-gauntlet.ts` — empty-reality deletion and permanent tombstone contract.
+- `round106-raymarch-policy-gauntlet.ts` — Auto/Always On/Off state transitions, software-renderer safety, shader and frame-budget disarms, plus production wiring.
 
 **tools/**
-- `build-wasm.sh` — `npm run wasm:build`. Recompiles `cosmos_engine.cpp` → `public/wasm/` via emsdk. **The committed artifact is stale** (no emsdk on the authoring laptop); run this before wiring `cosmos_physics_batch` into production.
+- `build-wasm.sh` — `npm run wasm:build`. Recompiles `cosmos_engine.cpp` → `public/wasm/` via the author's emsdk; the committed artifact is current and the physics batch is wired through `primePhysics`.
+- `process-tree.ts` — shared cross-platform teardown for spawned smoke/probe servers (Windows process-tree kill; isolated POSIX process group with graceful then forced shutdown).
 
 **probes/ (standalone, hand-run)**
 - `round63-void-probe.ts` — runtime GPU void diagnostic (`--gate` writes `verify/r63-probe.png`).
@@ -78,8 +82,11 @@ against `architecture-snapshot.json` (exit 1 on drift).
 - `round101-frost-visual.ts` — the frost-deck visual receipt (Ctrl+K drive, four views, hover clouds); writes `verify/frost/*.png`.
 - `round102-independence-probe.ts` — the R102 mutation proof: physically stashes `src/realities/solPrime`, boots empty-multiverse, restores; writes `verify/independence/`.
 - `round103-bughunt-probe.ts` — the instrumented Kamui-cycle receipt: rAF gap recorder + tier-event tap + 100 ms timeline sampler; asserts the R103 WALL-CLOCK law (eject/summon complete in real seconds) and the lens witness; `R103_GPU=1` pins headless Chromium onto the real adapter; writes `verify/bughunt/`.
-- `round103-gpu-lens-probe.ts` — is the geodesic tier alive on the real GPU? renderer string, live raymarch uniforms, settled capture.
+- `round103-gpu-lens-probe.ts` — is the geodesic tier alive on the real GPU? renderer string, live raymarch uniforms, settled capture (`R103_OUT_DIR` can direct receipts to a fresh folder).
 - `round103-lens-recheck.ts` — the smoke-exact drive with sequential settled shots (mid-flight screenshot artifact excluder).
+- `round104-desktop-perf-probe.ts` — measures the installed Tauri/WebView GPU, lens state, frame timing, and optional browser A/B.
+- `round105-vanished-marble-probe.ts` — UI-level empty-reality tombstone mutation receipt; restores the reality folder in `finally`.
+- `debug-cloud.ts` — R101.3 live thought-cloud positioning diagnostic.
 
 **tools/ (build & release)**
 - `build-wasm.sh` — emscripten build of `src/platform/native/cosmos_engine.cpp` → `public/wasm/`; pins the full bridge export surface + HEAPF64 (their absence once silently degraded the whole WASM tier to TypeScript).

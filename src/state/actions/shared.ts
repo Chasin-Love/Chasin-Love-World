@@ -34,7 +34,7 @@ export type PayloadImportStatus = {
   missing: Set<string>;
 };
 
-export function shadowReferencesFiles(fileIds: Set<string>): boolean {
+function shadowReferencesFiles(fileIds: Set<string>): boolean {
   return bucket().efs.shadows.some((shadow) => Object.values(shadow.tree).some((node) =>
     node.type === 'file' && Boolean(node.fileId) && fileIds.has(node.fileId!),
   ));

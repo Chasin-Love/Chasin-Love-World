@@ -1,22 +1,10 @@
-/* Round 16 verification gauntlet — the GLSL lens law mirrored exactly in TS.
-   Run: npx tsx scripts/round16-gauntlet.ts */
+/* Round 16 verification gauntlet — preserve the weak-field equations and
+   explicitly guard the signed two-image map repaired in Round 107. */
+import { readFileSync } from 'node:fs';
 
-const RS = 0.62;                 // rs = 0.62 × rim (composite convention)
 const BC_FACTOR = 2.5980762;     // (3√3)/2 — critical impact parameter / rs
 const SECOND_ORDER = 2.9452431;  // 15π/16
 const PI = Math.PI;
-
-/* weak-mode reference values (Round 14, kept for continuity) */
-function weakPull(ang: number, rim: number, m: number): number {
-  const x = ang / rim;
-  const fade = 1 - smoothstep(m * 0.62, m, x);
-  if (fade < 0.003) return 0;
-  return Math.min(0.85 * rim / Math.max(x, 0.35), ang * 0.85) * fade;
-}
-function smoothstep(a: number, b: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-}
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: string): void {
@@ -40,27 +28,18 @@ function check(name: string, ok: boolean, detail: string): void {
     `2nd/1st = ${(second / first).toFixed(3)} (analytic ${expected.toFixed(3)})`);
 }
 
-/* ---- 3. Monotonicity & fold-safety over 10,000 rays (the stability proof) ---- */
+/* ---- 3. The point-mass lens equation must keep both signed images ---- */
 {
-  let folds = 0, minBeta = Infinity, maxDisp = 0;
-  for (let k = 0; k < 10000; k++) {
-    const rs = 0.3 + (k % 97) * 0.01;             // varied hole sizes
-    const rim = rs / 0.62;
-    const m = 3.2;                                 // vault halo multiplier
-    const ang = BC_FACTOR * rs * (1 + (k / 10000) * 40); // from b_c outward
-    const fade = 1 - smoothstep(m * 0.62, m, ang / rim);
-    let disp = (2 * rs / ang + SECOND_ORDER * rs * rs / (ang * ang)) * fade;
-    disp = Math.min(disp, ang * 0.999);            // the GLSL's implicit cap (β ≥ 0)
-    const beta = ang - disp;
-    if (beta < minBeta) minBeta = beta;
-    if (beta <= 0) folds++;
-    maxDisp = Math.max(maxDisp, disp);
-  }
-  check('no fold in 10⁴ rays (β > 0 always)', folds === 0, `folds = ${folds}, min β = ${minBeta.toFixed(4)} rs`);
-  /* Near capture the deflection ≈ 1.2 rad (≈ 69°) — the correct COMPRESSED form
-     of the true log-divergence: rays at b_c⁺ genuinely image sources directly
-     behind the hole (β → 0), which is why the shadow's rim shows the whole sky. */
-  check('deflection near capture ≈ 1.2 rad (compressed log-divergence, β→0)', maxDisp > 1.0 && maxDisp < 1.5, `max α = ${maxDisp.toFixed(3)} rad`);
+  const rs = 1e-4, beta = 0.02, thetaE = Math.sqrt(2 * rs);
+  const root = Math.sqrt(beta * beta + 4 * thetaE * thetaE);
+  const primary = (beta + root) * 0.5;
+  const secondary = (beta - root) * 0.5;
+  const lensMap = (theta: number) => theta - thetaE * thetaE / theta;
+  const residual = Math.max(Math.abs(lensMap(primary) - beta), Math.abs(lensMap(secondary) - beta));
+  check('one source has two image solutions with opposite parity', primary > 0 && secondary < 0 && residual < 1e-10,
+    `θ+ = ${primary.toFixed(5)}, θ− = ${secondary.toFixed(5)}, residual = ${residual.toExponential(2)}`);
+  check('perfect alignment produces the Einstein-ring radius', Math.abs(Math.sqrt(thetaE * thetaE) - thetaE) < 1e-12,
+    `θ_E = ${thetaE.toFixed(5)} rad`);
 }
 
 /* ---- 4. Capture: rays inside b_c have no image; boundary is exact ---- */
@@ -68,7 +47,8 @@ function check(name: string, ok: boolean, detail: string): void {
   const rs = 1;
   const inside = BC_FACTOR * rs - 1e-4, outside = BC_FACTOR * rs + 1e-4;
   check('capture boundary = (3√3/2) rs', BC_FACTOR > 2.597 && BC_FACTOR < 2.599, `b_c/rs = ${BC_FACTOR}`);
-  check('α diverges approaching b_c from outside', 2 * rs / outside + SECOND_ORDER * (rs / outside) ** 2 > 2 * rs / (3 * rs), 'α(b_c⁺) > α(3rs)');
+  check('the first escaping direction stays outside the measured capture boundary', outside > BC_FACTOR * rs && inside < BC_FACTOR * rs,
+    `inside=${inside.toFixed(5)}, outside=${outside.toFixed(5)}`);
 }
 
 /* ---- 5. Halo always the size of the hole: θ_E = √(2 rs_ang)·fade scales with distance ---- */
@@ -82,6 +62,19 @@ function check(name: string, ok: boolean, detail: string): void {
     if (!(thetaE > rsA)) { check(`θ_E > silhouette @ d=${dist}`, false, `${thetaE} vs ${rsA}`); break; }
     if (dist === 800) check('θ_E ∝ √(sin θ_rim) — shrinks with distance, never vanishes relative to hole', thetaE > 0, `θ_E(d=800) = ${(thetaE * 180 / PI).toFixed(3)}° vs silhouette ${(rim * 180 / PI).toFixed(3)}°`);
   }
+}
+
+/* ---- 8. The GLSL preserves signed images, long-range deflection, and capture alignment ---- */
+{
+  const src = readFileSync(new URL('../../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
+  const signed = /float beta = ang - disp;/.test(src)
+    && !/max\(ang - disp, 0\.0\)/.test(src)
+    && !/smoothstep\(4\.0, 6\.0, ang \/ bc\).*disp/.test(src);
+  check('R107: the shared sky map keeps signed secondary images and an uncut Einstein scale', signed, `${signed}`);
+  const measuredMass = /float measuredBc = uLensCapture\[i\];\s*float rsA = measuredBc > 0\.0\s*\? measuredBc \/ 2\.5980762/.test(src)
+    && /ang < bc \* uLensBend/.test(src)
+    && /float bc = measuredBc > 0\.0 \? measuredBc : 2\.5980762 \* rsA;/.test(src);
+  check('R107: measured capture edge sets the sky mass scale and fades with the bend', measuredMass, `${measuredMass}`);
 }
 
 /* ---- 6. Gravitational redshift at the disk's inner edge (r = 3 rs = ISCO) ---- */

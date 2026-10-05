@@ -37,6 +37,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { terminateProcessTree } from '../tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const OUT = path.join(ROOT, 'scripts/verify/round104');
@@ -157,14 +158,6 @@ async function shot(page: import('playwright').Page, name: string): Promise<void
   }
 }
 
-function killTree(p: ChildProcess): void {
-  if (process.platform === 'win32' && p.pid) {
-    spawn('taskkill', ['/pid', String(p.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
-  } else {
-    p.kill('SIGTERM');
-  }
-}
-
 interface PhaseResult {
   renderer: string; avgFps: number; p95FrameMs: number; frames: number;
   gaps: number; invokes: number; invokeAvgMs: number;
@@ -230,6 +223,7 @@ async function main(): Promise<void> {
     app = spawn(EXE, [], {
       cwd: ROOT,
       stdio: 'ignore',
+      detached: process.platform !== 'win32',
       env: {
         ...process.env,
         /* the conf's GPU policy PLUS the anti-throttling trio the project's
@@ -312,7 +306,7 @@ async function main(): Promise<void> {
       } else {
         console.log('\n▶ A/B: serving the same dist/ and measuring GPU-forced Chromium …');
         const server = spawn('node', ['dist/server.cjs'], {
-          cwd: ROOT, stdio: 'ignore',
+          cwd: ROOT, stdio: 'ignore', detached: process.platform !== 'win32',
           env: { ...process.env, PORT: String(AB_PORT), NODE_ENV: 'production' },
         });
         let abBrowser: import('playwright').Browser | null = null;
@@ -334,7 +328,7 @@ async function main(): Promise<void> {
           console.log(`  A/B browser: renderer="${ab.renderer}" avg ${ab.avgFps.toFixed(1)} fps (p95 ${ab.p95FrameMs.toFixed(1)} ms) — the butter baseline`);
         } finally {
           await abBrowser?.close();
-          killTree(server);
+          await terminateProcessTree(server);
         }
       }
     }
@@ -374,7 +368,7 @@ async function main(): Promise<void> {
     await browser?.close().catch(() => {});
     if (app) {
       await new Promise((r) => setTimeout(r, 500));
-      killTree(app);
+      await terminateProcessTree(app);
     }
   }
   /* the verdict rides `code`, never results.every() — a run that threw

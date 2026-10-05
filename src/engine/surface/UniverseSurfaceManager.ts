@@ -40,8 +40,9 @@ export class UniverseSurfaceManager {
      of uniform objects referenced by every background material (celestial
      dome + star shells + nebula points): the masses bend THIS canvas and
      nothing else — the bodies themselves never bend. Each lens carries its
-     halo angle (uLenses.w) AND its silhouette angle (uLensRim): the bend is
-     always the size of the body's own hole in the surface, never fixed.
+     halo angle (uLenses.w) AND its lens radius (uLensRim): a black hole uses
+     its angular Schwarzschild radius, while an ordinary mass uses its
+     apparent surface radius.
 
      Round 52 — PUBLIC because the engine now spreads these exact objects into
      every point-cloud material too (see POINTS_VERT_LENSED): the sky's
@@ -51,18 +52,16 @@ export class UniverseSurfaceManager {
   public lensUniforms = {
     uLenses: { value: Array.from({ length: 16 }, () => new THREE.Vector4(0, 0, 1, 0)) },
     uLensRim: { value: new Array(16).fill(0) },
-    /* Round 16 — 1.0 marks a black hole: it lenses with the EXACT
-       Schwarzschild optics (image equation + capture shadow) instead of the
-       weak-field law the stars and worlds use. */
+    /* The black-hole composer's measured capture angle. A shared value keeps
+       the sky's missing-image boundary aligned with the rendered shadow. */
+    uLensCapture: { value: new Array(16).fill(0) },
+    /* 1.0 selects the signed black-hole image map; ordinary masses use the
+       bounded weak halo map. */
     uLensStrong: { value: new Array(16).fill(0) },
-    /* ROUND 66 — THE LIVING LENS: xyz = the hole's measured world velocity
-       (units/s), w = the disk's spin sign — the sky near a moving hole is
-       dragged and swirled (the water-around-the-cone law). */
-    uLensVel: { value: Array.from({ length: 16 }, () => new THREE.Vector4()) },
     uLensCount: { value: 0 },
     uLensBend: { value: 1 },
-    /* ROUND 58 — the sky lens scales with the panel's Grav. Lensing so the
-       dome's bend is exactly continuous with the geodesic quad's */
+    /* The background map uses the same user-facing lens scale as the
+       black-hole marcher, with its own weak-field source/image mapping. */
     uLensScale: { value: getBlackHoleParams().lensing },
   };
 
@@ -78,11 +77,9 @@ export class UniverseSurfaceManager {
        uploaded photo alike, so every sky agrees around the hole */
     this.photoDome.build(scene, this.lensUniforms);
 
-    /* ROUND 58/59 — the sky lens scales with the panel's Grav. Lensing, so the
-       dome's bend is EXACTLY continuous with the geodesic quad's at every
-       setting (both express α = 2·L·rs/b in their own units). The sky layers
-       bend THEMSELVES, live, in their own shaders — the geodesic quad renders
-       only the hole, and no capture of any kind exists behind it. */
+    /* The sky lens scale tracks the Studio's lens slider. The background
+       uses its own source/image map; the raymarcher supplies the measured
+       capture boundary where available. */
     window.addEventListener(BLACKHOLE_CHANGE_EVENT, (e) => {
       this.lensUniforms.uLensScale.value = (e as CustomEvent<{ lensing: number }>).detail.lensing;
     });
@@ -176,9 +173,10 @@ export class UniverseSurfaceManager {
           void main(){
             vColor = aColor;
             float tw = uTwinkle > 0.5 ? (0.8 + 0.2 * sin(uTime * 1.5 + position.x * 0.001)) : 1.0;
-            /* ROUND 61 — the shared well dims the shell exactly as the dome */
-            vAlpha = aAlpha * tw * lensWellFactor(position);
-            vec4 mv = modelViewMatrix * vec4(lensBentPosition(position), 1.0);
+            vec3 sourceWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+            vec3 imageWorld = lensImageWorld(sourceWorld);
+            vAlpha = aAlpha * tw * lensWellFactor(imageWorld);
+            vec4 mv = viewMatrix * vec4(imageWorld, 1.0);
             gl_PointSize = clamp(aSize * uScale * (260.0 / max(-mv.z, 0.001)), 2.0, 48.0);
             gl_Position = projectionMatrix * mv;
           }
@@ -261,9 +259,10 @@ export class UniverseSurfaceManager {
         varying vec3 vColor; varying float vAlpha;
         void main(){
           vColor = aColor;
-          /* ROUND 61 — the shared well dims the shell exactly as the dome */
-          vAlpha = aAlpha * lensWellFactor(position);
-          vec4 mv = modelViewMatrix * vec4(lensBentPosition(position), 1.0);
+          vec3 sourceWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+          vec3 imageWorld = lensImageWorld(sourceWorld);
+          vAlpha = aAlpha * lensWellFactor(imageWorld);
+          vec4 mv = viewMatrix * vec4(imageWorld, 1.0);
           gl_PointSize = clamp(aSize * uScale * (260.0 / max(-mv.z, 0.001)), 1.5, 36.0);
           gl_Position = projectionMatrix * mv;
         }
@@ -344,9 +343,10 @@ export class UniverseSurfaceManager {
         void main(){
           vColor = aColor;
           float tw = uTwinkle > 0.5 ? (0.76 + 0.24 * sin(uTime * 2.6 + position.x * 17.3 + position.y * 11.1 + position.z * 7.7)) : 1.0;
-          /* ROUND 61 — the shared well dims the shell exactly as the dome */
-          vAlpha = aAlpha * tw * lensWellFactor(position);
-          vec4 mv = modelViewMatrix * vec4(lensBentPosition(position), 1.0);
+          vec3 sourceWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+          vec3 imageWorld = lensImageWorld(sourceWorld);
+          vAlpha = aAlpha * tw * lensWellFactor(imageWorld);
+          vec4 mv = viewMatrix * vec4(imageWorld, 1.0);
           gl_PointSize = clamp(aSize * uScale * (260.0 / max(-mv.z, 0.001)), 1.5, 36.0);
           gl_Position = projectionMatrix * mv;
         }
@@ -486,22 +486,20 @@ export class UniverseSurfaceManager {
     return this.backdropMat;
   }
 
-  /** Round 14 — feed the masses that bend the universe surface (gravitational
-      lensing of the celestial canvas and the background star shells; the
-      bodies themselves never bend). Per lens: halo angle (vec4.w), the
-      body's own silhouette angle (rims) and — Round 16 — whether it is a
-      BLACK HOLE (strong = exact Schwarzschild optics with a capture shadow).
-      bend = damped global strength (0 when off). */
-  public setLenses(lenses: THREE.Vector4[], rims: number[], strong: number[], vels: THREE.Vector4[], count: number, bend: number): void {
+  /** Feed the masses that bend the celestial canvas and background stars;
+      the bodies themselves never bend. Black-hole slots include their
+      angular Schwarzschild scale and the raymarcher's measured capture edge.
+      bend is the damped global strength (0 when off). */
+  public setLenses(lenses: THREE.Vector4[], rims: number[], strong: number[], captures: number[], count: number, bend: number): void {
     const arr = this.lensUniforms.uLenses.value as THREE.Vector4[];
     const rimArr = this.lensUniforms.uLensRim.value as number[];
     const strongArr = this.lensUniforms.uLensStrong.value as number[];
-    const velArr = this.lensUniforms.uLensVel.value as THREE.Vector4[];
+    const captureArr = this.lensUniforms.uLensCapture.value as number[];
     for (let i = 0; i < count && i < arr.length; i++) {
       arr[i].copy(lenses[i]);
       rimArr[i] = rims[i];
       strongArr[i] = strong[i];
-      velArr[i].copy(vels[i]);
+      captureArr[i] = captures[i];
     }
     this.lensUniforms.uLensCount.value = count;
     this.lensUniforms.uLensBend.value = bend;

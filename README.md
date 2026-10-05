@@ -147,7 +147,9 @@ npm run serve          # rebuild server bundle + run
 npm run typecheck      # tsc --noEmit   (alias: npm run lint)
 npm run audit:arch     # architecture auditor (structural drift check, §13.1)
 npm run smoke          # headless playwright check vs reference frame
-npm run verify         # typecheck + round16-gauntlet + round17-gauntlet + smoke  ← THE gate
+npm run verify         # typecheck + 24 regression gauntlets + dev/prod smoke  ← THE gate
+npm run prod:smoke     # headless boot against the built dist/
+npm run wasm:build     # rebuild the native physics core for WASM via emsdk
 npm run desktop:dev    # tauri dev
 npm run desktop:build  # tauri build (C++ core compiles in; NSIS/deb/AppImage)
 npm run desktop:check  # cargo check

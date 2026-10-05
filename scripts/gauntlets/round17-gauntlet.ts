@@ -199,7 +199,7 @@ function inv(d: [number, number, number]): [number, number] {
 
   /* the on-by-default policy + its runtime safety nets */
   const policy = /cap\.tier === 'low'/ .test(capSrc) && !/cap\.tier !== 'cinematic'/.test(capSrc);
-  const frameGuard = /guardRaymarch\(dt\);/.test(engSrc) && /avg > 0\.055/.test(engSrc)
+  const frameGuard = /guardRaymarch\(wallDt\);/.test(engSrc) && /avg > 0\.055/.test(engSrc)
     && /this\.portal\.phase !== 'idle'/ .test(engSrc);
   const focusClamp = /activeFb\.data\.radius \* 0\.62 \* 7/.test(engSrc);
   check('R20: raymarch on by default (medium+ tier, software excluded)', policy, `${policy}`);
@@ -222,19 +222,15 @@ function inv(d: [number, number, number]): [number, number] {
   const enSrc = engineSource();
   const mgrSrc = readFileSync(new URL('../../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
 
-  /* The sky's discrete stars are point clouds. Until R52 their materials
-     carried no lens uniforms at all, so only the procedural canvas and the
-     sky shells bent while the stars the eye actually tracks stayed rigid —
-     the sky read flat around a black hole. The helper bends the vertex's
-     direction AS SEEN FROM THE CAMERA and preserves its distance (a cloud
-     inside an offset group bends wrongly if measured from the origin), and a
-     captured direction is mirrored behind the camera so it clips away. */
+  /* Discrete points are source positions. Their vertex path must solve the
+     forward image equation, while dome/photo fragments pull a source sample
+     from each observed pixel using the signed backward map. */
   const helper = ssSrc.includes('export const LENS_POINT_GLSL')
-    && ssSrc.includes('vec3 lensBendWorld(vec3 worldPos)')
+    && ssSrc.includes('vec3 lensImageWorld(vec3 worldPos)')
     && ssSrc.includes('vec3 delta = worldPos - cameraPosition;')
-    && ssSrc.includes('return cameraPosition + bent * dist;')
-    && ssSrc.includes('if (lensCaptured(bent)) return cameraPosition - delta;');
-  check('R52: star lensing helper bends from the camera, preserves distance, clips capture', helper, String(helper));
+    && ssSrc.includes('float mapped = mid - lensBlackHoleDeflection(mid, rsA);')
+    && ssSrc.includes('return cameraPosition + d * dist;');
+  check('R107: point stars solve the forward image equation from camera space and preserve distance', helper, String(helper));
 
   const starBend = shSrc.includes('vec4 wp = modelMatrix * vec4(vp, 1.0);')
     && shSrc.includes('#ifdef LENS_WORLD')
@@ -301,6 +297,7 @@ function inv(d: [number, number, number]): [number, number] {
   const engSrc = engineSource();
   const capSrc = readFileSync(new URL('../../src/engine/capability.ts', import.meta.url), 'utf8');
   const btSrc = readFileSync(new URL('../../src/engine/blackholeTier.ts', import.meta.url), 'utf8');
+  const policySrc = readFileSync(new URL('../../src/engine/raymarchPolicy.ts', import.meta.url), 'utf8');
   const skSrc = readFileSync(new URL('../../src/platform/storageKeys.ts', import.meta.url), 'utf8');
 
   /* THE POLICY FIX — the quality handler tore the geodesic tier down at any
@@ -309,7 +306,9 @@ function inv(d: [number, number, number]): [number, number] {
      the session. Stand-down now happens only when the tier genuinely
      cannot run it, and a round-trip back re-arms it. */
   const policyFix = !/if \(getQualityTier\(\) !== 'cinematic'\)/.test(engSrc)
-    && /if \(!canUseRaymarchBlackHole\(\)\) \{/.test(engSrc);
+    && /applyRaymarchPolicy\('quality-restore'\)/.test(engSrc)
+    && engSrc.includes('resolveRaymarchPolicy')
+    && policySrc.includes("input.override === 'auto' && !input.tierCapable");
   check('R53: quality changes stand the tier down only when the tier truly cannot run', policyFix, `${policyFix}`);
 
   /* THE RECOVERABLE BREAKER — exceed the budget → stand down for THIS
@@ -328,7 +327,9 @@ function inv(d: [number, number, number]): [number, number] {
   const overrideWired = /const override = getRaymarchOverride\(\);/.test(engSrc)
     && /window\.addEventListener\(RAYMARCH_OVERRIDE_EVENT, this\.onTierOverride\);/.test(engSrc)
     && /window\.removeEventListener\(RAYMARCH_OVERRIDE_EVENT, this\.onTierOverride\);/.test(engSrc)
-    && /override === 'on' && !isSoftwareRasterizer\(\)/.test(engSrc);
+    && engSrc.includes('resolveRaymarchPolicy')
+    && policySrc.includes("input.override === 'on' && input.stoodDown")
+    && policySrc.includes('input.softwareRenderer');
   const overrideModule = /export type RaymarchOverride = 'auto' \| 'on' \| 'off'/.test(btSrc)
     && /export function setRaymarchStatus/.test(btSrc)
     && skSrc.includes('blackholeTier:');
@@ -338,7 +339,8 @@ function inv(d: [number, number, number]): [number, number] {
      shows what is actually live (no more silent stand-downs). */
   const status = /setRaymarchStatus\('fallback', 'shader-error'\)/.test(engSrc)
     && /setRaymarchStatus\('fallback', 'frame-budget'\)/.test(engSrc)
-    && /setRaymarchStatus\(override === 'on' \? 'forced' : 'active', 'attached'\)/.test(engSrc);
+    && /setRaymarchStatus\(decision\.state, decision\.reason\)/.test(engSrc)
+    && policySrc.includes("reason: input.activationReason");
   check('R53: tier transitions report status (attach, breaker, shader failure)', status, `${status}`);
 
   /* capability owns the rasterizer list (no inline duplication) */
@@ -356,9 +358,9 @@ function inv(d: [number, number, number]): [number, number] {
   const oldGone = !existsSync(new URL('../../src/engine/blackhole.ts', import.meta.url));
   check('R54: the flat composite black hole (blackhole.ts) is deleted', oldGone, `${oldGone}`);
 
-  /* ROUND 56/58/64 — escaped rays exit TRANSPARENT: the live sky shows
-     through, already bent by its own 1/θ lens (exactly continuous with the
-     integrated deflection). Captured rays stay fully opaque: the shadow. */
+  /* ROUND 56/58/64 — escaped rays exit transparent so the independently
+     rendered sky map can provide the lensed background; captured rays stay
+     fully opaque and retain the shadow. */
   const rtLens = !/starField|nebulaField|uStarDensity/.test(rmSrc)
     && /vec3 v = normalize\(vWorld\.xyz - uCamPos\);/.test(rmSrc)
     && /captured \? 1\.0 : clamp\(alpha/.test(rmSrc)
@@ -372,28 +374,30 @@ function inv(d: [number, number, number]): [number, number] {
     && !/textureCube|uBgCube|uBgScreen|uProjMatrix/.test(rmSrc);
   check('R59: no background captures of any kind — no cubemap, no screen buffer, no layers', noCapture, `${noCapture}`);
 
-  /* ROUND 58/66 — the sky lens law: the gradual 1/θ decay scaled by the
-     march's lensing factor, and — the user's R66 verdict — LOCAL: unity
-     through the quad's coverage, exactly zero at 6·b_c (the vast whole-sky
-     arcs are gone; the whirlpool hugs the hole). */
+  /* ROUND 107 — signed thin-lens sky mapping. The deflection has its physical
+     1/θ falloff; the old six-shadow-radius cutoff removed the Einstein-scale
+     image, and the old nonnegative clamp removed the secondary image. */
   const ssSrc = readFileSync(new URL('../../src/engine/surface/surfaceShaders.ts', import.meta.url), 'utf8');
   const skyLens = ssSrc.includes('uniform float uLensScale;')
     && !/smoothstep\(m \* 0\.62, m, ang \/ rim\)/.test(ssSrc)
-    && /\) \* uLensScale \* uLensBend \* confine;/.test(ssSrc)
-    && /1\.0 - smoothstep\(4\.0, 6\.0, ang \/ bc\)/.test(ssSrc);
-  check('R58/66: the sky lens law — gradual 1/θ decay, confined to hug the hole', skyLens, `${skyLens}`);
+    && /float beta = ang - disp;/.test(ssSrc)
+    && !/max\(ang - disp, 0\.0\)/.test(ssSrc)
+    && /float effectiveRsA = rsA \* uLensBend;/.test(ssSrc)
+    && /float disp = 2\.0 \* effectiveRsA \/ ang\s*\+\s*2\.9452431 \* effectiveRsA \* effectiveRsA \/ \(ang \* ang\);/.test(ssSrc)
+    && /float rsA = measuredBc > 0\.0\s*\? measuredBc \/ 2\.5980762/.test(ssSrc)
+    && /float bc = measuredBc > 0\.0 \? measuredBc : 2\.5980762 \* rsA;/.test(ssSrc)
+    && /ang < bc \* uLensBend/.test(ssSrc)
+    && !/min\(3\.14159265, max\(beta/.test(ssSrc)
+    && !/confine|smoothstep\(4\.0, 6\.0, ang \/ bc\)/.test(ssSrc)
+    && /uniform float uLensCapture\[16\]/.test(ssSrc);
+  check('R107: signed long-range sky lensing preserves the secondary image and measured shadow edge', skyLens, `${skyLens}`);
 
-  /* ROUND 66 — THE LIVING LENS: the sky is DRAGGED along the hole's real
-     measured velocity and SWIRLED around its sightline (signed with the
-     disk's spin) — motion in the lens, never a static flat ring. The
-     velocity flows engine (tracked, smoothed) → uniform → shader. */
-  const livingLens = /uniform vec4 uLensVel\[16\];/.test(ssSrc)
-    && /float drag = min\(0\.16, speed \* 0\.012\) \* fall \* uLensBend;/.test(ssSrc)
-    && /float swirl = lvel\.w \* 0\.16 \* fall \* uLensBend \* tl;/.test(ssSrc)
-    && /private trackLensVelocity\(/.test(engSrc)
-    && /this\.trackLensVelocity\(b\.data\.id, b\.group\.position, dt, n, swirlSign\);/.test(engSrc)
-    && /this\.lensVels\[n\]\.set\(0, 0, 0, 0\);/.test(engSrc);
-  check('R66: the living lens — drag + swirl from measured velocity, engine → uniform → shader', livingLens, `${livingLens}`);
+  /* R107 removes the old disk-spin-driven sky swirl. The accretion disk's
+     rotation is not the black hole's Kerr spin, so it cannot drive frame
+     dragging in a Schwarzschild sky lens. */
+  const noInventedFrameDragging = !/uLensVel|trackLensVelocity|lvel\.w|float swirl =/.test(ssSrc)
+    && !/trackLensVelocity/.test(engSrc);
+  check('R107: sky lens has no disk-spin-driven frame-dragging term', noInventedFrameDragging, `${noInventedFrameDragging}`);
 
   /* NO GLOW SPRITE — it fatted the halo into a blob and washed the arch out;
      the blaze now comes from the damped project bloom (R65: distance-aware —
@@ -451,22 +455,25 @@ function inv(d: [number, number, number]): [number, number] {
     && /lensWellDarken\(rawD\)/.test(ssSrc)
     && !/wellDarken = max\(wellDarken, 1\.0 - smoothstep\(bcW/.test(ssSrc)
     && /float well = 1\.0 - lensWellDarken\(normalize\(vDir\)\);/.test(pdSrc)
-    && /lensWellFactor\(position\)/.test(usmSrc)
-    && (usmSrc.match(/lensWellFactor\(position\)/g)?.length ?? 0) === 3;
+    && /lensWellFactor\(imageWorld\)/.test(usmSrc)
+    && (usmSrc.match(/lensWellFactor\(imageWorld\)/g)?.length ?? 0) === 3;
   check('R61: ONE well law — shared C¹ gradient (zero at 4·b_c) consumed by dome + photo + all shells', oneWell, `${oneWell}`);
 }
 
 /* ==== ROUND 61 — the whole universe bends (lensing is not Sol-Prime-only) ==== */
 {
   const engSrc = engineSource();
+  const mgrSrc = readFileSync(new URL('../../src/engine/surface/UniverseSurfaceManager.ts', import.meta.url), 'utf8');
 
   /* ONE LENS LAW — every lens (home roster and other galaxies alike) is
-     written through the single slot writer: same asin(R/d) rim, same halo
-     multiplier, same behind-view cull. The old inline per-body body is gone. */
+     written through one slot writer. Black-hole slots also carry the exact
+     capture angle emitted by the raymarcher when it is available. */
   const oneLensLaw = /private pushSurfaceLens\(/.test(engSrc)
     && (engSrc.match(/pushSurfaceLens\(/g)?.length ?? 0) >= 4
+    && /blackHoleCaptureRadiusWorld\(/.test(engSrc)
+    && /uLensCapture/.test(mgrSrc)
     && !/lensStrong\[n\] = \(b\.data\.kind/.test(engSrc);
-  check('R61: every surface lens obeys ONE slot law (pushSurfaceLens — rim, halo, cull)', oneLensLaw, `${oneLensLaw}`);
+  check('R107: the shared slot writer carries the raymarch capture angle to every sky layer', oneLensLaw, `${oneLensLaw}`);
 
   /* CROSS-GALAXY FEED — the lens roster is not just this.bodies: holes in
      other galaxies' isolated inner systems (kind 'vault' with the geodesic

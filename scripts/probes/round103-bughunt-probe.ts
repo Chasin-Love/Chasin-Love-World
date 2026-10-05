@@ -35,6 +35,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { terminateProcessTree } from '../tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.PORT) || 3999;
@@ -59,12 +60,13 @@ async function serverHealthy(): Promise<boolean> {
 async function ensureServer(): Promise<ChildProcess | null> {
   if (await serverHealthy()) { console.log(`▶ reusing the healthy server on :${PORT}`); return null; }
   console.log(`▶ spawning npm run dev on :${PORT} …`);
-  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: false, env: { ...process.env, PORT: String(PORT) } });
+  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: process.platform !== 'win32', env: { ...process.env, PORT: String(PORT) } });
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1500));
     if (await serverHealthy()) return proc;
   }
+  await terminateProcessTree(proc);
   throw new Error('dev server did not become healthy within 120s');
 }
 
@@ -187,11 +189,12 @@ async function main(): Promise<void> {
      ANGLE/D3D11 path the author's live Chrome takes) — default headless uses
      SwiftShader and stands in as the extreme slow pipeline. */
   const gpuArgs = process.env.R103_GPU === '1' ? ['--enable-gpu', '--use-angle=default'] : [];
-  const browser = await chromium.launch({ args: ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', ...gpuArgs] });
+  let browser: import('playwright').Browser | null = null;
   const errors: string[] = [];
   const warnings: string[] = [];
   let code = 1;
   try {
+    browser = await chromium.launch({ args: ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', ...gpuArgs] });
     const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
     await page.bringToFront();
     page.on('console', (m) => {
@@ -368,11 +371,8 @@ async function main(): Promise<void> {
   } finally {
     if (warnings.length) console.log('\nENGINE WARNINGS:\n  ' + warnings.join('\n  '));
     if (errors.length) console.log('\nERRORS:\n  ' + errors.join('\n  '));
-    await browser.close();
-    if (serverProc) {
-      if (process.platform === 'win32' && serverProc.pid) spawn('taskkill', ['/pid', String(serverProc.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
-      else serverProc.kill('SIGTERM');
-    }
+    await browser?.close();
+    await terminateProcessTree(serverProc);
   }
   console.log(`\n${results.every((r) => r.ok) ? 'ALL GREEN' : 'REPRODUCED'} — captures + ledger in scripts/verify/bughunt/`);
   process.exit(code);

@@ -12,6 +12,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
+import { terminateProcessTree } from './tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = Number(process.env.PROD_SMOKE_PORT) || 3210;
@@ -36,6 +37,7 @@ async function waitHealthy(deadlineMs = 30000): Promise<boolean> {
 
 const server: ChildProcess = spawn('node', ['dist/server.cjs'], {
   cwd: ROOT,
+  detached: process.platform !== 'win32',
   env: { ...process.env, PORT: String(PORT), NODE_ENV: 'production' },
   stdio: 'ignore',
 });
@@ -78,9 +80,5 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close();
-  if (process.platform === 'win32' && server.pid) {
-    spawn('taskkill', ['/pid', String(server.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
-  } else {
-    server.kill();
-  }
+  await terminateProcessTree(server);
 }

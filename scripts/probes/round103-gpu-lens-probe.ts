@@ -10,23 +10,27 @@ import { spawn, type ChildProcess } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { terminateProcessTree } from '../tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.PORT) || 3999;
 const BASE = `http://127.0.0.1:${PORT}`;
-const OUT = path.join(ROOT, 'scripts/verify/bughunt');
+const OUT = process.env.R103_OUT_DIR
+  ? path.resolve(ROOT, process.env.R103_OUT_DIR)
+  : path.join(ROOT, 'scripts/verify/bughunt');
 
 async function serverHealthy(): Promise<boolean> {
   try { const res = await fetch(BASE + '/api/health', { signal: AbortSignal.timeout(2500) }); return res.ok; } catch { return false; }
 }
 async function ensureServer(): Promise<ChildProcess | null> {
   if (await serverHealthy()) return null;
-  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, PORT: String(PORT) } });
+  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: process.platform !== 'win32', env: { ...process.env, PORT: String(PORT) } });
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1500));
     if (await serverHealthy()) return proc;
   }
+  await terminateProcessTree(proc);
   throw new Error('no healthy dev server');
 }
 
@@ -51,7 +55,9 @@ const DUMP = `(() => {
     uCamPos: mat ? mat.uniforms.uCamPos.value.toArray().map((v) => Math.round(v)) : null,
     uCenter: mat ? mat.uniforms.uCenter.value.toArray().map((v) => Math.round(v)) : null,
     uCriticalB: mat ? +mat.uniforms.uCriticalB.value.toFixed(3) : null,
-    bh: { stoodDown: e.bhSys.raymarchStoodDown, disabled: e.bhSys.raymarchDisabled, flaps: e.bhSys.raymarchFlaps, count: e.bhSys.blackHoles.length },
+    uLensing: mat ? mat.uniforms.uLensing?.value : null,
+    bh: { stoodDown: e.bhSys.raymarchStoodDown, disabled: e.bhSys.raymarchDisabled, disableReason: e.bhSys.raymarchDisableReason, flaps: e.bhSys.raymarchFlaps, count: e.bhSys.blackHoles.length },
+    tierOverride: localStorage.getItem('my-universe:blackhole:tier:v1'),
     uLensCount: e.surfaceManager.lensUniforms.uLensCount.value,
     uLensBend: +e.surfaceManager.lensUniforms.uLensBend.value.toFixed(3),
     focusId: e.focusId,
@@ -61,9 +67,10 @@ const DUMP = `(() => {
 async function main(): Promise<void> {
   mkdirSync(OUT, { recursive: true });
   const serverProc = await ensureServer();
-  const browser = await chromium.launch({ args: ['--enable-gpu', '--use-angle=default', '--enable-unsafe-swiftshader', '--disable-backgrounding-occluded-windows'] });
+  let browser: import('playwright').Browser | null = null;
   const errs: string[] = [];
   try {
+    browser = await chromium.launch({ args: ['--enable-gpu', '--use-angle=default', '--enable-unsafe-swiftshader', '--disable-backgrounding-occluded-windows'] });
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     await page.bringToFront();
     page.on('console', (m) => {
@@ -99,11 +106,8 @@ async function main(): Promise<void> {
     await page.screenshot({ path: path.join(OUT, 'r103-gpu-lens.png') });
     console.log(errs.length ? `CONSOLE WARN/ERRORS:\n${errs.join('\n')}` : 'console clean');
   } finally {
-    await browser.close();
-    if (serverProc) {
-      if (process.platform === 'win32' && serverProc.pid) spawn('taskkill', ['/pid', String(serverProc.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
-      else serverProc.kill('SIGTERM');
-    }
+    await browser?.close();
+    await terminateProcessTree(serverProc);
   }
 }
 

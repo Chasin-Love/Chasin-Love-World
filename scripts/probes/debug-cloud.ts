@@ -3,6 +3,7 @@
 import { chromium } from 'playwright';
 import { spawn, type ChildProcess } from 'child_process';
 import { fileURLToPath } from 'url';
+import { terminateProcessTree } from '../tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.SMOKE_PORT) || 3000;
@@ -13,27 +14,29 @@ async function serverHealthy(): Promise<boolean> {
 }
 async function ensureServer(): Promise<ChildProcess | null> {
   if (await serverHealthy()) return null;
-  const p = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: false });
+  const p = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: process.platform !== 'win32' });
   const dl = Date.now() + 90_000;
   while (Date.now() < dl) { await new Promise((r) => setTimeout(r, 1500)); if (await serverHealthy()) return p; }
+  await terminateProcessTree(p);
   throw new Error('no server');
 }
 
 async function main() {
   const server = await ensureServer();
-  const browser = await chromium.launch({
-    args: [
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      '--disable-background-timer-throttling',
-    ],
-  });
-  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
-  await page.bringToFront();
-  const errors: string[] = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(`PAGEERROR: ${e.message}`));
+  let browser: import('playwright').Browser | null = null;
   try {
+    browser = await chromium.launch({
+      args: [
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-background-timer-throttling',
+      ],
+    });
+    const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    await page.bringToFront();
+    const errors: string[] = [];
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    page.on('pageerror', (e) => errors.push(`PAGEERROR: ${e.message}`));
     await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.waitForFunction('Boolean(window.__ENGINE__)', undefined, { timeout: 60_000 });
     await page.waitForTimeout(3_000);
@@ -129,8 +132,8 @@ async function main() {
     console.log(JSON.stringify(info, null, 2));
     await page.screenshot({ path: 'scripts/verify/frost/debug-cloud.png' });
   } finally {
-    await browser.close();
-    server?.kill();
+    await browser?.close();
+    await terminateProcessTree(server);
   }
 }
 main().catch((e) => { console.error(e); process.exit(1); });

@@ -30,7 +30,7 @@ type CosmosBackend = 'native-cpp' | 'wasm' | 'typescript';
    is broken — a real defect someone must fix). Degradation stays SILENT for the
    user (never an error, never a broken sky) but is now LOUD in the one place
    that is for maintainers: the console, and the console card. */
-export type DegradationReason =
+type DegradationReason =
   /* tier 1 (native) rejections — expected everywhere except the desktop shell */
   | 'no-tauri'            /* not running inside the Tauri shell at all */
   | 'tauri-import-failed' /* __TAURI_INTERNALS__ present but the api module would not load */
@@ -44,7 +44,7 @@ export type DegradationReason =
   | 'instantiate-failed'  /* the factory ran and the module could not be built/would not expose ccall */
   | 'wasm-fetch-failed';  /* the HEAD probe itself threw (offline, blocked, CORS) */
 
-export interface TierDegradation {
+interface TierDegradation {
   tier: 'native-cpp' | 'wasm';
   reason: DegradationReason;
   detail: string;

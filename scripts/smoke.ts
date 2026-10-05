@@ -4,14 +4,10 @@
 
    What it proves per run:
    1. the app BOOTS headless with ZERO console errors / page errors;
-   2. the geodesic black hole still renders the R20.4 reference look — the boot
-      sequence is driven exactly as a user would (v → cinematic focus), the frame
-      is polled until the hole's bright band actually lands center-frame (fixed
-      sleeps are too fragile across boot timings), the engine is paused, and the
-      final frame is compared against scripts/verify/reference-hole.png via
-      downsampled mean-absolute-difference + shadow/bright/mean luminance bands
-      (animated-scene tolerant, structural-regression sensitive: a missing disk
-      halo, a donut shadow or a dead raymarch tier all fail loudly).
+   2. on software renderers, the declared raymarch degradation is honest and the
+      background sky/lens stay live; on hardware, a geodesic hole must produce a
+      visible shadow + disk frame. The software and hardware tiers are not compared
+      to one golden because the software tier omits the raymarched disk by policy.
 
    Reuses a healthy server on :3000 if one is running; otherwise spawns
    `npm run dev` and tears it down afterwards. */
@@ -21,6 +17,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { terminateProcessTree } from './tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 /* SMOKE_PORT lets a second checkout verify on its own port (the spawned
@@ -57,19 +54,14 @@ async function serverHealthy(): Promise<boolean> {
 
 async function ensureServer(): Promise<ChildProcess | null> {
   if (await serverHealthy()) return null;
-  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: false });
+  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: process.platform !== 'win32' });
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1500));
     if (await serverHealthy()) return proc;
   }
+  await terminateProcessTree(proc);
   throw new Error('dev server did not become healthy within 90s');
-}
-
-function killServer(proc: ChildProcess): void {
-  if (!proc.pid) return;
-  if (process.platform === 'win32') spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
-  else proc.kill('SIGTERM');
 }
 
 /* pixel analysis runs inside the page (zero extra deps): downscale to 64×36 on a
@@ -142,11 +134,12 @@ async function analyze(page: import('playwright').Page, refB64: string | null, s
 async function main(): Promise<void> {
   const capture = process.argv.includes('--capture');
   const serverProc = await ensureServer();
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  let browser: import('playwright').Browser | null = null;
   const errors: string[] = [];
   let ok = false;
   try {
+    browser = await chromium.launch();
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     page.on('console', (m) => {
       if (m.type() !== 'error') return;
       /* headless Chromium has no audio device — this is environment noise, not an app defect */
@@ -191,6 +184,31 @@ async function main(): Promise<void> {
 
     await page.evaluate(`(() => { const e = window.__ENGINE__; if (e && typeof e.setPaused === 'function') e.setPaused(true); })()`);
     await page.waitForTimeout(800);                         // let the paused frame flush
+
+    const viewState = await page.evaluate(`(() => {
+      const e = window.__ENGINE__;
+      const canvas = document.querySelector('canvas');
+      const gl = canvas && (canvas.getContext('webgl2') || canvas.getContext('webgl'));
+      const debug = gl && gl.getExtension('WEBGL_debug_renderer_info');
+      const firstHole = e && e.bhSys && e.bhSys.blackHoles && e.bhSys.blackHoles[0];
+      const quad = firstHole && firstHole.group.children[0];
+      const uniforms = quad && quad.material && quad.material.uniforms;
+      const skyLensUniforms = e && e.surfaceManager && e.surfaceManager.lensUniforms;
+      return {
+        renderer: debug && gl ? String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)) : 'unavailable',
+        stage: e && e.cosmicStage,
+        activeRealityId: e && e.activeRealityId,
+        camera: e && e.camera ? [e.camera.position.x, e.camera.position.y, e.camera.position.z] : null,
+        rig: e && e.rig ? { zoomT: e.rig.zoomT, theta: e.rig.theta, phi: e.rig.phi, focused: e.rig.focused } : null,
+        holes: e && e.bhSys ? e.bhSys.blackHoles.map((v) => ({ geodesic: v.geodesic, visible: v.group.visible })) : null,
+        shaderTime: uniforms && uniforms.uTime ? uniforms.uTime.value : null,
+        lensing: uniforms && uniforms.uLensing ? uniforms.uLensing.value : null,
+        skyLensCount: skyLensUniforms && skyLensUniforms.uLensCount ? skyLensUniforms.uLensCount.value : 0,
+        skyLensStrength: skyLensUniforms && skyLensUniforms.uLensBend ? skyLensUniforms.uLensBend.value : 0,
+      };
+    })()`);
+    console.log(`SMOKE VIEW — ${JSON.stringify(viewState)}`);
+    const softwareRenderer = /swiftshader|llvmpipe|software raster|basic render/i.test(viewState.renderer);
 
     /* R98 — THE TIER RECEIPT, in the chain itself.
        Before this round the app could silently drop from the compiled core to
@@ -241,19 +259,46 @@ async function main(): Promise<void> {
 
     const shot = await page.screenshot();
     const shotB64 = shot.toString('base64');
+    /* Optional artifact path for diagnosing a red frame without replacing the
+       protected reference image or changing the capture baseline. */
+    if (process.env.SMOKE_CAPTURE_PATH) {
+      mkdirSync(path.dirname(process.env.SMOKE_CAPTURE_PATH), { recursive: true });
+      writeFileSync(process.env.SMOKE_CAPTURE_PATH, shot);
+      console.log(`SMOKE DEBUG CAPTURE — ${process.env.SMOKE_CAPTURE_PATH}`);
+    }
 
     if (capture) {
+      if (!softwareRenderer) throw new Error('the checked-in reference is the software-tier frame; capture it with SwiftShader');
       mkdirSync(VERIFY_DIR, { recursive: true });
-      writeFileSync(REFERENCE, shot);
       const m = await analyze(page, null, shotB64);
-      writeFileSync(METRICS, JSON.stringify({ shadow: m.shadow, mean: m.mean, bright: m.bright, capturedAt: new Date().toISOString() }, null, 2) + '\n');
+      if (!Array.isArray(viewState.holes) || viewState.holes.some((hole) => hole.geodesic)
+          || viewState.skyLensCount <= 0 || viewState.skyLensStrength <= 0 || m.mean < 0.004) {
+        throw new Error('refusing a blank or inconsistent software-tier capture');
+      }
+      writeFileSync(REFERENCE, shot);
+      writeFileSync(METRICS, JSON.stringify({
+        renderer: viewState.renderer,
+        geodesic: false,
+        skyLensCount: viewState.skyLensCount,
+        skyLensStrength: viewState.skyLensStrength,
+        shadow: m.shadow,
+        mean: m.mean,
+        bright: m.bright,
+        capturedAt: new Date().toISOString(),
+      }, null, 2) + '\n');
       console.log(`SMOKE CAPTURE — reference frame written (${shot.length} bytes)`);
       console.log(`  shadow ${m.shadow.toFixed(3)} · frame mean ${m.mean.toFixed(3)} · central bright ${m.bright.toFixed(3)}`);
       ok = true;
-    } else {
+    } else if (softwareRenderer) {
       if (!existsSync(REFERENCE)) throw new Error('no reference frame — run: npx tsx scripts/smoke.ts --capture');
       const ref = readFileSync(REFERENCE);
       const m = await analyze(page, ref.toString('base64'), shotB64);
+      const policyOk = Array.isArray(viewState.holes) && viewState.holes.length > 0
+        && viewState.holes.every((hole) => !hole.geodesic)
+        && viewState.skyLensCount > 0 && viewState.skyLensStrength > 0;
+      if (!policyOk) errors.push('[software] renderer degradation, sky-lens slots, or bend strength is inconsistent');
+      if (m.mean < 0.004) errors.push(`[software] the sky frame is blank (mean luminance ${m.mean.toFixed(3)})`);
+      console.log(`SMOKE SOFTWARE — geodesic tier off by policy · sky lenses ${viewState.skyLensCount} · bend ${viewState.skyLensStrength.toFixed(2)} · frame mean ${m.mean.toFixed(3)}`);
       console.log(`SMOKE FRAME — histL1 ${m.histL1.toFixed(4)} (max ${MAX_HIST_L1}) · shadow ${m.shadow.toFixed(3)} vs ${m.refShadow?.toFixed(3)} · mean ${m.mean.toFixed(3)} vs ${m.refMean?.toFixed(3)} · bright ${m.bright.toFixed(3)} vs ${m.refBright?.toFixed(3)} · (mae ${m.mae.toFixed(3)} informational)`);
       const histOk = m.histL1 <= MAX_HIST_L1;
       const shadowOk = m.refShadow === undefined || Math.abs(m.shadow - m.refShadow) <= MAX_SHADOW_DELTA;
@@ -263,7 +308,14 @@ async function main(): Promise<void> {
       if (!shadowOk) errors.push('[frame] shadow luminance off band — shadow lost or bloated');
       if (!meanOk) errors.push('[frame] whole-frame luminance off band — scene composition changed');
       if (!brightOk) errors.push('[frame] central bright-band fraction off — disk halo or photon ring missing');
-      ok = histOk && shadowOk && meanOk && brightOk;
+      ok = histOk && shadowOk && meanOk && brightOk && policyOk && m.mean >= 0.004;
+    } else {
+      const m = await analyze(page, null, shotB64);
+      const geodesicLive = Array.isArray(viewState.holes) && viewState.holes.some((hole) => hole.geodesic);
+      if (!geodesicLive) errors.push('[hardware] no black-hole raymarch is live on a hardware renderer');
+      if (m.mean < 0.02 || m.bright < 0.01) errors.push('[hardware] the focused black hole has no visible shadow/disk frame');
+      console.log(`SMOKE HARDWARE — geodesic ${geodesicLive ? 'live' : 'off'} · frame mean ${m.mean.toFixed(3)} · central bright ${m.bright.toFixed(3)}`);
+      ok = geodesicLive && m.mean >= 0.02 && m.bright >= 0.01;
     }
 
     if (errors.length) {
@@ -281,8 +333,8 @@ async function main(): Promise<void> {
     failureText = `${msg}${errors.length ? ' | ' + errors.join(' | ') : ''}`;
     process.exitCode = 1;
   } finally {
-    await browser.close();
-    if (serverProc) killServer(serverProc);
+    await browser?.close();
+    await terminateProcessTree(serverProc);
   }
 }
 

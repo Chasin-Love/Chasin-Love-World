@@ -304,8 +304,8 @@ export class BodyBuilders {
       /* Round 54/55 — ONE renderer, no stand-ins: the geodesic black hole,
          physics-colored (blackbody + Doppler) exactly like the reference,
          with his bent starfield behind it. On GPUs that cannot run it, the
-         hole hides itself; the exact Schwarzschild bend rides the universe
-         surface too (lensStrong is set for kind 'hole'). */
+         hole hides itself; the shared background lens uses a signed
+         second-order image map with the marcher's measured shadow edge. */
       const R = data.radius;
       const bh = this.bhSys.attachBlackHole(R, g);
       rb.mat = undefined;

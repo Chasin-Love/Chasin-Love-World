@@ -12,6 +12,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { terminateProcessTree } from '../tools/process-tree';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.PORT) || 3999;
@@ -25,12 +26,13 @@ async function serverHealthy(): Promise<boolean> {
 async function ensureServer(): Promise<ChildProcess | null> {
   if (await serverHealthy()) { console.log(`▶ reusing :${PORT}`); return null; }
   console.log(`▶ spawning dev server on :${PORT} …`);
-  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, PORT: String(PORT) } });
+  const proc = spawn('npm run dev', { cwd: ROOT, shell: true, stdio: 'ignore', detached: process.platform !== 'win32', env: { ...process.env, PORT: String(PORT) } });
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1500));
     if (await serverHealthy()) return proc;
   }
+  await terminateProcessTree(proc);
   throw new Error('dev server did not become healthy within 120s');
 }
 
@@ -67,9 +69,10 @@ const DUMP = `(() => {
 async function main(): Promise<void> {
   mkdirSync(OUT, { recursive: true });
   const serverProc = await ensureServer();
-  const browser = await chromium.launch({ args: ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
+  let browser: import('playwright').Browser | null = null;
   const errs: string[] = [];
   try {
+    browser = await chromium.launch({ args: ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
     const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
     await page.bringToFront();
     page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('AudioContext') && !m.text().includes('WebSocket') && !m.text().includes('[vite]')) errs.push(m.text()); });
@@ -99,11 +102,8 @@ async function main(): Promise<void> {
     }
     console.log(errs.length ? `ERRORS:\n${errs.join('\n')}` : 'no page errors');
   } finally {
-    await browser.close();
-    if (serverProc) {
-      if (process.platform === 'win32' && serverProc.pid) spawn('taskkill', ['/pid', String(serverProc.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
-      else serverProc.kill('SIGTERM');
-    }
+    await browser?.close();
+    await terminateProcessTree(serverProc);
   }
 }
 

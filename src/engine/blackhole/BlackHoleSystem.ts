@@ -11,6 +11,7 @@ import type { EffectComposer } from 'three/addons/postprocessing/EffectComposer.
 import { createBlackHole, type BlackHoleVisual } from '../blackholeRaymarch';
 import { canUseRaymarchBlackHole, isSoftwareRasterizer } from '../capability';
 import { getRaymarchOverride, setRaymarchStatus } from '../blackholeTier';
+import { resolveRaymarchPolicy } from '../raymarchPolicy';
 import { setCameraMemory, type CameraMemory } from '../cameraMemory';
 import type { CameraRig } from '../cameraRig';
 import type { RuntimeBody, UniverseEngine } from '../engine';
@@ -39,6 +40,7 @@ export class BlackHoleSystem {
   /* ---- owned state (moved verbatim) ---- */
   blackHoles: BlackHoleVisual[] = [];
   raymarchDisabled = false;
+  raymarchDisableReason: 'shader-error' | 'frame-budget-3-strikes' | null = null;
   private _rmGuardFrames = 0;
   private _rmGuardAccum = 0;
   raymarchStoodDown = false;
@@ -62,16 +64,22 @@ export class BlackHoleSystem {
      of the sky anywhere in the pipeline — no square, no layers. */
   attachBlackHole(R: number, container: THREE.Object3D): BlackHoleVisual {
     const override = getRaymarchOverride();
-    const capable = !this.raymarchDisabled
-      && (canUseRaymarchBlackHole() || (override === 'on' && !isSoftwareRasterizer()));
-    const geodesic = override !== 'off' && capable;
+    const decision = resolveRaymarchPolicy({
+      override,
+      tierCapable: canUseRaymarchBlackHole(),
+      softwareRenderer: isSoftwareRasterizer(),
+      disabledReason: this.raymarchDisabled
+        ? (this.raymarchDisableReason ?? 'shader-error')
+        : null,
+      stoodDown: this.raymarchStoodDown,
+      activationReason: 'attached',
+    });
+    const geodesic = decision.enabled;
     const visual = createBlackHole(R, { geodesic });
     container.add(visual.group);
     this.blackHoles.push(visual);
-    if (geodesic) setRaymarchStatus(override === 'on' ? 'forced' : 'active', 'attached');
-    else {
-      const reason = override === 'off' ? 'override-off' : 'tier-low';
-      setRaymarchStatus('off', reason);
+    setRaymarchStatus(decision.state, decision.reason);
+    if (!geodesic) {
       /* R103 — THE WITNESS (the R98 law: degradation is a VALUE, never a
          shrug). Without the geodesic tier the hole renders as a bare pit and
          the spacetime-bending look is simply GONE — the author's "the lens
@@ -81,10 +89,8 @@ export class BlackHoleSystem {
       if (!nonGeodesicWitnessed) {
         nonGeodesicWitnessed = true;
         console.warn(
-          `[universe] the geodesic black-hole tier is NOT live (${reason === 'override-off'
-            ? 'the Studio switch is OFF — my-universe:blackhole:tier:v1'
-            : 'the GPU probed as low-power or software-rendered'
-          }) — the lensed Eventide look is off this session. ` +
+          `[universe] the geodesic black-hole tier is NOT live (${decision.reason}) — ` +
+          `the lensed Eventide look is off this session. ` +
           `The Black Hole Studio tier switch can force it ('on'); the dome's sky-bend is unaffected.`,
         );
       }
@@ -143,6 +149,13 @@ export class BlackHoleSystem {
     const override = getRaymarchOverride();
     if (override === 'off') return;
     if (override === 'on') return; /* forced: the breaker never stands it down */
+    /* A hidden tab can report a long RAF gap after suspension. It is not a
+       representative render cost, so discard the partial sample window. */
+    if (typeof document !== 'undefined' && document.hidden) {
+      this._rmGuardFrames = 0;
+      this._rmGuardAccum = 0;
+      return;
+    }
     /* Round 20.1 — portal dives (vault entry, reality work) have their own
        heavy frame moments; they must never be blamed on the geodesic tier
        and stand it down permanently */
@@ -171,6 +184,7 @@ export class BlackHoleSystem {
         if (this.raymarchFlaps >= 3) {
           console.warn('[universe] geodesic black hole exceeded the frame budget three times — the hole hides itself for this session');
           this.raymarchDisabled = true;
+          this.raymarchDisableReason = 'frame-budget-3-strikes';
           this.setAllGeodesic(false);
           setRaymarchStatus('fallback', 'frame-budget-3-strikes');
         } else {
@@ -190,8 +204,19 @@ export class BlackHoleSystem {
       if (this._rmAwayFrames > 300) {
         this._rmAwayFrames = 0;
         this.raymarchStoodDown = false;
-        this.setAllGeodesic(true);
-        setRaymarchStatus(getRaymarchOverride() === 'on' ? 'forced' : 'active', 're-armed');
+        const override = getRaymarchOverride();
+        const decision = resolveRaymarchPolicy({
+          override,
+          tierCapable: canUseRaymarchBlackHole(),
+          softwareRenderer: isSoftwareRasterizer(),
+          disabledReason: this.raymarchDisabled
+            ? (this.raymarchDisableReason ?? 'shader-error')
+            : null,
+          stoodDown: false,
+          activationReason: 're-armed',
+        });
+        this.setAllGeodesic(decision.enabled);
+        setRaymarchStatus(decision.state, decision.reason);
       }
     } else {
       this._rmAwayFrames = 0;
@@ -203,7 +228,7 @@ export class BlackHoleSystem {
       while a portal owns the camera. */
   checkpointCameraView(dt: number): void {
     const quiescent = !this.bootIntro && this.kamuiTimer <= 0 && this.portal.phase === 'idle'
-      && this.galaxyDive === null && this.cosmicStage === 'web';
+      && this.galaxyDive === null && this.cosmicStage === 'web' && this.rig.isSettled;
     if (!quiescent) {
       this._camMemTimer = 0;
       return;
