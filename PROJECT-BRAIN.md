@@ -319,10 +319,34 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
 
 ---
 
-## 8. CURRENT STATE (as of 2026-10-05 — R106/R107 are merged locally to `main` at `0723578d`)
+## 8. CURRENT STATE (as of 2026-10-06 — the tip is the author's `Version 20.1` at `40ca4f9a`; R108 the first crossing shipped v16.2.0 toward the main repository)
 
 
-- **`main` is the blessed reference.** Its tip is R107 commit **`0723578d`**,
+- **R108 (this round, 2026-10-06 — THE FIRST CROSSING):** the author's decree: *"make a
+  pull request to my main github inspite of test version … & add new version of app
+  also."* TWO findings before the ship: (1) the smoke's first failure was the documented
+  cold-boot trap — the first page.goto after a cold Vite start measured ~67 s (> the 60 s
+  goto timeout); warm cache boots instantly, ports verified zombie-free; (2) the second
+  failure was HONEST CONTENT — with the Sol-Prime Continuum re-added (the author's
+  `Version 20.1`), the glob-discovered home reality changed (boot shows
+  `activeRealityId: "sol-prime"`, five vault bodies), the boot sky's composition
+  legitimately moved, and the golden frame drifted (histL1 0.3338 > 0.12) — while
+  `git diff 0723578d..HEAD` proves engine/physics/vault/state/server untouched since
+  R107. THE RE-PIN (the documented ritual): `smoke.ts --capture` wrote a fresh
+  reference from the new sky; SMOKE GREEN at histL1 0.0095, prod smoke green, full
+  verify green (24 gauntlets). THE CROSSING: the test-version `origin` synced (it had
+  trailed 28+ commits); release branch `release/v16.2.0` carries an explicit
+  history-adoption merge (`-s ours` — the main repository's `main` is one unrelated-
+  history snapshot commit, "Upload upgraded version") so the PR diff is the true file
+  delta; PR `main ← release/v16.2.0` opened on `Chasin-Love/Chasin-Love-World`; tag
+  **v16.2.0** (version bump 16.1.0 → 16.2.0 in the R104 LOCKSTEP: tauri.conf.json ⇄
+  Cargo.toml ⇄ Cargo.lock) pushed to BOTH repos — the main repository becomes the
+  release home, the test-version repo keeps serving `latest.json` because the installed
+  apps' updater endpoint still points there (repointing is a locked-contract change left
+  for the author). `docs/ROUND-108-THE-FIRST-CROSSING-2026-10-06.md`
+- **`main` is the blessed reference.** Its tip is the author's **`Version 20.1`** commit
+  **`40ca4f9a`** — the Sol-Prime Continuum reality pack re-added through the app — on
+  top of the R107 commit **`0723578d`**,
   the author-authorized R106/R107 fast-forward, on top of the **Version 20** merge
   (R105: the vanished marble + the sealed floor) on top of the R104 merge (the
   desktop rebirth) on top of the merged R96–R103 chain —
