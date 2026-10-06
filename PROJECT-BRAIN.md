@@ -343,7 +343,15 @@ Rounds (R-numbers) are the project's epochs; each ends with a round document `do
   Cargo.toml ⇄ Cargo.lock) pushed to BOTH repos — the main repository becomes the
   release home, the test-version repo keeps serving `latest.json` because the installed
   apps' updater endpoint still points there (repointing is a locked-contract change left
-  for the author). `docs/ROUND-108-THE-FIRST-CROSSING-2026-10-06.md`
+  for the author). **CLOSING RECEIPTS (same day):** the author merged #13 (04:26 UTC) —
+  the main repository's `main` tip is the *Version 20* merge `ee8763e7` and local main +
+  the test-version repo were fast-forwarded to it; the main repo's tag run was eaten by
+  Actions' first-activation window, so the release was dispatched explicitly on the tag
+  and **MY UNIVERSE v16.2.0** published on BOTH repos — the main repo's installers are
+  UNSIGNED (no `TAURI_SIGNING_PRIVATE_KEY` secret there yet → no `.sig`, no
+  `latest.json`; the signed feed lives on the test-version repo) — adding the secret and
+  repointing the endpoint are the author's settings.
+  `docs/ROUND-108-THE-FIRST-CROSSING-2026-10-06.md`
 - **`main` is the blessed reference.** Its tip is the author's **`Version 20.1`** commit
   **`40ca4f9a`** — the Sol-Prime Continuum reality pack re-added through the app — on
   top of the R107 commit **`0723578d`**,

@@ -71,3 +71,23 @@
   call.
 - The golden now reflects the Sol-Prime boot sky; a future round that changes the home
   reality again must re-capture the same way.
+
+## CLOSING RECEIPTS (same day, 2026-10-06)
+
+- **THE AUTHOR MERGED THE PR.** #13 was merged by `Chasin-Love` at 04:26 UTC; the main
+  repository's `main` tip became the *Version 20* merge (`ee8763e7`) — the blessed
+  reference is home. Local `main` and the test-version repo were fast-forwarded to the
+  same commit; all three lines carry the identical tree.
+- **THE RELEASE LANDED ON BOTH REPOS.** The main repository's tag-trigger run was eaten
+  by Actions' first-activation window (the repo had never run a workflow), so the
+  release was dispatched explicitly on the tag (`workflow_dispatch`, ref `v16.2.0`) —
+  ALL GREEN, and **MY UNIVERSE v16.2.0** published with the Windows NSIS installer
+  (11.3 MB), the Linux `.deb` (12.2 MB) and `.AppImage` (84.3 MB), and the WASM core.
+  The test-version repo's own tag-push run had already published the same release,
+  `latest.json` included.
+- **THE MAIN REPO BUILD IS UNSIGNED (expected):** the `TAURI_SIGNING_PRIVATE_KEY`
+  secret exists on the test-version repo but not (yet) on the main repository, so the
+  main repo's installers carry no `.sig` and no `latest.json` — its updater stays
+  dormant until the author adds the signing secret there. The signed installers (and
+  the live updater feed) remain on the test-version repo. Both follow-ups — adding the
+  secret and repointing `endpoints[0]` — are the author's settings to make.
