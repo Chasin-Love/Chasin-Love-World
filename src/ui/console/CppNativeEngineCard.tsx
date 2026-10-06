@@ -1,0 +1,293 @@
+import React, { useEffect, useState } from 'react';
+import { Cpu, Terminal, Play, Zap, Copy, Check, BadgeCheck, BadgeX, FlaskConical, Gauge } from 'lucide-react';
+import { cosmosBridge, type CosmosStatus } from '../../platform/native/cpp_bridge';
+import { getQualityTier, setQualityTier, probeCapability, type QualityTier } from '../../engine/capability';
+import { toast } from '../../ui/toast';
+import { ThoughtCloud } from './ThoughtCloud';
+
+const BACKEND_LABEL: Record<string, { text: string; cls: string }> = {
+  'native-cpp': { text: 'NATIVE C++ CORE', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' },
+  wasm: { text: 'WASM KERNEL', cls: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30' },
+  typescript: { text: 'TS REFERENCE FALLBACK', cls: 'bg-amber-500/20 text-amber-300 border-amber-400/30' },
+};
+
+/* The compiled C++ core can only run inside the Tauri desktop binary — a
+   browser tab physically cannot load it. Same probe the bridge uses. */
+const isDesktopShell = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+export const CppNativeEngineCard: React.FC = () => {
+  const [status, setStatus] = useState<CosmosStatus>(() => cosmosBridge.getStatus());
+  const [opsPerSec, setOpsPerSec] = useState<number | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [parity, setParity] = useState<number | null>(null);
+  const [parityBackend, setParityBackend] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'bench' | 'parity' | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [tier, setTier] = useState<QualityTier>(() => getQualityTier());
+  const [gpu, setGpu] = useState<string>('');
+
+  useEffect(() => {
+    let alive = true;
+    cosmosBridge.init().then((s) => {
+      if (alive) setStatus({ ...s });
+    }).catch(() => { /* ignore init failure */ });
+    setGpu(probeCapability().renderer);
+    return () => { alive = false; };
+  }, []);
+
+  const applyTier = (next: QualityTier) => {
+    setTier(next);
+    setQualityTier(next);
+    toast(`✦ Render quality: ${next.toUpperCase()} — applied live`);
+  };
+
+  const runBenchmark = async () => {
+    setBusy('bench');
+    try {
+      const res = await cosmosBridge.benchmark(128, 100);
+      /* measure wall latency from a second short run */
+      const t0 = performance.now();
+      await cosmosBridge.benchmark(128, 10);
+      const latency = performance.now() - t0;
+      setOpsPerSec(res.opsPerSec);
+      setLatencyMs(latency);
+      setStatus(cosmosBridge.getStatus());
+      toast(`✦ ${res.backend} RK4 benchmark: ${(res.opsPerSec / 1_000_000).toFixed(2)} Mops/sec`);
+    } catch (err) {
+      toast(`⚠ Benchmark failed: ${err instanceof Error ? err.message : String(err)}`, 'warn');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runParity = async () => {
+    setBusy('parity');
+    try {
+      const res = await cosmosBridge.verifyParity();
+      setParity(res.maxDelta);
+      setParityBackend(res.backend);
+      const ok = res.maxDelta < 1e-9 || res.backend === 'typescript';
+      toast(ok
+        ? `✦ Parity verified — max relative Δ ${res.maxDelta.toExponential(1)}`
+        : `⚠ Parity drift ${res.maxDelta.toExponential(1)} vs TS reference`);
+    } catch (err) {
+      toast(`⚠ Parity check failed: ${err instanceof Error ? err.message : String(err)}`, 'warn');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const copyCommand = (key: string, text: string) => {
+    const done = () => {
+      setCopiedKey(key);
+      toast('Command copied to clipboard');
+      setTimeout(() => setCopiedKey(null), 2000);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+      fallbackCopy(text, done);
+    }
+  };
+
+  const backend = BACKEND_LABEL[status.backend] ?? BACKEND_LABEL.typescript;
+
+  /* execCommand fallback for non-secure contexts (http://LAN, older webviews) */
+  const fallbackCopy = (text: string, done: () => void) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      done();
+    } catch {
+      toast('⚠ Clipboard unavailable — copy the command manually', 'warn');
+    }
+  };
+  const commands = {
+    desktop: 'npm run desktop:build',
+    linux: 'cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j$(nproc)',
+    windows: 'cmake -B build -G "Visual Studio 17 2022" -A x64 && cmake --build build --config Release',
+  };
+
+  return (
+    <div className="cc-panel p-4 sm:p-5 space-y-4">
+      {/* Header — R101.3 quiet manner: the words live in the clouds */}
+      <div className="flex items-start justify-between gap-3 border-b border-white/12 pb-3 flex-wrap">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-400/35 text-cyan-300">
+            <Cpu className="w-4 h-4" />
+          </div>
+          <div>
+            <ThoughtCloud
+              label="Astrophysics Simulation Core"
+              subtitle={`core v${status.version} · ${status.physicsFieldCount}-field telemetry · RK4 integrator. The same core that drives the sky — Verify Parity checks it field-for-field against the TypeScript reference.`}
+              hint="the compiled engine, with its face here"
+            >
+              <h3 className="font-display text-[13px] font-semibold text-white tracking-wide cursor-default">
+                ASTROPHYSICS SIMULATION CORE
+              </h3>
+            </ThoughtCloud>
+            {!isDesktopShell && (
+              <p className="font-mono text-[9px] text-cyan-300/80">
+                Browser preview — hover the tier badge for what that means
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <ThoughtCloud
+            label={backend.text}
+            subtitle={
+              status.fellBack ? (
+                <span className="block space-y-1">
+                  <span className="block">Compiled core not in use — this is why:</span>
+                  {status.degraded.filter((d) => d.reason !== 'no-tauri').length === 0 ? (
+                    <span className="block">Running in a browser tab — the native tier needs the desktop shell, so this is expected here.</span>
+                  ) : (
+                    status.degraded.filter((d) => d.reason !== 'no-tauri').map((d) => (
+                      <span key={`${d.tier}-${d.reason}`} className="block">
+                        ✕ {d.tier}: {d.reason} <span className="text-slate-500">({d.detail})</span>
+                      </span>
+                    ))
+                  )}
+                </span>
+              ) : (
+                'The compiled core is live — every physics number you see was computed by it.'
+              )
+            }
+            hint="why this tier"
+          >
+            <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${backend.cls} cursor-default`}>
+              {backend.text}
+            </span>
+          </ThoughtCloud>
+          <button
+            onClick={runParity}
+            disabled={busy !== null}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/20 hover:bg-violet-500/30 border border-violet-400/40 text-violet-200 text-xs font-mono tracking-wider transition-all cursor-pointer"
+          >
+            <FlaskConical className={`w-3 h-3 ${busy === 'parity' ? 'animate-pulse' : ''}`} />
+            <span>{busy === 'parity' ? 'Verifying...' : 'Verify Parity'}</span>
+          </button>
+          <button
+            onClick={runBenchmark}
+            disabled={busy !== null}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 text-xs font-mono tracking-wider transition-all cursor-pointer"
+          >
+            <Play className={`w-3 h-3 ${busy === 'bench' ? 'animate-spin' : ''}`} />
+            <span>{busy === 'bench' ? 'Calculating...' : 'Run RK4 Benchmark'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 font-mono text-xs">
+        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+          <span className="cc-label block">Active Backend</span>
+          <span className="text-sm font-bold text-white tabular-nums">{status.backend}</span>
+        </div>
+        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+          <span className="cc-label block">Core Version</span>
+          <span className="text-sm font-bold text-cyan-300 tabular-nums">{status.version}</span>
+        </div>
+        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+          <span className="cc-label block">N-Body Throughput</span>
+          <span className="text-sm font-bold text-emerald-300 tabular-nums">
+            {opsPerSec === null ? '—' : `${(opsPerSec / 1_000_000).toFixed(2)} Mops/s`}
+          </span>
+        </div>
+        <div className="p-2.5 rounded-xl bg-white/6 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+          <span className="cc-label block">Step Latency</span>
+          <span className="text-sm font-bold text-amber-300 tabular-nums">
+            {latencyMs === null ? '—' : `${latencyMs.toFixed(1)} ms`}
+          </span>
+        </div>
+      </div>
+
+      {/* Parity receipt — same criterion as the toast: the TS reference tier
+          trivially matches itself, so it always reads as verified */}
+      {parity !== null && (
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-black/25 border border-white/10 font-mono text-[11px]">
+          {(parity < 1e-9 || parityBackend === 'typescript')
+            ? <BadgeCheck className="w-4 h-4 text-emerald-400" />
+            : <BadgeX className="w-4 h-4 text-amber-400" />}
+          <span className={(parity < 1e-9 || parityBackend === 'typescript') ? 'text-emerald-300' : 'text-amber-300'}>
+            {(parity < 1e-9 || parityBackend === 'typescript') ? 'Numerical parity verified' : 'Parity drift detected'} — max relative Δ {parity.toExponential(1)} vs TS reference
+          </span>
+        </div>
+      )}
+
+      {/* Render quality tiers */}
+      <div className="space-y-2 font-mono text-xs">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <ThoughtCloud
+            label="Render Quality Tier"
+            subtitle="The raymarched black hole (true gravitational lensing) is already on at MEDIUM and above. CINEMATIC adds richer particles and exoplanet horizon plates; sharpness scales with your display's density — on a 125% screen MEDIUM and CINEMATIC render at the same resolution."
+            hint="applied live"
+          >
+            <div className="cc-panel-title cursor-default">
+              <Gauge className="w-3.5 h-3.5" />
+              <span>Render Quality Tier</span>
+            </div>
+          </ThoughtCloud>
+          <span className="text-[9px] text-slate-500 truncate max-w-[220px]" title={gpu}>{gpu}</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {(['low', 'medium', 'cinematic'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => applyTier(t)}
+              className={`px-2 py-1.5 rounded-xl border text-[11px] font-mono tracking-wider transition-all cursor-pointer ${
+                tier === t
+                  ? 'bg-cyan-500/25 border-cyan-400/50 text-cyan-200 shadow-[0_0_10px_rgba(6,182,212,0.25)]'
+                  : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              {t.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Build commands */}
+      <div className="space-y-2 font-mono text-xs">
+        <ThoughtCloud
+          label="Build Pipelines"
+          subtitle="The C++ core is compiled into the desktop binary (no DLL loading) and drives Kepler orbits + telemetry batches; web falls back to WASM, then the TypeScript reference."
+          hint="copy a command to build it yourself"
+        >
+          <div className="cc-panel-title cursor-default">
+            <Terminal className="w-3.5 h-3.5" />
+            <span>Build Pipelines</span>
+          </div>
+        </ThoughtCloud>
+        <div className="space-y-1.5 text-[11px]">
+          {([
+            ['desktop', 'Desktop App (Linux + Windows)', commands.desktop, 'text-emerald-400'],
+            ['linux', 'Standalone C++ Core (Linux .so)', commands.linux, 'text-cyan-400'],
+            ['win', 'Standalone C++ Core (Windows .dll)', commands.windows, 'text-amber-400'],
+          ] as const).map(([key, label, cmd, color]) => (
+            <div key={key} className="flex items-center justify-between p-2 rounded-xl bg-black/25 border border-white/10 gap-2">
+              <div className="truncate">
+                <span className={`${color} font-bold mr-2`}>[{label}]:</span>
+                <code className="text-slate-300">{cmd}</code>
+              </div>
+              <button
+                onClick={() => copyCommand(key, cmd)}
+                className="p-1 rounded-lg bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white shrink-0"
+                title="Copy command"
+              >
+                {copiedKey === key ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};

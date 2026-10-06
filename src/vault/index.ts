@@ -1,0 +1,34 @@
+/**
+ * MY UNIVERSE — CORE BACKEND ARCHITECTURE
+ *
+ * The single facade over the sovereign backend. Everything outside `backend/`
+ * imports from here — never from a deep path:
+ *  1. Virtual Filesystem (EFS) — copy-on-write inodes, snapshots, SHA-256 scrubbing
+ *  2. Triple-Tier Persistence — Desktop FS (Tauri) → OPFS → IndexedDB
+ *  3. Cryptographic Armor — PBKDF2 key derivation & AES-GCM 256-bit encryption
+ *  4. Universal Execution Engine — ISO 9660, Web Apps, Pyodide, Workers, ZIP
+ *  5. Domain Contracts — types, runner kinds
+ */
+
+// Master types
+export * from './types';
+
+// Storage & Filesystem
+export * from './storage/efs';
+export * from './storage/indexedDB';
+export * from './storage/crypto';
+export * from './storage/totp';
+export * from './storage/breaches';
+export * from './storage/importers';
+export * from './storage/courier';
+export * from './storage/zip';
+export * from './storage/formatters';
+export * from './storage/metrics';
+export * from './storage/procedural';
+export * from './storage/sanitizeHtml';
+export * from './storage/seeds';
+
+// Universal Execution Engine
+export * from './executors';
+export * from './executors/isoExecutor';
+

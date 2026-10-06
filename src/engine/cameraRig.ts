@@ -12,9 +12,10 @@
 /* -------------------------------------------------------------------------- */
 
 import * as THREE from 'three';
+import { clamp, damp } from './math';
 
-export const DIST_BASE = 3.0;
-export const DIST_SPAN = 800000;
+const DIST_BASE = 3.0;
+const DIST_SPAN = 800000;
 
 const PHI_MIN = 0.06;
 const PHI_MAX = Math.PI - 0.06;
@@ -22,10 +23,13 @@ const PHI_MAX = Math.PI - 0.06;
 /* easing speeds (1/s) */
 const LAMBDA_ORBIT = 7.5;
 const LAMBDA_ZOOM = 3.6;
-const LAMBDA_FOCUS = 6.0;
+/* gentle focus follow — a focused body keeps orbiting its star, so a stiff
+   follow makes the WHOLE universe visibly rotate around it. A soft λ lets
+   the body drift a little instead of whipping the sky. */
+const LAMBDA_FOCUS = 3.2;
 
 /* inertia */
-const ORBIT_FRICTION = 2.6; /* 1/s — flick glide time ≈ 0.4 s */
+const ORBIT_FRICTION = 3.4; /* 1/s — flick glide settles fast: no lingering drift */
 const PAN_FRICTION = 5.5;
 const ZOOM_FRICTION = 7.0;
 
@@ -40,23 +44,25 @@ const FLING_PX_CAP = 2600; /* px/s — fastest flick the rig believes */
 const ORBIT_FLING_CAP = 2.2; /* rad/s */
 const PAN_FLING_FACTOR = 2.2; /* × distance per second */
 
-const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
-const damp = (cur: number, target: number, lambda: number, dt: number) =>
-  cur + (target - cur) * (1 - Math.exp(-lambda * dt));
-
-export interface RigFrame {
+interface RigFrame {
   /** world-space point the camera orbits this frame (body position or origin) */
   focus: THREE.Vector3;
   /** a body is focused — distance is framed to focusRadius */
   focused: boolean;
   /** radius of the focused body */
   focusRadius: number;
-  /** 0..1 portal distortion — squeezes the rendered distance while warping */
-  portalEase: number;
   /** when focused: closest allowed orbit distance (defaults sized for planets) */
   focusMin?: number;
   /** when focused: farthest allowed orbit distance before focus releases */
   focusMax?: number;
+}
+
+/** Plain-number camera placement, savable/restorable across a portal. */
+interface RigSnapshot {
+  zoomT: number; tZoomT: number;
+  theta: number; tTheta: number;
+  phi: number; tPhi: number;
+  pan: [number, number, number];
 }
 
 export class CameraRig {
@@ -86,6 +92,8 @@ export class CameraRig {
   private focusRadius = 6;
   private focusMin = 1.35;
   private focusMax = 3500;
+  /* CAMERA STABILITY — the near clamp is a FLOOR, never a snap (see update). */
+  private minSmooth = 0;
 
   private panKeys: Record<string, boolean> = {};
   private dragging = false;
@@ -99,6 +107,7 @@ export class CameraRig {
   private pinchD = 0;
   private pinchX = 0;
   private pinchY = 0;
+  private pinching = false;
 
   private canvas: HTMLCanvasElement;
 
@@ -108,6 +117,8 @@ export class CameraRig {
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
     canvas.addEventListener('touchstart', this.onTouchStart, { passive: true });
     canvas.addEventListener('touchmove', this.onTouchMove, { passive: true });
+    canvas.addEventListener('touchend', this.onTouchEnd, { passive: true });
+    canvas.addEventListener('touchcancel', this.onTouchEnd, { passive: true });
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
   }
@@ -132,12 +143,26 @@ export class CameraRig {
 
   private onTouchStart = (e: TouchEvent) => {
     if (e.touches.length === 2) {
+      this.pinching = true;
       this.pinchD = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       this.pinchX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       this.pinchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       this.dragging = false; this.panning = false;
       this.orbitVX = 0; this.orbitVY = 0; this.panVel.set(0, 0, 0);
     }
+  };
+  private onTouchEnd = (e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      /* If a third touch ended, rebase the surviving pair so its next move
+         does not apply the distance accumulated while three touches were down. */
+      this.pinchD = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      this.pinchX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      this.pinchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      this.pinching = true;
+      return;
+    }
+    this.pinchD = 0;
+    this.pinching = false;
   };
   private onTouchMove = (e: TouchEvent) => {
     if (e.touches.length !== 2) return;
@@ -214,23 +239,45 @@ export class CameraRig {
 
   setZoomTarget(z: number) { this.tZoomT = clamp(z, 0, 1); }
   nudgeZoom(delta: number) { this.tZoomT = clamp(this.tZoomT + delta, 0, 1); }
-  /** zero the wheel/pinch velocity — the engine uses this when a warp lock
-      lands so the momentum it absorbed can't push the dial back out */
+  /** zero the wheel/pinch velocity — the engine uses this when a stage
+      transition lands so the momentum it absorbed can't push the dial back */
   killZoomMomentum() { this.zoomVel = 0; }
 
   /** live wheel velocity (zoomT/s) — the engine reads it to detect the user
-      pulling at a stage's edge, which is what fires the Kamui warp */
+      pulling at a stage's edge, which is what carries the dial across */
   get zoomVelocity(): number { return this.zoomVel; }
+  /** True only after commanded motion, inertial movement, and held controls end. */
+  get isSettled(): boolean {
+    const heldPan = Object.values(this.panKeys).some(Boolean);
+    return !this.dragging && !this.panning && !this.pinching && !heldPan
+      && Math.abs(this.zoomT - this.tZoomT) < 1e-4
+      && Math.abs(this.theta - this.tTheta) < 1e-4
+      && Math.abs(this.phi - this.tPhi) < 1e-4
+      && Math.abs(this.zoomVel) < 1e-5
+      && Math.abs(this.orbitVX) < 1e-4 && Math.abs(this.orbitVY) < 1e-4
+      && this.panVel.lengthSq() < 1e-6;
+  }
   setOrbit(theta: number | null, phi: number | null) {
     if (theta !== null) this.tTheta = theta;
     if (phi !== null) this.tPhi = clamp(phi, PHI_MIN, PHI_MAX);
   }
   clearPan() { this.panOffset.set(0, 0, 0); this.panVel.set(0, 0, 0); }
+  /** ROUND 61 — re-place a saved pan offset without touching the dial or
+      orbit (the camera-memory boot restore). Momentum stays killed: the
+      rig was just constructed, nothing is moving. */
+  restorePan(pan: [number, number, number]) { this.panOffset.set(pan[0], pan[1], pan[2]); }
+  /** Keep a cinematic effect locked to its live world-space subject. */
+  holdFocus(point: THREE.Vector3) {
+    this.focus.copy(point);
+    this.panOffset.set(0, 0, 0);
+    this.panVel.set(0, 0, 0);
+  }
 
-  /** current camera distance from the focus point (before portal squeeze) */
+  /** the rendered camera distance from the focus point — the focus floor has
+      already been applied, so this is what the frame actually uses */
   dist(): number {
     const base = DIST_BASE * Math.pow(DIST_SPAN, this.zoomT);
-    if (this.focused) return Math.min(Math.max(base, this.focusMin), this.focusMax);
+    if (this.focused) return Math.min(Math.max(base, this.minSmooth), this.focusMax);
     return base;
   }
 
@@ -247,6 +294,13 @@ export class CameraRig {
     return this.focused && this.baseDist() >= this.focusMax;
   }
 
+  /** true while the focused-distance clamp's near bound is pinning the orbit
+      (actively zooming INTO the framed object) — the engine uses it to dive
+      *through* a focused galaxy's frame into what lies inside it */
+  get atFocusMin(): boolean {
+    return this.focused && this.baseDist() <= this.focusMin;
+  }
+
   /**
    * Zoom intent: negative = the camera is actively easing inward (user is
    * diving toward something), ≈0 = orbiting/panning, positive = pulling out.
@@ -260,6 +314,33 @@ export class CameraRig {
   /** convert a world distance back to the equivalent zoomT dial value */
   static zoomTOf(dist: number): number {
     return clamp(Math.log(Math.max(dist, DIST_BASE) / DIST_BASE) / Math.log(DIST_SPAN), 0, 1);
+  }
+
+  /* ------------------------- snapshot / restore ------------------------- */
+
+  /** The exact camera placement (dial + orbit + pan), captured as plain
+      numbers so a portal can cut the rig back to where its traveler was. */
+  snapshot(): RigSnapshot {
+    return {
+      zoomT: this.zoomT, tZoomT: this.tZoomT,
+      theta: this.theta, tTheta: this.tTheta,
+      phi: this.phi, tPhi: this.tPhi,
+      pan: [this.panOffset.x, this.panOffset.y, this.panOffset.z],
+    };
+  }
+
+  /** Hard-cut to a snapshot — current AND target channels, all momentum
+      killed. Used when a portal closes: the camera returns to the exact
+      pre-open framing with no easing flight, zoom slam, or sideways glide. */
+  restore(s: RigSnapshot) {
+    this.zoomT = s.zoomT; this.tZoomT = s.tZoomT;
+    this.theta = s.theta; this.tTheta = s.tTheta;
+    this.phi = s.phi; this.tPhi = s.tPhi;
+    this.panOffset.set(s.pan[0], s.pan[1], s.pan[2]);
+    this.zoomVel = 0;
+    this.orbitVX = 0; this.orbitVY = 0;
+    this.panVel.set(0, 0, 0);
+    this.dragVX = 0; this.dragVY = 0;
   }
 
   /* -------------------------------- frame -------------------------------- */
@@ -316,8 +397,28 @@ export class CameraRig {
     this.focusRadius = s.focusRadius;
     this.focusMin = s.focusMin ?? this.focusRadius * 1.35;
     this.focusMax = s.focusMax ?? 3500;
+    /* CAMERA STABILITY — the floor eases in. Engaging a focus whose near
+       clamp sits further out than the camera (a geodesic hole's 4.34·rs, a
+       reality marble's glass) used to TELEPORT the camera outward on the
+       exact frame the focus bound — the jerk that made a portal entry feel
+       unstable. The floor therefore rises from wherever the camera already
+       is at the focus's own λ, so the push-out is smooth (and invisible when
+       the camera is already outside it). Tightening stays instant, so the
+       floor can never hold the camera outside its own frame.
+
+       `atFocusMin`/`atFocusMax` still read the TARGET floor, so every
+       threshold the engine keys off is untouched. */
+    if (!this.focused) {
+      this.minSmooth = 0;
+    } else if (this.minSmooth <= 0) {
+      this.minSmooth = Math.min(this.focusMin, DIST_BASE * Math.pow(DIST_SPAN, this.zoomT));
+    } else if (this.minSmooth > this.focusMin) {
+      this.minSmooth = this.focusMin;
+    } else {
+      this.minSmooth = damp(this.minSmooth, this.focusMin, LAMBDA_FOCUS, dt);
+    }
     this.renderCenter.copy(this.focus).add(this.panOffset);
-    const dist = Math.max(0.5, this.dist() * (1 - s.portalEase * 0.45));
+    const dist = Math.max(0.5, this.dist());
     const sp = Math.sin(this.phi), cp = Math.cos(this.phi);
     this.camera.position.set(
       this.renderCenter.x + dist * sp * Math.cos(this.theta),
@@ -335,6 +436,8 @@ export class CameraRig {
     this.canvas.removeEventListener('wheel', this.onWheel);
     this.canvas.removeEventListener('touchstart', this.onTouchStart);
     this.canvas.removeEventListener('touchmove', this.onTouchMove);
+    this.canvas.removeEventListener('touchend', this.onTouchEnd);
+    this.canvas.removeEventListener('touchcancel', this.onTouchEnd);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
   }

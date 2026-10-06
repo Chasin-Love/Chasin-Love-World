@@ -1,56 +1,180 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { UniverseEngine } from './engine/engine';
-import { actions, getState, newId } from './state';
-import { MEANING_LABEL, type CosmicBody, type Meaning } from './types';
-import { chime, initAudio, isMuted, setAudioMode, toggleMute } from './audio';
-import DiaryWindow, { type WinRect } from './ui/DiaryWindow';
-import CoreMode from './ui/CoreMode';
-import VaultUI from './ui/VaultUI';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { InnerWorldInfo, UniverseEngine } from './engine/engine';
+import { actions, getState, newId, hydrateDesktopSnapshot } from './state';
+import { MEANING_LABEL } from './domain/universe';
+import type { CosmicBody, Meaning } from './domain/universe';
+import { chime, initAudio, isMuted, setAudioMode, toggleMute, playKamuiVoice, playKamuiReturnVoice, type KamuiVoiceHandle } from './platform/audio';
+import type { WinRect } from './ui/diary/DiaryWindow';
 import { PhysicsHUD } from './ui/PhysicsHUD';
-import { ErrorBoundary, IcLink, toast, ToastHost, useUniverse } from './ui/bits';
-import { MultiverseBar } from './components/MultiverseBar';
-import { RealityHoverCard } from './components/RealityHoverCard';
-import { EditRealityModal } from './components/EditRealityModal';
-import { ClusterHoverCard } from './components/ClusterHoverCard';
-import { CosmicLineageModal } from './components/CosmicLineageModal';
-import { CosmicWebHUD, type CosmicWebSettings } from './components/CosmicWebHUD';
-import { getReality, type RealityConfig, type GalaxyClusterData } from './realities';
+import { ErrorBoundary, IcLink, ToastHost, useUniverse } from './ui/bits';
+import { toast } from './ui/toast';
+import { startRealitySync } from './platform/sync/realitySync';
+import { fetchDiskTombstones } from './platform/desktop/adapter';
+import { ensureSkyFor, onSkyChanged } from './platform/sky/skyRegistry';
+import { computeAurora, onThisDay } from './platform/sentiment/sentiment';
+import { perfMark } from './platform/performance';
+import { publishSimDate, publishSimDays } from './platform/simClock';
+import { MultiverseBar } from './ui/hud/MultiverseBar';
+import { armKamuiBend, playKamuiBend } from './ui/kamuiBend';
+import { RealityHoverCard } from './ui/hud/RealityHoverCard';
+import { ClusterHoverCard } from './ui/hud/ClusterHoverCard';
 
-interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean; maximized?: boolean }
+import { CosmicWebHUD, type CosmicWebSettings } from './ui/hud/CosmicWebHUD';
+const DiaryWindow = lazy(() => import('./ui/diary/DiaryWindow'));
+const CoreMode = lazy(() => import('./ui/CoreMode'));
+const VaultUI = lazy(() => import('./ui/VaultUI'));
+const CosmicLineageModal = lazy(() => import('./ui/lineage/CosmicLineageModal').then((module) => ({ default: module.CosmicLineageModal })));
+const CoreConsole = lazy(() => import('./ui/console/CoreConsole').then((module) => ({ default: module.CoreConsole })));
+const RealityAdvancedModal = lazy(() => import('./ui/reality/RealityAdvancedModal').then((module) => ({ default: module.RealityAdvancedModal })));
+const CommandPalette = lazy(() => import('./ui/console/CommandPalette').then((module) => ({ default: module.CommandPalette })));
+const UpdaterCard = lazy(() => import('./ui/UpdaterCard'));
+import { GalaxyHoverCard } from './ui/hud/GalaxyHoverCard';
+import { getReality, type GalaxyClusterData, type GalaxyData } from './realities';
+
+interface Win { key: string; planetId: string; rect: WinRect; minimized: boolean; maximized?: boolean; closing?: boolean }
 
 /* when maximized, the diary fills the viewport edge-to-edge (with a slim margin) */
 const MAX_RECT = (): WinRect => ({ x: 12, y: 12, w: window.innerWidth - 24, h: window.innerHeight - 24 });
 
 /* bump on every shipped build — lets you confirm the running bundle is current */
-export const BUILD = 'R28';
+const BUILD = 'R107';
+
+/* THE ECHO SHOWER TOAST — one glass banner the day a memory returns.
+   Auto-fades; re-keyed only when the shower's membership changes. */
+const EchoShowerToast: React.FC<{ signal: string; onDone: () => void }> = ({ signal, onDone }) => {
+  useEffect(() => {
+    const t = setTimeout(onDone, 5600);
+    return () => clearTimeout(t);
+  }, [signal, onDone]);
+  const n = signal.split(',').filter(Boolean).length;
+  return (
+    <div className="fixed top-24 left-1/2 -translate-x-1/2 z-95 rise-in pointer-events-none">
+      <div className="px-5 py-2 rounded-full border border-solar/40 bg-abyss/85 backdrop-blur-md shadow-[0_0_24px_rgba(242,193,120,0.15)]">
+        <p className="font-mono text-[9px] tracking-[0.3em] uppercase text-solar">
+          ✦ cosmic echo — {n === 1 ? 'a memory returns today' : `${n} memories return today`} · golden meteors carry them
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const MEANINGS: Meaning[] = ['memory', 'idea', 'person', 'dream', 'project', 'moment', 'unresolved', 'chapter'];
+
+function AsyncOverlay({ label = 'LOADING' }: { label?: string }) {
+  /* never flash for cache-hot loads — the dark veil appears only when the
+     chunk genuinely still needs time (>250ms) */
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 250);
+    return () => clearTimeout(t);
+  }, []);
+  if (!slow) return null;
+  return (
+    <div className="fixed inset-0 z-200 grid place-items-center bg-void/80 backdrop-blur-sm pointer-events-none">
+      <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-teal-ice/80 animate-pulse">{label}</span>
+    </div>
+  );
+}
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<UniverseEngine | null>(null);
+  const kamuiVoiceRef = useRef<KamuiVoiceHandle | null>(null);
   const state = useUniverse();
 
+  /* continuous reality ⇄ disk reconciler — one poll loop for the whole app */
+  useEffect(() => {
+    startRealitySync();
+  }, []);
+
   const [mode, setMode] = useState<'space' | 'core' | 'vault'>('space');
+  const modeRef = useRef(mode);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [hoverRealityId, setHoverRealityId] = useState<string | null>(null);
   const [hoverCluster, setHoverCluster] = useState<GalaxyClusterData | null>(null);
+  const [hoverGalaxy, setHoverGalaxy] = useState<{ galaxy: GalaxyData; realityName: string } | null>(null);
   const [hoverScreenPos, setHoverScreenPos] = useState<{ x: number; y: number } | null>(null);
+  /* THE HERALD'S DISK (R74) — the hovered object's projected screen circle;
+     the hover cards anchor OUTSIDE it (never on the object) and ride its
+     orbit via the engine's ~8 Hz re-emit. */
+  const [hoverDisk, setHoverDisk] = useState<{ cx: number; cy: number; r: number } | null>(null);
+  /* THE UNBROKEN BRIDGE (R75) — the herald card lives OUTSIDE the disk now,
+     so the journey from the disk to the card's own buttons crosses empty
+     space. The last disk is kept in a ref for that crossing: while a card
+     is visible, the pointer staying over the card — or in the corridor
+     between the disk and the card — keeps it alive; only leaving both
+     starts the 550 ms goodbye. */
+  const hoverDiskRef = useRef<{ cx: number; cy: number; r: number } | null>(null);
+  /* the pointer's true resting place — a pause emits no events, so the
+     goodbye must be able to re-check where the traveler actually stopped */
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  const clearHoverCard = useCallback(() => {
+    setHoverRealityId(null);
+    setHoverCluster(null);
+    setHoverGalaxy(null);
+    setHoverScreenPos(null);
+    setHoverDisk(null);
+    hoverDiskRef.current = null;
+  }, []);
+  /* THE UNBROKEN BRIDGE (R75) — the two lifelines in one predicate: over
+     the card's rect (±8 px grace) or inside the corridor between the
+     disk's rim and the card. The corridor is rim + 48 because the card's
+     near edge sits at rim + ~26 — a path that cuts the corner must never
+     read as a goodbye. */
+  const pointerOnBridge = useCallback((x: number, y: number): boolean => {
+    const card = document.querySelector('.holo-card');
+    if (!card) return false;
+    const rc = card.getBoundingClientRect();
+    if (x >= rc.left - 8 && x <= rc.right + 8 && y >= rc.top - 8 && y <= rc.bottom + 8) return true;
+    const d = hoverDiskRef.current;
+    return !!d && Math.hypot(x - d.cx, y - d.cy) <= d.r + 48;
+  }, []);
+  /* the goodbye is honest: when its 550 ms elapses it re-checks where the
+     pointer RESTS before killing the card — a traveler paused on the
+     bridge (a stop needs no move) stays alive; still bridged it quietly
+     re-arms, truly gone it takes the one shared clear. */
+  const goodbye = useCallback(() => {
+    const p = pointerRef.current;
+    if (p && pointerOnBridge(p.x, p.y)) {
+      hoverClearTimer.current = setTimeout(goodbye, 550);
+      return;
+    }
+    clearHoverCard();
+  }, [pointerOnBridge, clearHoverCard]);
   const [activeLineageCluster, setActiveLineageCluster] = useState<GalaxyClusterData | null>(null);
-  const [editingReality, setEditingReality] = useState<RealityConfig | null>(null);
+  const [lineageGalaxy, setLineageGalaxy] = useState<{ galaxy: GalaxyData; realityName: string } | null>(null);
+  /* the advanced reality editor (double-click a reality ring) */
+  const [advancedReality, setAdvancedReality] = useState<{ realityId: string; focusGalaxyId: string | null } | null>(null);
+  /* the Multiverse Core Console (click the Astral Core) */
+  const [coreConsoleOpen, setCoreConsoleOpen] = useState(false);
+  /* the galaxy the traveler is currently inside (drives the toolbar chip) */
+  const [activeGalaxyId, setActiveGalaxyId] = useState<string | null>(null);
   const [selectId, setSelectId] = useState<string | null>(null);
+  /* a clicked world inside an isolated galaxy's stellar system */
+  const [innerWorld, setInnerWorld] = useState<InnerWorldInfo | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [label, setLabel] = useState('PLANETARY SYSTEM');
   const [clock, setClock] = useState(() => new Date());
   const [paused, setPaused] = useState(false);
   const [showPhysics, setShowPhysics] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
+  /* the Ctrl+K command palette — retrieval for a universe */
+  const [showPalette, setShowPalette] = useState(false);
   const [idle, setIdle] = useState(false);
   const [wins, setWins] = useState<Win[]>([]);
+  /* the vault stays mounted for the kamui-suck swallow on close */
+  const [vaultClosing, setVaultClosing] = useState(false);
   const [zTop, setZTop] = useState(0);
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [entered, setEntered] = useState<string | null>(null);
-  const [intro, setIntro] = useState(true);
+  /* intro veil: mounted until lifted, lifted only when the title sequence is
+     done AND the engine has rendered its first frame (shader compilation and
+     scene building happen behind the opaque veil — the old code lifted it on a
+     blind 4.4s timer, exposing a frozen universe for seconds) */
+  const [introGone, setIntroGone] = useState(false);
+  const [introLift, setIntroLift] = useState(false);
+  const [minIntroDone, setMinIntroDone] = useState(false);
+  const [engineReady, setEngineReady] = useState(false);
   const [cosmicSettings, setCosmicSettings] = useState<CosmicWebSettings>({
     mode: 'simulation',
     showMatterDensity: true,
@@ -62,18 +186,51 @@ export default function App() {
     showCoordinates: true,
   });
   const [showMultiverseBar, setShowMultiverseBar] = useState(false);
+  /* KAMUI (v1) — each trigger bumps the key so the MultiverseBar re-enters
+     through the red vortex (the kamui-appear CSS animation) */
   const [kamuiKey, setKamuiKey] = useState(0);
+  const [showCosmicHud, setShowCosmicHud] = useState(false);
+  /* THE COSMIC ECHO — the memory meteor under the pointer (for the card) */
+  const [echoHover, setEchoHover] = useState<{ entryId: string; planetId: string; title: string; x: number; y: number } | null>(null);
+  const [echoFlash, setEchoFlash] = useState<string | null>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    /* keep in sync with .intro-veil / .intro-track / .intro-sub (4.4s in index.css) */
-    const t = setTimeout(() => setIntro(false), 4400);
-    return () => clearTimeout(t);
+    modeRef.current = mode;
+  }, [mode]);
+
+  /* the title sequence runs 4.4s (keep in sync with .intro-veil / .intro-track /
+     .intro-sub in index.css); the 12s cap is a safety net so a WebGL failure
+     can never trap the user on the veil */
+  useEffect(() => {
+    const t = setTimeout(() => setMinIntroDone(true), 4400);
+    const s = setTimeout(() => setEngineReady(true), 12000);
+    return () => { clearTimeout(t); clearTimeout(s); };
   }, []);
+
+  /* lift the darkness once BOTH the title has played and the universe has
+     actually rendered a frame. The unmount timer lives in its own effect so
+     the lift re-render can't clear it (a shared effect used to cancel its
+     own timer on the introLift re-run, leaving the veil mounted forever). */
+  useEffect(() => {
+    if (!minIntroDone || !engineReady || introLift) return;
+    setIntroLift(true);
+  }, [minIntroDone, engineReady, introLift]);
+  useEffect(() => {
+    if (!introLift) return;
+    const t = setTimeout(() => setIntroGone(true), 1400);
+    return () => clearTimeout(t);
+  }, [introLift]);
 
   /* announce the running build so you can confirm the bundle is current */
   useEffect(() => {
     console.log(`%c✦ MY UNIVERSE — build ${BUILD}`, 'color:#f2c178;font-weight:bold');
+  }, []);
+
+  /* desktop boot hydrate: adopt the authoritative state file (may reload once) */
+  useEffect(() => {
+    void hydrateDesktopSnapshot();
   }, []);
 
   /* real local time, ticking */
@@ -87,22 +244,54 @@ export default function App() {
   );
   const clockTime = useMemo(() => clock.toLocaleTimeString(undefined, { hour12: false }), [clock]);
 
-  const bodyOf = useCallback((id: string | null) => (id ? state.bodies.find((b) => b.id === id) ?? null : null), [state.bodies]);
+  const bodyOf = useCallback((id: string | null) =>
+    (id ? state.bodies.find((b) => b.id === id) ?? engineRef.current?.getInnerBody(id) ?? null : null), [state.bodies]);
 
   /* ---------------------------- engine boot ---------------------------- */
   useEffect(() => {
     if (!canvasRef.current || engineRef.current) return;
-    const engine = new UniverseEngine(canvasRef.current, getState().bodies, {
-      onHover: (id, x, y) => {
+    let cancelled = false;
+    let loadedEngine: UniverseEngine | null = null;
+    let boot: (() => void) | null = null;
+    /* R105 — adopt disk tombstones at boot: a deleted reality must never
+       boot back into the multiverse (a wiped / fresh / corrupt saved state
+       would otherwise re-seed it straight from the compiled bundle). Fired
+       alongside the engine import; if it lands after the constructor build,
+       the existence-sync effect below performs the rebuild — both orders end
+       in the same honest multiverse. */
+    void (async () => {
+      try {
+        const tombstoned = await fetchDiskTombstones();
+        if (!cancelled && tombstoned.length) actions.adoptDiskTombstones(tombstoned);
+      } catch { /* best-effort — the realitySync poll is the safety net */ }
+    })();
+    void import('./engine/engine').then(({ UniverseEngine }) => {
+      if (cancelled || !canvasRef.current || engineRef.current) return;
+      const engine = new UniverseEngine(canvasRef.current, getState().bodies, {
+      onHover: (id, x, y, disk) => {
+        /* THE HERALD'S DISK (R74) — the card anchors outside this circle.
+           THE UNBROKEN BRIDGE (R75) — a null disk never erases the last one:
+           the ref keeps it so the corridor to the card stays bridged.
+           THE STEADY HERALD (R76) — and the mounted card's STATE anchor
+           survives the null too: roaming the click-transparent crossing
+           re-picks empty space, and the old null-erasing write answered by
+           re-anchoring the card onto the cursor fallback — it
+           teleported the moment the rim was crossed and flickered back at
+           every boundary graze. The anchor now clears only with the card
+           (clearHoverCard); only a real disk emission ever moves it. */
+        if (disk) { hoverDiskRef.current = disk; setHoverDisk(disk); }
+        /* a fresh hover cancels any pending sticky-clear */
+        if (id && hoverClearTimer.current) { clearTimeout(hoverClearTimer.current); hoverClearTimer.current = null; }
         setHoverId(id);
         if (id && id.startsWith('cluster:')) {
           const parts = id.split(':');
           const clusterId = parts[1];
           const rId = parts[2];
           const r = getReality(rId, getState().customRealityDescriptions);
-          const cl = r.clusters?.find((c) => c.id === clusterId) ?? null;
+          const cl = r?.clusters?.find((c) => c.id === clusterId) ?? null;
           setHoverCluster(cl);
           setHoverRealityId(null);
+          setHoverGalaxy(null);
           if (x !== undefined && y !== undefined) {
             setHoverScreenPos({ x, y });
           }
@@ -110,16 +299,37 @@ export default function App() {
           const rId = id.replace('reality:', '');
           setHoverRealityId(rId);
           setHoverCluster(null);
+          setHoverGalaxy(null);
+          if (x !== undefined && y !== undefined) {
+            setHoverScreenPos({ x, y });
+          }
+        } else if (id && id.startsWith('galaxy:')) {
+          const parts = id.split(':');
+          const gid = parts[1];
+          const rId = parts.slice(2).join(':');
+          const r = getReality(rId, getState().customRealityDescriptions);
+          const gal = r?.galaxies?.find((g) => g.id === gid) ?? null;
+          setHoverGalaxy(r && gal ? { galaxy: gal, realityName: r.name } : null);
+          setHoverRealityId(null);
+          setHoverCluster(null);
           if (x !== undefined && y !== undefined) {
             setHoverScreenPos({ x, y });
           }
         } else {
-          setHoverRealityId(null);
-          setHoverCluster(null);
-          setHoverScreenPos(null);
+          /* sticky hover — the card lingers ~550ms after the pointer leaves
+             its object, so reaching the card's own buttons never races the
+             unmount (a plain hover-out used to kill the card mid-click).
+             R75: the goodbye is the honest one below — it re-checks the
+             pointer's resting place before clearing. */
+          if (hoverClearTimer.current) clearTimeout(hoverClearTimer.current);
+          hoverClearTimer.current = setTimeout(goodbye, 550);
         }
       },
-      onSelect: (id) => setSelectId(id),
+      onSelect: (id) => { setSelectId(id); if (id) setInnerWorld(null); },
+      onSelectInnerWorld: (info) => {
+        setInnerWorld(info);
+        if (info) chime(680);
+      },
       onSelectCluster: (cluster) => {
         setActiveLineageCluster(cluster);
         chime(720);
@@ -160,34 +370,178 @@ export default function App() {
       },
       onPortalDone: () => undefined,
       onContext: (id, x, y) => setMenu({ id, x, y }),
+      onKamuiTrigger: (reverse, vortexUv) => {
+        /* the DOM swallow (.kamui-suck) collapses toward the tear's screen
+           point — the engine reports it on every trigger; the reverse also
+           arms the pixel-bend filter so the card smears like the anchor
+           star does in the GLSL warp */
+        const rootStyle = document.documentElement.style;
+        rootStyle.setProperty('--kamui-vortex-x', `${(vortexUv.x * 100).toFixed(2)}%`);
+        rootStyle.setProperty('--kamui-vortex-y', `${(vortexUv.y * 100).toFixed(2)}%`);
+        if (reverse) {
+          armKamuiBend({ x: vortexUv.x * window.innerWidth, y: vortexUv.y * window.innerHeight });
+          playKamuiBend();
+        }
+        setKamuiKey((k) => k + 1);
+        /* THE SUMMON PREHEATS ITS DESTINATION (R67) — the tunnel takes 5.5s
+           to build; the first-ever open used to spend that time idle and
+           then pay the diary/vault chunk fetch DURING the handoff, a real
+           processing hitch the traveler read as part of the freeze. Warming
+           the code chunk behind the vortex makes the first open as instant
+           as every later one. */
+        if (!reverse) {
+          void import('./ui/diary/DiaryWindow');
+          void import('./ui/VaultUI');
+        }
+        /* THE VOICE (R82/R82.4) — both directions speak: the forward
+           summon gets the chosen cinematic sequence (riser → rip → B♭
+           drone → sub-drop), the eject gets THE TIME MIRROR — the forward
+           voice itself rendered offline and reversed, the jutsu
+           un-happening (the author's round-2 pick). The mirror renders
+           once per session; repeat ejects replay the cached buffer. Only
+           when the audio context is alive (a user gesture has blessed
+           this session) and the master is unmuted. */
+        if (!isMuted()) {
+          kamuiVoiceRef.current?.stop();
+          if (reverse) {
+            kamuiVoiceRef.current = playKamuiReturnVoice(1.9);
+          } else {
+            kamuiVoiceRef.current = playKamuiVoice(5.0, 1.0);
+          }
+        }
+      },
+      onFirstFrame: () => setEngineReady(true),
+      onEchoOpen: (entryId, planetId, title) => {
+        /* a memory meteor was caught — reopen the page it remembers */
+        chime(740);
+        toast(`✦ Echo caught: "${title.slice(0, 40)}"`);
+        openDiaryForRef.current?.(planetId);
+        void entryId;
+      },
+      onHoverEcho: (echo, x, y) => setEchoHover(echo ? { ...echo, x: x ?? 0, y: y ?? 0 } : null),
       onScaleLabel: (l) => setLabel(l),
-      onSimDate: () => undefined,
+      onSimDate: publishSimDate,
+      onSimDays: publishSimDays,
       onSelectReality: (realityId) => {
+        /* R102 — switchReality refuses a collapsed reality's id; the toast
+           is guarded the same way */
         actions.switchReality(realityId);
         const r = getReality(realityId, getState().customRealityDescriptions);
+        if (!r) return;
         toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
         chime(880);
-        engineRef.current?.resetView();
+        /* THE WEB DOOR (R76) — clicking a reality sphere is an explicit
+           stage crossing: the Kamui carries the traveler to that reality's
+           COSMIC WEB (zoomToHierarchy(2) fires the staged beginStageWarp
+           from the multiverse side — R72's carrier). The old resetView()
+           dove straight into the home stellar system, skipping the web —
+           the arrival the author called a lack of logic. */
+        engineRef.current?.zoomToHierarchy(2);
       },
       onDoubleClickReality: (realityId) => {
-        const r = getReality(realityId, getState().customRealityDescriptions);
-        setEditingReality(r);
+        setAdvancedReality({ realityId, focusGalaxyId: null });
         chime(520);
       },
+      onSelectGalaxy: (galaxyId, realityId) => {
+        const r = getReality(realityId, getState().customRealityDescriptions);
+        const gal = r?.galaxies?.find((g) => g.id === galaxyId);
+        if (!r || !gal) return;
+        /* entering another reality's galaxy carries the dimensional barrier over */
+        if (getState().activeRealityId !== realityId) {
+          actions.switchReality(realityId);
+          toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
+          chime(880);
+        }
+        setActiveGalaxyId(galaxyId);
+        engineRef.current?.enterGalaxy(realityId, galaxyId);
+        toast(`⌖ ${gal.name} — ${r.name}`);
+        chime(760);
+      },
+      onSelectCore: () => {
+        setCoreConsoleOpen(true);
+        chime(960);
+        toast('✦ Multiverse Core Console online');
+      },
       onSelectDemonCore: () => {
-        setKamuiKey((k) => k + 1);
         setShowMultiverseBar(true);
+        setKamuiKey((k) => k + 1);
         toast('✦ Kamui: Core Activated');
         chime(960);
       },
     });
-    engineRef.current = engine;
-    (window as any).__ENGINE__ = engine;
+      engineRef.current = engine;
+      /* The engine is loaded asynchronously, so the one-time reality-sync
+         effect may have already run before engineRef was assigned. Initialize
+         the active reality here as well; this builds the galaxy-stage roster
+         and a valid reality target on the first interaction. R102: with NO
+         active reality the engine boots onto the bare multiverse — null is
+         the honest target, not a phantom home. */
+      const initialState = getState();
+      const bootReality = initialState.activeRealityId
+        ? getReality(initialState.activeRealityId, initialState.customRealityDescriptions) ?? null
+        : null;
+      engine.setReality(bootReality);
+      /* R102 — the empty multiverse boots ON the giant sphere (there is no
+         home sky to land under); the warp runs behind the intro veil */
+      if (!bootReality) engine.zoomToMultiverse();
+      /* Sky Studio: pull this reality's photo sky (its own folder) once the
+         engine is live — setReality already applied the cached spec if any */
+      if (bootReality) void ensureSkyFor(bootReality.id);
+      engine.setRendering(modeRef.current !== 'vault');
+      loadedEngine = engine;
+      perfMark('engine-ready');
+      (window as any).__ENGINE__ = engine;
 
-    const boot = () => { initAudio(); window.removeEventListener('pointerdown', boot); };
-    window.addEventListener('pointerdown', boot);
-    return () => { engine.dispose(); engineRef.current = null; };
+      boot = () => { initAudio(); if (boot) window.removeEventListener('pointerdown', boot); };
+      window.addEventListener('pointerdown', boot);
+    }).catch((err) => {
+      /* A silent boot death is the worst failure mode this app has — v15.0.0
+         shipped a black screen because a prod-only chunk-order error died in
+         this chain unseen. The veil comes OFF and the reason goes ON the glass. */
+      console.error('[boot] the universe engine failed to ignite:', err);
+      document.querySelector('.intro-veil')?.remove();
+      const veil = document.createElement('div');
+      veil.setAttribute('style', 'position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:rgba(4,6,12,0.97);color:#e8e2d4;font-family:ui-monospace,SFMono-Regular,monospace;text-align:center;padding:24px');
+      const kind = document.createElement('p');
+      kind.textContent = '✦ IGNITION FAILURE';
+      kind.setAttribute('style', 'font-size:10px;letter-spacing:0.34em;text-transform:uppercase;color:#f2c178;margin:0 0 10px');
+      const what = document.createElement('p');
+      what.textContent = String((err as Error)?.message ?? err);
+      what.setAttribute('style', 'font-size:13px;line-height:1.6;margin:0;max-width:640px;word-break:break-word');
+      const hint = document.createElement('p');
+      hint.textContent = 'The cosmos could not start. Your universe and data are untouched. Right-click → Inspect (devtools build) or relaunch; if it repeats, install the latest release.';
+      hint.setAttribute('style', 'font-size:11px;opacity:0.7;margin:14px 0 0');
+      veil.append(kind, what, hint);
+      document.body.appendChild(veil);
+    });
+    return () => {
+      cancelled = true;
+      if (boot) window.removeEventListener('pointerdown', boot);
+      kamuiVoiceRef.current?.stop();
+      kamuiVoiceRef.current = null;
+      loadedEngine?.dispose();
+      engineRef.current = null;
+    };
   }, []);
+
+  /* THE UNBROKEN BRIDGE (R75) — the window-level keep-alive. While a herald
+     card is visible, every pointer move re-checks the bridge predicate:
+     over the card or corridor any pending goodbye is cancelled; over
+     neither, one 550 ms goodbye is (re)armed. Roaming on the disk never
+     hits this path at all — the engine's hover is still live there. */
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      pointerRef.current = { x: e.clientX, y: e.clientY };
+      if (!document.querySelector('.holo-card')) return;
+      if (pointerOnBridge(e.clientX, e.clientY)) {
+        if (hoverClearTimer.current) { clearTimeout(hoverClearTimer.current); hoverClearTimer.current = null; }
+      } else if (!hoverClearTimer.current) {
+        hoverClearTimer.current = setTimeout(goodbye, 550);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
+  }, [pointerOnBridge, goodbye]);
 
   /* while the vault's own glass scene covers the screen, stop the heavy
      universe composer from drawing a scene nobody can see — kills the lag */
@@ -195,6 +549,50 @@ export default function App() {
     engineRef.current?.setRendering(mode !== 'vault');
     return () => { engineRef.current?.setRendering(true); };
   }, [mode]);
+
+  /* hidden tabs must stop rendering entirely — every open background tab
+     used to keep a full WebGL universe + bloom pipeline competing for the
+     single GPU, which froze the foreground tab ("app died" moments) */
+  useEffect(() => {
+    const apply = () => {
+      const visible = document.visibilityState === 'visible';
+      engineRef.current?.setRendering(visible && modeRef.current !== 'vault');
+    };
+    apply();
+    document.addEventListener('visibilitychange', apply);
+    return () => document.removeEventListener('visibilitychange', apply);
+  }, []);
+
+  /* prefetch the heavy lazy panes AFTER the intro veil is gone — kicking it
+     off at engine-ready competed with the first frames and the title timer
+     for the main thread (the dev-server transform of VaultUI takes seconds),
+     which held the black veil long past the title. Starting it once the
+     universe is live keeps boot clean; by the time the user opens the Vault /
+     Core / a diary, its chunk is already in the module cache */
+  useEffect(() => {
+    if (!introGone) return;
+    let cancelled = false;
+    const load = () => {
+      if (cancelled) return;
+      void import('./ui/VaultUI');
+      void import('./ui/CoreMode');
+      void import('./ui/diary/DiaryWindow');
+      void import('./ui/lineage/CosmicLineageModal');
+      void import('./ui/console/CoreConsole');
+      void import('./ui/reality/RealityAdvancedModal');
+    };
+    const gate = window.setTimeout(() => {
+      if (typeof window.requestIdleCallback === 'function') {
+        const h = window.requestIdleCallback(load, { timeout: 2500 });
+        /* the callback handle needs no cancel once the gate fired — cancelled
+           covers unmount before the gate */
+        if (cancelled) window.cancelIdleCallback(h);
+      } else {
+        window.setTimeout(load, 0);
+      }
+    }, 1500);
+    return () => { cancelled = true; clearTimeout(gate); };
+  }, [introGone]);
 
   /* ------------------------------ keyboard ------------------------------ */
   useEffect(() => {
@@ -204,6 +602,12 @@ export default function App() {
       const eng = engineRef.current;
       if (!eng) return;
       if (e.key === '?') { setShowKeys((v) => !v); return; }
+      /* Ctrl+K / Cmd+K — the command palette (works in every mode) */
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setShowPalette((v) => !v);
+        return;
+      }
       if (e.key === 'Escape') {
         if (menu) setMenu(null);
         else if (showKeys) setShowKeys(false);
@@ -216,14 +620,49 @@ export default function App() {
         if (mode === 'core') closeCore();
         else { eng.enterCoreMode(); eng.setConnections(getState().connections.map((c) => [c.a, c.b] as [string, string])); setMode('core'); setAudioMode('core'); }
       }
-      if (e.key === 'v' || e.key === 'V') { if (mode === 'space') eng.focusOn('eventide'); }
-      if (e.key === 'm' || e.key === 'M') { const m = toggleMute(); toast(m ? 'silence — the universe mutes' : 'the hum returns'); }
+      if (e.key === 'v' || e.key === 'V') {
+        if (mode === 'space') {
+          /* find THIS reality's black hole — the vault body id is per-reality */
+          const vaultBody = getState().bodies.find((b) => b.kind === 'vault');
+          if (vaultBody) eng.focusOn(vaultBody.id);
+        }
+      }
+      if (e.key === 'g' || e.key === 'G') { if (mode === 'space') { setShowCosmicHud((v) => !v); toast(showCosmicHud ? 'survey HUD stowed' : '✦ scientific survey HUD online'); } }      if (e.key === 'm' || e.key === 'M') { const m = toggleMute(); toast(m ? 'silence — the universe mutes' : 'the hum returns'); }
       if (e.key === ' ') { e.preventDefault(); eng.setPaused(!eng.pausedNow); setPaused(eng.pausedNow); toast(paused ? 'time flows' : 'time held'); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, menu, showKeys, paused]);
+  }, [mode, menu, showKeys, paused, showCosmicHud]);
+
+  /* the engine reports shader compile failures on this channel — surface
+     them instead of letting visuals silently degrade (throttled so a GPU
+     with many failing programs can't toast-spam) */
+  useEffect(() => {
+    let lastWarn = 0;
+    const onShaderError = (e: Event) => {
+      const detail = (e as CustomEvent).detail ?? {};
+      console.error('[UNIVERSE] shader compile failed:', detail.log ?? detail);
+      if (Date.now() - lastWarn < 5000) return;
+      lastWarn = Date.now();
+      toast('a cosmic shader failed to compile — visuals may look degraded', 'warn');
+    };
+    window.addEventListener('eventide-shader-error', onShaderError);
+    return () => window.removeEventListener('eventide-shader-error', onShaderError);
+  }, []);
+
+  /* Sky Studio — live updates: an upload/activation/slider change re-applies
+     the active reality's photo sky instantly (other realities just warm the
+     cache so their warp-in is instant) */
+  useEffect(() => {
+    return onSkyChanged((realityId) => {
+      const eng = engineRef.current;
+      if (!eng) return;
+      if (getState().activeRealityId === realityId) {
+        void eng.applyActiveSky();
+      }
+    });
+  }, []);
 
   /* idle chrome fade */
   useEffect(() => {
@@ -248,29 +687,112 @@ export default function App() {
     }
   }, [state.connections, mode]);
 
+  /* THE SENTIMENT AURORA — the active reality's mood weather, damped in the
+     engine; re-derived only when the diary actually changes (signature-gated
+     against the 3s disk-sync heartbeats) */
+  const entriesSigAurora = useMemo(() => JSON.stringify(state.entries), [state.entries]);
+  useEffect(() => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    const entries = JSON.parse(entriesSigAurora) as typeof state.entries;
+    eng.setSentimentAurora(computeAurora(entries));
+    /* THE COSMIC ECHO — arm today's shower (idempotent inside the engine) */
+    const echoes = onThisDay(entries).slice(0, 8);
+    eng.armEchoShower(echoes.map((e) => ({ entryId: e.entry.id, planetId: e.planetId, title: e.entry.title })));
+    if (echoes.length > 0) {
+      const key = echoes.map((e) => e.entry.id).join(',');
+      setEchoFlash((prev) => (prev === key ? prev : key));
+    }
+  }, [entriesSigAurora]);
+
   /* sync reality and dimensional barrier when active reality shifts */
   useEffect(() => {
     const eng = engineRef.current;
     if (!eng) return;
-    const r = getReality(state.activeRealityId || 'sol-prime', state.customRealityDescriptions);
-    eng.setReality(r);
+    /* R102 — activeRealityId '' (the empty multiverse) is a legal pointer;
+       the engine receives null and renders the bare stage until a reality
+       is forged or warped to */
+    const r = state.activeRealityId
+      ? getReality(state.activeRealityId, state.customRealityDescriptions) ?? null
+      : null;
+    /* the live container (this reality's actual worlds/pages) feeds the
+       engine — user-added bodies survive every warp */
+    eng.setReality(r, state.bodies, state.entries);
   }, [state.activeRealityId, state.customRealityDescriptions]);
 
-  /* keep the living structure in sync — new worlds form, dissolved worlds vanish,
-     and moons always mirror the diary pages of their planet */
+  /* Round 14 — physics toggles ride store state into the engine. engineReady
+     re-fires this after the async boot so the engine's first state is the
+     persisted one, not its default. */
+  const spacetimeLensOn = state.spacetimeLensing !== false;
+  const livingGravityOn = state.livingGravity !== false;
+  /* R94 — THE FLIP (the R91 decree lands): absent flag = ON. From this
+     round the universe boots with true N-body gravity driving the sky;
+     a device where the core can't run gets the clockwork automatically
+     (the freshness law), and the console switch can always restore it. */
+  const universeDriverOn = state.universeDriver !== false;
   useEffect(() => {
     const eng = engineRef.current;
     if (!eng) return;
-    eng.syncBodies(state.bodies);
-    eng.syncMoons(state.entries);
-    eng.setConnections(state.connections.map((c) => [c.a, c.b] as [string, string]));
-  }, [state.bodies, state.entries, state.connections]);
+    eng.setSpacetimeLens(spacetimeLensOn);
+    eng.setLivingGravity(livingGravityOn);
+    eng.setUniverseDriver(universeDriverOn);
+  }, [spacetimeLensOn, livingGravityOn, universeDriverOn, engineReady]);
 
-  /* close diary windows whose world has dissolved */
+  /* EXISTENCE SYNC — the 3D multiverse is rebuilt from the live reality list
+     whenever a reality or galaxy is created/edited/deleted, so the scene is
+     always literal: a bubble exists iff the reality exists, an ellipse exists
+     iff that galaxy exists. Deps are value signatures (the store hands out
+     fresh array identities on every keystroke — identity deps would over-fire).
+     engineReady re-fires this once after the async boot (the same law the
+     physics toggles above obey): the engine ignites AFTER mount, so without
+     this dep the skip guard below is never consumed at boot — the first real
+     change of the session (typically the first delete) steals it and silently
+     skips its own rebuild, leaving a ghost marble in the multiverse. */
+  const galSig = useMemo(() => JSON.stringify(state.customGalaxies ?? {}), [state.customGalaxies]);
+  const metaSig = useMemo(() => JSON.stringify(state.customRealityMeta ?? {}), [state.customRealityMeta]);
+  const customIdsSig = useMemo(() => (state.customRealities ?? []).map((r) => r.id).join(','), [state.customRealities]);
+  const deletedSig = useMemo(() => (state.deletedRealityIds ?? []).join(','), [state.deletedRealityIds]);
+  const skipFirstRebuild = useRef(true);
   useEffect(() => {
-    setWins((cur) => cur.filter((w) => state.bodies.some((b) => b.id === w.planetId)));
-    setEntered((cur) => (cur && !state.bodies.some((b) => b.id === cur) ? null : cur));
-  }, [state.bodies]);
+    const eng = engineRef.current;
+    if (!eng) return;
+    if (skipFirstRebuild.current) { skipFirstRebuild.current = false; return; } /* constructor already built it */
+    eng.rebuildMultiverse();
+    const r = state.activeRealityId
+      ? getReality(state.activeRealityId, state.customRealityDescriptions) ?? null
+      : null;
+    eng.setReality(r);
+    /* R102 — the reality you were inside just collapsed (or the last one
+       did): the traveler surfaces at the multiverse sphere */
+    if (!r) eng.zoomToMultiverse();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [galSig, metaSig, customIdsSig, deletedSig, engineReady]);
+
+  /* keep the living structure in sync — new worlds form, dissolved worlds vanish,
+     and moons always mirror the diary pages of their planet. Signature-guarded:
+     the store hands out fresh view identities on every notify (including the 3s
+     disk-sync heartbeat), and re-pushing identical rosters at the engine is
+     wasted churn at best and stage churn at worst. */
+  const bodiesSig = useMemo(() => JSON.stringify(state.bodies), [state.bodies]);
+  const entriesSig = useMemo(() => JSON.stringify(state.entries), [state.entries]);
+  const connectionsSig = useMemo(() => JSON.stringify(state.connections), [state.connections]);
+  useEffect(() => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    eng.syncBodies(JSON.parse(bodiesSig) as typeof state.bodies);
+    eng.syncMoons(JSON.parse(entriesSig) as typeof state.entries);
+    eng.setConnections((JSON.parse(connectionsSig) as typeof state.connections).map((c) => [c.a, c.b] as [string, string]));
+  }, [bodiesSig, entriesSig, connectionsSig]);
+
+  /* close diary windows whose world has dissolved — a body counts as alive
+     if the active container knows it OR the engine still resolves it (inner
+     realms of non-home galaxies live only inside the engine) */
+  useEffect(() => {
+    setWins((cur) => cur.filter((w) =>
+      state.bodies.some((b) => b.id === w.planetId) || engineRef.current?.getInnerBody(w.planetId)
+    ));
+    setEntered((cur) => (cur && !state.bodies.some((b) => b.id === cur) && !engineRef.current?.getInnerBody(cur) ? null : cur));
+  }, [bodiesSig]);
 
   /* ------------------------------ helpers ------------------------------ */
 
@@ -281,23 +803,34 @@ export default function App() {
     setAudioMode('space');
   }, []);
 
+  const vaultClosingRef = useRef(false);
   const closeVault = useCallback(() => {
-    setMode('space');
-    setAudioMode('space');
+    if (vaultClosingRef.current) return; /* already being swallowed (Escape / double-close) */
+    vaultClosingRef.current = true;
+    /* THE RETURN TEAR — the reverse vortex fires NOW, at full strength,
+       and the vault stays mounted just long enough to be sucked into it. */
+    setVaultClosing(true);
     engineRef.current?.leavePortal();
-    engineRef.current?.resetView();
+    setAudioMode('space');
+    setTimeout(() => { setMode('space'); setVaultClosing(false); vaultClosingRef.current = false; }, 900);
   }, []);
 
   const closeWin = (key: string) => {
-    setWins((cur) => {
-      const next = cur.filter((w) => w.key !== key);
-      if (next.length === 0) {
-        engineRef.current?.leavePortal();
-        setAudioMode('space');
-        setEntered(null);
-      }
-      return next;
-    });
+    const target = wins.find((w) => w.key === key);
+    if (!target || target.closing) return;
+    const remaining = wins.filter((w) => w.key !== key && !w.closing);
+    if (remaining.length === 0) {
+      /* THE RETURN TEAR — the reverse vortex fires NOW, at full strength,
+         and the diary stays mounted just long enough to be sucked into it
+         (kamui-suck) before it unmounts. Side effects stay out of the
+         state updaters. */
+      engineRef.current?.leavePortal();
+      setAudioMode('space');
+      setEntered(null);
+      setWins((cur) => cur.map((w) => (w.key === key ? { ...w, closing: true } : w)));
+      return;
+    }
+    setWins((cur) => cur.filter((w) => w.key !== key));
   };
 
   const minimizeWin = (key: string) => setWins((cur) => cur.map((w) => (w.key === key ? { ...w, minimized: true } : w)));
@@ -307,7 +840,19 @@ export default function App() {
   };
   const maximizeWin = (key: string) => setWins((cur) => cur.map((w) => (w.key === key ? { ...w, maximized: !w.maximized } : w)));
 
+  /* kamui-suck closing windows unmount after the swallow animation ends */
+  useEffect(() => {
+    if (!wins.some((w) => w.closing)) return;
+    const t = setTimeout(() => setWins((cur) => cur.filter((w) => !w.closing)), 900);
+    return () => clearTimeout(t);
+  }, [wins]);
+
+
   /* open (or raise) a diary window for a world — used by constellation links */
+  /* openDiaryFor lives in a ref so the engine boot effect can call the
+     latest version without re-booting the engine */
+  const openDiaryForRef = useRef<(id: string) => void>(() => {});
+
   const openDiaryFor = useCallback((id: string) => {
     setAudioMode('diary');
     setWins((cur) => {
@@ -325,6 +870,7 @@ export default function App() {
       }];
     });
   }, []);
+  useEffect(() => { openDiaryForRef.current = openDiaryFor; }, [openDiaryFor]);
 
   const onTemporal = useCallback((ms: number | null) => {
     engineRef.current?.setTemporal(ms);
@@ -347,18 +893,58 @@ export default function App() {
     return 'scroll — travel the scales · click — select · double-click — enter · ? — keys';
   }, [hoverBody, selectBody, mode, entered, paused, bodyOf]);
 
+  /* R102 — hover cards resolve their subject against the live reality list;
+     a reality collapsed mid-hover resolves to nothing and its card simply
+     stands down (no phantom names from a vanished world) */
+  const hoveredReality = hoverRealityId ? getReality(hoverRealityId, state.customRealityDescriptions) : undefined;
+  const hoveredClusterReality = hoverCluster ? getReality(hoverCluster.realityId, state.customRealityDescriptions) : undefined;
+  const lineageClusterReality = activeLineageCluster ? getReality(activeLineageCluster.realityId, state.customRealityDescriptions) : undefined;
+
   /* ------------------------------- render ------------------------------- */
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-void">
+      {/* THE KAMUI BEND — the DOM twin of the vortex shader's tidal shear.
+          An empty frame: kamuiBend.ts fills the map and animates the
+          displacement scale while a swallowed overlay bends into the tear.
+          sRGB interpolation keeps the byte-encoded field intact. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <filter id="kamui-bend" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+          <feImage id="kamui-bend-map" preserveAspectRatio="none" result="map" />
+          <feDisplacementMap id="kamui-bend-displace" in="SourceGraphic" in2="map" scale="0" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ cursor: 'grab', touchAction: 'none' }} />
+
+      {/* THE COSMIC ECHO — the memory meteor under the pointer */}
+      {echoHover && !advancedReality && !coreConsoleOpen && (
+        <div
+          className="fixed z-95 pointer-events-none rise-in"
+          style={{
+            left: Math.min(echoHover.x + 14, window.innerWidth - 260),
+            top: Math.min(echoHover.y + 14, window.innerHeight - 120),
+          }}
+        >
+          <div className="px-3 py-2 rounded-lg border border-solar/40 bg-abyss/90 backdrop-blur-md max-w-60">
+            <p className="font-mono text-[8px] tracking-[0.26em] uppercase text-solar/80">cosmic echo · a memory returns</p>
+            <p className="text-[11.5px] text-paper/90 leading-snug mt-1 line-clamp-2">{echoHover.title}</p>
+            <p className="font-mono text-[8.5px] text-slate-dim mt-1">click to reopen the page</p>
+          </div>
+        </div>
+      )}
+
+      {/* echo shower arrival toast — once per distinct shower */}
+      {echoFlash && <EchoShowerToast signal={echoFlash} onDone={() => setEchoFlash(null)} />}
 
       {/* ambient vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(130% 100% at 50% 45%, transparent 55%, rgba(2,4,9,0.5) 100%)' }} />
 
-      {/* opening veil — absolute darkness, the name, then a smooth fade home */}
-      {intro && (
-        <div className="intro-veil fixed inset-0 z-[35] pointer-events-none flex flex-col items-center justify-center" style={{ background: '#04060c' }}>
+      {/* opening veil — absolute darkness, the name, then a smooth fade home.
+          It stays fully opaque until the engine's first rendered frame, so all
+          boot-time compilation happens invisibly behind it. */}
+      {!introGone && (
+        <div className={`intro-veil fixed inset-0 z-35 pointer-events-none flex flex-col items-center justify-center ${introLift ? 'lift' : ''}`} style={{ background: '#04060c' }}>
           <div className="intro-track font-display font-medium text-paper/90 text-[clamp(20px,3.4vw,34px)]" style={{ letterSpacing: '0.5em', textIndent: '0.5em' }}>
             MY UNIVERSE
           </div>
@@ -387,7 +973,7 @@ export default function App() {
 
       {/* selection card */}
       {selectBody && (
-        <div className="chrome absolute bottom-12 left-6 rise-in z-[50]" key={selectBody.id}>
+        <div className="chrome absolute bottom-12 left-6 rise-in z-50" key={selectBody.id}>
           <div className="px-4 py-3 border-l-2 max-w-[320px] rounded-r-lg" style={{ borderColor: selectBody.palette.atmo, background: 'rgba(8,12,22,0.85)', backdropFilter: 'blur(6px)' }}>
             <div className="flex items-center justify-between">
               <p className="font-display text-[12px] tracking-[0.18em] text-paper">{selectBody.name.toUpperCase()}</p>
@@ -405,7 +991,33 @@ export default function App() {
 
             {showPhysics && (
               <div className="mt-3 pointer-events-auto">
-                <PhysicsHUD body={selectBody} onClose={() => setShowPhysics(false)} />
+                <PhysicsHUD body={selectBody} livingGravity={livingGravityOn} onClose={() => setShowPhysics(false)} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* isolated inner world selection card */}
+      {innerWorld && (
+        <div className="chrome absolute bottom-12 left-6 rise-in z-50" key={innerWorld.body.id}>
+          <div className="px-4 py-3 border-l-2 max-w-[320px] rounded-r-lg" style={{ borderColor: innerWorld.body.palette.atmo, background: 'rgba(8,12,22,0.85)', backdropFilter: 'blur(6px)' }}>
+            <div className="flex items-center justify-between">
+              <p className="font-display text-[12px] tracking-[0.18em] text-paper">{innerWorld.body.name.toUpperCase()}</p>
+              <button
+                onClick={() => setShowPhysics(!showPhysics)}
+                className="font-mono text-[9px] tracking-wider uppercase px-2 py-0.5 rounded bg-teal-ice/15 hover:bg-teal-ice/30 text-teal-ice border border-teal-ice/30 transition-colors"
+              >
+                {showPhysics ? 'HIDE LAWS' : 'PHYSICS LAWS'}
+              </button>
+            </div>
+            <p className="font-mono text-[8.5px] tracking-[0.2em] uppercase text-solar/80 mt-1">
+              {innerWorld.galaxyName} · {innerWorld.starName} system
+            </p>
+            <p className="font-body text-[11px] text-slate-soft leading-relaxed mt-1">{innerWorld.body.note}</p>
+            {showPhysics && (
+              <div className="mt-3 pointer-events-auto">
+                <PhysicsHUD body={innerWorld.body} livingGravity={livingGravityOn} onClose={() => setShowPhysics(false)} />
               </div>
             )}
           </div>
@@ -415,8 +1027,8 @@ export default function App() {
       {/* context menu */}
       {menu && menuBody && (
         <>
-          <div className="fixed inset-0 z-[90]" onClick={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }} />
-          <div className="ctx-menu fixed z-[95] w-[218px] py-1.5" style={{ left: Math.min(menu.x, window.innerWidth - 230), top: Math.min(menu.y, window.innerHeight - 330) }}>
+          <div className="fixed inset-0 z-90" onClick={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }} />
+          <div className="ctx-menu fixed z-95 w-54.5 py-1.5" style={{ left: Math.min(menu.x, window.innerWidth - 230), top: Math.min(menu.y, window.innerHeight - 330) }}>
             <p className="px-4 py-1.5 font-mono text-[8.5px] tracking-[0.26em] uppercase text-slate-dim">
               {menuBody.kind === 'vault' ? `${menuBody.name} — the universal vault` : `${menuBody.name} — assign meaning`}
             </p>
@@ -427,14 +1039,14 @@ export default function App() {
                 : ' Single-click another world first to enable “link”.'}
             </p>
             {menuBody.kind !== 'vault' && MEANINGS.map((m) => (
-              <button key={m ?? 'x'} className="ctx-item w-full text-left px-4 py-[7px] text-[12px] text-slate-soft flex items-center justify-between"
+              <button key={m ?? 'x'} className="ctx-item w-full text-left px-4 py-1.75 text-[12px] text-slate-soft flex items-center justify-between"
                 onClick={() => { actions.setMeaning(menuBody.id, m); setMenu(null); toast(`${menuBody.name} now represents: ${MEANING_LABEL[m!]}`); }}>
                 {MEANING_LABEL[m!]}
                 {menuBody.meaning === m && <span className="text-solar">·</span>}
               </button>
             ))}
             <div className="h-px bg-line/70 my-1.5" />
-            <button className="ctx-item w-full text-left px-4 py-[7px] text-[12px] text-slate-soft flex items-center gap-2"
+            <button className="ctx-item w-full text-left px-4 py-1.75 text-[12px] text-slate-soft flex items-center gap-2"
               onClick={() => {
                 if (selectId && selectId !== menuBody.id && selectId !== 'anchor') {
                   actions.connect(selectId, menuBody.id);
@@ -445,11 +1057,11 @@ export default function App() {
               }}>
               <IcLink size={11} /> link with selected
             </button>
-            <button className="ctx-item w-full text-left px-4 py-[7px] text-[12px] text-teal-ice flex items-center gap-2"
+            <button className="ctx-item w-full text-left px-4 py-1.75 text-[12px] text-teal-ice flex items-center gap-2"
               onClick={() => { setSelectId(menuBody.id); setShowPhysics(true); setMenu(null); }}>
               <span>✦</span> physics telemetry & laws
             </button>
-            <button className="ctx-item w-full text-left px-4 py-[7px] text-[12px] text-slate-soft"
+            <button className="ctx-item w-full text-left px-4 py-1.75 text-[12px] text-slate-soft"
               onClick={() => { engineRef.current?.focusOn(menuBody.id); setMenu(null); }}>
               focus camera
             </button>
@@ -460,30 +1072,32 @@ export default function App() {
 
       {/* diary windows */}
       {wins.filter((w) => !w.minimized).map((w, i) => {
-        const planet = state.bodies.find((b) => b.id === w.planetId);
+        const planet = state.bodies.find((b) => b.id === w.planetId) ?? engineRef.current?.getInnerBody(w.planetId) ?? null;
         if (!planet) return null;
         return (
-          <DiaryWindowFrame key={w.key} z={zTop + i} focused={focusKey === w.key}>
-            <ErrorBoundary label="THE DIARY">
-              <DiaryWindow
-                planet={planet}
-                rect={w.maximized ? MAX_RECT() : w.rect}
-                maximized={!!w.maximized}
-                focused={focusKey === w.key}
-                onFocus={() => { setFocusKey(w.key); setZTop((z) => z + 1); }}
-                onMinimize={() => minimizeWin(w.key)}
-                onMaximize={() => maximizeWin(w.key)}
-                onClose={() => closeWin(w.key)}
-                onOpenLinked={openDiaryFor}
-              />
-            </ErrorBoundary>
+          <DiaryWindowFrame key={w.key} z={zTop + i} focused={focusKey === w.key} closing={!!w.closing}>
+            <Suspense fallback={null}>
+              <ErrorBoundary label="THE DIARY">
+                <DiaryWindow
+                  planet={planet}
+                  rect={w.maximized ? MAX_RECT() : w.rect}
+                  maximized={!!w.maximized}
+                  focused={focusKey === w.key}
+                  onFocus={() => { setFocusKey(w.key); setZTop((z) => z + 1); }}
+                  onMinimize={() => minimizeWin(w.key)}
+                  onMaximize={() => maximizeWin(w.key)}
+                  onClose={() => closeWin(w.key)}
+                  onOpenLinked={openDiaryFor}
+                />
+              </ErrorBoundary>
+            </Suspense>
           </DiaryWindowFrame>
         );
       })}
 
       {/* minimized dock */}
       {wins.some((w) => w.minimized) && (
-        <div className="fixed bottom-5 right-5 z-[65] flex gap-2">
+        <div className="fixed bottom-5 right-5 z-65 flex gap-2">
           {wins.filter((w) => w.minimized).map((w) => {
             const p = state.bodies.find((b) => b.id === w.planetId);
             return (
@@ -499,29 +1113,103 @@ export default function App() {
 
       {/* core mode */}
       {mode === 'core' && (
-        <CoreMode
-          onClose={closeCore}
-          onInspect={(id) => { closeCore(); engineRef.current?.focusOn(id); }}
-          onTemporal={onTemporal}
-          onEnterWorld={(id) => { closeCore(); engineRef.current?.portalTo(id); }}
-        />
+        <Suspense fallback={<AsyncOverlay label="OPENING CORE" />}>
+          <CoreMode
+            onClose={closeCore}
+            onInspect={(id) => { closeCore(); engineRef.current?.focusOn(id); }}
+            onTemporal={onTemporal}
+            onEnterWorld={(id) => { closeCore(); engineRef.current?.portalTo(id); }}
+          />
+        </Suspense>
       )}
 
       {/* vault */}
-      {mode === 'vault' && (
-        <ErrorBoundary label="THE VAULT">
-          <VaultUI onClose={closeVault} />
-        </ErrorBoundary>
+      {(mode === 'vault' || vaultClosing) && (
+        <Suspense fallback={<AsyncOverlay label="OPENING VAULT" />}>
+          <ErrorBoundary label="THE VAULT">
+            <VaultUI onClose={closeVault} closing={vaultClosing} />
+          </ErrorBoundary>
+        </Suspense>
       )}
+
+      {/* THE COMMAND PALETTE — Ctrl+K: retrieval across the whole universe */}
+      {showPalette && (
+        <Suspense fallback={<AsyncOverlay label="OPENING COMMAND PALETTE" />}>
+          <CommandPalette
+            onClose={() => setShowPalette(false)}
+            api={{
+              onWarpReality: (id) => {
+                actions.switchReality(id);
+                const r = getReality(id, state.customRealityDescriptions);
+                if (!r) return;
+                toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
+                chime(880);
+                engineRef.current?.resetView();
+              },
+              onEnterGalaxy: (rid, gid) => {
+                const r = getReality(rid, state.customRealityDescriptions);
+                const gal = r?.galaxies?.find((g) => g.id === gid);
+                if (!r || !gal) return;
+                if (getState().activeRealityId !== rid) {
+                  actions.switchReality(rid);
+                  toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
+                  chime(880);
+                }
+                engineRef.current?.enterGalaxy(rid, gid);
+                toast(`⌖ ${gal.name} — ${r.name}`);
+                chime(760);
+              },
+              onFocusBody: (id) => {
+                setMode('space');
+                engineRef.current?.focusOn(id);
+                chime(720);
+              },
+              onDiveBody: (id) => {
+                setMode('space');
+                engineRef.current?.portalTo(id);
+                chime(660);
+              },
+              onJumpTo: (id) => {
+                setMode('space');
+                engineRef.current?.jumpTo(id);
+                setKamuiKey((k) => k + 1);
+                toast('✦ Kamui: Focused on Core');
+                chime(880);
+              },
+              onOpenVault: () => { setMode('vault'); setAudioMode('vault'); },
+              onOpenConsole: () => { setCoreConsoleOpen(true); chime(960); },
+              onOpenMemory: (entryId, planetId) => {
+                setMode('space');
+                chime(740);
+                const eng = engineRef.current;
+                if (eng) {
+                  eng.pulseConstellation([planetId]);
+                }
+                openDiaryForRef.current?.(planetId);
+                void entryId;
+              },
+              onConstellate: (planetIds) => {
+                setMode('space');
+                engineRef.current?.pulseConstellation(planetIds);
+                chime(700);
+                toast(`✦ ${planetIds.length} worlds answer in the sky`);
+              },
+              onZoomStage: (i) => { engineRef.current?.zoomToHierarchy(i); chime(720); },
+              onFrameCore: () => { engineRef.current?.zoomToCore(); chime(720); },
+            }}
+          />
+        </Suspense>
+      )}
+
 
       {/* shortcuts */}
       {showKeys && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center overlay-in" style={{ background: 'rgba(3,5,10,0.7)' }} onClick={() => setShowKeys(false)}>
-          <div className="ctx-menu w-[300px] p-5 rise-in" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-130 flex items-center justify-center overlay-in" style={{ background: 'rgba(3,5,10,0.7)' }} onClick={() => setShowKeys(false)}>
+          <div className="ctx-menu w-75 p-5 rise-in" onClick={(e) => e.stopPropagation()}>
             <p className="font-mono text-[9px] tracking-[0.3em] uppercase text-solar/80 mb-4">hidden keys</p>
             {[
               ['H', 'return home'], ['C', 'anchor star core'], ['V', 'find the vault'],
-              ['SPACE', 'hold / release time'], ['M', 'mute the hum'], ['?', 'this list'], ['ESC', 'leave'],
+              ['G', 'scientific survey HUD'], ['SPACE', 'hold / release time'], ['M', 'mute the hum'], ['?', 'this list'], ['ESC', 'leave'],
             ].map(([k, d]) => (
               <div key={k} className="flex items-center justify-between py-1.5 border-b border-line/40 last:border-0">
                 <span className="font-mono text-[10px] text-solar">{k}</span>
@@ -549,20 +1237,43 @@ export default function App() {
         </div>
       )}
 
+      {/* Scientific survey HUD — summoned with G, rides the cosmic scale ladder */}
+      {showCosmicHud && mode === 'space' && (
+        <CosmicWebHUD
+          settings={cosmicSettings}
+          onUpdateSettings={(patch) => setCosmicSettings((cur) => ({ ...cur, ...patch }))}
+          scaleLabel={label}
+        />
+      )}
+
       {showMultiverseBar && (
         <MultiverseBar
-          activeRealityId={state.activeRealityId || 'sol-prime'}
+          activeRealityId={state.activeRealityId ?? ''}
           currentScaleLabel={label}
+          galaxies={(state.activeRealityId ? getReality(state.activeRealityId, state.customRealityDescriptions)?.galaxies : undefined) ?? []}
+          activeGalaxyId={activeGalaxyId}
+          onEnterGalaxy={(gid) => {
+            const rid = state.activeRealityId;
+            if (!rid) return;
+            const r = getReality(rid, state.customRealityDescriptions);
+            const gal = r?.galaxies?.find((g) => g.id === gid);
+            if (!r || !gal) return;
+            setActiveGalaxyId(gid);
+            engineRef.current?.enterGalaxy(rid, gid);
+            toast(`⌖ Diving into ${gal.name} — ${r.name}`);
+            chime(760);
+          }}
+          onOpenCoreConsole={() => {
+            setCoreConsoleOpen(true);
+            chime(960);
+          }}
           onWarpReality={(id) => {
             actions.switchReality(id);
             const r = getReality(id, state.customRealityDescriptions);
+            if (!r) return;
             toast(`Quantum Warp: Switched to Reality ${r.name}`);
             chime(880);
             engineRef.current?.resetView();
-          }}
-          onZoomToMultiverse={() => {
-            engineRef.current?.zoomToMultiverse();
-            toast('Camera set to Multiverse Scale');
           }}
           onZoomToSystem={() => {
             engineRef.current?.zoomToSystem();
@@ -579,85 +1290,75 @@ export default function App() {
             engineRef.current?.zoomOut();
           }}
           onEditRealityLore={(r) => {
-            const fresh = getReality(r.id, state.customRealityDescriptions);
-            setEditingReality(fresh);
+            setAdvancedReality({ realityId: r.id, focusGalaxyId: null });
           }}
           onInspectLineage={(cluster) => {
             setActiveLineageCluster(cluster);
             chime(720);
           }}
-          onZoomToDemonCore={() => {
-            engineRef.current?.zoomToDemonCore();
-            setKamuiKey((k) => k + 1);
-            toast('✦ Kamui: Focused on Core');
-            chime(960);
+          onCloseBar={() => {
+            setShowMultiverseBar(false);
           }}
           onTriggerKamui={() => {
             engineRef.current?.triggerKamui();
             setKamuiKey((k) => k + 1);
-            chime(960);
-          }}
-          onCloseBar={() => {
-            setShowMultiverseBar(false);
+            toast('✦ Kamui: Core Activated');
           }}
           kamuiKey={kamuiKey}
         />
       )}
 
-      {/* Hover Tooltip / HUD for Core */}
-      {hoverId === 'demon-core' && mode === 'space' && label.includes('MULTIVERSE') && !editingReality && !hoverCluster && !activeLineageCluster && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-auto bg-slate-950/85 backdrop-blur-2xl border border-red-500/60 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(255,23,68,0.4)] text-slate-100 max-w-md w-[92vw] sm:w-[420px] kamui-demon-badge">
-          <div className="flex items-center justify-between border-b border-red-500/30 pb-2 mb-2.5">
+      {/* Hover HUD for the Astral Core — the multiverse's living center */}
+      {hoverId === 'multiverse-core' && mode === 'space' && label.includes('MULTIVERSE') && !coreConsoleOpen && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-auto bg-slate-950/85 backdrop-blur-2xl border border-cyan-400/50 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(6,182,212,0.35)] text-slate-100 max-w-md w-[92vw] sm:w-105 demon-badge">
+          <div className="flex items-center justify-between border-b border-cyan-400/30 pb-2 mb-2.5">
             <div className="flex items-center gap-2">
-              <span className="demon-eye-spin inline-block w-3.5 h-3.5 rounded-full bg-red-500 shadow-[0_0_10px_#ff1744] ring-1 ring-white/70" />
-              <h3 className="font-bold text-sm tracking-wider text-red-200 uppercase font-mono">CORE</h3>
+              <span className="demon-eye-spin inline-block w-3.5 h-3.5 rounded-full bg-linear-to-br from-cyan-300 to-violet-500 shadow-[0_0_10px_#00f5d4] ring-1 ring-white/70" />
+              <h3 className="font-bold text-sm tracking-wider text-cyan-100 uppercase font-mono">THE ASTRAL CORE</h3>
             </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-red-950/80 border border-red-400/40 text-red-300">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-400/40 text-cyan-300">
               ORIGIN (0, 0, 0)
             </span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed mb-3">
-            The supreme cosmic singularity anchoring and stabilizing all 20 parallel bubble realities through quantum flux resonance and space-time harmonic containment.
+            The supreme singularity anchoring every parallel reality through quantum flux resonance and space-time harmonic containment. It is the command deck of the multiverse.
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                engineRef.current?.triggerKamui();
-                setKamuiKey((k) => k + 1);
-                setShowMultiverseBar((prev) => !prev);
+                setCoreConsoleOpen(true);
                 chime(960);
               }}
-              className="flex-1 py-1.5 px-3 bg-red-600/30 hover:bg-red-600/50 border border-red-500/60 rounded-xl font-mono text-[11px] font-bold text-red-200 hover:text-white transition-all shadow-[0_0_12px_rgba(255,23,68,0.3)] cursor-pointer text-center"
+              className="flex-1 py-1.5 px-3 bg-cyan-500/30 hover:bg-cyan-500/50 border border-cyan-400/60 rounded-xl font-mono text-[11px] font-bold text-cyan-100 hover:text-white transition-all shadow-[0_0_12px_rgba(6,182,212,0.3)] cursor-pointer text-center"
             >
-              ✦ ACTIVATE TOOLBAR
+              ✦ OPEN CORE CONSOLE
             </button>
             <button
               onClick={() => {
-                engineRef.current?.zoomToDemonCore();
-                setKamuiKey((k) => k + 1);
-                setShowMultiverseBar(true);
-                chime(960);
+                engineRef.current?.zoomToCore();
+                chime(720);
               }}
               className="py-1.5 px-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl font-mono text-[11px] text-slate-200 hover:text-white transition-all cursor-pointer"
             >
-              ZOOM
+              FRAME
             </button>
           </div>
         </div>
       )}
 
       {/* Hover Tooltip / HUD for Parallel Realities (Only active at Multiverse Macro Scale) */}
-      {hoverRealityId && mode === 'space' && label.includes('MULTIVERSE') && !editingReality && !hoverCluster && !activeLineageCluster && (
+      {hoveredReality && mode === 'space' && label.includes('MULTIVERSE') && !hoverGalaxy && !advancedReality && !coreConsoleOpen && !hoverCluster && !activeLineageCluster && (
         <RealityHoverCard
-          reality={getReality(hoverRealityId, state.customRealityDescriptions)}
+          reality={hoveredReality}
           screenPos={hoverScreenPos}
+          disk={hoverDisk}
           onEditDescription={(r) => {
-            const fresh = getReality(r.id, state.customRealityDescriptions);
-            setEditingReality(fresh);
+            setAdvancedReality({ realityId: r.id, focusGalaxyId: null });
           }}
           onWarp={(id) => {
             actions.switchReality(id);
             const r = getReality(id, state.customRealityDescriptions);
+            if (!r) return;
             toast(`Quantum Warp: Switched to Reality ${r.name}`);
             chime(880);
             engineRef.current?.resetView();
@@ -669,12 +1370,45 @@ export default function App() {
         />
       )}
 
+      {/* Hover Tooltip / HUD for a Major Galaxy — on a reality's ellipse ring
+          (multiverse scale) or out in the galaxy field (galaxy scale) */}
+      {hoverGalaxy && mode === 'space' && (label.includes('MULTIVERSE') || label.includes('GALAXY')) && !advancedReality && !coreConsoleOpen && !hoverCluster && !activeLineageCluster && !lineageGalaxy && (
+        <GalaxyHoverCard
+          galaxy={hoverGalaxy.galaxy}
+          realityName={hoverGalaxy.realityName}
+          screenPos={hoverScreenPos}
+          disk={hoverDisk}
+          onEnter={(gid, rid) => {
+            const r = getReality(rid, state.customRealityDescriptions);
+            const gal = r?.galaxies?.find((g) => g.id === gid);
+            if (!r || !gal) return;
+            if (state.activeRealityId !== rid) {
+              actions.switchReality(rid);
+              toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
+              chime(880);
+            }
+            setActiveGalaxyId(gid);
+            engineRef.current?.enterGalaxy(rid, gid);
+            toast(`⌖ Diving into ${gal.name} — ${r.name}`);
+            chime(760);
+          }}
+          onEdit={(gal) => {
+            setAdvancedReality({ realityId: gal.realityId, focusGalaxyId: gal.id });
+          }}
+          onInspectLineage={(gal) => {
+            setLineageGalaxy({ galaxy: gal, realityName: hoverGalaxy.realityName });
+            chime(720);
+          }}
+        />
+      )}
+
       {/* Hover Tooltip / HUD for Orbiting Galaxy Clusters / Galaxy Groups (Only active at Multiverse Macro Scale) */}
-      {hoverCluster && mode === 'space' && label.includes('MULTIVERSE') && !editingReality && !activeLineageCluster && (
+      {hoverCluster && mode === 'space' && label.includes('MULTIVERSE') && !advancedReality && !coreConsoleOpen && !activeLineageCluster && (
         <ClusterHoverCard
           cluster={hoverCluster}
-          realityName={getReality(hoverCluster.realityId, state.customRealityDescriptions).name}
+          realityName={hoveredClusterReality?.name ?? 'Collapsed Reality'}
           screenPos={hoverScreenPos}
+          disk={hoverDisk}
           onInspectLineage={(cluster) => {
             setActiveLineageCluster(cluster);
             chime(720);
@@ -682,6 +1416,7 @@ export default function App() {
           onWarp={(realityId) => {
             actions.switchReality(realityId);
             const r = getReality(realityId, state.customRealityDescriptions);
+            if (!r) return;
             toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
             chime(880);
             engineRef.current?.resetView();
@@ -691,38 +1426,134 @@ export default function App() {
 
       {/* Deep-Dive Cosmic Lineage & Hierarchy Explorer Modal */}
       {activeLineageCluster && (
-        <CosmicLineageModal
-          cluster={activeLineageCluster}
-          realityName={getReality(activeLineageCluster.realityId, state.customRealityDescriptions).name}
-          onClose={() => setActiveLineageCluster(null)}
-          onWarpToReality={(realityId) => {
-            actions.switchReality(realityId);
-            const r = getReality(realityId, state.customRealityDescriptions);
-            toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
-            chime(880);
-            engineRef.current?.resetView();
-            setActiveLineageCluster(null);
-          }}
-        />
+        <Suspense fallback={<AsyncOverlay label="OPENING LINEAGE" />}>
+          <CosmicLineageModal
+            cluster={activeLineageCluster}
+            realityName={lineageClusterReality?.name ?? 'Collapsed Reality'}
+            onClose={() => setActiveLineageCluster(null)}
+            onZoomToStage={(stageIndex) => {
+              engineRef.current?.zoomToHierarchy(stageIndex);
+              chime(720);
+              setActiveLineageCluster(null);
+            }}
+            onWarpToReality={(realityId) => {
+              actions.switchReality(realityId);
+              const r = getReality(realityId, state.customRealityDescriptions);
+              if (!r) return;
+              toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
+              chime(880);
+              engineRef.current?.resetView();
+              setActiveLineageCluster(null);
+            }}
+          />
+        </Suspense>
       )}
 
-      {/* Reality Lore Description Writer / Editor Modal */}
-      {editingReality && (
-        <EditRealityModal
-          reality={editingReality}
-          onClose={() => setEditingReality(null)}
-          onSave={(realityId, description) => {
-            actions.updateRealityDescription(realityId, description);
-            toast('Reality description saved to cosmological record');
-            chime(660);
-            setEditingReality(null);
-          }}
-          onReset={(realityId) => {
-            actions.resetRealityDescription(realityId);
-            toast('Reality description reset to default lore');
-          }}
-        />
+      {/* Per-galaxy lineage explorer — every major galaxy is navigable */}
+      {lineageGalaxy && (
+        <Suspense fallback={<AsyncOverlay label="OPENING LINEAGE" />}>
+          <CosmicLineageModal
+            lineageOverride={lineageGalaxy.galaxy.lineage}
+            subjectLabel={lineageGalaxy.galaxy.name}
+            realityName={lineageGalaxy.realityName}
+            onClose={() => setLineageGalaxy(null)}
+            onZoomToStage={(stageIndex) => {
+              engineRef.current?.zoomToHierarchy(stageIndex);
+              chime(720);
+              setLineageGalaxy(null);
+            }}
+            onWarpToReality={(realityId) => {
+              actions.switchReality(realityId);
+              const r = getReality(realityId, state.customRealityDescriptions);
+              if (!r) return;
+              toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
+              chime(880);
+              engineRef.current?.resetView();
+              setLineageGalaxy(null);
+            }}
+          />
+        </Suspense>
       )}
+
+      {/* Reality Advanced Editor — double-click a reality bubble (or its Edit buttons) */}
+      {advancedReality && (
+        <Suspense fallback={<AsyncOverlay label="OPENING EDITOR" />}>
+          <RealityAdvancedModal
+            realityId={advancedReality.realityId}
+            focusGalaxyId={advancedReality.focusGalaxyId}
+            onClose={() => setAdvancedReality(null)}
+            onEnterGalaxy={(rid, gid) => {
+            const r = getReality(rid, state.customRealityDescriptions);
+            const gal = r?.galaxies?.find((g) => g.id === gid);
+            if (!r || !gal) return;
+            if (state.activeRealityId !== rid) {
+              actions.switchReality(rid);
+              toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
+              chime(880);
+            }
+            setActiveGalaxyId(gid);
+            engineRef.current?.enterGalaxy(rid, gid);
+            toast(`⌖ Diving into ${gal.name} — ${r.name}`);
+              chime(760);
+            }}
+          />
+        </Suspense>
+      )}
+
+      {/* THE MULTIVERSE CORE CONSOLE — click the Astral Core at (0,0,0) */}
+      {coreConsoleOpen && (
+        <Suspense fallback={<AsyncOverlay label="OPENING CORE CONSOLE" />}>
+          <CoreConsole
+            onClose={() => setCoreConsoleOpen(false)}
+            lensOn={spacetimeLensOn}
+            livingOn={livingGravityOn}
+            onToggleLens={(on) => actions.setSpacetimeLensing(on)}
+            onToggleLiving={(on) => actions.setLivingGravity(on)}
+            onRestoreEphemeris={() => {
+              engineRef.current?.healLivingGravity();
+              toast('✦ Ephemeris restored — every world back on its divine path');
+              chime(600);
+            }}
+            onWarpReality={(id) => {
+            actions.switchReality(id);
+            const r = getReality(id, state.customRealityDescriptions);
+            if (!r) return;
+            toast(`Quantum Warp: Switched to Reality ${r.name}`);
+            chime(880);
+            engineRef.current?.resetView();
+          }}
+          onZoomToCore={() => {
+            engineRef.current?.zoomToCore();
+            chime(720);
+          }}
+          onShowToolbar={() => {
+            setShowMultiverseBar(true);
+            setCoreConsoleOpen(false);
+            toast('✦ Hierarchy toolbar summoned');
+          }}
+          onEnterGalaxy={(rid, gid) => {
+            const r = getReality(rid, state.customRealityDescriptions);
+            const gal = r?.galaxies?.find((g) => g.id === gid);
+            if (!r || !gal) return;
+            setCoreConsoleOpen(false);
+            if (state.activeRealityId !== rid) {
+              actions.switchReality(rid);
+              toast(`Quantum Warp: Traveled into Reality — ${r.name}`);
+              chime(880);
+            }
+            setActiveGalaxyId(gid);
+            engineRef.current?.enterGalaxy(rid, gid);
+            toast(`⌖ Diving into ${gal.name} — ${r.name}`);
+            chime(760);
+            }}
+          />
+        </Suspense>
+      )}
+
+      {/* the desktop app keeps itself current — web never mounts this */}
+      <Suspense fallback={null}>
+        <UpdaterCard />
+      </Suspense>
 
       <ToastHost />
     </div>
@@ -732,8 +1563,17 @@ export default function App() {
 /* wrapper that controls stacking without fighting the spring transform.
    pointer-events pass straight through — the window root re-enables them —
    so the universe stays clickable while diaries are open. */
-function DiaryWindowFrame({ children, z }: { children: ReactNode; z: number; focused: boolean }) {
-  return <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 + (z % 50) }}>{children}</div>;
+function DiaryWindowFrame({ children, z, focused, closing }: { children: ReactNode; z: number; focused: boolean; closing?: boolean }) {
+  return (
+    /* the bend host — the SVG displacement filter lives on the PARENT of the
+       .kamui-suck wrapper, so the keyframe's blur/brightness animation and
+       the per-pixel vortex warp compose instead of fighting each other */
+    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 + (z % 50), filter: closing ? 'url(#kamui-bend)' : undefined }}>
+      {/* the swallow wrapper — the frame carries it so the keyframe never
+          fights the diary spring's imperative transform writes */}
+      <div className={`absolute inset-0 ${closing ? 'kamui-suck' : ''}`}>{children}</div>
+    </div>
+  );
 }
 
 function RenameRow({ body, onDone }: { body: CosmicBody; onDone: () => void }) {
@@ -741,7 +1581,7 @@ function RenameRow({ body, onDone }: { body: CosmicBody; onDone: () => void }) {
   const [val, setVal] = useState(body.name);
   if (!editing) {
     return (
-      <button className="ctx-item w-full text-left px-4 py-[7px] text-[12px] text-slate-soft" onClick={() => setEditing(true)}>
+      <button className="ctx-item w-full text-left px-4 py-1.75 text-[12px] text-slate-soft" onClick={() => setEditing(true)}>
         rename
       </button>
     );

@@ -1,0 +1,1658 @@
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { actions } from '../../state';
+import { fmtDate } from '../../vault/storage/formatters';
+import { computeStreak } from '../../vault/storage/metrics';
+import { sanitizeDiaryHtml } from '../../vault/storage/sanitizeHtml';
+import { delLocalPayload } from '../../vault/storage/indexedDB';
+import { MEANING_LABEL } from '../../domain/universe';
+import type { Attachment, CosmicBody, DiaryEntry, Mood, Weather } from '../../domain/universe';
+import { sfxConnect, sfxTick, startRecording, stopRecording } from '../../platform/audio';
+import Book from './Book';
+import { IcBook, IcClose, IcCompress, IcDownload, IcExpand, IcGlobe, IcImage, IcMic, IcMin, IcMoon, IcPlus, IcSearch, IcStar, IcStop, IcTrash, useUniverse } from '../bits';
+import { toast } from '../toast';
+import { readAsDataURL, synthBars } from '../lib';
+import { AudioPlate, VideoPlate, ImageOrGifPlate, FileOrCodePlate, useAttachmentSource } from './MediaPlates';
+import AttachmentEditor from './AttachmentEditor';
+import { highlightLine, langOf } from '../syntax';
+import { prettyPrint } from '../format';
+
+export interface WinRect { x: number; y: number; w: number; h: number; }
+
+function useSpringWindow(rect: WinRect, locked = false) {
+  const elRef = useRef<HTMLDivElement>(null);
+  const pos = useRef({ x: rect.x, y: rect.y, w: rect.w, h: rect.h });
+  const vel = useRef({ x: 0, y: 0, w: 0, h: 0 });
+  const target = useRef({ ...pos.current });
+
+  useEffect(() => { target.current = { x: rect.x, y: rect.y, w: rect.w, h: rect.h }; }, [rect]);
+
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+    const step = (now: number) => {
+      raf = requestAnimationFrame(step);
+      const dt = Math.min(0.04, (now - last) / 1000);
+      last = now;
+      const el = elRef.current;
+      if (!el) return;
+      const k = 130, d = 15;
+      (['x', 'y', 'w', 'h'] as const).forEach((ax) => {
+        const f = -k * (pos.current[ax] - target.current[ax]) - d * vel.current[ax];
+        vel.current[ax] += f * dt;
+        pos.current[ax] += vel.current[ax] * dt;
+      });
+      el.style.transform = `translate3d(${pos.current.x}px, ${pos.current.y}px, 0)`;
+      el.style.width = `${pos.current.w}px`;
+      el.style.height = `${pos.current.h}px`;
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const onBarDown = (e: React.PointerEvent) => {
+    if (locked) return;
+    if ((e.target as HTMLElement).closest('button,input,select,textarea')) return;
+    e.preventDefault();
+    const start = { mx: e.clientX, my: e.clientY, ...target.current };
+    const move = (ev: PointerEvent) => {
+      ev.preventDefault();
+      target.current.x = Math.max(-start.w + 120, Math.min(window.innerWidth - 80, start.x + ev.clientX - start.mx));
+      target.current.y = Math.max(8, Math.min(window.innerHeight - 60, start.y + ev.clientY - start.my));
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  const onGripDown = (e: React.PointerEvent) => {
+    if (locked) return;
+    e.preventDefault(); e.stopPropagation();
+    const start = { mx: e.clientX, my: e.clientY, w: target.current.w, h: target.current.h };
+    const move = (ev: PointerEvent) => {
+      ev.preventDefault();
+      target.current.w = Math.max(430, Math.min(window.innerWidth - 40, start.w + ev.clientX - start.mx));
+      target.current.h = Math.max(330, Math.min(window.innerHeight - 40, start.h + ev.clientY - start.my));
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return { elRef, onBarDown, onGripDown };
+}
+
+const MOODS: { id: Mood; label: string; color: string }[] = [
+  { id: 'calm', label: 'calm', color: '#7fc4e8' },
+  { id: 'warm', label: 'warm', color: '#f2c178' },
+  { id: 'bright', label: 'bright', color: '#9fd8a8' },
+  { id: 'heavy', label: 'heavy', color: '#8b93a8' },
+  { id: 'burning', label: 'burning', color: '#e0785a' },
+];
+const moodOf = (id?: Mood) => MOODS.find((m) => m.id === id);
+
+const WEATHERS: { id: Weather; label: string }[] = [
+  { id: 'clear', label: 'clear sky' }, { id: 'rain', label: 'rain' }, { id: 'storm', label: 'storm' },
+  { id: 'fog', label: 'fog' }, { id: 'dust', label: 'dust' },
+];
+
+function WeatherGlyph({ w, size = 13 }: { w: Weather; size?: number }) {
+  const d: Record<Weather, string> = {
+    clear: 'M12 8.2a3.8 3.8 0 100 7.6 3.8 3.8 0 000-7.6zM12 3v1.6M12 19.4V21M3 12h1.6M19.4 12H21M5.6 5.6l1.1 1.1M17.3 17.3l1.1 1.1M18.4 5.6l-1.1 1.1M6.7 17.3l-1.1 1.1',
+    rain: 'M7 14a4.5 4.5 0 111-8.9A5.5 5.5 0 0118 7.5 3.8 3.8 0 0117.5 15H7zM8.5 17l-.9 2.4M12.3 17l-.9 2.4M16 17l-.9 2.4',
+    storm: 'M7 13.5a4.5 4.5 0 111-8.9A5.5 5.5 0 0118 7 3.8 3.8 0 0117.5 14.5H7zM12.6 14l-2.3 4h2.8l-1.6 3.6 4.2-5h-2.8l1.8-2.6z',
+    fog: 'M4 9h16M6 12.5h14M5 16h12',
+    dust: 'M4.5 9.5h.01M8 7h.01M12 10h.01M16 7.5h.01M19.5 10.5h.01M6.5 13.5h.01M10.5 15h.01M14.5 13h.01M18.5 15.5h.01M8.5 18h.01M13.5 17.5h.01',
+  };
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d[w]} /></svg>;
+}
+
+function WeatherLayer({ weather }: { weather: Weather }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const cv = ref.current; if (!cv) return;
+    const g = cv.getContext('2d'); if (!g) return;
+    const W = 460, H = 340;
+    cv.width = W; cv.height = H;
+    let raf = 0;
+    const t0 = performance.now();
+    const n = weather === 'rain' || weather === 'storm' ? 64 : weather === 'dust' ? 48 : 22;
+    const parts = Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1.7 + 0.4, v: Math.random() * 1.6 + 0.6, p: Math.random() * 7 }));
+    let flash = 0;
+    const loop = (now: number) => {
+      raf = requestAnimationFrame(loop);
+      const t = (now - t0) / 1000;
+      g.clearRect(0, 0, W, H);
+      if (weather === 'rain' || weather === 'storm') {
+        g.strokeStyle = 'rgba(165,195,235,0.3)';
+        g.lineWidth = 1;
+        g.beginPath();
+        parts.forEach((pt) => {
+          pt.y += pt.v * 5.4; pt.x += 0.7;
+          if (pt.y > H + 8) { pt.y = -12; pt.x = Math.random() * W; }
+          g.moveTo(pt.x, pt.y);
+          g.lineTo(pt.x - 2.4, pt.y + 9 + pt.s * 4);
+        });
+        g.stroke();
+        if (weather === 'storm') {
+          if (flash <= 0 && Math.random() < 0.005) flash = 1;
+          if (flash > 0) { g.fillStyle = `rgba(224,236,255,${(flash * 0.2).toFixed(3)})`; g.fillRect(0, 0, W, H); flash -= 0.055; }
+        }
+      } else if (weather === 'fog') {
+        parts.forEach((pt, i) => {
+          const x = ((pt.x + t * (9 + pt.s * 7)) % (W + 200)) - 100;
+          const y = pt.y + Math.sin(t * 0.3 + pt.p) * 9;
+          const r = 52 + pt.s * 26;
+          const rg = g.createRadialGradient(x, y, 0, x, y, r);
+          rg.addColorStop(0, `rgba(172,192,218,${(0.055 + 0.02 * Math.sin(t * 0.5 + i)).toFixed(3)})`);
+          rg.addColorStop(1, 'rgba(172,192,218,0)');
+          g.fillStyle = rg;
+          g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+        });
+      } else if (weather === 'dust') {
+        parts.forEach((pt) => {
+          pt.x += pt.v * 0.65 + Math.sin(t + pt.p) * 0.3;
+          pt.y += Math.sin(t * 0.8 + pt.p) * 0.22;
+          if (pt.x > W + 4) pt.x = -4;
+          g.fillStyle = `rgba(242,193,120,${(0.14 + 0.1 * Math.sin(t + pt.p)).toFixed(3)})`;
+          g.fillRect(pt.x, pt.y, pt.s, pt.s);
+        });
+      } else {
+        parts.forEach((pt) => {
+          const x = pt.x + Math.sin(t * 0.4 + pt.p) * 15;
+          const y = pt.y + Math.cos(t * 0.3 + pt.p) * 11;
+          g.fillStyle = `rgba(222,236,255,${(0.05 + 0.05 * Math.sin(t + pt.p)).toFixed(3)})`;
+          g.beginPath(); g.arc(x, y, pt.s, 0, 7); g.fill();
+        });
+      }
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [weather]);
+  return <canvas ref={ref} className="weather-canvas" aria-hidden />;
+}
+
+const TEMPLATES: { label: string; title: string; body: string }[] = [
+  { label: 'dream log', title: 'Dream log', body: 'The dream, before it evaporates:\n\n\n— on waking:\nwhat stayed? what slipped?' },
+  { label: 'three lights', title: 'Three lights', body: '1. \n2. \n3. ' },
+  { label: 'field note', title: 'Field note', body: 'observed:\n\ninterpreted:\n\nnext:' },
+  { label: 'unsent letter', title: 'Letter, unsent', body: 'To —\n\n\n\n— from the far side of the planet' },
+];
+
+
+const htmlToText = (html: string): string => {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  d.querySelectorAll('.plate-spacer').forEach((n) => n.remove());
+  return d.textContent || '';
+};
+
+
+type DiaryExportOptions = { format: 'pdf' | 'png' | 'cosmic'; quality?: 'standard' | 'ultra' | 'master' };
+
+async function exportDiaryDocumentLazy(
+  entry: DiaryEntry,
+  planet: CosmicBody,
+  sourceContainer: HTMLElement | null,
+  options: DiaryExportOptions,
+): Promise<void> {
+  const { exportDiaryDocument } = await import('./exportDiary');
+  await exportDiaryDocument(entry, planet, sourceContainer, options);
+}
+
+
+const TONES: { id: string; label: string; css: string }[] = [
+  { id: '', label: 'original', css: 'none' },
+  { id: 'noir', label: 'noir', css: 'grayscale(1) contrast(1.12)' },
+  { id: 'warm', label: 'warm', css: 'sepia(0.38) saturate(1.25)' },
+  { id: 'fade', label: 'faded', css: 'saturate(0.55) brightness(1.1) contrast(0.88)' },
+];
+const toneCss = (id?: string) => TONES.find((t) => t.id === (id ?? ''))?.css ?? 'none';
+
+const PLATE_DEFAULT_W: Record<Attachment['kind'], number> = {
+  image: 55,
+  video: 65,
+  audio: 78,
+  code: 85,
+  file: 75,
+};
+
+const GluedPage = memo(function GluedPage({
+  entry,
+  active,
+  planet,
+  onTagFilter,
+  onMediaAttach,
+}: {
+  entry: DiaryEntry;
+  active: boolean;
+  planet: CosmicBody;
+  onTagFilter: (t: string) => void;
+  onMediaAttach?: (files: FileList | null) => void;
+}) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  /* the plates' actual positioning context — %-based x/w must be measured
+     against this, not the padded window root (they lagged ~12% before) */
+  const platesRef = useRef<HTMLDivElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [selId, setSelId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [dragState, setDragState] = useState<{ id: string; kind: Attachment['kind']; mode: 'move' | 'resize'; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number } | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
+  const [codeEditId, setCodeEditId] = useState<string | null>(null);
+
+  const atts = entry.attachments;
+  const mood = moodOf(entry.mood);
+  const weather = entry.weather ?? 'clear';
+  const pageText = htmlToText(entry.body);
+  const words = pageText.trim() ? pageText.trim().split(/\s+/).length : 0;
+  const mins = words ? Math.max(1, Math.round(words / 200)) : 0;
+  const isEmpty = !pageText.trim() && atts.length === 0;
+
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  /* the editor's HTML is owned imperatively, NOT by React — React must never
+     rewrite it while you're typing/clicking, or the caret gets destroyed */
+  const loadedEntryId = useRef<string | null>(null);
+
+  const saveText = () => {
+    const el = bodyRef.current;
+    if (!el) return;
+    /* keep the saved body clean of the transient text spacers */
+    const clone = el.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('.plate-spacer').forEach((n) => n.remove());
+    actions.updateEntry(entry.id, { body: sanitizeDiaryHtml(clone.innerHTML) });
+  };
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const html = event.clipboardData.getData('text/html');
+    if (!html) return;
+    event.preventDefault();
+    const safeHtml = sanitizeDiaryHtml(html);
+    if (safeHtml) document.execCommand('insertHTML', false, safeHtml);
+    saveText();
+  };
+
+  const onInput = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(saveText, 550);
+  };
+
+  /* flush pending debounced text when the page unmounts — closing a window
+     must never eat the last keystrokes */
+  useEffect(() => () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      saveText();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const syncTextSpacers = useCallback(() => {
+    const textEl = bodyRef.current;
+    if (!textEl) return;
+    textEl.querySelectorAll('.plate-spacer').forEach((n) => n.remove());
+
+    const gluedAtts = atts.filter((a) => a.glued);
+    if (gluedAtts.length === 0) return;
+
+    const leftAtts = gluedAtts
+      .filter((a) => (a.x ?? 0) <= 40)
+      .sort((a, b) => (a.y ?? 48) - (b.y ?? 48));
+    const rightAtts = gluedAtts
+      .filter((a) => (a.x ?? 0) > 40)
+      .sort((a, b) => (a.y ?? 48) - (b.y ?? 48));
+
+    const frag = document.createDocumentFragment();
+
+    let prevLeftY = 0;
+    leftAtts.forEach((a) => {
+      const targetTop = a.y ?? 48;
+      const leadH = Math.max(0, targetTop - prevLeftY);
+      const cardEl = cardRefs.current[a.id];
+      const cardH = cardEl ? cardEl.offsetHeight : (a.kind === 'audio' ? (a.h ?? 64) + 26 : 180);
+      const widthPct = Math.min(85, Math.max(20, (a.x ?? 6) + (a.w ?? PLATE_DEFAULT_W[a.kind])));
+
+      if (leadH > 0) {
+        const lead = document.createElement('div');
+        lead.className = 'plate-spacer';
+        lead.contentEditable = 'false';
+        lead.style.cssText = `
+          float: left;
+          clear: left;
+          width: 1px;
+          height: ${leadH}px;
+          pointer-events: none;
+          user-select: none;
+        `;
+        frag.appendChild(lead);
+      }
+
+      const obstacle = document.createElement('div');
+      obstacle.className = 'plate-spacer';
+      obstacle.contentEditable = 'false';
+      obstacle.style.cssText = `
+        float: left;
+        clear: left;
+        width: ${widthPct}%;
+        height: ${cardH}px;
+        margin-right: 14px;
+        margin-bottom: 8px;
+        shape-outside: margin-box;
+        pointer-events: none;
+        user-select: none;
+      `;
+      frag.appendChild(obstacle);
+      prevLeftY = targetTop + cardH + 8;
+    });
+
+    let prevRightY = 0;
+    rightAtts.forEach((a) => {
+      const targetTop = a.y ?? 48;
+      const leadH = Math.max(0, targetTop - prevRightY);
+      const cardEl = cardRefs.current[a.id];
+      const cardH = cardEl ? cardEl.offsetHeight : (a.kind === 'audio' ? (a.h ?? 64) + 26 : 180);
+      const widthPct = Math.min(85, Math.max(20, 100 - (a.x ?? 45)));
+
+      if (leadH > 0) {
+        const lead = document.createElement('div');
+        lead.className = 'plate-spacer';
+        lead.contentEditable = 'false';
+        lead.style.cssText = `
+          float: right;
+          clear: right;
+          width: 1px;
+          height: ${leadH}px;
+          pointer-events: none;
+          user-select: none;
+        `;
+        frag.appendChild(lead);
+      }
+
+      const obstacle = document.createElement('div');
+      obstacle.className = 'plate-spacer';
+      obstacle.contentEditable = 'false';
+      obstacle.style.cssText = `
+        float: right;
+        clear: right;
+        width: ${widthPct}%;
+        height: ${cardH}px;
+        margin-left: 14px;
+        margin-bottom: 8px;
+        shape-outside: margin-box;
+        pointer-events: none;
+        user-select: none;
+      `;
+      frag.appendChild(obstacle);
+      prevRightY = targetTop + cardH + 8;
+    });
+
+    textEl.insertBefore(frag, textEl.firstChild);
+  }, [atts]);
+
+  /* load the page body exactly once per entry — afterwards the DOM is yours;
+     React never rewrites it, so the caret never jumps while you click/type */
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || loadedEntryId.current === entry.id) return;
+    el.innerHTML = sanitizeDiaryHtml(entry.body || '');
+    loadedEntryId.current = entry.id;
+    syncTextSpacers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry.id]);
+
+  /* re-sync the text spacers only when the sealed layout actually changes —
+     not on every keystroke, so the caret is never disturbed */
+  const spacerKey = atts
+    .filter((a) => a.glued)
+    .map((a) => `${a.id}:${a.x ?? 0}:${a.y ?? 0}:${a.w ?? 0}:${a.h ?? 0}`)
+    .join('|');
+  useEffect(() => {
+    if (loadedEntryId.current === entry.id) syncTextSpacers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spacerKey]);
+
+  /* drag gesture with click discrimination: pointer-down NEVER swallows the
+     click — inner controls (PREVIEW, zoom, play, download) stay clickable;
+     a drag only engages after 4px of real movement. */
+  const gesture = useRef<{
+    id: string; kind: Attachment['kind']; mode: 'move' | 'resize';
+    startX: number; startY: number;
+    origX: number; origY: number; origW: number; origH: number;
+    moved: boolean;
+    pointerId: number; target: HTMLElement;
+  } | null>(null);
+  /* suppress the synthetic click right after a real drag */
+  const ghostClickUntil = useRef(0);
+
+  const handlePointerDown = (a: Attachment, mode: 'move' | 'resize') => (e: React.PointerEvent) => {
+    if (a.glued) return;
+    /* interactive controls own their clicks — never start a drag from them */
+    if (mode === 'move' && (e.target as HTMLElement).closest('button, input, a, textarea, select, label')) return;
+    e.stopPropagation();
+
+    gesture.current = {
+      id: a.id, kind: a.kind, mode,
+      startX: e.clientX, startY: e.clientY,
+      origX: a.x ?? 6, origY: a.y ?? 48,
+      origW: a.w ?? PLATE_DEFAULT_W[a.kind], origH: a.h ?? 240,
+      moved: false, pointerId: e.pointerId, target: e.target as HTMLElement,
+    };
+    setSelId(a.id);
+
+    const onMove = (ev: PointerEvent) => {
+      const g = gesture.current;
+      if (!g) return;
+      const dxPx = ev.clientX - g.startX;
+      const dyPx = ev.clientY - g.startY;
+      if (!g.moved && Math.hypot(dxPx, dyPx) < 4) return;
+      if (!g.moved) {
+        g.moved = true;
+        try { g.target.setPointerCapture(g.pointerId); } catch { /* detached */ }
+      }
+      const rect = (platesRef.current ?? containerRef.current)?.getBoundingClientRect();
+      if (!rect || rect.width === 0) return;
+
+      if (g.mode === 'move') {
+        const newX = Math.max(0, Math.min(90, g.origX + (dxPx / rect.width) * 100));
+        const newY = Math.max(0, g.origY + dyPx);
+        actions.updateAttachment(entry.id, g.id, { x: newX, y: newY });
+      } else if (g.mode === 'resize') {
+        /* FREEFORM: horizontal → width, vertical → height. Media plates
+           object-fit their content inside (never cropped or distorted);
+           text plates gain a scrollable box. Audio keeps its natural height. */
+        const newW = Math.max(15, Math.min(100, g.origW + (dxPx / rect.width) * 100));
+        if (g.kind === 'audio') {
+          actions.updateAttachment(entry.id, g.id, { w: newW });
+        } else {
+          const newH = Math.max(64, g.origH + dyPx);
+          actions.updateAttachment(entry.id, g.id, { w: newW, h: newH });
+        }
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      const g = gesture.current;
+      gesture.current = null;
+      setDragState(null);
+      if (g?.moved) {
+        ghostClickUntil.current = performance.now() + 300;
+        sfxTick();
+        setTimeout(syncTextSpacers, 20);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  const toggleGlue = (a: Attachment) => {
+    const isGlued = !a.glued;
+    actions.updateAttachment(entry.id, a.id, { glued: isGlued });
+    sfxTick();
+    toast(isGlued ? 'attachment sealed into the paper' : 'attachment unsealed & freed');
+  };
+
+  const applyTemplate = (t: (typeof TEMPLATES)[number]) => {
+    const el = bodyRef.current;
+    if (!el) return;
+    el.innerText = t.body;
+    actions.updateEntry(entry.id, { body: t.body, title: entry.title === 'Untitled page' ? t.title : entry.title });
+    sfxTick();
+    toast(`${t.label} formed`);
+  };
+
+  const editingAtt = editingId ? atts.find((a) => a.id === editingId) ?? null : null;
+  const codeAtt = codeEditId ? atts.find((a) => a.id === codeEditId) ?? null : null;
+
+  /** Video: capture the currently displayed frame as a new photo plate. */
+  const grabVideoFrame = (a: Attachment) => {
+    const el = cardRefs.current[a.id]?.querySelector('video');
+    if (!el || !el.videoWidth) {
+      toast('start the video first, then grab the frame', 'warn');
+      return;
+    }
+    try {
+      const cv = document.createElement('canvas');
+      cv.width = el.videoWidth;
+      cv.height = el.videoHeight;
+      cv.getContext('2d')!.drawImage(el, 0, 0);
+      actions.addAttachment(entry.id, {
+        kind: 'image',
+        name: `frame · ${a.name}`,
+        dataUrl: cv.toDataURL('image/jpeg', 0.9),
+        x: Math.min(80, (a.x ?? 6) + 6),
+        y: (a.y ?? 48) + 32,
+        w: Math.min(48, (a.w ?? 65) - 10),
+      });
+      sfxTick();
+      toast('frame captured as a photo plate — edit it like any photo');
+    } catch {
+      toast('could not capture this frame (protected video?)', 'warn');
+    }
+  };
+  /* resolve the editor's image through the same loader the plates use —
+     big photos are offloaded to OPFS/IndexedDB and have an empty dataUrl */
+  const editingSrc = useAttachmentSource(editingAtt ?? {
+    id: '__editor_none__', kind: 'image', name: '', dataUrl: '',
+  }).src;
+
+  return (
+    <div
+      className="relative flex flex-col h-full px-8 pt-5 pb-7 overflow-hidden"
+      ref={containerRef}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          onMediaAttach?.(e.dataTransfer.files);
+        }
+      }}
+    >
+      {active && <WeatherLayer weather={weather} />}
+      {mood && (
+        <span
+          className="pointer-events-none absolute inset-0"
+          style={{ background: `radial-gradient(120% 85% at 88% 0%, ${mood.color}1f, transparent 58%)` }}
+        />
+      )}
+
+      <div className="relative page-head flex items-start justify-between gap-3 pb-3 mb-3">
+        <div className="min-w-0 flex-1">
+          <input
+            className="bg-transparent font-display text-[16px] font-medium tracking-[0.06em] text-paper w-full outline-none placeholder:text-slate-dim/50"
+            defaultValue={entry.title}
+            placeholder="Untitled page"
+            onBlur={(e) => actions.updateEntry(entry.id, { title: e.target.value || 'Untitled page' })}
+            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+          />
+          <span className="font-mono text-[7.5px] tracking-[0.24em] uppercase text-slate-dim/80 block mt-1">
+            {entry.archived ? 'on the dark side · ' : entry.bookmarked ? 'bookmarked · ' : ''}
+            edited {fmtDate(entry.updatedAt)}{words ? ` · ${words} words · ${mins} min read` : ''}
+          </span>
+        </div>
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <span className="date-stamp">{fmtDate(entry.createdAt)}</span>
+          <div className="flex items-center gap-1.5" title="set the mood of this page">
+            {MOODS.map((mm) => (
+              <button
+                key={mm.id}
+                title={mm.label}
+                onClick={() => {
+                  sfxTick();
+                  actions.updateEntry(entry.id, { mood: entry.mood === mm.id ? undefined : mm.id });
+                }}
+                className={`mood-dot ${entry.mood === mm.id ? 'on' : ''}`}
+                style={{ background: mm.color, boxShadow: entry.mood === mm.id ? `0 0 8px ${mm.color}` : 'none' }}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-0.5" title="set the weather of this page">
+            {WEATHERS.map((ww) => (
+              <button
+                key={ww.id}
+                title={ww.label}
+                onClick={() => {
+                  sfxTick();
+                  actions.updateEntry(entry.id, { weather: weather === ww.id && ww.id !== 'clear' ? undefined : ww.id });
+                }}
+                className={`weather-btn ${weather === ww.id ? 'on' : ''}`}
+              >
+                <WeatherGlyph w={ww.id} size={12} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {isEmpty && (
+        <div className="relative templates">
+          <span className="font-mono text-[7.5px] tracking-[0.3em] uppercase text-slate-dim/80">begin as</span>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {TEMPLATES.map((t) => (
+              <button key={t.label} onClick={() => applyTemplate(t)} className="template-card">
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div
+        className="page-scroll relative flex-1 min-h-0 overflow-y-auto pr-1.5"
+      >
+        <div className="relative min-h-125" ref={platesRef}>
+          <div
+            ref={bodyRef}
+            contentEditable
+            suppressContentEditableWarning
+            className="page-body whitespace-pre-wrap outline-none relative z-10"
+            style={{ minHeight: '500px' }}
+            onInput={onInput}
+            onPaste={handlePaste}
+            onClick={() => setSelId(null)}
+          />
+
+          <div className="absolute inset-0 pointer-events-none z-20">
+            {atts.map((a) => {
+              const isSel = selId === a.id;
+              /* size = width always; height is natural UNLESS the user has
+                 freely resized (freeform): then the card is exactly w×h and
+                 the content object-fits inside — visible in full, no crop */
+              const freeform = a.kind !== 'audio' && !!a.h;
+              const style: React.CSSProperties = {
+                position: 'absolute',
+                left: `${a.x ?? 6}%`,
+                top: `${a.y ?? 48}px`,
+                width: `${a.w ?? PLATE_DEFAULT_W[a.kind]}%`,
+                height: freeform ? `${a.h}px` : undefined,
+                filter: a.kind === 'image' && a.tone ? toneCss(a.tone) : 'none',
+                transform: a.tilt ? 'rotate(-1.8deg)' : undefined,
+              };
+
+              return (
+                <div
+                  key={a.id}
+                  ref={(el) => { cardRefs.current[a.id] = el; }}
+                  style={style}
+                  className={`plate-card pointer-events-auto rounded-lg transition-shadow border ${freeform ? 'has-h' : ''} ${
+                    a.glued ? 'border-teal-ice/40 shadow-lg' : 'border-solar/60 shadow-xl cursor-move'
+                  } ${isSel ? 'ring-2 ring-solar' : ''}`}
+                  onClickCapture={(e) => {
+                    /* a drag just ended on this plate — eat the ghost click */
+                    if (performance.now() < ghostClickUntil.current) {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelId(a.id);
+                  }}
+                  onPointerDown={handlePointerDown(a, 'move')}
+                >
+                  <div className="plate-media relative overflow-hidden rounded-md bg-panel/90">
+                    {a.kind === 'image' && (
+                      <ImageOrGifPlate
+                        att={a}
+                        onImageLoad={() => { setTimeout(syncTextSpacers, 10); }}
+                      />
+                    )}
+                    {a.kind === 'video' && (
+                      <VideoPlate
+                        att={a}
+                        isGlued={a.glued}
+                      />
+                    )}
+                    {a.kind === 'audio' && (
+                      <AudioPlate
+                        att={a}
+                        isGlued={a.glued}
+                      />
+                    )}
+                    {(a.kind === 'file' || a.kind === 'code') && (
+                      <FileOrCodePlate
+                        att={a}
+                        isGlued={a.glued}
+                      />
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1 mt-1 px-1 py-0.5 bg-void/80 rounded border border-line/30 text-[9px] font-mono">
+                    <span className="truncate text-slate-dim max-w-25" title={a.name}>{a.name}</span>
+                    <div className="flex items-center gap-0.5">
+                      {a.kind === 'image' && (
+                        <button
+                          title="open editor — crop · resize · rotate · flip · filters"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sfxTick();
+                            if (a.isGif) toast('editing keeps only the GIF\'s first frame — it becomes a photo', 'warn');
+                            setEditingId(a.id);
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-teal-ice/15 text-teal-ice hover:bg-teal-ice/30"
+                        >
+                          ✎ edit
+                        </button>
+                      )}
+                      {a.kind === 'video' && (
+                        <button
+                          title="capture the current frame as a photo plate"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            grabVideoFrame(a);
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-teal-ice/15 text-teal-ice hover:bg-teal-ice/30"
+                        >
+                          ⎌ frame
+                        </button>
+                      )}
+                      {a.kind === 'code' && (
+                        <button
+                          title="edit this snippet's text in place"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sfxTick();
+                            setCodeEditId(a.id);
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-teal-ice/15 text-teal-ice hover:bg-teal-ice/30"
+                        >
+                          ✎ text
+                        </button>
+                      )}
+                      {(a.kind === 'audio' || a.kind === 'file' || a.kind === 'video') && (
+                        <button
+                          title="rename this attachment"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRenaming({ id: a.id, value: a.name });
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-white/5 text-slate-dim hover:text-paper"
+                        >
+                          ✎ name
+                        </button>
+                      )}
+                      <button
+                        title={`tone: ${a.tone || 'original'} — click to cycle`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const idx = TONES.findIndex((t) => t.id === (a.tone ?? ''));
+                          const next = TONES[(idx + 1) % TONES.length];
+                          actions.updateAttachment(entry.id, a.id, { tone: next.id || undefined });
+                          sfxTick();
+                        }}
+                        className={`px-1.5 py-0.5 rounded ${a.tone ? 'bg-solar/20 text-solar' : 'bg-white/5 text-slate-dim hover:text-paper'}`}
+                      >
+                        ◐ {a.tone || 'original'}
+                      </button>
+                      <button
+                        title="tilt the plate"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          actions.updateAttachment(entry.id, a.id, { tilt: !a.tilt });
+                          sfxTick();
+                        }}
+                        className={`px-1.5 py-0.5 rounded ${a.tilt ? 'bg-solar/20 text-solar' : 'bg-white/5 text-slate-dim hover:text-paper'}`}
+                      >
+                        ⤡
+                      </button>
+                      <button
+                        title="cycle size — S · M · L (width scales, content follows)"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const cur = a.w ?? PLATE_DEFAULT_W[a.kind];
+                          const next = cur < 40 ? 55 : cur < 68 ? 78 : 32;
+                          actions.updateAttachment(entry.id, a.id, { w: next });
+                          sfxTick();
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-white/5 text-slate-dim hover:text-paper"
+                      >
+                        ⤢
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleGlue(a);
+                        }}
+                        className={`px-1.5 py-0.5 rounded ${a.glued ? 'bg-teal-ice/20 text-teal-ice' : 'bg-solar/20 text-solar'}`}
+                      >
+                        {a.glued ? 'sealed' : 'free'}
+                      </button>
+                      <button
+                        title="remove attachment"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          actions.deleteAttachment(entry.id, a.id);
+                          toast('attachment removed');
+                        }}
+                        className="text-red-400 hover:text-red-300 px-1"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+
+                  {!a.glued && (
+                    <div
+                      className="absolute -right-1.5 -bottom-1.5 w-3.5 h-3.5 bg-solar rounded-full cursor-nwse-resize shadow"
+                      onPointerDown={handlePointerDown(a, 'resize')}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="relative flex items-center justify-between gap-3 mt-2.5 pt-2.5 border-t border-line/40">
+        <div className="flex items-center gap-1.5 flex-wrap min-h-6 min-w-0">
+          {entry.tags.map((t) => (
+            <button key={t} onClick={() => onTagFilter(t)} className="tag-chip">
+              {t}
+            </button>
+          ))}
+          <TagInput entryId={entry.id} tags={entry.tags} />
+        </div>
+          <span className="font-mono text-[7px] tracking-[0.2em] uppercase text-slate-dim/40 shrink-0">
+            drag · resize · edit
+          </span>
+        <div className="relative flex items-center gap-2 shrink-0">
+          <div className="relative">
+            <button
+              className={`win-icon ${showExportMenu ? 'bg-solar/20 text-solar' : ''}`}
+              title="Export document (Vector PDF / Ultra-HD Image / Cosmic Print)"
+              onClick={() => {
+                sfxTick();
+                setShowExportMenu(!showExportMenu);
+              }}
+            >
+              <IcDownload size={12} />
+            </button>
+
+            {showExportMenu && (
+              <div className="absolute right-0 bottom-full mb-2 z-50 p-2.5 rounded-lg border border-teal-ice/30 bg-[#070b16]/95 backdrop-blur-xl shadow-2xl flex flex-col gap-1.5 w-64 animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-line/40 text-[8.5px] font-mono text-slate-dim tracking-wider uppercase">
+                  <span>Export Document Scan</span>
+                  <button onClick={() => setShowExportMenu(false)} className="text-slate-dim hover:text-paper text-xs px-1">✕</button>
+                </div>
+                
+                <button
+                  disabled={isExporting}
+                  onClick={async () => {
+                    setShowExportMenu(false);
+                    setIsExporting(true);
+                    sfxTick();
+                    await exportDiaryDocumentLazy(entry, planet, containerRef.current, { format: 'pdf', quality: 'ultra' });
+                    setIsExporting(false);
+                  }}
+                  className="flex items-start gap-2 p-1.5 rounded hover:bg-void/80 text-left transition-colors border border-transparent hover:border-teal-ice/20 group"
+                >
+                  <span className="text-sm mt-0.5">📄</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-sans text-xs text-paper font-medium group-hover:text-teal-ice transition-colors">Vector PDF (Infinite Zoom)</div>
+                    <div className="font-mono text-[8px] text-slate-dim leading-snug mt-0.5">Multi-page paginated A4, 100% vector text, zero pixel cracking</div>
+                  </div>
+                </button>
+
+                <button
+                  disabled={isExporting}
+                  onClick={async () => {
+                    setShowExportMenu(false);
+                    setIsExporting(true);
+                    sfxTick();
+                    await exportDiaryDocumentLazy(entry, planet, containerRef.current, { format: 'png', quality: 'master' });
+                    setIsExporting(false);
+                  }}
+                  className="flex items-start gap-2 p-1.5 rounded hover:bg-void/80 text-left transition-colors border border-transparent hover:border-solar/20 group"
+                >
+                  <span className="text-sm mt-0.5">🖼️</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-sans text-xs text-paper font-medium group-hover:text-solar transition-colors">Ultra-HD Image (300 DPI)</div>
+                    <div className="font-mono text-[8px] text-slate-dim leading-snug mt-0.5">100% exact live DOM scan, 3x master resolution for sharing</div>
+                  </div>
+                </button>
+
+                <button
+                  disabled={isExporting}
+                  onClick={async () => {
+                    setShowExportMenu(false);
+                    setIsExporting(true);
+                    sfxTick();
+                    await exportDiaryDocumentLazy(entry, planet, containerRef.current, { format: 'cosmic' });
+                    setIsExporting(false);
+                  }}
+                  className="flex items-start gap-2 p-1.5 rounded hover:bg-void/80 text-left transition-colors border border-transparent hover:border-line/40 group"
+                >
+                  <span className="text-sm mt-0.5">🌌</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-sans text-xs text-paper font-medium group-hover:text-slate-soft transition-colors">Cosmic Print / Native PDF</div>
+                    <div className="font-mono text-[8px] text-slate-dim leading-snug mt-0.5">Rendered 100% in-app · direct download with dark celestial borders — no printer, no dialogs</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            className={`bookmark-btn ${entry.archived ? 'on' : ''}`}
+            onClick={() => {
+              sfxTick();
+              actions.updateEntry(entry.id, { archived: !entry.archived });
+              toast(entry.archived ? 'back in the light' : 'moved to the dark side');
+            }}
+          >
+            <IcMoon size={13} />
+            <span>{entry.archived ? 'return' : 'dark side'}</span>
+          </button>
+          {confirmDel ? (
+            <button
+              className="font-mono text-[8.5px] tracking-[0.16em] uppercase text-red-300 border border-red-400/50 px-2 py-1 hover:bg-red-400/10 transition-colors"
+              onClick={() => {
+                actions.deleteEntry(entry.id);
+                toast('page dissolved into the planet');
+              }}
+              onMouseLeave={() => setConfirmDel(false)}
+            >
+              confirm?
+            </button>
+          ) : (
+            <button
+              className="font-mono text-[8.5px] tracking-[0.16em] uppercase text-slate-dim hover:text-red-300 transition-colors"
+              onClick={() => setConfirmDel(true)}
+            >
+              dissolve
+            </button>
+          )}
+          <button
+            className={`bookmark-btn ${entry.bookmarked ? 'on' : ''}`}
+            onClick={() => {
+              sfxTick();
+              actions.toggleBookmark(entry.id);
+            }}
+          >
+            <IcStar size={13} filled={entry.bookmarked} />
+            <span>{entry.bookmarked ? 'marked' : 'mark'}</span>
+          </button>
+        </div>
+      </div>
+
+      {editingAtt && (
+        <AttachmentEditor
+          name={editingAtt.name}
+          src={editingSrc}
+          onCancel={() => setEditingId(null)}
+          onApply={(dataUrl) => {
+            /* the old offloaded payload becomes an orphan — remove it */
+            if (editingAtt.payloadRef) void delLocalPayload(editingAtt.payloadRef);
+            actions.updateAttachment(entry.id, editingAtt.id, {
+              dataUrl,
+              payloadRef: undefined,
+              payloadMissing: undefined,
+              isGif: undefined,
+            });
+            setEditingId(null);
+            setTimeout(syncTextSpacers, 30);
+            toast('edit applied to attachment');
+          }}
+        />
+      )}
+
+      {renaming && (() => {
+        const att = atts.find((a) => a.id === renaming.id);
+        if (!att) { setRenaming(null); return null; }
+        return (
+          <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onPointerDown={() => setRenaming(null)}>
+            <div className="w-full max-w-sm rounded-2xl border border-teal-ice/30 bg-[#070b16]/95 p-4 shadow-2xl" onPointerDown={(e) => e.stopPropagation()}>
+              <div className="font-display text-[12px] tracking-[0.14em] uppercase text-paper mb-2">Rename attachment</div>
+              <input
+                autoFocus
+                value={renaming.value}
+                onChange={(e) => setRenaming({ id: renaming.id, value: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const v = renaming.value.trim();
+                    if (v) actions.updateAttachment(entry.id, renaming.id, { name: v });
+                    setRenaming(null);
+                  } else if (e.key === 'Escape') setRenaming(null);
+                }}
+                className="w-full bg-black/40 border border-line/50 rounded-lg px-3 py-2 font-mono text-xs text-paper outline-none focus:border-teal-ice/60"
+                placeholder="attachment name"
+              />
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={() => setRenaming(null)} className="px-3 py-1.5 rounded bg-white/5 border border-white/10 text-slate-dim hover:text-paper font-mono text-[10px]">cancel</button>
+                <button
+                  onClick={() => {
+                    const v = renaming.value.trim();
+                    if (v) { actions.updateAttachment(entry.id, renaming.id, { name: v }); sfxTick(); }
+                    setRenaming(null);
+                  }}
+                  className="px-3 py-1.5 rounded bg-teal-ice/25 border border-teal-ice/50 text-teal-ice font-mono text-[10px] hover:bg-teal-ice/35"
+                >
+                  save name
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {codeAtt && (
+        <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onPointerDown={() => setCodeEditId(null)}>
+          <div className="w-full max-w-2xl rounded-2xl border border-teal-ice/30 bg-[#070b16]/95 shadow-2xl flex flex-col max-h-[86vh]" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-line/40">
+              <div className="min-w-0">
+                <div className="font-display text-[12px] tracking-[0.14em] uppercase text-paper">Edit snippet</div>
+                <div className="font-mono text-[8.5px] text-slate-dim tracking-[0.16em] uppercase truncate">{codeAtt.name}</div>
+              </div>
+              <button onClick={() => setCodeEditId(null)} className="text-slate-dim hover:text-paper px-2 text-lg leading-none">×</button>
+            </div>
+            <CodeEditorModal
+              initial={codeAtt.codeSnippet ?? ''}
+              lang={langOf(codeAtt.fileExt || codeAtt.name.split('.').pop())}
+              onCancel={() => setCodeEditId(null)}
+              onSave={(text) => {
+                actions.updateAttachment(entry.id, codeAtt.id, {
+                  codeSnippet: text,
+                  lineCount: text.split('\n').length,
+                });
+                setCodeEditId(null);
+                toast('snippet updated');
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+function CodeEditorModal({ initial, lang, onCancel, onSave }: { initial: string; lang: string; onCancel: () => void; onSave: (text: string) => void }) {
+  const [text, setText] = useState(initial);
+  const [formatted, setFormatted] = useState(false);
+  const gutterRef = useRef<HTMLDivElement>(null);
+  const hlRef = useRef<HTMLPreElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const lineCount = text.split('\n').length;
+
+  /* highlight overlay lines (capped for very large snippets) */
+  const hlLines = useMemo(() => {
+    const ls = text.split('\n').slice(0, 1500);
+    return ls.map((l) => highlightLine(l.length > 600 ? l.slice(0, 600) : l, lang));
+  }, [text, lang]);
+
+  /* the textarea is the scroller — keep the highlight layer + gutter aligned */
+  const syncScroll = () => {
+    const ta = taRef.current;
+    if (!ta) return;
+    if (hlRef.current) {
+      hlRef.current.scrollTop = ta.scrollTop;
+      hlRef.current.scrollLeft = ta.scrollLeft;
+    }
+    if (gutterRef.current) gutterRef.current.scrollTop = ta.scrollTop;
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    const ta = e.currentTarget;
+    const { selectionStart: s, selectionEnd: en } = ta;
+    setText(text.slice(0, s) + '  ' + text.slice(en));
+    requestAnimationFrame(() => {
+      ta.selectionStart = ta.selectionEnd = s + 2;
+    });
+  };
+
+  return (
+    <>
+      <div className="flex-1 min-h-60 w-full flex overflow-hidden bg-black/60 relative font-mono text-[11px] leading-relaxed">
+        {/* line-number gutter */}
+        <div
+          ref={gutterRef}
+          className="select-none shrink-0 w-11 overflow-hidden text-right py-4 pr-2 text-slate-600 border-r border-white/5 bg-black/30"
+          aria-hidden
+        >
+          {Array.from({ length: lineCount }, (_, i) => (
+            <div key={i}>{i + 1}</div>
+          ))}
+        </div>
+        {/* highlighted layer + transparent-caret textarea, perfectly stacked */}
+        <div className="relative flex-1 min-w-0">
+          <pre
+            ref={hlRef}
+            aria-hidden
+            className="absolute inset-0 px-3 py-4 whitespace-pre overflow-hidden pointer-events-none m-0"
+          >
+            {hlLines.map((toks, i) => (
+              <div key={i}>
+                {toks.length === 0
+                  ? '\u00A0'
+                  : toks.map((t, ti) => <span key={ti} style={{ color: t.color }}>{t.text}</span>)}
+              </div>
+            ))}
+          </pre>
+          <textarea
+            ref={taRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onScroll={syncScroll}
+            onKeyDown={handleKeyDown}
+            spellCheck={false}
+            wrap="off"
+            aria-label="code editor"
+            className="absolute inset-0 w-full h-full resize-none bg-transparent border-0 outline-none px-3 py-4 text-transparent caret-solar whitespace-pre overflow-auto focus:ring-0 selection:bg-teal-ice/25"
+          />
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-line/40">
+        <span className="font-mono text-[9px] text-slate-dim">
+          {lineCount} lines · {text.length} chars · Tab indents
+          {formatted && <span className="text-violet-300/90"> · ✨ formatted</span>}
+        </span>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const next = prettyPrint(text, lang);
+              if (next !== text) { setText(next); setFormatted(true); sfxTick(); }
+            }}
+            className="px-3 py-1.5 rounded bg-violet-500/15 border border-violet-400/30 text-violet-200 hover:bg-violet-500/25 font-mono text-[10px]"
+            title="pretty-print this snippet (html · css · json · js)"
+          >
+            ✨ format
+          </button>
+          <button onClick={onCancel} className="px-3 py-1.5 rounded bg-white/5 border border-white/10 text-slate-dim hover:text-paper font-mono text-[10px]">cancel</button>
+          <button onClick={() => onSave(text)} className="px-3 py-1.5 rounded bg-teal-ice/25 border border-teal-ice/50 text-teal-ice font-mono text-[10px] hover:bg-teal-ice/35">save snippet</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function TagInput({ entryId, tags }: { entryId: string; tags: string[] }) {
+  return (
+    <input
+      className="bg-transparent font-mono text-[9.5px] tracking-[0.14em] uppercase text-slate-soft w-19 placeholder:text-slate-dim/60 border-b border-transparent focus:border-line transition-colors"
+      placeholder="+ tag"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          const v = (e.target as HTMLInputElement).value.trim().toLowerCase().replace(/\s+/g, '-');
+          if (v && !tags.includes(v)) { sfxTick(); actions.updateEntry(entryId, { tags: [...tags, v] }); }
+          (e.target as HTMLInputElement).value = '';
+        }
+      }}
+    />
+  );
+}
+
+function ConstellationBar({ planetId, onOpen }: { planetId: string; onOpen?: (id: string) => void }) {
+  const state = useUniverse();
+  const [picking, setPicking] = useState(false);
+  const links = state.connections.filter((c) => c.a === planetId || c.b === planetId);
+  const linkedIds = new Set(links.map((c) => (c.a === planetId ? c.b : c.a)));
+  const candidates = state.bodies.filter((b) => b.id !== planetId && b.id !== 'anchor' && !linkedIds.has(b.id));
+  const bodyOf = (id: string) => state.bodies.find((b) => b.id === id);
+
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap px-4 py-2 border-t border-line/50 shrink-0" style={{ background: 'rgba(6,9,17,0.5)' }}>
+      <span className="font-mono text-[7.5px] tracking-[0.3em] uppercase text-slate-dim/90 mr-1">linked with</span>
+      {links.length === 0 && <span className="font-mono text-[8.5px] tracking-[0.14em] text-slate-dim/70">no constellations yet</span>}
+      {links.map((c) => {
+        const otherId = c.a === planetId ? c.b : c.a;
+        const other = bodyOf(otherId);
+        if (!other) return null;
+        return (
+          <span key={c.id} className="link-chip group">
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: other.palette.atmo, boxShadow: `0 0 6px ${other.palette.atmo}` }} />
+            <button className="truncate max-w-27.5 hover:text-paper transition-colors" onClick={() => { sfxTick(); onOpen?.(otherId); }} title={`open ${other.name}'s diary`}>
+              {other.name}
+            </button>
+            <button
+              className="opacity-40 group-hover:opacity-100 hover:text-red-300 transition-all"
+              onClick={() => { sfxTick(); actions.disconnect(c.id); toast(`link to ${other.name} dissolved`); }}
+              title="dissolve this link"
+            >
+              <IcClose size={8} />
+            </button>
+          </span>
+        );
+      })}
+      <span className="relative">
+        <button className="link-chip accent" onClick={() => setPicking((v) => !v)} title="link another world">
+          <IcPlus size={9} /> link
+        </button>
+        {picking && (
+          <>
+            <span className="fixed inset-0 z-290" onClick={() => setPicking(false)} />
+            <span className="link-pop absolute bottom-full left-0 mb-1.5 z-295">
+              <span className="block font-mono text-[7.5px] tracking-[0.28em] uppercase text-slate-dim px-3 pt-2.5 pb-1.5">form a constellation</span>
+              {candidates.length === 0 && <span className="block px-3 pb-2.5 font-mono text-[9px] text-slate-dim/70">every world is already linked</span>}
+              <span className="block max-h-37.5 overflow-y-auto thin-scroll">
+                {candidates.map((b) => (
+                  <button key={b.id} className="link-pop-item" onClick={() => { sfxConnect(); actions.connect(planetId, b.id); setPicking(false); toast(`constellation formed with ${b.name}`); }}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: b.palette.atmo }} />
+                    <span className="truncate">{b.name}</span>
+                    {b.meaning && <span className="font-mono text-[7px] tracking-[0.18em] uppercase text-slate-dim ml-auto pl-2">{b.meaning}</span>}
+                  </button>
+                ))}
+              </span>
+            </span>
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
+interface Props {
+  planet: CosmicBody;
+  rect: WinRect;
+  maximized?: boolean;
+  focused: boolean;
+  onFocus: () => void;
+  onMinimize: () => void;
+  onMaximize: () => void;
+  onClose: () => void;
+  onOpenLinked?: (id: string) => void;
+}
+
+export default function DiaryWindow({ planet, rect, maximized, focused, onFocus, onMinimize, onMaximize, onClose, onOpenLinked }: Props) {
+  const state = useUniverse();
+  const { elRef, onBarDown, onGripDown } = useSpringWindow(rect, !!maximized);
+  const [q, setQ] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [cosmos, setCosmos] = useState(false);
+  const [page, setPage] = useState(0);
+  const [recording, setRecording] = useState(false);
+  const [confirmPageDel, setConfirmPageDel] = useState(false);
+  const [darkSide, setDarkSide] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const allEntries = useMemo(() => state.entries.filter((e) => e.planetId === planet.id), [state.entries, planet.id]);
+  const streak = useMemo(() => computeStreak(allEntries), [allEntries]);
+
+  const entries = useMemo(() => {
+    let list = allEntries.filter((e) => (darkSide ? e.archived : !e.archived));
+    if (q.trim()) {
+      const s = q.trim().toLowerCase();
+      /* search the rendered text, not the HTML source — "div" used to match everything */
+      list = list.filter((e) => e.title.toLowerCase().includes(s) || htmlToText(e.body).toLowerCase().includes(s) || e.tags.some((t) => t.includes(s)));
+    }
+    return [...list].sort((a, b) => a.createdAt - b.createdAt);
+  }, [allEntries, q, darkSide]);
+
+  const cosmosResults = useMemo(() => {
+    if (!q.trim()) return [];
+    const s = q.trim().toLowerCase();
+    return state.entries
+      .filter((e) => e.planetId !== planet.id && (e.title.toLowerCase().includes(s) || htmlToText(e.body).toLowerCase().includes(s)))
+      .slice(0, 6);
+  }, [q, state.entries, planet.id]);
+
+  const clamped = Math.min(page, Math.max(0, entries.length - 1));
+  useEffect(() => { if (clamped !== page) setPage(clamped); }, [clamped, page]);
+
+  const currentEntry = entries[clamped];
+
+  const climate = useMemo(() => {
+    const counts: Record<string, number> = {};
+    allEntries.forEach((e) => { if (e.mood) counts[e.mood] = (counts[e.mood] ?? 0) + 1; });
+    return counts;
+  }, [allEntries]);
+  const climateTotal = Object.values(climate).reduce((a, b) => a + b, 0);
+
+  const addPage = () => {
+    setQ('');
+    setDarkSide(false);
+    actions.addEntry(planet.id);
+    toast(`new page formed on ${planet.name}`);
+    setTimeout(() => setPage(entries.length), 60);
+  };
+
+  const onMic = async () => {
+    if (recording) {
+      const res = await stopRecording();
+      setRecording(false);
+      if (res) {
+        let target = currentEntry;
+        if (!target) { setQ(''); setDarkSide(false); target = actions.addEntry(planet.id); setPage(allEntries.length); }
+        actions.addAttachment(target.id, { kind: 'audio', name: 'voice memo', dataUrl: res.dataUrl, peaks: res.peaks, duration: res.duration });
+        toast('voice memo glued to the page — drag it where you want it');
+      }
+      return;
+    }
+    const ok = await startRecording();
+    if (!ok) { toast('microphone unreachable in this runtime', 'warn'); return; }
+    setRecording(true);
+    toast('recording — the planet is listening');
+  };
+
+  /* release the mic if the window closes mid-recording */
+  useEffect(() => () => { void stopRecording(); }, []);
+
+  const onMediaAttach = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (!f) continue;
+
+      /* one honest guard for every branch — 80MB of base64 inside the state
+         tree is ~107MB of string and stalls persistence */
+      if (f.size > 80 * 1024 * 1024) {
+        toast(`${f.name} exceeds 80MB — too heavy to glue into a page`, 'warn');
+        continue;
+      }
+
+      let target = currentEntry;
+      if (!target) {
+        setQ('');
+        setDarkSide(false);
+        target = actions.addEntry(planet.id);
+        setPage(allEntries.length);
+      }
+
+      // 1. Audio files (mp3, wav, ogg, m4a, flac, aac)
+      if (f.type.startsWith('audio/') || f.name.match(/\.(mp3|wav|ogg|m4a|aac|flac|wma)$/i)) {
+        try {
+          const dataUrl = await readAsDataURL(f);
+          const tempAudio = new Audio();
+          tempAudio.src = dataUrl;
+          await new Promise<void>((resolve) => {
+            tempAudio.onloadedmetadata = () => resolve();
+            tempAudio.onerror = () => resolve();
+            setTimeout(resolve, 800);
+          });
+          const dur = (tempAudio.duration && isFinite(tempAudio.duration)) ? Math.round(tempAudio.duration) : undefined;
+          actions.addAttachment(target.id, {
+            kind: 'audio',
+            name: f.name,
+            dataUrl,
+            duration: dur,
+            peaks: synthBars(f.name + f.size, 40),
+          });
+          toast(`audio track glued — playable immediately`);
+        } catch {
+          toast('failed to read audio attachment', 'warn');
+        }
+      }
+      // 2. Video files (mp4, webm, mov, ogg, mkv)
+      else if (f.type.startsWith('video/') || f.name.match(/\.(mp4|webm|mov|ogg|mkv)$/i)) {
+        try {
+          const dataUrl = await readAsDataURL(f);
+          actions.addAttachment(target.id, {
+            kind: 'video',
+            name: f.name,
+            dataUrl,
+          });
+          toast(`video glued to page — fully playable`);
+        } catch {
+          toast('failed to read video attachment', 'warn');
+        }
+      }
+      // 3. Animated GIF files
+      else if (f.type === 'image/gif' || f.name.toLowerCase().endsWith('.gif')) {
+        try {
+          const dataUrl = await readAsDataURL(f);
+          actions.addAttachment(target.id, {
+            kind: 'image',
+            name: f.name,
+            dataUrl,
+            isGif: true,
+          });
+          toast(`animated GIF glued — loopable & playable`);
+        } catch {
+          toast('failed to read GIF attachment', 'warn');
+        }
+      }
+      // 4. Standard Images (png, jpg, webp, svg)
+      else if (f.type.startsWith('image/')) {
+        const img = new Image();
+        const url = URL.createObjectURL(f);
+        img.onload = () => {
+          try {
+            /* dimension-less SVGs report 0 — fall back to a sane canvas size */
+            const maxDim = Math.max(img.width, img.height) || 1024;
+            const scale = Math.min(1, 1400 / maxDim);
+            const cv = document.createElement('canvas');
+            cv.width = Math.max(1, Math.round(img.width * scale));
+            cv.height = Math.max(1, Math.round(img.height * scale));
+            cv.getContext('2d')!.drawImage(img, 0, 0, cv.width, cv.height);
+            /* keep PNG transparency instead of painting black backgrounds */
+            const keepAlpha = f.type === 'image/png' || f.type === 'image/webp';
+            const dataUrl = cv.toDataURL(keepAlpha ? 'image/png' : 'image/jpeg', 0.90);
+            actions.addAttachment(target!.id, {
+              kind: 'image',
+              name: f.name,
+              dataUrl,
+              size: f.size,
+            });
+            toast('photo glued to page');
+          } catch {
+            toast('failed to read image attachment', 'warn');
+          } finally {
+            URL.revokeObjectURL(url);
+          }
+        };
+        img.onerror = () => {
+          toast('failed to read image attachment', 'warn');
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      }
+      // 5. Code & Text Files (HTML, JS, TS, CSS, JSON, Markdown, Python, SQL, Shell, etc. — stored safely, no execution)
+      else if (
+        f.name.match(/\.(html|htm|js|jsx|ts|tsx|mjs|cjs|css|scss|sass|less|json|md|markdown|py|sql|sh|bash|zsh|c|cpp|h|hpp|rs|go|java|kt|php|rb|swift|wasm|txt|log|yml|yaml|xml|csv|tsv|env|toml)$/i) ||
+        f.type.startsWith('text/') ||
+        f.type.includes('json') ||
+        f.type.includes('javascript') ||
+        f.type.includes('xml')
+      ) {
+        try {
+          const text = await f.text();
+          const dataUrl = await readAsDataURL(f);
+          const lines = text.split('\n');
+          const ext = f.name.split('.').pop()?.toLowerCase();
+          actions.addAttachment(target.id, {
+            kind: 'code',
+            name: f.name,
+            dataUrl,
+            size: f.size,
+            fileExt: ext,
+            codeSnippet: text,
+            lineCount: lines.length,
+            mimeType: f.type || 'text/plain',
+          });
+          if (ext === 'html' || ext === 'htm') {
+            toast(`HTML code documented & stored safely (safe no-run mode)`);
+          } else {
+            toast(`${f.name} documented & stored safely`);
+          }
+        } catch {
+          toast('failed to read code file', 'warn');
+        }
+      }
+      // 6. Any other documents & archives (PDF, ZIP, TAR, DOCX, etc. — vaulted safely)
+      else {
+        try {
+          const dataUrl = await readAsDataURL(f);
+          const ext = f.name.split('.').pop()?.toLowerCase();
+          actions.addAttachment(target.id, {
+            kind: 'file',
+            name: f.name,
+            dataUrl,
+            size: f.size,
+            fileExt: ext,
+            mimeType: f.type || 'application/octet-stream',
+          });
+          toast(`${f.name} archived in document vault`);
+        } catch {
+          toast('failed to read document', 'warn');
+        }
+      }
+    }
+  };
+
+  const fronts: ReactNode[] = entries.map((e, i) => (
+    <GluedPage
+      key={e.id}
+      entry={e}
+      planet={planet}
+      active={Math.abs(i - clamped) <= 1}
+      onTagFilter={(t) => { setSearchOpen(true); setQ(t); }}
+      onMediaAttach={onMediaAttach}
+    />
+  ));
+
+  const verso = () => (
+    <div className="h-full flex flex-col items-center justify-center gap-3 opacity-70">
+      <div className="w-10 h-10 rounded-full border border-line flex items-center justify-center">
+        <IcBook size={16} className="text-slate-dim" />
+      </div>
+      <p className="font-mono text-[9.5px] tracking-[0.3em] uppercase text-slate-dim">verso · {planet.name}</p>
+      <p className="font-body text-[11px] italic text-slate-dim/70 max-w-55 text-center leading-relaxed">{planet.note}</p>
+    </div>
+  );
+
+  return (
+    <div
+      ref={elRef}
+      className={`diary-window overlay-in ${focused ? 'focused' : ''}`}
+      style={{ '--atmo': planet.palette.atmo, left: 0, top: 0, width: rect.w, height: rect.h, zIndex: focused ? 60 : 40 } as React.CSSProperties}
+      onPointerDown={onFocus}
+    >
+      <div className="win-bar flex items-center gap-3 px-4 h-11.5 border-b border-line/60 shrink-0" onPointerDown={onBarDown}>
+        <span className="swatch-orb shrink-0" style={{ background: `radial-gradient(circle at 32% 30%, #fff8, ${planet.palette.atmo})`, boxShadow: `0 0 12px ${planet.palette.atmo}66, inset 0 0 4px rgba(0,0,0,0.5)` }} />
+        <div className="min-w-0 shrink">
+          <span className="font-display text-[11.5px] font-medium tracking-[0.24em] uppercase text-paper truncate block leading-tight">{planet.name}</span>
+          <span className="font-mono text-[7.5px] tracking-[0.22em] uppercase text-slate-dim block leading-tight mt-0.5">
+            personal diary · {entries.length} page{entries.length === 1 ? '' : 's'} · {entries.length} moon{entries.length === 1 ? '' : 's'} in orbit
+          </span>
+        </div>
+        {streak >= 1 && (
+          <span className="streak-chip" title={`${streak} day${streak === 1 ? '' : 's'} of writing in a row — the planet remembers`}>
+            <span className="streak-spark" />{streak}d
+          </span>
+        )}
+        {planet.meaning && (
+          <span className="meaning-chip shrink-0" style={{ color: 'var(--atmo)', borderColor: 'color-mix(in srgb, var(--atmo) 40%, transparent)' }}>
+            {MEANING_LABEL[planet.meaning]}
+          </span>
+        )}
+        {climateTotal > 0 && (
+          <span
+            className="climate-strip"
+            title={'mood climate — ' + MOODS.filter((m) => climate[m.id]).map((m) => `${m.label} ${climate[m.id]}`).join(' · ')}
+          >
+            {MOODS.filter((m) => climate[m.id]).map((m) => (
+              <span key={m.id} style={{ width: `${(climate[m.id] / climateTotal) * 100}%`, background: m.color }} />
+            ))}
+          </span>
+        )}
+        <div className="flex-1" />
+        {searchOpen && (
+          <div className="search-pill flex items-center gap-1.5 mr-1">
+            <IcSearch size={11} className="text-slate-dim shrink-0" />
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => { setQ(e.target.value); setPage(0); }}
+              placeholder={cosmos ? 'search the cosmos…' : 'search pages…'}
+              className="bg-transparent font-mono text-[10px] text-paper w-28 placeholder:text-slate-dim/60 outline-none"
+            />
+            <button
+              onClick={() => setCosmos((v) => !v)}
+              className={`shrink-0 ${cosmos ? 'text-teal-ice' : 'text-slate-dim'}`}
+              title={cosmos ? 'searching every world' : 'searching this world only'}
+            >
+              {cosmos ? <IcGlobe size={11} /> : <IcMoon size={11} />}
+            </button>
+          </div>
+        )}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button onClick={() => { setDarkSide((v) => !v); setPage(0); }}
+            className={`win-icon ${darkSide ? 'active' : ''}`} title={darkSide ? 'return to the light' : 'view the dark side (archived pages)'}>
+            <IcMoon size={13} />
+          </button>
+          <button onClick={() => { setSearchOpen((v) => !v); if (searchOpen) { setQ(''); setCosmos(false); } }}
+            className={`win-icon ${searchOpen ? 'active' : ''}`} title="search pages">
+            <IcSearch size={13} />
+          </button>
+          <button onClick={() => void onMic()} className={`win-icon ${recording ? 'recording' : ''}`} title="record a voice memo into this page">
+            {recording ? <IcStop size={13} /> : <IcMic size={13} />}
+          </button>
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="win-icon"
+            title="attach media (video, gif, audio, image) or document/code files (HTML, JS, CSS, JSON, Python, etc.)"
+          >
+            <IcImage size={13} />
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            accept="image/*,video/*,audio/*,.gif,.mp4,.webm,.mov,.mp3,.wav,.ogg,.m4a,.flac,.html,.htm,.css,.js,.jsx,.ts,.tsx,.json,.md,.py,.sql,.sh,.txt,.pdf,.zip,.tar,.gz,.wasm"
+            className="hidden"
+            onChange={(e) => { onMediaAttach(e.target.files); e.target.value = ''; }}
+          />
+          <button onClick={addPage} className="win-icon accent" title="new page — a new moon forms">
+            <IcPlus size={13} />
+          </button>
+          {currentEntry && (
+            confirmPageDel ? (
+              <button
+                onClick={() => { actions.deleteEntry(currentEntry.id); setConfirmPageDel(false); toast('page dissolved — its moon is gone'); }}
+                onMouseLeave={() => setConfirmPageDel(false)}
+                className="font-mono text-[8px] tracking-[0.16em] uppercase text-red-300 border border-red-400/50 px-2 py-1.5 hover:bg-red-400/10 transition-colors"
+                title="confirm delete page"
+              >
+                sure?
+              </button>
+            ) : (
+              <button onClick={() => { setConfirmPageDel(true); setTimeout(() => setConfirmPageDel(false), 2400); }} className="win-icon danger" title="dissolve this page">
+                <IcTrash size={13} />
+              </button>
+            )
+          )}
+          <span className="w-px h-5 bg-line/70 mx-1.5" />
+          <button onClick={onMinimize} className="win-icon" title="minimize"><IcMin size={13} /></button>
+          <button onClick={onMaximize} className={`win-icon ${maximized ? 'active' : ''}`} title={maximized ? 'restore size' : 'maximize'}>
+            {maximized ? <IcCompress size={13} /> : <IcExpand size={13} />}
+          </button>
+          <button onClick={onClose} className="win-icon danger" title="close diary"><IcClose size={13} /></button>
+        </div>
+      </div>
+
+      {cosmos && q.trim() && (
+        <div className="cosmos-panel">
+          {cosmosResults.length === 0 && (
+            <p className="px-3 py-2 font-mono text-[9px] tracking-[0.2em] uppercase text-slate-dim">no memory answers that anywhere</p>
+          )}
+          {cosmosResults.map((e) => {
+            const p = state.bodies.find((b) => b.id === e.planetId);
+            if (!p) return null;
+            const snippet = e.body.replace(/\n/g, ' ').slice(0, 70);
+            const m = moodOf(e.mood);
+            return (
+              <button
+                key={e.id}
+                className="cosmos-item"
+                onClick={() => { setCosmos(false); setQ(''); onOpenLinked?.(e.planetId); }}
+                title={`open ${p.name}'s diary`}
+              >
+                <span className="w-1.75 h-1.75 rounded-full shrink-0" style={{ background: p.palette.atmo, boxShadow: `0 0 6px ${p.palette.atmo}` }} />
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block text-[11px] text-paper truncate">{e.title}</span>
+                  <span className="block font-mono text-[8px] text-slate-dim truncate">{snippet || '…'}</span>
+                </span>
+                <span className="font-mono text-[7.5px] tracking-[0.2em] uppercase text-slate-dim shrink-0">{p.name}{m ? ` · ${m.label}` : ''}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex-1 relative overflow-hidden p-3.5 pb-4">
+        <div className="book-plate relative w-full h-full">
+          <Book
+            fronts={fronts}
+            verso={verso}
+            index={clamped}
+            onIndex={setPage}
+            emptyText={darkSide ? 'the dark side is empty — archive a page to send it here' : q ? 'no pages answer that search' : 'this world holds no pages yet — press + to form one'}
+          />
+        </div>
+      </div>
+
+      <ConstellationBar planetId={planet.id} onOpen={onOpenLinked} />
+
+      {!maximized && <div className="resize-grip" onPointerDown={onGripDown} />}
+    </div>
+  );
+}

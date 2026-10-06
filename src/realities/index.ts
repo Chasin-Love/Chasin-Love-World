@@ -1,39 +1,81 @@
-import { RealityConfig } from './types';
-import { solPrimeReality } from './solPrime';
-import { hyperionLuminaReality } from './hyperionLumina';
-import { ignisEmberReality } from './ignisEmber';
-import { kardashevMatrixReality } from './kardashevMatrix';
-import { vesperaTwilightReality } from './vesperaTwilight';
-import { singularityRiftReality } from './singularityRift';
-import { biolumePrimordialReality } from './biolumePrimordial';
-import { chronosParadoxReality } from './chronosParadox';
-import { parallelRealities } from './parallels';
+import { RealityConfig, RealityMetaOverride } from './types';
 import { generateClustersForReality } from './clusterGenerator';
+import { generateGalaxiesForReality, prng, seedOf, inclinedOrbitElements } from './galaxyGenerator';
+import { GalaxyData } from './hierarchyTypes';
 
 export * from './types';
 export * from './hierarchyTypes';
 export * from './clusterGenerator';
-export * from './solPrime';
-export * from './hyperionLumina';
-export * from './ignisEmber';
-export * from './kardashevMatrix';
-export * from './vesperaTwilight';
-export * from './singularityRift';
-export * from './biolumePrimordial';
-export * from './chronosParadox';
-export * from './parallels';
+export * from './galaxyGenerator';
 
-export const RAW_REALITIES: any[] = [
-  solPrimeReality,
-  hyperionLuminaReality,
-  ignisEmberReality,
-  kardashevMatrixReality,
-  vesperaTwilightReality,
-  singularityRiftReality,
-  biolumePrimordialReality,
-  chronosParadoxReality,
-  ...parallelRealities,
+// Dynamically discover all reality configurations across all subfolders
+const realityModules = import.meta.glob<{ [key: string]: any }>('./*/index.ts', { eager: true });
+
+/* the wide world-name pool — realities draw their cast from here, seeded by
+   their own id, so every reality gets a distinct set of worlds */
+const WORLD_NAME_POOL = [
+  'Aethelgard', 'Celestia', 'Vesperion', 'Chronos', 'Astraea', 'Hyperion', 'Zephyria',
+  'Elysium', 'Nocturne', 'Pyros', 'Meridian', 'Solmara', 'Veyra', 'Ossia', 'Thalor',
+  'Nyxara', 'Auralith', 'Kaelis', 'Dravenna', 'Solarine', 'Umbris', 'Faelora',
+  'Tessara', 'Orivane', 'Lumenor', 'Cindara', 'Maristel', 'Quorin', 'Halcyra',
+  'Serenno', 'Avieth', 'Corvane', 'Ithralis', 'Ysolde', 'Peridion', 'Vantress',
+  'Ondrim', 'Calyx', 'Miravel', 'Zephyrion', 'Elandor', 'Ravassa', 'Solaris',
+  'Nimbrethil', 'Ardentis', 'Vespera', 'Oculon', 'Terravox',
 ];
+
+/* realityId → disk folder name, derived from the build-time glob keys. This
+   is the authoritative address map for base realities — bin operations send
+   the exact folder instead of guessing from display names. R102: derived
+   ENTIRELY from discovery — no reality is hand-wired into the core. */
+const folderById = new Map<string, string>();
+
+function collectRawRealities(): any[] {
+  const map = new Map<string, any>();
+
+  for (const [path, mod] of Object.entries(realityModules)) {
+    // Ignore anything inside the bin recycle directory
+    if (path.includes('/bin/') || path.startsWith('./bin/')) continue;
+
+    const folderMatch = path.match(/^\.\/([^/]+)\/index\.ts$/);
+    for (const val of Object.values(mod)) {
+      if (Array.isArray(val)) {
+        val.forEach((item) => {
+          if (item && item.id && Array.isArray(item.bodies) && !map.has(item.id)) {
+            map.set(item.id, item);
+            if (folderMatch) folderById.set(item.id, folderMatch[1]);
+          }
+        });
+      } else if (val && typeof val === 'object' && val.id && Array.isArray(val.bodies) && !map.has(val.id)) {
+        /* RealityConfigs are recognizable by their `bodies` array — this keeps
+           helper exports (galaxy rosters, lineages) from being mistaken for
+           realities and becoming colorless phantom universes */
+        map.set(val.id, val);
+        if (folderMatch) folderById.set(val.id, folderMatch[1]);
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+export const RAW_REALITIES: any[] = collectRawRealities();
+
+/** The disk folder that backs a base reality ('chronos-paradox' →
+    'chronosParadox'). Custom realities are tracked in state.realityFolders. */
+export function folderNameForReality(id: string): string | undefined {
+  return folderById.get(id);
+}
+
+/** Mirrors the server's create-folder naming rule so the client can propose
+    the folder name itself (the server sanitizes and may confirm it). */
+export function deriveFolderName(name: string): string {
+  const rawSanitized = name.replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
+  const words = rawSanitized.split(/[\s-_]+/).filter(Boolean);
+  const camel = words
+    .map((w, idx) => (idx === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .join('');
+  return camel || `reality_${Date.now()}`;
+}
 
 /**
  * Cosmological 3D Golden Spiral structural layout algorithm for parallel bubble universes orbiting the central Core.
@@ -43,7 +85,9 @@ export function buildRealityConfig(
   r: any,
   i: number,
   total: number,
-  customDescriptions?: Record<string, string>
+  customDescriptions?: Record<string, string>,
+  customGalaxies?: Record<string, GalaxyData[]>,
+  customRealityMeta?: Record<string, RealityMetaOverride>
 ): RealityConfig {
   const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~2.399963
   const phi = i * goldenAngle;
@@ -93,7 +137,7 @@ export function buildRealityConfig(
       createdAt: now - 850 * day,
       radius: 2.8,
       palette: { deep: '#000000', base: '#0f172a', high: '#38bdf8', atmo: '#6fc2b4', ice: '#ffffff' },
-      orbit: { a: 220 + (i % 4) * 20, speed: TAU / (10000 + i * 500), phase: (i * 1.3) % TAU, incl: -0.15 + (i % 3) * 0.1 },
+      orbit: { a: 220 + (i % 4) * 20, speed: TAU / (10000 + i * 500), phase: (i * 1.3) % TAU, incl: -0.15 + (i % 3) * 0.1, node: Math.random() * TAU, argP: Math.random() * TAU },
     };
     updatedBodies.push(vaultBody);
   } else {
@@ -108,24 +152,64 @@ export function buildRealityConfig(
   }
 
   const bubbleSize = 24000;
+
+  /* user-authored identity overrides (rename / recolor / reclassify) */
+  const meta = customRealityMeta?.[r.id];
+  const effName = meta?.name?.trim() || r.name;
+  const effCode = meta?.codeName?.trim() || r.codeName;
+  const effSpectral = meta?.spectral?.trim() || r.spectral;
+  const effColorA = meta?.colorA || r.colorA;
+  const effColorB = meta?.colorB || r.colorB;
+  /* the anchor star's aura — user-picked via the control panel's presets */
+  const effStarColor = meta?.starColor || r.starColor || effColorA;
+
+  /* an explicit roster on the config wins (solPrime ships its captured one);
+     otherwise generate — clusters sized to the requested galaxy count */
+  const clusterCount = r.clusters?.length ?? Math.max(1, Math.min(12, r.galaxyCountHint ?? 1));
   const { clusters, homeLineage } = generateClustersForReality(
     r.id,
-    r.name,
-    r.colorA,
-    r.colorB,
+    effName,
+    effColorA,
+    effColorB,
     updatedBodies,
-    bubbleSize
+    bubbleSize,
+    clusterCount
   );
+
+  /* major galaxies — one ellipse orbit around the bubble per galaxy.
+     Precedence: user-authored roster (state) → explicit roster on the config
+     → deterministic generation from the persisted galaxyCountHint. An
+     explicitly emptied roster stays empty (?? not ||). The home galaxy's
+     color always follows the reality's live colorA. */
+  const galaxyRoster: GalaxyData[] = customGalaxies?.[r.id]
+    ?? r.galaxies?.map((g: GalaxyData) => (g.isHomeGalaxy ? { ...g, color: effColorA } : g))
+    ?? generateGalaxiesForReality({
+      realityId: r.id,
+      realityName: effName,
+      colorA: effColorA,
+      colorB: effColorB,
+      clusters,
+      anchorStarName: updatedBodies[0]?.name ?? `${effName} Anchor Star`,
+      worldsCount: updatedBodies.length,
+      galaxyCountHint: r.galaxyCountHint,
+    });
 
   const desc = customDescriptions && customDescriptions[r.id] ? customDescriptions[r.id] : r.description;
 
   return {
     ...r,
+    name: effName,
+    codeName: effCode,
+    spectral: effSpectral,
+    colorA: effColorA,
+    colorB: effColorB,
+    starColor: effStarColor,
     description: desc,
     bubblePos,
     bubbleSize,
     bodies: updatedBodies,
     clusters: r.clusters || clusters,
+    galaxies: galaxyRoster,
     homeLineage: r.homeLineage || homeLineage,
   };
 }
@@ -133,15 +217,24 @@ export function buildRealityConfig(
 export function computeAllRealities(
   customRealities?: RealityConfig[],
   deletedIds?: string[],
-  customDescriptions?: Record<string, string>
+  customDescriptions?: Record<string, string>,
+  customGalaxies?: Record<string, GalaxyData[]>,
+  customRealityMeta?: Record<string, RealityMetaOverride>
 ): RealityConfig[] {
   const deletedSet = new Set(deletedIds || []);
   const baseList = RAW_REALITIES.filter((r) => !deletedSet.has(r.id));
   const customList = (customRealities || []).filter((r) => !deletedSet.has(r.id));
-  const combined = [...baseList, ...customList];
+  /* dedup by id: a reality restored/kept on disk (glob) and still present in
+     customRealities (state) must render once, not twice */
+  const seen = new Set<string>();
+  const combined = [...baseList, ...customList].filter((r) => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
   const total = combined.length;
 
-  return combined.map((r, i) => buildRealityConfig(r, i, total, customDescriptions));
+  return combined.map((r, i) => buildRealityConfig(r, i, total, customDescriptions, customGalaxies, customRealityMeta));
 }
 
 // Initial statically built realities
@@ -151,8 +244,13 @@ export function setRuntimeRealities(realities: RealityConfig[]) {
   REALITIES = realities;
 }
 
-export function getReality(id: string, customDescriptions?: Record<string, string>): RealityConfig {
+/** Resolves a reality by id — the first reality is the fallback. R102: may
+    return undefined when the multiverse holds NO realities at all (every
+    folder deleted) — a first-class state the whole app must tolerate; the
+    boot path lands at the empty multiverse instead of dereferencing. */
+export function getReality(id: string, customDescriptions?: Record<string, string>): RealityConfig | undefined {
   const found = REALITIES.find((r) => r.id === id) || REALITIES[0];
+  if (!found) return undefined;
   if (customDescriptions && customDescriptions[found.id]) {
     return {
       ...found,
@@ -173,6 +271,7 @@ export function createNewRealityConfig(params: {
   colorA: string;
   colorB: string;
   planetsCount: number;
+  galaxyCount?: number;
   clusterName?: string;
 }): RealityConfig {
   const day = 86400000;
@@ -204,12 +303,18 @@ export function createNewRealityConfig(params: {
     createdAt: now - 900 * day,
     radius: 2.9,
     palette: { deep: '#000000', base: '#0b0f19', high: params.colorA, atmo: params.colorB, ice: '#ffffff' },
-    orbit: { a: 210, speed: TAU / 12000, phase: 1.2, incl: -0.1 },
+    orbit: { a: 210, speed: TAU / 12000, phase: 1.2, incl: -0.1, node: Math.random() * TAU, argP: Math.random() * TAU },
   };
 
-  const planetNames = [
-    'Aethelgard', 'Celestia', 'Vesperion', 'Chronos', 'Astraea', 'Hyperion', 'Zephyria', 'Elysium', 'Nocturne', 'Pyros'
-  ];
+  /* world names are drawn from a wide pool, seeded by this reality's own id —
+     no two realities ever spawn the same cast of worlds */
+  const nameRnd = prng(seedOf(`worlds::${id}::${params.name}`));
+  const shuffled = [...WORLD_NAME_POOL];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(nameRnd() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const planetNames = shuffled.slice(0, 8);
 
   const generatedBodies = [anchorStar];
   const count = Math.min(8, Math.max(1, params.planetsCount));
@@ -218,7 +323,6 @@ export function createNewRealityConfig(params: {
     const semiMajor = 35 + p * 22 + Math.random() * 6;
     const speed = TAU / (1400 + p * 600);
     const phase = Math.random() * TAU;
-    const incl = (Math.random() - 0.5) * 0.18;
     generatedBodies.push({
       id: `${id}-planet-${p + 1}`,
       name: pName,
@@ -236,7 +340,7 @@ export function createNewRealityConfig(params: {
         atmo: params.colorA,
         ice: '#ffffff',
       },
-      orbit: { a: semiMajor, speed, phase, incl },
+      orbit: { a: semiMajor, speed, phase, ...inclinedOrbitElements(Math.random, 0.18) },
     });
   }
   generatedBodies.push(vaultBody);
@@ -252,6 +356,7 @@ export function createNewRealityConfig(params: {
     starColor: params.colorA,
     bodies: generatedBodies,
     entries: [],
+    galaxyCountHint: params.galaxyCount,
   };
 
   return buildRealityConfig(rawConfig, REALITIES.length, REALITIES.length + 1);

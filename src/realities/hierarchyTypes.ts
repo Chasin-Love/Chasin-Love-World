@@ -89,6 +89,30 @@ export interface CosmicLineage {
   };
 }
 
+/* A major galaxy of a reality. These are the ellipse orbits drawn around a
+   reality bubble in the multiverse view — ONE ellipse = ONE galaxy, so a
+   reality's galaxy list is exactly what you see circling its ring. */
+export interface GalaxyData {
+  id: string;
+  realityId: string;
+  clusterId?: string;        /* host galaxy cluster / group inside the cosmic web */
+  name: string;
+  type: string;              /* morphology, e.g. 'Barred Spiral (SBbc)' */
+  color: string;             /* tint of the node + its ellipse orbit */
+  diameterKly: string;
+  starsCount: string;
+  description: string;
+  isHomeGalaxy: boolean;     /* the galaxy holding the reality's anchor star system */
+  /* orbital elements around the reality bubble (radius in bubble-size units) */
+  orbitRadius: number;       /* × bubbleSize */
+  orbitSpeed: number;        /* radians / second */
+  orbitIncl: number;         /* ellipse tilt */
+  orbitPhase: number;        /* starting angle */
+  /* the full 11-stage cosmic address of this galaxy — every galaxy is
+     enterable and navigable down to its own stellar systems */
+  lineage: CosmicLineage;
+}
+
 export interface GalaxyClusterData {
   id: string;
   realityId: string;

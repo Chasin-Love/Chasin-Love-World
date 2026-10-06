@@ -1,0 +1,32 @@
+R53 BUNDLE BASELINE (auto-updater card added, refreshed 2026-09-27T05:22:33.925Z)
+
+total assets: 16445.6 KB across 58 files
+
+     6878.0 KB  ts.worker-DTZAwq0V.js
+     3385.7 KB  MonacoCodeEditor-CYcZfdof.js
+     1028.6 KB  css.worker-CqwWTjeG.js
+      699.2 KB  html.worker-DhJ4VZMp.js
+      547.3 KB  three-C0QczyIH.js
+      463.6 KB  workers-BkQFdmsB.js
+      400.7 KB  exportDiary-Bvtb9aBX.js
+      396.7 KB  json.worker-BF9eV5mS.js
+      315.3 KB  index-BK0Ee3l4.js
+      276.1 KB  VaultUI-BgHqfnRx.js
+      267.7 KB  editor.worker-DCKwvLbM.js
+      252.3 KB  react-ofez_3M1.js
+      247.1 KB  engine-YVuM_I8e.js
+      211.4 KB  index-C3vd67eF.css
+      197.6 KB  html2canvas.esm-QH1iLAAe.js
+      156.1 KB  index.es-CiX1JOzU.js
+      137.7 KB  codicon-Brq4_Ui5.ttf
+      136.1 KB  MonacoCodeEditor-opCNbZjC.css
+       97.7 KB  DiaryWindow-D4bBoYap.js
+       71.4 KB  CoreConsole-CBLHcFk1.js
+       28.7 KB  purify.es-DBIK8olT.js
+       28.0 KB  lspLanguageFeatures-BYcnBaZl.js
+       27.6 KB  RealityAdvancedPanel-BE5YYnyt.js
+       27.6 KB  CoreMode-D2p01VoU.js
+       22.5 KB  workers-CN195Zc2.css
+       21.6 KB  tsMode-Bl_k5dye.js
+       19.3 KB  CosmicLineageModal-Na_wDu3v.js
+       12.2 KB  jsonMode-CV41knyr.js

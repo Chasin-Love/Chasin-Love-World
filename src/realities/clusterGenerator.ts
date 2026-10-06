@@ -1,4 +1,4 @@
-import { CosmicBody } from '../types';
+import type { CosmicBody } from '../domain/universe';
 import { CosmicAddress, CosmicLineage, GalaxyClusterData } from './hierarchyTypes';
 
 interface ClusterTemplate {
@@ -119,7 +119,7 @@ const CLUSTER_TEMPLATES_BY_REALITY: Record<string, ClusterTemplate[]> = {
   ],
 };
 
-export function buildCosmicAddress(realityId: string, clusterIdx: number): CosmicAddress {
+function buildCosmicAddress(realityId: string, clusterIdx: number): CosmicAddress {
   return {
     realityId,
     cosmicWebId: `web-${realityId}`,
@@ -140,9 +140,10 @@ export function generateClustersForReality(
   colorA: string,
   colorB: string,
   bodies: CosmicBody[],
-  bubbleSize: number
+  bubbleSize: number,
+  clusterCount = 5
 ): { clusters: GalaxyClusterData[]; homeLineage: CosmicLineage } {
-  const templates = CLUSTER_TEMPLATES_BY_REALITY[realityId] || [
+  const baseTemplates = CLUSTER_TEMPLATES_BY_REALITY[realityId] || [
     {
       name: `${realityName} Home Cluster`,
       type: 'Galaxy Group',
@@ -224,6 +225,18 @@ export function generateClustersForReality(
       description: `A cluster energized by colliding galaxy discs, producing thousands of new protostars every millennium.`,
     },
   ];
+
+  /* realities with an explicit template set (sol-prime) use it verbatim;
+     generated realities size their lineage to the requested galaxy count —
+     the old behavior forced exactly five clusters on every custom reality */
+  const templates = baseTemplates.length === clusterCount
+    ? baseTemplates
+    : Array.from({ length: Math.max(1, clusterCount) }, (_, idx) => {
+        const base = baseTemplates[idx % baseTemplates.length];
+        const cycle = Math.floor(idx / baseTemplates.length);
+        if (cycle === 0) return base;
+        return { ...base, name: `${base.name} ${cycle + 1}`, code: `${base.code}-${cycle + 1}` };
+      });
 
   const anchor = bodies[0] || { name: 'Anchor Star', kind: 'star' };
   const worldsCount = bodies.length;

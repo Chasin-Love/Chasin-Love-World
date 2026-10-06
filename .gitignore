@@ -1,3 +1,47 @@
-node_modules/
+# Build artifacts
 dist/
+build/
+.vite/
+
+# Desktop (Tauri) build artifacts
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Dependencies
+node_modules/
+bun.lock
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors & IDEs
+.zcode/
+.vscode/
+.idea/
+zed/
+zcode/
+.canvas-meta.json
+
+# OS generated files
 .DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+.freebuff/
+
+# Stray run logs (R100 cleanup — the two that had gathered at the root)
+*.log
+
+# R105 — the permanent-death tombstone ledger (runtime disk state, never source)
+src/realities/bin/.tombstones/

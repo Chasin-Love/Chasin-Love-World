@@ -1,8 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { BodyKind, CosmicBody, Meaning } from '../types';
-import { MEANING_LABEL, MEANINGS } from '../types';
-import { actions, computeStats, eventsOf, fmtBytes, fmtDate, fmtStamp, snapshotAt } from '../state';
-import { useUniverse, toast } from './bits';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { BodyKind, CosmicBody, Meaning, UniverseState } from '../domain/universe';
+import type { VaultFile } from '../domain/vault';
+import { MEANING_LABEL, MEANINGS } from '../domain/universe';
+import { actions } from '../state';
+import {
+  fmtDate, fmtStamp,
+  eventsOf,
+  getStoredPayload, putStoredPayload,
+} from '../vault';
+import { useUniverse } from './bits';
+import { toast } from './toast';
 
 interface Props {
   onClose: () => void;
@@ -12,6 +19,74 @@ interface Props {
 }
 
 const MINUTE = 60000;
+const BACKUP_FORMAT = 'eventide-universe-backup';
+const BACKUP_VERSION = 2;
+
+type BackupPayload = { type: string; data: string };
+type UniverseBackup = {
+  format: typeof BACKUP_FORMAT;
+  version: typeof BACKUP_VERSION;
+  exportedAt: number;
+  state: UniverseState;
+  payloads: Record<string, BackupPayload>;
+  missingPayloadRefs: string[];
+};
+type PayloadRestoreStatus = {
+  available: Set<string>;
+  missing: Set<string>;
+};
+
+function payloadRefsOf(value: Pick<UniverseState, 'vault' | 'vaultTrash' | 'entries'>): Set<string> {
+  const refs = new Set<string>();
+  value.vault.forEach((file) => { if (file.payloadRef) refs.add(file.payloadRef); });
+  value.vaultTrash.forEach((trash) => { if (trash.item.payloadRef) refs.add(trash.item.payloadRef); });
+  value.entries.forEach((entry) => entry.attachments.forEach((attachment) => {
+    if (attachment.payloadRef) refs.add(attachment.payloadRef);
+  }));
+  return refs;
+}
+
+function markMissingEntries(entries: UniverseState['entries'], missing: Set<string>): UniverseState['entries'] {
+  return entries.map((entry) => ({
+    ...entry,
+    attachments: entry.attachments.map((attachment) => attachment.payloadRef && missing.has(attachment.payloadRef)
+      ? { ...attachment, dataUrl: '', payloadMissing: true }
+      : attachment),
+  }));
+}
+
+function markMissingFiles(files: VaultFile[], missing: Set<string>): VaultFile[] {
+  return files.map((file) => file.payloadRef && missing.has(file.payloadRef)
+    ? { ...file, payloadMissing: true, sealed: true }
+    : file);
+}
+
+function bytesToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBlob(data: string, type: string): Blob {
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type });
+}
+
+function isUniverseBackup(value: unknown): value is UniverseBackup {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<UniverseBackup>;
+  return candidate.format === BACKUP_FORMAT
+    && candidate.version === BACKUP_VERSION
+    && Boolean(candidate.state)
+    && Boolean(candidate.payloads)
+    && Array.isArray(candidate.missingPayloadRefs);
+}
 
 const MEANING_COLOR: Record<string, string> = {
   memory: '#7fc4e8', dream: '#b49ae8', person: '#f2a0b0', project: '#f2c178',
@@ -96,23 +171,24 @@ export default function CoreMode({ onClose, onInspect, onTemporal, onEnterWorld 
   const [selectedMeaning, setSelectedMeaning] = useState<Meaning | 'all'>('all');
   const [selectedKind, setSelectedKind] = useState<BodyKind | 'all'>('all');
 
-  const max = Date.now();
+  /* the timeline window is frozen at open — recomputing `max` per render used
+     to tear the playback rAF loop down and rebuild it every frame */
+  const max = useMemo(() => Date.now(), []);
   const events = useMemo(() => eventsOf(state), [state]);
-  const min = events.length ? Math.min(events[0].t, max - 30 * 86400000) : max - 365 * 86400000;
+  const min = useMemo(
+    () => (events.length ? Math.min(events[0].t, max - 30 * 86400000) : max - 365 * 86400000),
+    [events, max]
+  );
   const isPast = max - t > MINUTE;
   const asOf = isPast ? t : undefined;
-
-  const stats = useMemo(() => computeStats(state, asOf), [state, asOf]);
-  const snap = useMemo(() => (asOf ? snapshotAt(state, asOf) : null), [state, asOf]);
-  const laterCount = asOf
-    ? state.bodies.filter((b) => b.id !== 'anchor' && b.createdAt > asOf).length +
-      state.entries.filter((e) => e.createdAt > asOf).length
-    : 0;
 
   useEffect(() => { onTemporal(isPast ? t : null); }, [t, isPast, onTemporal]);
   useEffect(() => () => onTemporal(null), [onTemporal]);
 
-  /* temporal playback loop — throttled to ~25fps state updates to keep WebGL smooth and prevent UI jank */
+  /* temporal playback loop — throttled to ~25fps state updates to keep WebGL smooth and prevent UI jank.
+     Current position lives in a ref so the effect deps stay stable (no per-frame teardown). */
+  const tRef = useRef(t);
+  useEffect(() => { tRef.current = t; }, [t]);
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
@@ -124,11 +200,15 @@ export default function CoreMode({ onClose, onInspect, onTemporal, onEnterWorld 
       const elapsed = n - lastUpdate;
       if (elapsed >= 40) {
         lastUpdate = n;
-        setT((cur) => {
-          const next = cur + elapsed * (span / 12000);
-          if (next >= max) { setPlaying(false); return max; }
-          return next;
-        });
+        const next = tRef.current + elapsed * (span / 12000);
+        if (next >= max) {
+          tRef.current = max;
+          setT(max);
+          setPlaying(false);
+          return; /* reached the present — stop scheduling */
+        }
+        tRef.current = next;
+        setT(next);
       }
       raf = requestAnimationFrame(loop);
     };
@@ -156,42 +236,108 @@ export default function CoreMode({ onClose, onInspect, onTemporal, onEnterWorld 
     });
   }, [state.bodies, selectedKind, selectedMeaning, search]);
 
-  const handleExportJSON = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `universe-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast('Universe backup exported');
+  const handleExportJSON = async () => {
+    try {
+      const refs = payloadRefsOf(state);
+      const payloads: Record<string, BackupPayload> = {};
+      const missingPayloadRefs: string[] = [];
+      for (const ref of refs) {
+        const stored = await getStoredPayload(ref);
+        if (!stored) {
+          missingPayloadRefs.push(ref);
+          continue;
+        }
+        payloads[ref] = { type: stored.type || 'application/octet-stream', data: bytesToBase64(await stored.arrayBuffer()) };
+      }
+      const missing = new Set(missingPayloadRefs);
+      const backupState: UniverseState = {
+        ...state,
+        entries: markMissingEntries(state.entries, missing),
+        vault: markMissingFiles(state.vault, missing),
+        vaultTrash: state.vaultTrash.map((trash) => ({ ...trash, item: markMissingFiles([trash.item], missing)[0] })),
+      };
+      const backup: UniverseBackup = {
+        format: BACKUP_FORMAT,
+        version: BACKUP_VERSION,
+        exportedAt: Date.now(),
+        state: backupState,
+        payloads,
+        missingPayloadRefs,
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `universe-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast(missingPayloadRefs.length ? `Backup exported with ${missingPayloadRefs.length} unavailable payload(s)` : 'Universe backup exported');
+    } catch {
+      toast('Failed to export universe backup', 'warn');
+    }
   };
 
   const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
+  const reader = new FileReader();
+  reader.onerror = () => {
+    toast('Failed to read the backup file', 'warn');
+  };
+  reader.onload = async (evt) => {
       try {
-        const parsed = JSON.parse(evt.target?.result as string);
-        actions.importUniverse(parsed);
-        toast('Universe state restored from backup');
-      } catch (err) {
-        toast('Failed to parse JSON backup file');
+        const parsed: unknown = JSON.parse(evt.target?.result as string);
+        const versioned = isUniverseBackup(parsed);
+        const imported = versioned ? parsed.state : parsed as UniverseState;
+        if (!imported || !Array.isArray(imported.bodies) || !Array.isArray(imported.vault)) {
+          throw new Error('invalid universe state');
+        }
+
+        const refs = payloadRefsOf(imported);
+        const status: PayloadRestoreStatus = { available: new Set(), missing: new Set() };
+        const payloads = versioned ? parsed.payloads : {};
+        for (const ref of refs) {
+          const entry = payloads[ref];
+          let restored = false;
+          if (entry && typeof entry.data === 'string') {
+            try {
+              await putStoredPayload(ref, base64ToBlob(entry.data, typeof entry.type === 'string' ? entry.type : 'application/octet-stream'));
+              restored = true;
+            } catch {
+              restored = false;
+            }
+          }
+          if (!restored) {
+            try { restored = Boolean(await getStoredPayload(ref)); } catch { restored = false; }
+          }
+          (restored ? status.available : status.missing).add(ref);
+        }
+
+        actions.importUniverse(imported, status);
+        if (status.missing.size) {
+          toast(`Metadata restored; ${status.missing.size} payload(s) unavailable`, 'warn');
+        } else if (versioned) {
+          toast('Universe backup restored with payloads');
+        } else {
+          toast('Universe metadata restored; existing payloads preserved');
+        }
+      } catch {
+        toast('Failed to restore JSON backup', 'warn');
       }
     };
     reader.readAsText(file);
   };
 
   return (
-    <div className="fixed inset-0 z-[100] pointer-events-auto overlay-in bg-slate-950/20 flex flex-col justify-between p-6 md:p-8 overflow-hidden text-paper">
+    <div className="fixed inset-0 z-100 pointer-events-auto overlay-in bg-slate-950/20 flex flex-col justify-between p-6 md:p-8 overflow-hidden text-paper">
       {/* Past temporal veil tint */}
       {isPast && (
         <div className="absolute inset-0 temporal-veil pointer-events-none" />
       )}
 
       {/* Top right floating Close / Return button */}
-      <div className="absolute top-6 right-8 z-[110] flex items-center gap-3">
+      <div className="absolute top-6 right-8 z-110 flex items-center gap-3">
         {isPast && (
           <button
             onClick={() => { setPlaying(false); setT(max); }}
@@ -210,7 +356,7 @@ export default function CoreMode({ onClose, onInspect, onTemporal, onEnterWorld 
       </div>
 
       {/* MAIN TWO-COLUMN CONTAINER MATCHING SCREENSHOT */}
-      <main className="flex-1 min-h-0 grid grid-cols-12 gap-6 lg:gap-10 overflow-hidden max-w-[1400px] w-full mx-auto pt-2 pb-4">
+      <main className="flex-1 min-h-0 grid grid-cols-12 gap-6 lg:gap-10 overflow-hidden max-w-350 w-full mx-auto pt-2 pb-4">
         
         {/* ================= LEFT COLUMN: COSMIC OBJECTS ================= */}
         <section className="col-span-7 flex flex-col min-h-0 overflow-hidden">
@@ -493,6 +639,15 @@ function WorldEditor({ body, onClose, onEnterWorld }: { body: CosmicBody; onClos
   const [confirmDel, setConfirmDel] = useState(false);
   const [confirmPage, setConfirmPage] = useState<string | null>(null);
   const pages = state.entries.filter((e) => e.planetId === body.id).sort((a, b) => b.createdAt - a.createdAt);
+  /* the Anchor Star and the Eventide Black Hole are load-bearing — removeBody
+     refuses them, so the UI must never offer a dissolve button that no-ops */
+  const protectedBody = body.id === 'anchor' || body.id === 'eventide';
+  /* pending confirm timers — cleared on unmount so they can't fire stale */
+  const timersRef = useRef<number[]>([]);
+  useEffect(() => () => { timersRef.current.forEach((id) => clearTimeout(id)); }, []);
+  const later = (fn: () => void, ms: number) => {
+    timersRef.current.push(window.setTimeout(fn, ms));
+  };
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); onClose(); } };
@@ -509,9 +664,9 @@ function WorldEditor({ body, onClose, onEnterWorld }: { body: CosmicBody; onClos
   };
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center overlay-in bg-slate-950/40" onClick={onClose}>
+    <div className="pointer-events-auto fixed inset-0 z-120 flex items-center justify-center overlay-in bg-slate-950/40" onClick={onClose}>
       <div
-        className="w-[640px] max-w-[92vw] max-h-[86vh] flex flex-col hud-pod-card border border-solar/40 shadow-[0_30px_90px_rgba(0,0,0,0.8),0_0_45px_rgba(242,193,120,0.2)] rise-in overflow-hidden sifi-corners"
+        className="w-160 max-w-[92vw] max-h-[86vh] flex flex-col hud-pod-card border border-solar/40 shadow-[0_30px_90px_rgba(0,0,0,0.8),0_0_45px_rgba(242,193,120,0.2)] rise-in overflow-hidden sifi-corners"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-solar/25 bg-slate-950/50">
@@ -535,7 +690,17 @@ function WorldEditor({ body, onClose, onEnterWorld }: { body: CosmicBody; onClos
           </label>
 
           <div>
-            <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-paper/50 block mb-2">Meaning — Core Representation</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-paper/50">Meaning — Core Representation</span>
+              {meaning !== null && (
+                <button
+                  onClick={() => setMeaning(null)}
+                  className="font-mono text-[9px] tracking-[0.18em] uppercase text-paper/40 hover:text-paper transition-colors"
+                >
+                  ✕ clear meaning
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(MEANING_DESC) as (keyof typeof MEANING_DESC)[]).map((m) => {
                 const active = meaning === m;
@@ -573,7 +738,7 @@ function WorldEditor({ body, onClose, onEnterWorld }: { body: CosmicBody; onClos
               <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-paper/50">Moons / Diary Pages</span>
               <span className="font-mono text-[10px] text-paper/50 tabular-nums">{pages.length} Moons</span>
             </div>
-            <div className="border border-teal-ice/20 rounded-xl bg-slate-950/60 divide-y divide-teal-ice/15 max-h-[160px] overflow-y-auto thin-scroll">
+            <div className="border border-teal-ice/20 rounded-xl bg-slate-950/60 divide-y divide-teal-ice/15 max-h-40 overflow-y-auto thin-scroll">
               {pages.length === 0 && <p className="px-4 py-3 text-[12px] text-paper/35">No moons orbiting this world yet.</p>}
               {pages.map((p) => (
                 <div key={p.id} className="flex items-center gap-3 px-3.5 py-2">
@@ -596,7 +761,7 @@ function WorldEditor({ body, onClose, onEnterWorld }: { body: CosmicBody; onClos
                     </button>
                   ) : (
                     <button
-                      onClick={() => { setConfirmPage(p.id); setTimeout(() => setConfirmPage((c) => (c === p.id ? null : c)), 2600); }}
+                      onClick={() => { setConfirmPage(p.id); later(() => setConfirmPage((c) => (c === p.id ? null : c)), 2600); }}
                       className="p-1 rounded text-paper/40 hover:text-rose-400 transition-colors"
                     >
                       <Icon d="trash" size={13} />
@@ -607,27 +772,40 @@ function WorldEditor({ body, onClose, onEnterWorld }: { body: CosmicBody; onClos
             </div>
           </div>
 
-          <div className="border border-rose-500/40 rounded-xl p-4 bg-rose-950/25 flex items-center justify-between gap-4">
-            <div>
-              <p className="font-mono text-[9.5px] tracking-[0.24em] uppercase text-rose-300 font-semibold">Dissolve World</p>
-              <p className="text-[11.5px] text-paper/50 mt-0.5">Permanently removes this world and all attached diary pages.</p>
+          {protectedBody ? (
+            <div className="border border-teal-ice/25 rounded-xl p-4 bg-teal-ice/5 flex items-center gap-4">
+              <div>
+                <p className="font-mono text-[9.5px] tracking-[0.24em] uppercase text-teal-ice font-semibold">Protected Celestial Body</p>
+                <p className="text-[11.5px] text-paper/50 mt-0.5">
+                  {body.id === 'eventide'
+                    ? 'The Eventide Black Hole anchors the Universal Vault — it cannot be dissolved.'
+                    : 'The Anchor Star regulates this continuum — it cannot be dissolved.'}
+                </p>
+              </div>
             </div>
-            {confirmDel ? (
-              <button
-                onClick={() => { actions.deleteBody(body.id); toast(`${body.name} dissolved`); onClose(); }}
-                className="shrink-0 font-mono text-[9.5px] tracking-[0.2em] uppercase px-4 py-2 rounded-lg bg-rose-500/35 border border-rose-500 text-rose-100 hover:bg-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)] transition-all"
-              >
-                Confirm Dissolve
-              </button>
-            ) : (
-              <button
-                onClick={() => { setConfirmDel(true); setTimeout(() => setConfirmDel(false), 3000); }}
-                className="shrink-0 font-mono text-[9.5px] tracking-[0.2em] uppercase px-4 py-2 rounded-lg border border-rose-500/40 text-rose-300 hover:bg-rose-500/15 transition-all"
-              >
-                Dissolve
-              </button>
-            )}
-          </div>
+          ) : (
+            <div className="border border-rose-500/40 rounded-xl p-4 bg-rose-950/25 flex items-center justify-between gap-4">
+              <div>
+                <p className="font-mono text-[9.5px] tracking-[0.24em] uppercase text-rose-300 font-semibold">Dissolve World</p>
+                <p className="text-[11.5px] text-paper/50 mt-0.5">Permanently removes this world and all attached diary pages.</p>
+              </div>
+              {confirmDel ? (
+                <button
+                  onClick={() => { actions.deleteBody(body.id); toast(`${body.name} dissolved`); onClose(); }}
+                  className="shrink-0 font-mono text-[9.5px] tracking-[0.2em] uppercase px-4 py-2 rounded-lg bg-rose-500/35 border border-rose-500 text-rose-100 hover:bg-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)] transition-all"
+                >
+                  Confirm Dissolve
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setConfirmDel(true); later(() => setConfirmDel(false), 3000); }}
+                  className="shrink-0 font-mono text-[9.5px] tracking-[0.2em] uppercase px-4 py-2 rounded-lg border border-rose-500/40 text-rose-300 hover:bg-rose-500/15 transition-all"
+                >
+                  Dissolve
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-solar/20 bg-slate-950/50 flex justify-end gap-3">
@@ -666,9 +844,9 @@ function WorldFormer({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center overlay-in bg-slate-950/40" onClick={onClose}>
+    <div className="pointer-events-auto fixed inset-0 z-120 flex items-center justify-center overlay-in bg-slate-950/40" onClick={onClose}>
       <div
-        className="w-[480px] max-w-[92vw] hud-pod-card border border-solar/40 shadow-[0_30px_90px_rgba(0,0,0,0.8),0_0_45px_rgba(242,193,120,0.2)] rise-in overflow-hidden sifi-corners"
+        className="w-120 max-w-[92vw] hud-pod-card border border-solar/40 shadow-[0_30px_90px_rgba(0,0,0,0.8),0_0_45px_rgba(242,193,120,0.2)] rise-in overflow-hidden sifi-corners"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-solar/25 bg-slate-950/50">

@@ -2,18 +2,29 @@
 /*                  ASTROPHYSICS TELEMETRY & PHYSICS HUD                      */
 /* -------------------------------------------------------------------------- */
 
-import React, { useState } from 'react';
-import type { CosmicBody } from '../types';
+import React, { useEffect, useState } from 'react';
+import type { CosmicBody } from '../domain/universe';
 import { calculatePhysics, type BodyPhysicsData } from '../physics/physicsEngine';
+import { gravityTelemetry } from '../physics/nbody';
 
 interface PhysicsHUDProps {
   body: CosmicBody;
+  livingGravity?: boolean;
   onClose?: () => void;
 }
 
-export const PhysicsHUD: React.FC<PhysicsHUDProps> = ({ body, onClose }) => {
+export const PhysicsHUD: React.FC<PhysicsHUDProps> = ({ body, livingGravity, onClose }) => {
   const [activeTab, setActiveTab] = useState<'orbital' | 'gravity' | 'thermo' | 'relativity' | 'galaxy' | 'laws'>('orbital');
   const phys: BodyPhysicsData = calculatePhysics(body);
+  /* Living Gravity telemetry refreshes live from the engine's module registry
+     while the HUD is open (1 Hz — the numbers drift on orbital timescales) */
+  const [, setTelemetryTick] = useState(0);
+  useEffect(() => {
+    if (!livingGravity) return;
+    const h = window.setInterval(() => setTelemetryTick((n) => n + 1), 1000);
+    return () => window.clearInterval(h);
+  }, [livingGravity]);
+  const grav = livingGravity ? gravityTelemetry.get(body.id) : undefined;
 
   const fmtNum = (num: number, dec: number = 2) => {
     if (isNaN(num)) return '0';
@@ -201,6 +212,73 @@ export const PhysicsHUD: React.FC<PhysicsHUDProps> = ({ body, onClose }) => {
                 {phys.densityGcm3 > 4 ? 'Terrestrial Silicate/Iron Core' : phys.densityGcm3 > 1.5 ? 'Water-Ice Complex' : 'Gas Giant Envelope'}
               </span>
             </div>
+
+            {/* ROUND 14 — SPACETIME CURVATURE: Einstein's field equations say
+                EVERY mass bends spacetime, not only black holes */}
+            <div className="bg-slate-950/80 p-2.5 rounded border border-violet-400/40">
+              <span className="font-mono text-[9.5px] uppercase font-bold text-violet-300 block mb-1">
+                SPACETIME CURVATURE — EINSTEIN'S FIELD EQUATIONS
+              </span>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-paper/60 text-[10px]">Surface compactness (2GM/Rc²):</span>
+                <span className="font-mono text-sm font-bold text-violet-300">{phys.spacetimeCurvatureSurface.toExponential(3)}</span>
+              </div>
+              <div className="flex items-baseline justify-between mt-1 text-[10px]">
+                <span className="text-paper/60">Surface clock rate (dτ/dt):</span>
+                <span className="font-mono text-teal-ice font-semibold">
+                  {phys.timeDilationAtSurface >= 0.999999 ? `1 − ${(1 - phys.timeDilationAtSurface).toExponential(2)}` : phys.timeDilationAtSurface.toFixed(10)}
+                </span>
+              </div>
+              <p className="text-[9px] text-paper/45 mt-1.5 leading-relaxed">
+                {phys.isRelativistic
+                  ? 'At the event horizon 2GM/Rc² = 1 — the well has no bottom; clocks freeze at the surface.'
+                  : '"Matter tells spacetime how to curve." A planet\'s value is ~10⁻¹⁰ — the fabric is real yet nearly flat, which is why Newton\'s laws serve so well at human scales.'}
+              </p>
+            </div>
+
+            {/* ROUND 14 — LIVING GRAVITY: true mutual N-body coupling in
+                osculating elements (Gauss's planetary equations) */}
+            {grav && (
+              <div className="bg-slate-900/60 p-2.5 rounded border border-solar/30">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-mono text-[9.5px] uppercase font-bold text-solar">
+                    LIVING GRAVITY — N-BODY COUPLING
+                  </span>
+                  {grav.guarded && (
+                    <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40 uppercase">
+                      Keeper's fence
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <span className="text-paper/60 text-[10px]">Deviation from canonical path:</span>
+                  <span className="font-mono text-sm font-bold text-solar">
+                    {grav.deviationAU.toExponential(2)} AU
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between mt-0.5 text-[10px]">
+                  <span className="text-paper/60">Strongest fellow-world pull:</span>
+                  <span className="font-mono text-teal-ice font-semibold">{grav.strongestPullN.toExponential(2)} N</span>
+                </div>
+                <div className="flex items-baseline justify-between mt-0.5 text-[10px]">
+                  <span className="text-paper/60">Eccentricity breathing (Δe):</span>
+                  <span className="font-mono text-violet-300 font-semibold">{grav.dE.toExponential(2)}</span>
+                </div>
+                <div className="flex items-baseline justify-between mt-0.5 text-[10px]">
+                  <span className="text-paper/60">Apsidal precession / nodal breathing:</span>
+                  <span className="font-mono text-violet-300 font-semibold">
+                    {grav.dOmegaDeg.toFixed(4)}° / {grav.dIncDeg.toFixed(4)}°
+                  </span>
+                </div>
+                <p className="text-[9px] text-paper/45 mt-1.5 leading-relaxed">
+                  Gauss's planetary equations along the exact Kepler path: the mutual tides of the other
+                  worlds breathe this orbit's shape and precess its line of apsides — the same first-order
+                  theory that models the real Solar System's secular dance. {grav.deviationAU > 0
+                    ? `This world sits ${(grav.deviationAU * 149597870.7).toLocaleString(undefined, { maximumFractionDigits: 0 })} km from its divine ephemeris — pulled by real gravity, held by bounded elements.`
+                    : 'This world rides its divine ephemeris exactly — nothing has pulled it far enough to measure yet.'}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -287,6 +365,17 @@ export const PhysicsHUD: React.FC<PhysicsHUDProps> = ({ body, onClose }) => {
                 <span className="font-mono text-sm text-solar font-semibold">dτ/dt = {fmtNum(phys.timeDilationFactor ?? 0.707, 3)}</span>
                 <span className="text-paper/40 text-[9px] block">Clocks run 29.3% slower</span>
               </div>
+            </div>
+
+            {/* Round 16 — the shadow: the hole's one true measurement */}
+            <div className="bg-slate-900/60 p-2 rounded border border-paper/10">
+              <span className="text-paper/50 font-mono text-[9px] uppercase block">Shadow Diameter — the EHT measure</span>
+              <span className="font-mono text-sm text-paper font-semibold">
+                ⌀ = 3√3·GM/c² ≈ {fmtNum((phys.schwarzschildRadiusKm ?? 29.5) * 2.598, 1)} km
+              </span>
+              <span className="text-paper/40 text-[9px] block">
+                b_c = (3√3/2)·R_s — light below this impact parameter never escapes. This is the silhouette EHT photographed around M87*.
+              </span>
             </div>
           </div>
         )}

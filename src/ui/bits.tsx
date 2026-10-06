@@ -1,6 +1,7 @@
 import { Component, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { getState, subscribe } from '../state';
-import type { UniverseState } from '../types';
+import type { UniverseState } from '../domain/universe';
+import { registerToastHandler } from './toast';
 
 export function useUniverse(): UniverseState {
   return useSyncExternalStore(subscribe, getState, getState);
@@ -13,8 +14,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode; label?: stri
   render() {
     if (!this.state.err) return this.props.children;
     return (
-      <div className="absolute inset-0 z-[200] grid place-items-center" style={{ background: 'rgba(4,6,12,0.94)' }}>
-        <div className="text-center max-w-[360px] px-6">
+      <div className="absolute inset-0 z-200 grid place-items-center" style={{ background: 'rgba(4,6,12,0.94)' }}>
+        <div className="text-center max-w-90 px-6">
           <p className="font-mono text-[9px] tracking-[0.34em] uppercase text-solar/80">local distortion</p>
           <p className="font-display text-[17px] tracking-[0.14em] text-paper mt-2">
             {this.props.label ?? 'THIS PANEL'} HICCUPED
@@ -59,14 +60,14 @@ export const IcChevL = (p: IconProps) => <I {...p} d="M14 6l-6 6 6 6" />;
 export const IcChevR = (p: IconProps) => <I {...p} d="M10 6l6 6-6 6" />;
 export const IcMic = (p: IconProps) => <I {...p} d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4" />;
 export const IcStop = (p: IconProps) => <I {...p} d="M8 8h8v8H8z" />;
-export const IcPlay = (p: IconProps) => (
+const IcPlay = (p: IconProps) => (
   <svg width={p.size ?? 14} height={p.size ?? 14} viewBox="0 0 24 24" fill="currentColor" className={p.className}><path d="M8 5.5v13l11-6.5z" /></svg>
 );
-export const IcPause = (p: IconProps) => (
+const IcPause = (p: IconProps) => (
   <svg width={p.size ?? 14} height={p.size ?? 14} viewBox="0 0 24 24" fill="currentColor" className={p.className}><path d="M7 5h3.4v14H7zM13.6 5H17v14h-3.4z" /></svg>
 );
 export const IcBook = (p: IconProps) => <I {...p} d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5V5.5M20 18v3H6.5" />;
-export const IcInline = (p: IconProps) => <I {...p} d="M4 5h16M4 19h16M8.5 9h7v6h-7z" />;
+const IcInline = (p: IconProps) => <I {...p} d="M4 5h16M4 19h16M8.5 9h7v6h-7z" />;
 export const IcImage = (p: IconProps) => <I {...p} d="M4 5h16v14H4zM8.5 11a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM4 16l5-4 3 2.5L16 11l4 4" />;
 export const IcLock = (p: IconProps) => <I {...p} d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6zM12 15v2" />;
 export const IcUnlock = (p: IconProps) => <I {...p} d="M7 11V8a5 5 0 0 1 9.6-2M6 11h12v9H6zM12 15v2" />;
@@ -81,29 +82,25 @@ export const IcStar = (p: IconProps & { filled?: boolean }) => (
 export const IcTerminal = (p: IconProps) => <I {...p} d="M4 5h16v14H4zM7.5 9l3 3-3 3M12.5 15h4" />;
 export const IcScan = (p: IconProps) => <I {...p} d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M3 12h18" />;
 export const IcFolder = (p: IconProps) => <I {...p} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />;
-export const IcGrid = (p: IconProps) => <I {...p} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />;
-export const IcRows = (p: IconProps) => <I {...p} d="M4 6h16M4 12h16M4 18h16" />;
-export const IcMove = (p: IconProps) => <I {...p} d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5" />;
-export const IcPulse = (p: IconProps) => <I {...p} d="M3 12h4l2.5-6 4 12L16 12h5" />;
+
+
+const IcMove = (p: IconProps) => <I {...p} d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5" />;
+
 
 /* --------------------------------- toast -------------------------------- */
-
-let toastFn: ((msg: string, tone?: 'ok' | 'warn') => void) | null = null;
-export function toast(msg: string, tone: 'ok' | 'warn' = 'ok') { toastFn?.(msg, tone); }
 
 export function ToastHost() {
   const [items, setItems] = useState<{ id: number; msg: string; tone: string }[]>([]);
   const idRef = useRef(0);
   useEffect(() => {
-    toastFn = (msg, tone = 'ok') => {
+    return registerToastHandler((msg, tone = 'ok') => {
       const id = ++idRef.current;
       setItems((cur) => [...cur.slice(-3), { id, msg, tone }]);
       setTimeout(() => setItems((cur) => cur.filter((x) => x.id !== id)), 3400);
-    };
-    return () => { toastFn = null; };
+    });
   }, []);
   return (
-    <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-[250] flex flex-col items-center gap-2 pointer-events-none">
+    <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-250 flex flex-col items-center gap-2 pointer-events-none">
       {items.map((t) => (
         <div key={t.id} className={`toast-item ${t.tone === 'warn' ? 'warn' : ''}`}>{t.msg}</div>
       ))}
@@ -113,7 +110,7 @@ export function ToastHost() {
 
 /* ------------------------------- audio chip ------------------------------ */
 
-export function AudioChip({ dataUrl, peaks, duration }: { dataUrl: string; peaks?: number[]; duration?: number }) {
+function AudioChip({ dataUrl, peaks, duration }: { dataUrl: string; peaks?: number[]; duration?: number }) {
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const bars = peaks ?? Array.from({ length: 34 }, (_, i) => 0.3 + 0.7 * Math.abs(Math.sin(i * 0.7)));
@@ -133,7 +130,7 @@ export function AudioChip({ dataUrl, peaks, duration }: { dataUrl: string; peaks
       >
         {playing ? <IcPause size={11} /> : <IcPlay size={11} />}
       </button>
-      <div className="flex items-end gap-[2px] h-6 flex-1" aria-hidden>
+      <div className="flex items-end gap-0.5 h-6 flex-1" aria-hidden>
         {bars.map((b, i) => (
           <span key={i} className="flex-1 bg-teal-ice/60" style={{ height: `${Math.round(b * 100)}%`, opacity: playing ? 1 : 0.55 }} />
         ))}
@@ -143,13 +140,4 @@ export function AudioChip({ dataUrl, peaks, duration }: { dataUrl: string; peaks
   );
 }
 
-export function WaveStrip({ name, height = 30 }: { name: string; height?: number }) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  const bars = Array.from({ length: 40 }, (_, i) => 0.25 + 0.75 * Math.abs(Math.sin(i * 0.8 + h % 7)));
-  return (
-    <div className="flex items-end gap-[2px] w-full" style={{ height }}>
-      {bars.map((b, i) => <span key={i} className="flex-1 bg-teal-ice/50" style={{ height: `${Math.round(b * 100)}%` }} />)}
-    </div>
-  );
-}
+
