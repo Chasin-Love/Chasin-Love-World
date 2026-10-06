@@ -1,10 +1,10 @@
 {
   "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
   "geodesic": false,
-  "skyLensCount": 2,
+  "skyLensCount": 8,
   "skyLensStrength": 1,
-  "shadow": 0.0033023088235294117,
-  "mean": 0.006565121527777864,
-  "bright": 0,
-  "capturedAt": "2026-10-05T16:48:29.225Z"
+  "shadow": 0.2864884460784316,
+  "mean": 0.06326836294934805,
+  "bright": 0.0859375,
+  "capturedAt": "2026-10-06T04:08:04.650Z"
 }
